@@ -1,15 +1,28 @@
 # Language Specification (working draft)
 
-> **Draft.** A sketch, not a frozen spec. Several surface-syntax questions are
-> still open — they are being resolved as the example acceptance suite forces
-> them. Expect churn through the early phases.
+> **Draft.** A sketch, not a frozen spec. Several surface-syntax questions
+> are still open and are being resolved as the example acceptance suite
+> forces them. Expect churn through the early phases. The acceptance suite
+> in [`../examples/README.md`](../examples/README.md) is the working ground
+> truth — anything the suite uses must be specified here.
 
 ## Lexical
 
 - Line comments `//`; block comments `/* ... */`.
 - Identifiers: letter or `_`, then letters/digits/`_`.
-- Statements are newline-terminated; semicolons optional.
+- Statements are newline-terminated; semicolons optional. Newlines inside
+  open brackets — `(...)`, `[...]`, `{...}`, `<...>` — do **not** terminate
+  a statement, so multi-line literals and call expressions work
+  unsurprisingly. Trailing commas are permitted (and recommended) in
+  multi-line literals.
 - Source files use the `.td` extension.
+- String literals: `"..."`. Standard escapes (`\n`, `\t`, `\\`, `\"`,
+  `\xNN`, `\uNNNN`).
+- Rune literals: single-quoted character: `'a'`, `'('`, `'\n'`, `'ÿ'`.
+  A rune literal is of type `rune`.
+- Integer literals: `42`, `0xFF`, `0o755`, `0b1010`, with `_` separators
+  permitted: `1_000_000`.
+- Float literals: `3.14`, `1e9`, `2.5e-3`.
 
 ## Imports
 
@@ -19,14 +32,25 @@ import encoding/json
 ```
 
 An import brings a Go (bound) or Tide package into scope under its package
-name. Members are accessed package-qualified: `fmt.println`, `json.marshal`.
+name. Members are accessed package-qualified: `fmt.println`, `json.parse`.
+All imports must appear at the top of the file, before any declarations.
 
 ## Types
 
-Primitives: `string`, `bool`, `int`, `int8..int64`, `uint..uint64`, `float32`,
-`float64`, `byte`, `rune`.
+Primitives: `string`, `bool`, `int`, `int8..int64`, `uint..uint64`,
+`float32`, `float64`, `byte`, `rune`.
 
-Struct shapes use `type`:
+`unit` is the type with exactly one value, also written `()`. Functions
+with no declared return type return `unit`; codegen erases it.
+
+`Any` is an escape type used **only** at the binding boundary for Go's
+`interface{}`/`any` parameters (e.g. variadic formatters). Concrete types
+implicitly widen to `Any` at call sites that expect it. Going back to a
+concrete type requires a typed `match` (form TBD). User-authored Tide code
+should not introduce `Any`-typed parameters in its own functions.
+
+Struct shapes use `type` and are **records** (value types, structural —
+see Records below):
 
 ```td
 type User = {
@@ -35,27 +59,156 @@ type User = {
 }
 ```
 
-Nominal newtypes — distinct types over an underlying type, with their own
-method set (required — D11; needed for e.g. `time.Duration`). Syntax TBD;
-placeholder `newtype UserId = string`.
+**Tuples** are anonymous product types: `(int, string)`, `(int, int, int)`.
+Construct with `(a, b, ...)`, destructure with `let (a, b) = pair`, match
+with the same pattern, access by position `t.0`, `t.1` (discouraged for
+arity > 2 — prefer a record). Tuples must have arity ≥ 2; `(a)` is just
+a parenthesised expression. Equality is structural.
 
-Generics use angle brackets: `List<T>`, `Map<string, int>`, `func<T>(...)`.
+Nominal newtypes — distinct types over an underlying type, with their own
+method set. Required because Tide must faithfully represent types like
+`time.Duration` (a Go `type Duration int64` with methods). Syntax TBD;
+working placeholder `newtype UserId = string`.
+
+Generics use angle brackets: `List<T>`, `Map<string, int>`, `func<T>(...)`,
+`class LRU<K, V> { ... }`. Type parameters are unconstrained in v1
+(bounded generics — `<T extends Comparable>` — are park material).
 
 There is **no `any`**. Untyped dynamic values do not exist.
 
+## Bindings
+
+`let name: T = expr` — immutable binding; cannot be reassigned.
+`var name: T = expr` — mutable binding; may be reassigned with `name = ...`.
+
+Type annotations are optional when the type can be inferred from the
+right-hand side or from a target context:
+
+```td
+let n = 42                  // inferred int
+let xs: []int = []          // empty literal needs context
+var cur: Option<Node> = head
+```
+
+## Collections
+
+### Slices: `[]T`
+
+- Type: `[]T` (`[]int`, `[]string`, `[]Interval`, ...).
+- Literal: `[1, 2, 3]` (element type inferred from context).
+- Empty literal: `[]int{}` (explicit type required when context is
+  insufficient).
+- `s.len(): int`.
+- `s.push(v): []T` — returns a new slice header (may grow underlying
+  storage). Idiomatic re-assignment: `s = s.push(v)` when `s` is `var`.
+- Indexing: `s[i]` — out-of-bounds panics at the `.td` site.
+- Safe access: `s.get(i): Option<T>`.
+- Iteration: `for v in s` (value), `for (i, v) in s` (index and value).
+
+### Maps: `Map<K, V>`
+
+- Type: `Map<K, V>`.
+- Empty literal: `Map<K, V>{}`.
+- Map literal with entries: `Map<string, int>{ "a": 1, "b": 2 }` —
+  quoted keys disambiguate a map literal from a record literal.
+- `m.get(k): Option<V>` — `Option`-wrapped to remove Go's
+  zero-value-with-ok pitfall.
+- `m.set(k, v)`, `m.has(k): bool`, `m.delete(k)`, `m.len(): int`.
+- Iteration: `for k in m` (keys, order unspecified — matches Go) and
+  `for (k, v) in m` (entries).
+
+### Stacks: `Stack<T>`
+
+A thin generic built-in. The two acceptance examples that need a stack
+(`interview/rpn_calculator`, `leetcode/valid_parentheses`) would
+otherwise duplicate the same data structure.
+
+- Construct: `Stack<T>{}`.
+- `s.push(v)`, `s.peek(): Option<T>`, `s.len(): int`.
+- `s.pop(): Result<T, error>` — error is `"stack underflow"`. Returning
+  `Result` (not `Option`) so `try s.pop()` is the idiomatic shrink-and-use
+  form inside a `Result`-returning function.
+
+## Strings
+
+`string` is a sequence of bytes by storage (matches Go), but iterates as
+**runes** by default:
+
+- `for c in s` — iterates `rune` values.
+- `for (i, c) in s` — iterates byte-index/rune pairs (matches Go's
+  `for i, r := range s`).
+- `s.len(): int` — **byte** length (matches Go and the underlying memory
+  representation).
+- `s.bytes(): []byte` — view as bytes.
+- `s.runes(): []rune` — collect runes into a slice; use `.runes().len()`
+  for rune count.
+- Concatenation: `+`. No implicit conversion from non-string operands —
+  use `strconv.itoa(n)` etc., or rely on `Any`-widening variadic
+  formatters like `fmt.println(...)`.
+
 ## Sum types
 
-A `type` whose right-hand side is a union of variants. Variants are nullary or
-carry named fields:
+A `type` whose right-hand side is a union of variants. Variants are
+nullary or carry **positional** named-typed fields:
 
 ```td
 type Tree<T> =
   | Leaf
   | Node(value: T, left: Tree<T>, right: Tree<T>)
+
+type Event =
+  | InsertCoin(amount: int)
+  | Select(item: Item)
+  | Refund
 ```
 
-`Result<T, E>` (`Ok(T) | Err(E)`) and `Option<T>` (`Some(T) | None`) are
-built-in sum types using the same machinery.
+- Construction: nullary `Leaf`; payload-bearing `Node(v, l, r)` —
+  positional, matching the declaration order.
+- Pattern: same positional shape — `Node(v, l, r)`, `Leaf`,
+  `InsertCoin(n)`, `_` (wildcard).
+- `Result<T, E>` (`Ok(T) | Err(E)`) and `Option<T>` (`Some(T) | None`)
+  are built-in sum types using the same machinery.
+
+Named-payload variants (e.g. `Node{value: T, left: Tree<T>}`) are park
+material; positional is the one obvious form for the typical small
+payloads.
+
+## Pattern matching
+
+`match` is an **expression**. Each arm is an expression; the arms must
+unify to one type. An arm body may use a block `{ ... <trailing
+expression> }`; the trailing expression is the arm's value.
+
+```td
+let v = match getUser(id) {
+  Ok(user) => user.name,
+  Err(e)   => "<unknown: " + e.error() + ">",
+}
+```
+
+`match` is **exhaustive**; a non-exhaustive `match` is a compile error.
+
+Patterns support:
+
+- Literals (`'('`, `42`, `"key"`).
+- Wildcards (`_`).
+- Alternatives (`'(' | '[' | '{'`).
+- Variants with positional payloads (`Some(x)`, `Node(v, l, r)`,
+  `Dispensing(_, change)`).
+- Tuples (`(Idle, InsertCoin(n))`, `(s, e)`).
+- Records by name (`User{ id, name }`) — punning omitted in v1.
+
+A `match` used at statement position discards its value; the arms must
+all type to `unit`.
+
+## Expressions
+
+- **Blocks** are expressions: `{ stmt; stmt; ... trailingExpr }`. The
+  block's value is the trailing expression's value, or `unit` if there
+  is no trailing expression. `return` and `try` short-circuit.
+- **`if` / `else`** is an expression: arms must unify. An `if` without
+  `else` has type `unit` and may only appear at statement position.
+- **`match`** is an expression (see above).
 
 ## Functions
 
@@ -65,53 +218,131 @@ func add(a: int, b: int): int {
 }
 ```
 
+Top-level functions use the `func` keyword. Methods inside a `class` do
+not (see Classes).
+
+**Function types** (for first-class function values):
+
+- Type: `func(T, U): R` (parens around params, colon-return).
+- Closure literal: `func(a: T, b: U): R { body }` — same shape, anonymous.
+- Short closure: `(a, b) => a < b` — when parameter types are inferable
+  from context (e.g. a comparator argument).
+- Variadic: `func print(args: ...Any)`. At the call site, individual
+  arguments widen to `Any`.
+
 ## Error handling
 
-`Result<T, E>` is the error type. `try` propagates the error arm early:
+`Result<T, E>` is the error type. `error` is a built-in interface
+(structurally identical to Go's `error`: one method `error(): string`),
+so `(T, error)`-returning Go functions bind directly to `Result<T,
+error>`. The built-in `error(msg: string): error` constructs a basic
+error. A `class` may declare `implements error` for typed errors.
 
-```td
-func load(path: string): Result<string, error> {
-  let data = try os.readFile(path)
-  return Ok(data)
-}
-```
+`try e` propagates the error arm early:
 
-For inspection rather than propagation, use `match`. Mapping Go's `errors.Is` /
-`errors.As` / `%w` wrapping onto Tide error values is a Phase-2 design item.
+- In a `Result<_, E>`-returning function: `try e` where `e: Result<T,
+  E>` evaluates to `T` on `Ok(T)`; on `Err(E)` the function returns
+  `Err(E)`. (No implicit error conversion in v1; the error types must
+  match.)
+- In an `Option<T>`-returning function: `try e` where `e: Option<U>`
+  evaluates to `U` on `Some`; `None` returns `None` from the function.
 
-## Pattern matching
-
-```td
-match getUser(id) {
-  Ok(user) => fmt.println(user.name),
-  Err(e)   => fmt.println("error:", e),
-}
-```
-
-`match` is exhaustive; a non-exhaustive `match` is a compile error. Patterns
-support literals, tuples, and `|` alternatives, with `_` as wildcard.
+For inspection rather than propagation, use `match`. Mapping Go's
+`errors.Is`/`errors.As`/`%w` wrapping onto Tide error values is a later
+design item.
 
 ## Control flow
 
 ```td
 if x > 0 { ... } else if x < 0 { ... } else { ... }
 
-for i in 1..=100 { ... }      // inclusive range
-for item in items { ... }     // iteration
-while cond { ... }
+for v in items     { ... }   // value iteration
+for (i, v) in xs   { ... }   // index + value (slices)
+for (k, v) in m    { ... }   // entries (maps)
+for c in str       { ... }   // runes (strings)
+for i in 1..=100   { ... }   // inclusive range
+for i in 0..n      { ... }   // half-open range
+while cond         { ... }
+
+return                     // unit return
+return value
 ```
 
-## Records and behavioral types
+Range forms: `a..b` half-open `[a, b)`; `a..=b` inclusive `[a, b]`. No
+stepped ranges in v1.
 
-Tide distinguishes data from behavior (decision D14).
+`defer expr` queues `expr` (typically a method call) to run when the
+enclosing **function** returns, in LIFO order. Function-scoped, not
+block-scoped (matches Go).
 
-**Records** — `type X = {...}` data shapes — are **structural**: two records
-with the same fields are interchangeable.
+## Records
 
-**Behavioral types** — `class`es and Tide-defined `interface`s — are
-**nominal** with **explicit, declared conformance**. A type satisfies an
-interface only when it declares `implements` and the checker verifies the
-method set. There is no implicit or accidental satisfaction.
+Records (`type X = {...}`) are **structural** value types (D14 — see
+`design-decisions.md`): two records with the same fields are
+interchangeable. They are copied on assignment, like Go structs.
+
+**Construction.** Named fields, all required unless the field type is
+`Option<T>`:
+
+```td
+let u = User{ id: "x", name: "y" }
+```
+
+No positional form (rejected: short records' "obvious" order is exactly
+the case people get wrong). Anonymous record literals — `{ x: 1, y: 2 }`
+— are accepted only when the target type is inferable from context.
+
+## Classes
+
+Classes are **reference types** (D14, G16): assignment copies the
+reference; mutating a `var` field through any reference is visible
+through every reference to the same instance.
+
+```td
+class Counter {
+  var n: int
+
+  increment()  { this.n = this.n + 1 }
+  value(): int { return this.n }
+
+  static new(): Counter { return Counter{ n: 0 } }
+}
+```
+
+**Field declarations** use `let` or `var` at the top of the class body:
+
+- `let field: T` — set once at construction; later assignment is a
+  compile error.
+- `var field: T` — assignable through `inst.field = value` from any
+  reference. Visibility (public/private) is not yet a concept; all
+  fields are effectively public in v1.
+
+**Methods** — declared without `func`:
+
+```td
+class MyReader implements io.Reader {
+  read(p: []byte): Result<int, error> { ... }
+}
+```
+
+`this` is the implicit receiver. The pointer-vs-value-receiver
+distinction is a codegen concern, not a surface concern.
+
+**Static methods** — declared with `static`, called as `ClassName.name(...)`
+or `ClassName<T>.name(...)`:
+
+```td
+class LRU<K, V> {
+  static new(capacity: int): LRU<K, V> { ... }
+}
+
+let cache = LRU<string, int>.new(2)
+```
+
+**Generic classes** — `class Name<T1, T2> { ... }`. Type parameters are
+in scope throughout the class body.
+
+**Interface conformance** — explicit, declared, checked:
 
 ```td
 interface Reader {
@@ -119,28 +350,95 @@ interface Reader {
 }
 
 class MyReader implements Reader {
-  read(p: []byte): Result<int, error> { /* ... */ }
+  read(p: []byte): Result<int, error> { ... }
 }
 ```
 
-`implements` works for both Tide-defined interfaces and bound Go interfaces, so
-a Tide class can explicitly implement e.g. `io.Reader`. Codegen emits a static
-conformance assertion, so a mismatch fails in Tide's checker, not in generated
-Go. Method-set semantics follow Go (value- vs pointer-receiver).
+There is no implicit or accidental satisfaction (D14). `implements`
+works for both Tide-defined interfaces and bound Go interfaces, so a
+Tide class can explicitly implement e.g. `io.Reader` or `http.Handler`.
+Codegen emits a static conformance assertion; a mismatch fails in
+Tide's checker, not in generated Go. Method-set semantics follow Go's
+(value- vs pointer-receiver).
+
+For the bound-Go side, method names are uniformly rewritten:
+`ServeHTTP` (Go, exported) is exposed in the binding as `serveHTTP`,
+and the Tide class declares `serveHTTP`. Codegen translates back to
+`ServeHTTP` for the synthesized Go method. This is a binding-layer
+convention, not a language rule.
+
+**Reference equality.** Class instances support `refEq<T>(a: T, b: T):
+bool` (built-in, defined only for class `T`). For records and variants,
+`==` is field-wise structural equality.
 
 ## Concurrency
 
+Concurrency is uncolored (D7 — see `design-decisions.md`): no `async`,
+no `await`.
+
+### Channels
+
 ```td
-let ch = makeChannel<int>()
-spawn {
-  ch.send(1)
-}
-let x = ch.recv()
+let ch = makeChannel<int>()           // unbuffered
+let bc = makeChannel<Event>(16)       // buffered, capacity 16
+
+ch.send(1)
+let x = ch.recv()                     // blocks
+let v = ch.tryRecv()                  // Option<T>, non-blocking
+ch.close()
+
+for v in ch { ... }                   // ranges until closed
 ```
 
-No `async` (decision D7). Structured scopes and cancellation: see
-`docs/architecture.md` section 4.
+Directional channel types (`chanSend<T>`, `chanRecv<T>`) are park
+material — v1 has bidirectional channels only.
+
+### `spawn`
+
+`spawn { ... }` runs a block concurrently (compiles to a goroutine).
+Used inside a structured-concurrency scope (below).
+
+### `select`
+
+```td
+select {
+  case s = <-sigs        => { ... },    // receive into a binding
+  case <-ctx.done()      => { ... },    // receive, drop the value
+  case events.send(e)    => { ... },    // send
+  default                => { ... },    // optional non-blocking case
+}
+```
+
+The `<-ch` receive operator is **only** valid inside a `select` case; in
+plain code use the method form `ch.recv()`. Symmetry: `ch.send(v)` works
+both inside and outside `select`.
+
+### Structured concurrency
+
+```td
+let pages = try scope<Page, error> {
+  for u in urls {
+    spawn { try fetch(u, timeout) }
+  }
+}
+```
+
+A `scope<T, E> { ... }` runs the spawned tasks, joins them when the
+block ends, and:
+
+- Returns `Result<[]T, E>` when each spawn returns `Result<T, E>`.
+- Returns `Result<unit, E>` when spawns are fire-and-forget (return
+  `Result<unit, E>`).
+- The first `Err` cancels its siblings via the scope's context and is
+  the scope's result.
+
+Inside a scope, `scope.context: context.Context` is the cancellable
+context to pass into bound Go calls. The scope's lifetime drives
+cancellation; explicit `context` values from bound APIs interoperate
+through the binding boundary.
 
 ## Examples
 
-Target programs that v1 must compile are catalogued in `examples/README.md`.
+Target programs that v1 must compile are catalogued in
+[`../examples/README.md`](../examples/README.md). Each example is the
+definition of done for the features it exercises (D12).

@@ -1,7 +1,8 @@
 // Showcase: the net/http binding and Go interface conformance.
-// HealthHandler explicitly implements Go's http.Handler -- the conformance is
-// declared and checked by Tide (decision D14), with no hand-written glue.
-// Target sketch — syntax is illustrative (see docs/language-spec.md).
+// HealthHandler explicitly implements Go's http.Handler — the conformance is
+// declared and checked by Tide (D14, see ../../docs/design-decisions.md),
+// with no hand-written glue.
+
 import http
 import log
 

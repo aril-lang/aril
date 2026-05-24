@@ -1,5 +1,5 @@
 // Phase 1 target. Toolchain smoke test: ranges, if/else, arithmetic, output.
-// Target sketch — syntax is illustrative (see docs/language-spec.md).
+
 import fmt
 
 func main() {
