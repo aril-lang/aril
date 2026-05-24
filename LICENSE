@@ -1,0 +1,8 @@
+TODO: choose a license before any public release.
+
+For a programming-language project a permissive license is conventional:
+  - MIT          — minimal, widely understood
+  - Apache-2.0   — minimal, plus an explicit patent grant (recommended for a
+                   language/compiler, which involves novel implementation work)
+
+Replace this file with the full chosen license text.

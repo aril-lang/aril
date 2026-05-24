@@ -1,0 +1,26 @@
+# Build outputs
+/tide
+/bin/
+*.exe
+*.test
+*.out
+*.prof
+
+# Editor / OS junk
+.DS_Store
+.idea/
+.vscode/
+*~
+*.swp
+
+# Claude Code local config (per-developer; the rest of .claude/ is tracked)
+.claude/settings.local.json
+
+# Development pipeline — internal process artifacts (see CLAUDE.md, hard constraints).
+# These files document our internal planning and decisions and are deliberately
+# not published with the project.
+/CLAUDE.md
+/TODO.md
+/backlog.md
+/AI.md
+/spec-gaps.md

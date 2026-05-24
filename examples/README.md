@@ -1,0 +1,77 @@
+# Examples — the v1 acceptance suite
+
+These programs **define what v1 must be able to express** (decision D12 in
+`AI.md`). Each is chosen to *force* specific language features. An example
+compiling and running is the definition of done for the features it exercises.
+
+Examples are written feature-first: the program comes before the implementation
+that makes it compile. The **first project task** (see `TODO.md`) is to
+hand-write all of them as complete `.td` programs against the spec — a paper
+validation of `docs/language-spec.md` before any compiler exists (decision
+D13). Files present today are early **target sketches**; their syntax is
+illustrative and will be completed and tightened by that exercise.
+
+`★` marks **showcase** examples — the ones that demonstrate Tide's value over
+plain Go (sum types, exhaustive matching, ergonomic errors, uncolored
+concurrency, interface conformance).
+
+## `leetcode/` — core language
+
+Algorithmic problems that exercise the type system, control flow, generics,
+recursion, and data structures with little or no standard library. These are
+the Phase 1–2 acceptance tests for the language core.
+
+| Example | Forces | Phase |
+|---|---|---|
+| `two_sum` | slices, hash maps, iteration | 2 |
+| `valid_parentheses` | a generic stack, strings/runes, `match` on characters | 2 |
+| `invert_binary_tree` ★ | generic **sum type**, recursion, exhaustive `match` | 2 |
+| `reverse_linked_list` | references, mutation, `Option`-typed links | 2 |
+| `merge_intervals` | structs, sorting with a comparator (function values) | 2 |
+
+The binary-tree problem is the headline: a recursive generic discriminated
+union with pattern matching is exactly where Tide's type system pays off over
+Go, which has no sum types.
+
+## `interview/` — modeling and error handling
+
+Slightly more "real" than LeetCode — problems about structuring code, modeling
+domains, and handling failure.
+
+| Example | Forces | Phase |
+|---|---|---|
+| `fizzbuzz` | toolchain smoke: ranges, `if`/`else`, arithmetic, output | 1 |
+| `rpn_calculator` ★ | `Result` / `try` / `match`; sum-typed tokens; errors as values | 2 |
+| `vending_machine` ★ | a **state machine** — exhaustive `match` over a sum-typed state | 2 |
+| `lru_cache` | a generic `class` with methods; map plus ordering | 3 |
+| `config_loader` | typed structs, the `encoding/json` binding, error handling | 3 |
+
+The RPN calculator and the state machine prove that `Result`-based errors and
+exhaustive matching are ergonomic in practice, not just on paper.
+
+## `services/` — the runtime pitch
+
+Backend programs that exercise the standard-library bindings and the
+concurrency model. This is where the actual product claim — "the Go runtime" —
+is demonstrated.
+
+| Example | Forces | Phase |
+|---|---|---|
+| `wc` | a CLI: `os`/args, `io`, file reading, exit codes | 3 |
+| `healthcheck_server` ★ | `net/http`; **Go interface conformance** (a Tide type as `http.Handler`) | 3–4 |
+| `todo_api` | JSON REST CRUD; DTO structs; `Result` mapped to HTTP status codes | 4 |
+| `parallel_fetcher` ★ | **structured concurrency**, channels, `context` cancellation, timeouts | 5 |
+| `graceful_server` ★ | `net/http` + `os/signal` + `context` + `select`: graceful shutdown | 5 |
+
+`healthcheck_server` is the critical binding test: a Tide type satisfying Go's
+`http.Handler` interface, with no hand-written glue. `parallel_fetcher` proves
+the uncolored concurrency model (D7) end to end — the place the Go runtime
+actually beats a single-threaded event loop.
+
+## How to use this suite
+
+- Implement features against the next example in phase order.
+- When an example compiles and runs, record it (a checkbox here, or in
+  `TODO.md`).
+- v1 ships when every example above compiles, runs, and produces correct
+  output — and the `★` showcases need **no** manual Go shims.
