@@ -28,15 +28,19 @@ no browser ecosystem — and that is deliberate.
 
 ```td
 import http
+import io
+import json
 
 type User = {
-  id: string
+  id:   string
   name: string
 }
 
 func getUser(id: string): Result<User, error> {
-  let resp = try http.get("/users/" + id)
-  return Ok(User{ id, name: resp.body })
+  let resp = try http.get("https://api.example.com/users/" + id)
+  let body = try io.readAll(resp.body)
+  let user = try json.parse<User>(body)
+  return Ok(user)
 }
 ```
 

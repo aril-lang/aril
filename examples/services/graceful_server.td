@@ -13,7 +13,7 @@ import os
 import signal
 import time
 
-class hello implements http.Handler {
+class Hello implements http.Handler {
   serveHTTP(w: http.ResponseWriter, r: http.Request) {
     // Simulate a slow handler so shutdown has something to wait on.
     time.sleep(time.seconds(1))
@@ -24,7 +24,7 @@ class hello implements http.Handler {
 func main() {
   let srv = http.Server{
     addr:    ":8080",
-    handler: hello{},
+    handler: Hello{},
   }
 
   let sigs = makeChannel<os.Signal>(1)

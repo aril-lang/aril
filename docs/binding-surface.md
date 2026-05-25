@@ -1,12 +1,12 @@
 # Binding surface (target sketch)
 
-The intended Tide-side spelling of every Go-stdlib call and type used by the
-v1 acceptance suite (`examples/`). This document is a **contract**: when
+The intended Tide-side spelling of the Go-stdlib calls and types **used by
+the v1 acceptance suite**, plus near-neighbours we expect to ship in the
+first binding-generator iteration. This document is a **contract**: when
 the binding generator (`internal/bindgen`) lands, the surface it produces
-for these packages must match this sketch. The wrapper layer's design
-decisions — `(T, error)` → `Result`, nullable-pointer → `Option`,
-non-nullable pointer → direct, variadic `interface{}` → `...Any` — apply
-throughout.
+must match this sketch. The wrapper layer's design decisions — `(T,
+error)` → `Result`, nullable-pointer → `Option`, non-nullable pointer →
+direct, variadic `interface{}` → `...Any` — apply throughout.
 
 > Note. Names follow the convention from `docs/language-spec.md`:
 > exported Go identifiers are exposed in their lowerCamel form
@@ -54,7 +54,7 @@ os.lookupEnv(key: string): Option<string>             // distinguishes unset
 // Signal channel element (re-exported from os; matches Go's os.Signal interface).
 type os.Signal = interface { signal(): unit; string(): string }
 
-os.Interrupt: os.Signal                               // SIGINT alias
+os.interrupt: os.Signal                               // SIGINT alias (Go: os.Interrupt)
 
 // File handle (only the bits used by the suite).
 class os.File implements io.Reader, io.Writer, io.Closer {
@@ -146,27 +146,31 @@ log.setFlags(flags: int)
 ## time
 
 ```td
-// Nominal newtype — see D11 (G needed). Wraps Go's time.Duration int64.
-newtype time.Duration
+// Nominal newtype over int64 — wraps Go's time.Duration.
+newtype time.Duration = int64
 
 // Construction (matches Go's time.Second * N idiom, but via factory funcs).
-time.nanoseconds(n: int):  time.Duration
-time.microseconds(n: int): time.Duration
-time.milliseconds(n: int): time.Duration
 time.seconds(n: int):      time.Duration
-time.minutes(n: int):      time.Duration
-time.hours(n: int):        time.Duration
+time.milliseconds(n: int): time.Duration
 
-// Arithmetic on durations — overloads of +, -, *, / against int.
-// Operator overloading is `open` — for v1 use methods if `+` is not yet
-// available:
-//   d1.add(d2): time.Duration
+// Arithmetic on durations is method-based for v1 (operator overloading is
+// not in scope for the v1 acceptance suite):
+//   d1.add(d2: time.Duration): time.Duration
 //   d.mul(n: int): time.Duration
 
-// Time points.
-class time.Time { /* opaque; methods produced by bindgen */ }
-time.now(): time.Time
-time.since(t: time.Time): time.Duration
+// Periodic ticks.
+class time.Ticker {
+  let c: RecvChan<time.Time>      // fires on each tick
+  stop()
+}
+time.tick(d: time.Duration):    RecvChan<time.Time>      // simple ticker
+time.newTicker(d: time.Duration): time.Ticker            // stoppable
+
+// One-shot timeout signal.
+time.after(d: time.Duration): RecvChan<time.Time>
+
+// Sleep blocks the current goroutine.
+time.sleep(d: time.Duration)
 
 // Sleep blocks the current goroutine.
 time.sleep(d: time.Duration)
@@ -176,25 +180,19 @@ time.sleep(d: time.Duration)
 
 ```td
 interface context.Context {
-  done(): chanRecv<unit>                              // close-channel pattern
+  done(): RecvChan<unit>                              // closes when cancelled
   err(): Option<error>
   deadline(): Option<time.Time>
   value(key: Any): Option<Any>
 }
 
 context.background(): context.Context                 // Go: context.Background()
-context.todo():       context.Context                 // Go: context.TODO()
 
-// Two-value returns -> tuple (G24). cancel() is idempotent; defer it.
+// Two-value returns -> tuple. The cancel() is idempotent; defer it.
 context.withCancel(parent: context.Context):
     (context.Context, func())
 context.withTimeout(parent: context.Context, d: time.Duration):
     (context.Context, func())
-context.withDeadline(parent: context.Context, deadline: time.Time):
-    (context.Context, func())
-
-context.withValue(parent: context.Context, key: Any, value: Any):
-    context.Context
 ```
 
 ## encoding/json
@@ -211,6 +209,30 @@ json.serializeTo<W: io.Writer>(w: W, v: Any): Result<unit, error>
 
 // "Pretty-printed" variant of serialize.
 json.serializeIndent(v: Any, prefix: string, indent: string): Result<[]byte, error>
+```
+
+## net/url
+
+```td
+class url.URL {
+  let scheme:   string
+  let host:     string                    // host:port if a port is present
+  let path:     string                    // request path; "" if the URL has none
+  let rawQuery: string
+  let fragment: string
+
+  string(): string                        // re-serialize
+  query(): url.Values                     // parse rawQuery into a multi-map
+}
+
+class url.Values {
+  get(key: string):    string
+  values(key: string): []string
+  set(key: string, v: string)
+  add(key: string, v: string)
+}
+
+url.parse(rawURL: string): Result<url.URL, error>
 ```
 
 ## net/http
@@ -234,19 +256,22 @@ http.ResponseWriter.writeString(s: string): Result<int, error>
 // Wrapped struct of Go's *http.Request.
 class http.Request {
   let method: string
-  let url:    url.URL              // non-nullable per G34
-  let body:   io.ReadCloser        // non-nullable per G34; http.NoBody when empty
+  let url:    url.URL              // non-nullable (always-non-nil pointer)
+  let body:   io.ReadCloser        // non-nullable; http.NoBody when empty
   let header: http.Header
   // ... more as needed
 
   withContext(ctx: context.Context): http.Request   // returns a shallow copy
 }
 
-// Header is a Map<string, []string> with case-insensitive operations.
+// HTTP header — multi-valued, case-insensitive keys. Modelled as a class
+// (not a Map), so `.get(key)` is the single-string convenience that 99 %
+// of callers want; full multi-value access is via `.values(key)`.
 class http.Header {
-  get(key: string): string
-  set(key: string, value: string)
-  add(key: string, value: string)
+  get(key: string):           string            // first value, or "" if absent
+  values(key: string):        []string          // all values; empty slice if absent
+  set(key: string, v: string)
+  add(key: string, v: string)
   delete(key: string)
 }
 

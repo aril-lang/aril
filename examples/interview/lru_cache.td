@@ -6,20 +6,20 @@
 
 import fmt
 
-class lruNode<K, V> {
+class LRUNode<K, V> {
   let key:   K
   var value: V
-  var prev:  Option<lruNode<K, V>>
-  var next:  Option<lruNode<K, V>>
+  var prev:  Option<LRUNode<K, V>>
+  var next:  Option<LRUNode<K, V>>
 }
 
 class LRU<K, V> {
   let capacity: int
 
   var size:  int
-  var head:  Option<lruNode<K, V>>      // most recently used
-  var tail:  Option<lruNode<K, V>>      // least recently used (eviction target)
-  var index: Map<K, lruNode<K, V>>
+  var head:  Option<LRUNode<K, V>>      // most recently used
+  var tail:  Option<LRUNode<K, V>>      // least recently used (eviction target)
+  var index: Map<K, LRUNode<K, V>>
 
   static new(capacity: int): LRU<K, V> {
     return LRU<K, V>{
@@ -27,7 +27,7 @@ class LRU<K, V> {
       size:     0,
       head:     None,
       tail:     None,
-      index:    Map<K, lruNode<K, V>>{},
+      index:    Map<K, LRUNode<K, V>>{},
     }
   }
 
@@ -52,7 +52,7 @@ class LRU<K, V> {
       },
       None => {},
     }
-    let n = lruNode<K, V>{
+    let n = LRUNode<K, V>{
       key:   k,
       value: v,
       prev:  None,
@@ -74,7 +74,7 @@ class LRU<K, V> {
 
   // ----- internals -----
 
-  touch(n: lruNode<K, V>) {
+  touch(n: LRUNode<K, V>) {
     match this.head {
       Some(h) => if refEq(h, n) { return },
       None    => return,
@@ -89,7 +89,7 @@ class LRU<K, V> {
     this.head = Some(n)
   }
 
-  detach(n: lruNode<K, V>) {
+  detach(n: LRUNode<K, V>) {
     match n.prev {
       Some(p) => p.next = n.next,
       None    => this.head = n.next,

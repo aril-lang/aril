@@ -185,6 +185,26 @@ terminology. Raw `go/types` diagnostics that point at generated Go are a
 **Why.** Errors pointing at code the user never wrote destroy the
 "TypeScript ergonomics" promise.
 
+### D11 — Surface-syntax discipline
+
+**Claim.** The Tide surface is **TypeScript-flavoured, ML-influenced**, with
+a single, settled spelling for each construct. The acceptance-suite paper
+validation forced concrete answers across roughly thirty surface-syntax
+questions; the resolutions live in `docs/language-spec.md`.
+
+**Why.** A language with two equally valid spellings for the same thing
+("many ways to do it") inflates surface area for users and for the
+compiler. The paper-validation pass kills "let's pick later" by
+demanding that every example be writeable **one obvious, unambiguous
+way**.
+
+**Status.** *Mostly firm.* Three items remain open: the concrete syntax
+for nominal newtypes (`newtype X = T` with optional methods, working
+shape), the typed `match v as { T => ..., U => ... }` narrowing form for
+the `Any` escape type, and visibility / public-private on class members.
+All three are scoped out of the v1 acceptance suite; the suite is
+expressible without them.
+
 ### D12 — v1 scope is defined by an example acceptance suite
 
 **Claim.** The set of programs in `examples/README.md` defines what v1 must
@@ -195,6 +215,23 @@ those features.
 **Why.** Examples-as-acceptance-criteria keeps the language honest —
 features are designed against concrete, representative programs, not in the
 abstract.
+
+### D13 — Validate the spec on paper before building the compiler
+
+**Claim.** Before any compiler code is written, every example in the
+acceptance suite (D12) is hand-implemented as a complete `.td` program
+against `docs/language-spec.md`. The spec passes only when each example
+can be written *one obvious, unambiguous way*.
+
+**Why.** Writing real programs in a spec is the cheapest way to expose
+under-specification, ambiguity, and awkwardness — and to force the
+remaining D11 syntax questions to resolution. Doing this *before* a
+lexer or parser exists keeps mistakes cheap: a missing form in the spec
+costs an edit, not a compiler rebuild.
+
+**Status.** Complete for v1. Found roughly thirty surface-syntax gaps;
+each has a resolution folded into `docs/language-spec.md` (G15 binding
+naming convention also noted on D14).
 
 ### D14 — Structural records, nominal behavioral types
 

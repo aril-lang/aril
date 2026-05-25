@@ -14,6 +14,7 @@ import log
 import strconv
 import strings
 import sync
+// url.URL is reached transitively through http.Request.url; not imported by name.
 
 type Todo = {
   id:    int

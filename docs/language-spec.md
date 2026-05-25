@@ -124,7 +124,10 @@ A thin generic built-in. The two acceptance examples that need a stack
 otherwise duplicate the same data structure.
 
 - Construct: `Stack<T>{}`.
-- `s.push(v)`, `s.peek(): Option<T>`, `s.len(): int`.
+- `s.push(v): unit` — mutates the receiver (`Stack<T>` is a class —
+  reference type, no reassignment needed).
+- `s.peek(): Option<T>`.
+- `s.len(): int`.
 - `s.pop(): Result<T, error>` — error is `"stack underflow"`. Returning
   `Result` (not `Option`) so `try s.pop()` is the idiomatic shrink-and-use
   form inside a `Result`-returning function.
@@ -218,17 +221,22 @@ func add(a: int, b: int): int {
 }
 ```
 
-Top-level functions use the `func` keyword. Methods inside a `class` do
-not (see Classes).
+Top-level functions use the `func` keyword. Methods inside a `class` or an
+`interface` declaration do not (see Classes, Behavioral types).
 
 **Function types** (for first-class function values):
 
 - Type: `func(T, U): R` (parens around params, colon-return).
+- Zero-param form: `func(): R`.
+- Unit return: `func(T, U)` — the `: unit` is omitted. `func()` is
+  shorthand for `func(): unit` — typical for cleanup/cancel callbacks
+  (e.g. the second element of `context.withTimeout(...)`).
 - Closure literal: `func(a: T, b: U): R { body }` — same shape, anonymous.
 - Short closure: `(a, b) => a < b` — when parameter types are inferable
   from context (e.g. a comparator argument).
 - Variadic: `func print(args: ...Any)`. At the call site, individual
-  arguments widen to `Any`.
+  arguments — including concrete values *and* interface values — widen
+  to `Any`.
 
 ## Error handling
 
@@ -354,12 +362,46 @@ class MyReader implements Reader {
 }
 ```
 
+Interface method declarations omit `func`, like methods in a class.
+
 There is no implicit or accidental satisfaction (D14). `implements`
 works for both Tide-defined interfaces and bound Go interfaces, so a
 Tide class can explicitly implement e.g. `io.Reader` or `http.Handler`.
 Codegen emits a static conformance assertion; a mismatch fails in
 Tide's checker, not in generated Go. Method-set semantics follow Go's
 (value- vs pointer-receiver).
+
+**Interface composition** — an interface may aggregate other interfaces
+with `extends`. The composed interface requires the union of the method
+sets:
+
+```td
+interface ReadCloser extends Reader, Closer { }
+
+// Equivalent to writing read() and close() out explicitly. Extra
+// methods may be added in the body:
+interface CountingReader extends Reader {
+  bytesRead(): int
+}
+```
+
+`extends` is interface-only — classes use `implements` to declare
+conformance, not to inherit. There is no class inheritance in v1.
+
+**Anonymous interface as a type** — an interface shape can be used
+inline as a type expression, the same way records can:
+
+```td
+type Signal = interface {
+  signal(): unit
+  string(): string
+}
+```
+
+The shape is anonymous and nominal-by-the-declaration-site: two
+distinct `type X = interface { ... }` aliases with identical method
+sets are *different* types (D14). For ad-hoc structural matching in
+generic code, use a named `interface` declaration plus `extends`.
 
 For the bound-Go side, method names are uniformly rewritten:
 `ServeHTTP` (Go, exported) is exposed in the binding as `serveHTTP`,
@@ -378,25 +420,53 @@ no `await`.
 
 ### Channels
 
+Three channel types:
+
+- `Channel<T>` — bidirectional. The type returned by `makeChannel<T>()`.
+- `SendChan<T>` — send-only view. A `Channel<T>` widens to `SendChan<T>`
+  implicitly at a call site or assignment that expects it; the reverse
+  is not allowed.
+- `RecvChan<T>` — receive-only view. Same widening rules.
+
+The directional views exist so binding signatures can faithfully reflect
+Go's `chan<- T` and `<-chan T` parameter shapes (e.g. `signal.notify`
+takes a `SendChan<os.Signal>`; `context.Context.done()` returns a
+`RecvChan<unit>`). They also let user code declare intent at the
+producer/consumer boundary.
+
 ```td
-let ch = makeChannel<int>()           // unbuffered
-let bc = makeChannel<Event>(16)       // buffered, capacity 16
+let ch = makeChannel<int>()           // Channel<int>, unbuffered
+let bc = makeChannel<Event>(16)       // Channel<Event>, capacity 16
 
 ch.send(1)
-let x = ch.recv()                     // blocks
+let x = ch.recv()                     // blocks until a value or close
 let v = ch.tryRecv()                  // Option<T>, non-blocking
 ch.close()
 
 for v in ch { ... }                   // ranges until closed
+
+// Directional widening:
+func produce(out: SendChan<int>) { out.send(42) }
+func consume(in: RecvChan<int>)  { let _ = in.recv() }
+let pipe = makeChannel<int>()
+produce(pipe)
+consume(pipe)
 ```
 
-Directional channel types (`chanSend<T>`, `chanRecv<T>`) are park
-material — v1 has bidirectional channels only.
+`SendChan<T>` supports `.send(v)` and `.close()`. `RecvChan<T>` supports
+`.recv()`, `.tryRecv()`, and `for v in c`.
 
 ### `spawn`
 
-`spawn { ... }` runs a block concurrently (compiles to a goroutine).
-Used inside a structured-concurrency scope (below).
+`spawn { ... }` runs a block concurrently (compiles to a goroutine). The
+block is a **function-shaped scope**: `return Ok(v)` / `return Err(e)`
+inside the block returns from the spawn (not from the surrounding
+function), and `try expr` inside the block early-returns with `Err`. The
+block's result type is the scope's task result (`Result<T, E>` for a
+`scope<T, E>`).
+
+Spawns may only appear inside a structured-concurrency `scope` (below)
+— there is no detached/orphaned goroutine form in v1.
 
 ### `select`
 
@@ -432,10 +502,16 @@ block ends, and:
 - The first `Err` cancels its siblings via the scope's context and is
   the scope's result.
 
-Inside a scope, `scope.context: context.Context` is the cancellable
-context to pass into bound Go calls. The scope's lifetime drives
-cancellation; explicit `context` values from bound APIs interoperate
-through the binding boundary.
+**`scope.context`** is an identifier bound only in the **lexical body**
+of a `scope { ... }` block — including in any nested `spawn` blocks. A
+function called from inside a spawn does *not* inherit `scope.context`
+dynamically; if it needs the scope's context, pass it as a parameter.
+Inside the lexical scope, `scope.context: context.Context` is the
+cancellable context to pass into bound Go calls.
+
+Scopes nest. An inner scope's lifetime is bounded by its enclosing scope;
+an outer cancellation propagates to inner scopes through the
+`context.Context` chain.
 
 ## Examples
 

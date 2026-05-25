@@ -84,11 +84,21 @@ Only the wrapper layer involves judgment.
 | `func F() (T, error)` | `Result<T, error>` | the dominant error idiom |
 | `func F() (T, bool)` | comma-ok form / `Option<T>` | distinct from the error case |
 | `func F() *T` returning nil | `Option<T>` | nil-returning pointers are nullable |
+| `func F() *T`, always non-nil¹ | `T` (direct) | wrapper-layer override; audited per binding |
 | `func F() T`, T valid with error (e.g. `Read`) | tuple `(T, error)` kept | rare; do not collapse |
-| `interface{}` / `any` | explicit escape type | type-unsafe; flag at the wrapper |
-| `type D int64` (named) | nominal newtype | requires D11 newtypes |
-| variadic `...T` | variadic param | |
+| `func F() (T, U)` (neither error nor bool) | tuple `(T, U)` | e.g. `context.WithTimeout` |
+| `interface{}` / `any` | `Any` (escape type) | binding-only; concrete values widen at call site |
+| `type D int64` (named) | nominal newtype | working shape `newtype D = int64` |
+| variadic `...T` | variadic param `...T` | for `...any` → `...Any` |
+| variadic `chan<- T` / `<-chan T` | `SendChan<T>` / `RecvChan<T>` | directional channel views |
 | functional-options pattern | normal optional params | wrapper-layer work |
+
+¹ The wrapper layer marks a returned `*T` as non-nullable when the Go
+documentation or established usage guarantees a non-nil pointer
+(`*http.Request.URL`, `*http.Request.Body`, `*http.Response.Header`,
+...). The audited list is one of the L3 "this is where a wrapper made a
+semantic decision" checkpoints; mismatches with reality become bugs and
+are caught by differential testing.
 
 The dangerous cases — nullability, `(T,error)` vs comma-ok vs both-valid,
 panics — are *semantic*; signature derivation does not catch them. They are the
