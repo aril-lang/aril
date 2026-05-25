@@ -143,6 +143,21 @@ log.setPrefix(prefix: string)
 log.setFlags(flags: int)
 ```
 
+## math
+
+```td
+math.sqrt(x: float64): float64
+math.abs(x: float64):  float64
+math.pow(x: float64, y: float64): float64
+math.min(a: float64, b: float64): float64
+math.max(a: float64, b: float64): float64
+math.pi: float64
+
+// Integer min/max have no Go-stdlib referent (Go's math.{Min,Max} are
+// float-typed). User code uses `if a < b { a } else { b }` for now;
+// promoting them to Tide-side built-ins (cf. refEq) is park material.
+```
+
 ## time
 
 ```td
