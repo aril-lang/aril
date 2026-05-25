@@ -276,12 +276,13 @@ let v = match getUser(id) {
 
 Patterns support:
 
-- Literals (`'('`, `42`, `"key"`).
+- Literals (`'('`, `42`, `"key"`, `()` for the sole `unit` value).
 - Wildcards (`_`).
 - Alternatives (`'(' | '[' | '{'`).
 - Variants with positional payloads (`Some(x)`, `Node(v, l, r)`,
   `Dispensing(_, change)`).
-- Tuples (`(Idle, InsertCoin(n))`, `(s, e)`).
+- Tuples (`(Idle, InsertCoin(n))`, `(s, e)`). Note that `()` is the
+  unit-literal *pattern*, not a tuple — tuples are arity ≥ 2 (G24).
 - Records by name (`User{ id, name }`) — punning omitted in v1.
 
 A `match` used at statement position discards its value; the arms must
@@ -367,6 +368,20 @@ error. A `class` may declare `implements error` for typed errors.
 For inspection rather than propagation, use `match`. Mapping Go's
 `errors.Is`/`errors.As`/`%w` wrapping onto Tide error values is a later
 design item.
+
+**Diverging built-ins.** Two built-ins never return — they unify with
+any expected type at the call site, so they can occupy a `match` arm
+or any other typed position:
+
+- `panic(msg: string)` — abort the program with an unrecoverable
+  error. The Go runtime's panic stack walks via the D8 source map,
+  so the trace points at the originating `.td` site. Use for
+  invariant violations and "obviously unreachable" arms.
+- `os.exit(code: int)` — terminate the process with the given code.
+
+Both compile down to Go's `panic` and `os.Exit` respectively; neither
+returns, and the checker treats them as type-compatible with whatever
+context they appear in.
 
 ## Control flow
 
