@@ -1,0 +1,8 @@
+--- TITLE ---
+E0102: unterminated "string literal" reaches EOF
+
+--- INPUT ---
+"abc
+
+--- ERRORS ---
+src.td:1:1: error[E0102]: Unterminated literal
