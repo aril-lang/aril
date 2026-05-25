@@ -32,6 +32,20 @@ fmt.errorf(format: string, args: ...Any): error
 // Writer-targeted variants used by HTTP and io examples.
 fmt.fprintln(w: io.Writer, args: ...Any): Result<int, error>
 fmt.fprintf(w: io.Writer, format: string, args: ...Any): Result<int, error>
+
+// Stdin reading. Tide wraps Go's `fmt.Scan(&v)` (pointer-mutation
+// style) into typed return form. `T` may be any of the numeric
+// primitives (`int`, `int8..int64`, `uint..uint64`, `float32`,
+// `float64`), `bool`, `byte`, `rune`, or `string` — anything Go's
+// `fmt.Scan` knows how to parse from a single whitespace-separated
+// token.
+fmt.scan<T>(): Result<T, error>
+
+// Multi-value forms — return a tuple so the call site can
+// destructure with `let (a, b) = ...`. Provided for arities 2 and 3;
+// for higher arities call `fmt.scan<T>()` repeatedly.
+fmt.scan2<A, B>(): Result<(A, B), error>
+fmt.scan3<A, B, C>(): Result<(A, B, C), error>
 ```
 
 ## os
@@ -149,6 +163,11 @@ log.setFlags(flags: int)
 math.sqrt(x: float64): float64
 math.abs(x: float64):  float64
 math.pow(x: float64, y: float64): float64
+math.log(x: float64):  float64                          // natural log
+math.log10(x: float64): float64
+math.log2(x: float64): float64
+math.floor(x: float64): float64
+math.ceil(x: float64): float64
 math.min(a: float64, b: float64): float64
 math.max(a: float64, b: float64): float64
 math.pi: float64
