@@ -1,0 +1,49 @@
+--- TITLE ---
+sum type (tagged-struct shape) + match (switch on .Tag) — prints "red"
+
+--- INPUT ---
+import fmt
+
+type Color = | Red | Green | Blue
+
+func main() {
+  let c: Color = Red
+  match c {
+    Red => fmt.println("red"),
+    Green => fmt.println("green"),
+    Blue => fmt.println("blue"),
+  }
+}
+
+--- GO ---
+package main
+
+import "fmt"
+
+type Color struct {
+	Tag uint8
+}
+
+var (
+	ColorRed   = Color{Tag: 0}
+	ColorGreen = Color{Tag: 1}
+	ColorBlue  = Color{Tag: 2}
+)
+
+func main() {
+	var c Color = ColorRed
+	switch c.Tag {
+	case 0:
+		fmt.Println("red")
+	case 1:
+		fmt.Println("green")
+	case 2:
+		fmt.Println("blue")
+	}
+}
+
+--- STDOUT ---
+red
+
+--- EXIT ---
+0

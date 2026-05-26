@@ -10,20 +10,36 @@ import (
 )
 
 // Emit lowers the given Tide AST to a Go source string. The
-// returned text is gofmt-stable for the hello/fizzbuzz subset
-// (no extra trailing whitespace, single trailing newline, tab
-// indentation, alphabetised imports). file is the source path
-// embedded into //line directives; pass "" to suppress them.
+// returned text is gofmt-stable (round-trips through gofmt -s).
+// file is the source path embedded into //line directives;
+// pass "" to suppress them.
 func Emit(f *ast.File, file string) (string, error) {
-	g := &gen{file: file}
+	g := &gen{file: file, variant: map[string]variantInfo{}}
+	// First pass — register sum-type variants so later
+	// expression / pattern lowering can qualify Variant idents
+	// to their Go-side constants and tag numbers.
+	for _, d := range f.Decls {
+		if td, ok := d.(*ast.TypeDecl); ok {
+			if sb, ok := td.Body.(*ast.SumTypeBody); ok {
+				for i, v := range sb.Variants {
+					g.variant[v.Name] = variantInfo{owner: td.Name, tag: i}
+				}
+			}
+		}
+	}
 	g.writeHeader(f)
 	for _, d := range f.Decls {
-		fn, ok := d.(*ast.FuncDecl)
-		if !ok {
-			return "", fmt.Errorf("codegen: PR-C only handles FuncDecl, got %T", d)
-		}
-		if err := g.emitFuncDecl(fn); err != nil {
-			return "", err
+		switch v := d.(type) {
+		case *ast.FuncDecl:
+			if err := g.emitFuncDecl(v); err != nil {
+				return "", err
+			}
+		case *ast.TypeDecl:
+			if err := g.emitTypeDecl(v); err != nil {
+				return "", err
+			}
+		default:
+			return "", fmt.Errorf("codegen: unhandled top-level decl %T", d)
 		}
 	}
 	// gofmt -s pass — guarantees the output round-trips through
@@ -48,6 +64,17 @@ type gen struct {
 	// has most recently been written, so we avoid emitting the
 	// same directive twice in a row.
 	emittedLine int
+	// variant maps a variant identifier (e.g. "Red") to its
+	// owning sum-type and declaration-order tag (per
+	// lowering-go.md §Variant-tag numbering). Populated during
+	// the first decl pass in Emit and consumed by expression /
+	// pattern lowering.
+	variant map[string]variantInfo
+}
+
+type variantInfo struct {
+	owner string // owning sum-type name (e.g. "Color")
+	tag   int    // declaration order, used for the Tag field
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -80,6 +107,55 @@ func (g *gen) writeHeader(f *ast.File) {
 			g.b.WriteString(")\n\n")
 		}
 	}
+}
+
+// emitTypeDecl lowers a TypeDecl. PR-F2 handles SumTypeBody
+// (nullary-only) → Go `type T int` + `const (TVariant T = iota;
+// ...)`, and AliasBody → Go `type T = U`.
+func (g *gen) emitTypeDecl(td *ast.TypeDecl) error {
+	switch body := td.Body.(type) {
+	case *ast.AliasBody:
+		g.line(td.Span.StartLine)
+		g.b.WriteString("type ")
+		g.b.WriteString(goIdent(td.Name))
+		g.b.WriteString(" = ")
+		if err := g.emitTypeExpr(body.Aliased); err != nil {
+			return err
+		}
+		g.b.WriteByte('\n')
+		return nil
+	case *ast.SumTypeBody:
+		// Verify nullary-only — payload variants are PR-F3.
+		for _, v := range body.Variants {
+			if len(v.Fields) > 0 {
+				return fmt.Errorf("codegen: variant %s.%s has payload — payload variants land in a later PR",
+					td.Name, v.Name)
+			}
+		}
+		// Lower to a tagged struct, matching the Option / Result
+		// shape from lowering-go.md §Container types. Nullary
+		// variants are constants of the struct type; their tag
+		// is the declaration order (§Variant-tag numbering).
+		g.line(td.Span.StartLine)
+		g.b.WriteString("type ")
+		g.b.WriteString(goIdent(td.Name))
+		g.b.WriteString(" struct {\n\tTag uint8\n}\n")
+		g.b.WriteString("var (\n")
+		for i, v := range body.Variants {
+			g.b.WriteByte('\t')
+			g.b.WriteString(goIdent(td.Name))
+			g.b.WriteString(goIdent(v.Name))
+			g.b.WriteString(" = ")
+			g.b.WriteString(goIdent(td.Name))
+			g.b.WriteByte('{')
+			g.b.WriteString("Tag: ")
+			g.b.WriteString(strconv.Itoa(i))
+			g.b.WriteString("}\n")
+		}
+		g.b.WriteString(")\n")
+		return nil
+	}
+	return fmt.Errorf("codegen: unhandled TypeBody %T", td.Body)
 }
 
 func (g *gen) emitFuncDecl(fn *ast.FuncDecl) error {
@@ -163,9 +239,7 @@ func (g *gen) emitBlockBody(b *ast.Block) error {
 func (g *gen) emitStmt(s ast.Stmt) error {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
-		// Special-case ReturnExpr (DivergingExpr per ast.md):
-		// in Go it must lower to a `return` statement, not to a
-		// value-position expression.
+		// ReturnExpr (DivergingExpr): lower to Go `return` stmt.
 		if r, ok := v.Expr.(*ast.ReturnExpr); ok {
 			g.line(v.Span.StartLine)
 			g.writeIndent()
@@ -179,6 +253,10 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 			}
 			g.b.WriteByte('\n')
 			return nil
+		}
+		// MatchExpr: lower to Go `switch` statement.
+		if m, ok := v.Expr.(*ast.MatchExpr); ok {
+			return g.emitMatchAsStmt(m)
 		}
 		g.line(v.Span.StartLine)
 		g.writeIndent()
@@ -215,6 +293,123 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 		return nil
 	}
 	return fmt.Errorf("codegen: unhandled stmt %T", s)
+}
+
+// emitMatchAsStmt lowers a MatchExpr at statement position to a
+// Go `switch` whose `case` arms run the arm body as a statement.
+// Per lowering-go.md §MatchIR, the case head varies by pattern
+// shape:
+//   - VariantPat / IdentPat-bound-to-variant → `case <tag-int>:`
+//     of `switch subject.Tag`.
+//   - Literal patterns → `case <literal>:` of `switch subject`.
+//   - WildcardPat → `default:`.
+// PR-F2 uses one of the two switch forms based on whether the
+// arm set is variant-based or literal-based; mixing is not
+// reached by the corpus and rejected.
+func (g *gen) emitMatchAsStmt(m *ast.MatchExpr) error {
+	hasVariant, hasLiteral := false, false
+	for _, arm := range m.Arms {
+		switch p := arm.Pattern.(type) {
+		case *ast.VariantPat:
+			hasVariant = true
+			_ = p
+		case *ast.IdentPat:
+			if _, ok := g.variant[p.Name]; ok {
+				hasVariant = true
+			}
+		case *ast.IntLitPat, *ast.StringLitPat, *ast.BoolLitPat:
+			hasLiteral = true
+		}
+	}
+	if hasVariant && hasLiteral {
+		return fmt.Errorf("codegen: mixing variant and literal patterns in one match — not yet supported")
+	}
+	g.line(m.Span.StartLine)
+	g.writeIndent()
+	g.b.WriteString("switch ")
+	if err := g.emitExpr(m.Subject); err != nil {
+		return err
+	}
+	if hasVariant {
+		g.b.WriteString(".Tag")
+	}
+	g.b.WriteString(" {\n")
+	for _, arm := range m.Arms {
+		g.writeIndent()
+		if err := g.emitMatchArmHeader(arm.Pattern); err != nil {
+			return err
+		}
+		g.b.WriteString(":\n")
+		g.indent++
+		if err := g.emitMatchArmBody(arm.Body, arm.Span); err != nil {
+			return err
+		}
+		g.indent--
+	}
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	return nil
+}
+
+// emitMatchArmHeader writes either `case <expr>` or `default`.
+func (g *gen) emitMatchArmHeader(p ast.Pattern) error {
+	switch pat := p.(type) {
+	case *ast.WildcardPat:
+		g.b.WriteString("default")
+		return nil
+	case *ast.IntLitPat:
+		g.b.WriteString("case ")
+		g.b.WriteString(strconv.FormatInt(pat.Value, 10))
+		return nil
+	case *ast.StringLitPat:
+		g.b.WriteString("case ")
+		g.b.WriteString(strconv.Quote(pat.Value))
+		return nil
+	case *ast.BoolLitPat:
+		g.b.WriteString("case ")
+		if pat.Value {
+			g.b.WriteString("true")
+		} else {
+			g.b.WriteString("false")
+		}
+		return nil
+	case *ast.VariantPat:
+		// PR-F2 only handles nullary variants; payload
+		// sub-patterns land with PR-F3.
+		if len(pat.Sub) > 0 {
+			return fmt.Errorf("codegen: payload variant pattern %s(...) not yet supported", lastSeg(pat.QName))
+		}
+		info, ok := g.variant[lastSeg(pat.QName)]
+		if !ok {
+			return fmt.Errorf("codegen: variant pattern %s does not match any declared sum-type variant", lastSeg(pat.QName))
+		}
+		g.b.WriteString("case ")
+		g.b.WriteString(strconv.Itoa(info.tag))
+		return nil
+	case *ast.IdentPat:
+		if info, ok := g.variant[pat.Name]; ok {
+			g.b.WriteString("case ")
+			g.b.WriteString(strconv.Itoa(info.tag))
+			return nil
+		}
+		return fmt.Errorf("codegen: IdentPat %q in match arm is a fresh binding — only variant patterns supported in PR-F2", pat.Name)
+	}
+	return fmt.Errorf("codegen: unsupported pattern %T", p)
+}
+
+func lastSeg(q []string) string {
+	if len(q) == 0 {
+		return ""
+	}
+	return q[len(q)-1]
+}
+
+// emitMatchArmBody emits the arm body as a Go statement. The
+// arm body in source is an Expr; we wrap it in a synthetic
+// ExprStmt so the existing statement-lowering paths work. A
+// ReturnExpr arm body lowers to a `return` statement as usual.
+func (g *gen) emitMatchArmBody(body ast.Expr, _ ast.Span) error {
+	return g.emitStmt(&ast.ExprStmt{Span: body.NodeSpan(), Expr: body})
 }
 
 // emitLetOrVar lowers both `let` and `var` to Go's `var name [T] = value`.
@@ -379,8 +574,22 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		}
 		return nil
 	case *ast.Ident:
+		// Variant identifiers (declared in any sum type in the
+		// same file) get qualified to their Go-side variable:
+		// `Red` → `ColorRed`.
+		if info, ok := g.variant[v.Name]; ok {
+			g.b.WriteString(goIdent(info.owner))
+			g.b.WriteString(goIdent(v.Name))
+			return nil
+		}
 		g.b.WriteString(goIdent(v.Name))
 		return nil
+	case *ast.MatchExpr:
+		// PR-F2 only supports match in statement position; the
+		// statement emitter for ExprStmt handles the wrap and
+		// arm-body emission. Reaching MatchExpr in pure
+		// expression position is not supported yet.
+		return fmt.Errorf("codegen: match expression in value position not yet supported")
 	case *ast.Field:
 		return g.emitField(v)
 	case *ast.Call:
