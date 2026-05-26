@@ -197,11 +197,21 @@ func (p *parser) parseFuncDecl() (*ast.FuncDecl, *Diag) {
 	if _, err := p.expect(lexer.KindPunct, "("); err != nil {
 		return nil, err
 	}
-	// PR-B: empty parameter list only.
+	params, err := p.parseParamList()
+	if err != nil {
+		return nil, err
+	}
 	if _, err := p.expect(lexer.KindPunct, ")"); err != nil {
 		return nil, err
 	}
-	// PR-B: no return-type clause.
+	var retType ast.TypeExpr
+	if p.at(lexer.KindPunct, ":") {
+		p.advance() // consume ':'
+		retType, err = p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
 	body, err := p.parseBlock()
 	if err != nil {
 		return nil, err
@@ -211,8 +221,129 @@ func (p *parser) parseFuncDecl() (*ast.FuncDecl, *Diag) {
 			StartLine: kw.Line, StartCol: kw.Col,
 			EndLine: body.Span.EndLine, EndCol: body.Span.EndCol,
 		},
-		Name: name.Lexeme,
-		Body: body,
+		Name:       name.Lexeme,
+		Params:     params,
+		ReturnType: retType,
+		Body:       body,
+	}, nil
+}
+
+// parseParamList reads zero or more comma-separated `name: T`
+// parameters up to (but not consuming) the closing ')'.
+func (p *parser) parseParamList() ([]*ast.Param, *Diag) {
+	var out []*ast.Param
+	p.skipNewlines()
+	if p.at(lexer.KindPunct, ")") {
+		return nil, nil
+	}
+	for {
+		p.skipNewlines()
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return nil, p.diag("E0112", "expected parameter name", t.Line, t.Col)
+		}
+		nameTok := p.advance()
+		if _, err := p.expect(lexer.KindPunct, ":"); err != nil {
+			return nil, err
+		}
+		ty, err := p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, &ast.Param{
+			Span: ast.Span{
+				StartLine: nameTok.Line, StartCol: nameTok.Col,
+				EndLine: ty.NodeSpan().EndLine, EndCol: ty.NodeSpan().EndCol,
+			},
+			Name:     nameTok.Lexeme,
+			DeclType: ty,
+		})
+		p.skipNewlines()
+		if !p.at(lexer.KindPunct, ",") {
+			break
+		}
+		p.advance() // consume ','
+	}
+	return out, nil
+}
+
+// parseTypeExpr emits PrimitiveType for the closed PrimitiveName
+// set (per ast.md §PrimitiveName) and NamedType for everything
+// else. Form:
+//
+//	TypeExpr = PrimitiveType
+//	         | NamedType
+//	NamedType = Ident ("." Ident)*  ("<" TypeArgList ">")?
+//
+// Generic args are parsed if present (so `Result<int, error>` and
+// `Map<string, int>` parse cleanly), even though the only
+// type-bearing positions in PR-F1's corpus use bare primitives.
+func (p *parser) parseTypeExpr() (ast.TypeExpr, *Diag) {
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return nil, p.diag("E0112",
+			fmt.Sprintf("expected type expression, got %s %q", t.Kind, t.Lexeme),
+			t.Line, t.Col)
+	}
+	first := p.advance()
+	startLine, startCol := first.Line, first.Col
+	endLine, endCol := first.Line, first.Col+utf8.RuneCountInString(first.Lexeme)
+
+	// Commit to PrimitiveType when the first segment is a member
+	// of the closed primitive-name set AND there is no further
+	// qualification (`.`) or type-arg list. `int.Foo` and
+	// `Result<int>` continue to flow through the NamedType path.
+	isPrim := ast.PrimitiveNames[first.Lexeme]
+	if isPrim && !p.at(lexer.KindPunct, ".") && !p.at(lexer.KindOp, "<") {
+		return &ast.PrimitiveType{
+			Span: ast.Span{
+				StartLine: startLine, StartCol: startCol,
+				EndLine: endLine, EndCol: endCol,
+			},
+			Name: first.Lexeme,
+		}, nil
+	}
+
+	qname := []string{first.Lexeme}
+	for p.at(lexer.KindPunct, ".") {
+		p.advance() // consume '.'
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return nil, p.diag("E0112", "expected identifier after `.`", t.Line, t.Col)
+		}
+		next := p.advance()
+		qname = append(qname, next.Lexeme)
+		endLine, endCol = next.Line, next.Col+utf8.RuneCountInString(next.Lexeme)
+	}
+	var args []ast.TypeExpr
+	if p.at(lexer.KindOp, "<") {
+		p.advance() // consume '<'
+		for {
+			p.skipNewlines()
+			arg, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, arg)
+			p.skipNewlines()
+			if !p.at(lexer.KindPunct, ",") {
+				break
+			}
+			p.advance() // consume ','
+		}
+		closeTok, err := p.expect(lexer.KindOp, ">")
+		if err != nil {
+			return nil, err
+		}
+		endLine, endCol = closeTok.Line, closeTok.Col+1
+	}
+	return &ast.NamedType{
+		Span: ast.Span{
+			StartLine: startLine, StartCol: startCol,
+			EndLine: endLine, EndCol: endCol,
+		},
+		QName: qname,
+		Args:  args,
 	}, nil
 }
 
@@ -250,14 +381,134 @@ func (p *parser) parseStmt() (ast.Stmt, *Diag) {
 		return p.parseIfStmt()
 	case p.at(lexer.KindKeyword, "for"):
 		return p.parseForStmt()
+	case p.at(lexer.KindKeyword, "let"):
+		return p.parseLetOrVar(true)
+	case p.at(lexer.KindKeyword, "var"):
+		return p.parseLetOrVar(false)
+	case p.at(lexer.KindKeyword, "return"):
+		// `return` is a DivergingExpr (ast.md §Expr); when it
+		// appears at statement position we wrap it in an
+		// ExprStmt rather than introducing a separate ReturnStmt.
+		re, err := p.parseReturnExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.ExprStmt{Span: re.Span, Expr: re}, nil
 	default:
-		// Expression statement.
+		// Expression statement OR assignment.
 		e, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
+		// `lvalue = value` — distinguishing from `==` is a
+		// non-issue because `=` is its own Op token (the lexer
+		// emits `==` as a single token; bare `=` only appears
+		// in assignment position).
+		if p.at(lexer.KindOp, "=") {
+			eqTok := p.advance()
+			rhs, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			_ = eqTok
+			return &ast.AssignStmt{
+				Span: ast.Span{
+					StartLine: e.NodeSpan().StartLine, StartCol: e.NodeSpan().StartCol,
+					EndLine: rhs.NodeSpan().EndLine, EndCol: rhs.NodeSpan().EndCol,
+				},
+				LValue: e,
+				Value:  rhs,
+			}, nil
+		}
 		return &ast.ExprStmt{Span: e.NodeSpan(), Expr: e}, nil
 	}
+}
+
+func (p *parser) parseLetOrVar(isLet bool) (ast.Stmt, *Diag) {
+	kw := p.advance() // consume 'let' or 'var'
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return nil, p.diag("E0112", "expected binding name", t.Line, t.Col)
+	}
+	nameTok := p.advance()
+	var declType ast.TypeExpr
+	if p.at(lexer.KindPunct, ":") {
+		p.advance() // consume ':'
+		var err *Diag
+		declType, err = p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+	// `var x: T` admitted without initialiser — sema will reject
+	// per G1, but the AST schema (ast.md:222) makes Value
+	// optional. `let` must always have an initialiser.
+	var value ast.Expr
+	if isLet || p.at(lexer.KindOp, "=") {
+		if _, err := p.expect(lexer.KindOp, "="); err != nil {
+			return nil, err
+		}
+		v, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		value = v
+	}
+	endLine, endCol := nameTok.Line, nameTok.Col+utf8.RuneCountInString(nameTok.Lexeme)
+	if declType != nil {
+		endLine, endCol = declType.NodeSpan().EndLine, declType.NodeSpan().EndCol
+	}
+	if value != nil {
+		endLine, endCol = value.NodeSpan().EndLine, value.NodeSpan().EndCol
+	}
+	span := ast.Span{
+		StartLine: kw.Line, StartCol: kw.Col,
+		EndLine: endLine, EndCol: endCol,
+	}
+	if isLet {
+		// LetStmt.Pattern — for PR-F1 always IdentPat; tuple /
+		// variant / record destructuring patterns land later.
+		pat := &ast.IdentPat{
+			Span: ast.Span{
+				StartLine: nameTok.Line, StartCol: nameTok.Col,
+				EndLine: nameTok.Line, EndCol: nameTok.Col + utf8.RuneCountInString(nameTok.Lexeme),
+			},
+			Name: nameTok.Lexeme,
+		}
+		return &ast.LetStmt{
+			Span: span, Pattern: pat, DeclType: declType, Value: value,
+		}, nil
+	}
+	return &ast.VarStmt{
+		Span: span, Name: nameTok.Lexeme, DeclType: declType, Value: value,
+	}, nil
+}
+
+// parseReturnExpr parses `return` or `return <expr>` and returns
+// it as a ReturnExpr (DivergingExpr per ast.md). Callers at
+// statement position wrap it in an ExprStmt.
+func (p *parser) parseReturnExpr() (*ast.ReturnExpr, *Diag) {
+	kw := p.advance() // consume 'return'
+	// Bare `return` ends at end-of-statement (newline, `}`, EOF).
+	if p.at(lexer.KindNewline) || p.at(lexer.KindPunct, "}") || p.at(lexer.KindEOF) {
+		return &ast.ReturnExpr{
+			Span: ast.Span{
+				StartLine: kw.Line, StartCol: kw.Col,
+				EndLine: kw.Line, EndCol: kw.Col + utf8.RuneCountInString("return"),
+			},
+		}, nil
+	}
+	value, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.ReturnExpr{
+		Span: ast.Span{
+			StartLine: kw.Line, StartCol: kw.Col,
+			EndLine: value.NodeSpan().EndLine, EndCol: value.NodeSpan().EndCol,
+		},
+		Value: value,
+	}, nil
 }
 
 func (p *parser) parseIfStmt() (*ast.IfStmt, *Diag) {
