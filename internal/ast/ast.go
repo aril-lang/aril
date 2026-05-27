@@ -109,12 +109,13 @@ type FieldDecl struct {
 func (n *FieldDecl) NodeSpan() Span   { return n.Span }
 func (n *FieldDecl) NodeKind() string { return "FieldDecl" }
 
-// ClassDecl — `class Name { fields, methods }`. PR-F4 admits
-// only the non-generic, non-implements shape: no `<T>` type
-// parameters, no `implements Foo`. TypeParams and Implements
-// are present as required-but-empty slots per ast.md §ClassDecl
-// so future generics / interface PRs can populate them without
-// changing the struct shape (or its canonical serialisation).
+// ClassDecl — `class Name<TypeParams> { fields, methods }`.
+// PR-F4 admitted only the non-generic, non-implements shape;
+// PR-G1 lifted the generic restriction (TypeParams now populated
+// by the parser for `class Name<T, U>` decls). `implements` is
+// still rejected at parse time and lands with the interface PR;
+// the Implements slot stays empty per ast.md §ClassDecl so the
+// struct shape and canonical serialisation are stable.
 type ClassDecl struct {
 	Span       Span
 	Name       string
@@ -154,12 +155,16 @@ type Method struct {
 func (n *Method) NodeSpan() Span   { return n.Span }
 func (n *Method) NodeKind() string { return "Method" }
 
-// FuncDecl is a top-level function. PR-F1 covers the
-// non-generic shape with typed parameters and an optional
-// return type. Generic type parameters land with later PRs.
+// FuncDecl is a top-level function. PR-F1 covered the
+// non-generic shape; PR-G1 adds TypeParams (empty when the
+// function is non-generic). Each entry is a type-parameter
+// name; constraints are all `any` in PR-G1 (per the agreed
+// minimal-generics scope), with comparable-propagation for
+// container key positions added later by codegen if needed.
 type FuncDecl struct {
 	Span       Span
 	Name       string
+	TypeParams []string // empty for non-generic
 	Params     []*Param
 	ReturnType TypeExpr // nil ⇒ unit
 	Body       *Block

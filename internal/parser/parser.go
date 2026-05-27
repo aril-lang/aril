@@ -316,19 +316,26 @@ func (p *parser) parseSumTypeBody() (*ast.SumTypeBody, *Diag) {
 	}, nil
 }
 
-// parseClassDecl parses `class Name { fields, methods }`. PR-F4
-// scope: no type parameters, no `implements`. A class member is
-// either `let|var name: T` (field) or `[static] name(params)? body`
-// (method); the parser commits based on the leading keyword.
+// parseClassDecl parses `class Name<TypeParams> { fields, methods }`.
+// Type parameters arrived with PR-G1 (the `<T, U>` list after the
+// name is admitted; bare names only, constraints come with PR-G3).
+// `implements` is still rejected at parse time and lands with the
+// interface PR. A class member is either `let|var name: T` (field)
+// or `[static] name<TypeParams>?(params)? body` (method); the
+// parser commits based on the leading keyword.
 func (p *parser) parseClassDecl() (*ast.ClassDecl, *Diag) {
 	kw := p.advance() // consume 'class'
 	nameTok, err := p.expect(lexer.KindIdent, "")
 	if err != nil {
 		return nil, err
 	}
-	if p.at(lexer.KindKeyword, "implements") || p.at(lexer.KindOp, "<") {
+	typeParams, err := p.parseTypeParamList()
+	if err != nil {
+		return nil, err
+	}
+	if p.at(lexer.KindKeyword, "implements") {
 		t := p.peek()
-		return nil, p.diag("E0112", "PR-F4 admits only plain `class Name { ... }` — no generics or `implements` yet", t.Line, t.Col)
+		return nil, p.diag("E0112", "`implements` on class declarations is not yet supported", t.Line, t.Col)
 	}
 	if _, err := p.expect(lexer.KindPunct, "{"); err != nil {
 		return nil, err
@@ -358,9 +365,10 @@ func (p *parser) parseClassDecl() (*ast.ClassDecl, *Diag) {
 			StartLine: kw.Line, StartCol: kw.Col,
 			EndLine: closeTok.Line, EndCol: closeTok.Col + 1,
 		},
-		Name:    nameTok.Lexeme,
-		Fields:  fields,
-		Methods: methods,
+		Name:       nameTok.Lexeme,
+		TypeParams: typeParams,
+		Fields:     fields,
+		Methods:    methods,
 	}, nil
 }
 
@@ -444,6 +452,10 @@ func (p *parser) parseFuncDecl() (*ast.FuncDecl, *Diag) {
 	if err != nil {
 		return nil, err
 	}
+	typeParams, err := p.parseTypeParamList()
+	if err != nil {
+		return nil, err
+	}
 	if _, err := p.expect(lexer.KindPunct, "("); err != nil {
 		return nil, err
 	}
@@ -472,10 +484,48 @@ func (p *parser) parseFuncDecl() (*ast.FuncDecl, *Diag) {
 			EndLine: body.Span.EndLine, EndCol: body.Span.EndCol,
 		},
 		Name:       name.Lexeme,
+		TypeParams: typeParams,
 		Params:     params,
 		ReturnType: retType,
 		Body:       body,
 	}, nil
+}
+
+// parseTypeParamList reads an optional `<T, U, ...>` list at
+// the declaration head. v1 admits only bare names (default
+// constraint `any`); user-written constraints land in PR-G3.
+func (p *parser) parseTypeParamList() ([]string, *Diag) {
+	if !p.at(lexer.KindOp, "<") {
+		return nil, nil
+	}
+	p.advance() // consume '<'
+	var out []string
+	for {
+		p.skipNewlines()
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return nil, p.diag("E0112",
+				fmt.Sprintf("expected type-parameter name, got %s %q", t.Kind, t.Lexeme),
+				t.Line, t.Col)
+		}
+		tp := p.advance()
+		out = append(out, tp.Lexeme)
+		if p.at(lexer.KindPunct, ":") {
+			t := p.peek()
+			return nil, p.diag("E0112",
+				"type-parameter constraints (`<T: SomeInterface>`) land in PR-G3 — drop the constraint and let `any` default apply",
+				t.Line, t.Col)
+		}
+		if p.at(lexer.KindPunct, ",") {
+			p.advance()
+			continue
+		}
+		break
+	}
+	if _, err := p.expect(lexer.KindOp, ">"); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // parseParamList reads zero or more comma-separated `name: T`
