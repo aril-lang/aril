@@ -415,6 +415,92 @@ func TestReplShowOriginalSource(t *testing.T) {
 	}
 }
 
+func TestReplRollbackPopsCorrectSlot(t *testing.T) {
+	// A broken `func` decl must roll back from `decls` even
+	// when prior stmts exist. Previous (buggy) rollback popped
+	// from stmts unconditionally, leaving the broken decl in
+	// the session so every subsequent input re-failed.
+	input := "import fmt\n" +
+		"let x = 1\n" +
+		"func bad() { broken!!!! }\n" +
+		"fmt.println(\"recovered:\", x)\n" +
+		":quit\n"
+	stdout, stderr, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d", exit)
+	}
+	if !strings.Contains(stdout, "recovered: 1") {
+		t.Errorf("expected 'recovered: 1' after broken-decl rollback; stdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+}
+
+func TestReplRejectsRetypedBrokenInput(t *testing.T) {
+	// Retyping the exact same broken input must short-circuit
+	// at the REPL boundary, not re-enter the compile pipeline.
+	input := "let x = oh dear\n" +
+		"let x = oh dear\n" +
+		"let x = 42\n" +
+		"x\n" +
+		":quit\n"
+	stdout, stderr, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d", exit)
+	}
+	if !strings.Contains(stderr, "previously failed to compile") {
+		t.Errorf("expected rejected-tracker hit on retype; stderr:\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "42") {
+		t.Errorf("expected final '42' auto-print; stdout:\n%s", stdout)
+	}
+}
+
+func TestReplResetMainKeepsDecls(t *testing.T) {
+	// `:reset main` clears the main() body but keeps imports
+	// and decls so the user can iterate on stmts against an
+	// established scaffolding.
+	input := "import fmt\n" +
+		"class Counter { var n: int }\n" +
+		"let c = Counter(7)\n" +
+		"c\n" +
+		":reset main\n" +
+		"let c2 = Counter(99)\n" +
+		"c2\n" +
+		":show\n" +
+		":quit\n"
+	stdout, stderr, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d (stderr: %s)", exit, stderr)
+	}
+	if !strings.Contains(stdout, "Counter{n: 99}") {
+		t.Errorf("post-reset constructor call should still find Counter; stdout:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "class Counter") {
+		t.Errorf(":show after :reset main should still list the class; stdout:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "Counter(7)") {
+		t.Errorf(":reset main should drop the prior `Counter(7)` stmt; stdout:\n%s", stdout)
+	}
+}
+
+func TestReplResetClearsRejected(t *testing.T) {
+	// After :reset the rejected set is cleared, so a previously
+	// failed input becomes acceptable again (only blocked
+	// because it failed to compile — not because the text
+	// itself is poisoned forever).
+	input := "let x = oh dear\n" +
+		":reset\n" +
+		"let x = 5\n" +
+		"x\n" +
+		":quit\n"
+	stdout, _, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d", exit)
+	}
+	if !strings.Contains(stdout, "5") {
+		t.Errorf("expected '5' after :reset + valid let; stdout:\n%s", stdout)
+	}
+}
+
 func TestBuildOutputFlag(t *testing.T) {
 	outPath := filepath.Join(t.TempDir(), "hello-bin")
 	_, stderr, exit := runTide(t, "build", "-o", outPath, "examples/hello.td")
