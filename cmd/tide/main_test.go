@@ -454,6 +454,83 @@ func TestReplRejectsRetypedBrokenInput(t *testing.T) {
 	}
 }
 
+func TestReplFuncRedefinitionLastWins(t *testing.T) {
+	// Two `func greet` declarations — the second must replace
+	// the first in place, not append (which would trip Go's
+	// duplicate-decl error).
+	input := "import fmt\n" +
+		"func greet(n: string) { fmt.println(\"hi\", n) }\n" +
+		"greet(\"first\")\n" +
+		"func greet(n: string) { fmt.println(\"HELLO\", n) }\n" +
+		"greet(\"second\")\n" +
+		":show\n" +
+		":quit\n"
+	stdout, stderr, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d (stderr: %s)", exit, stderr)
+	}
+	if !strings.Contains(stdout, "HELLO second") {
+		t.Errorf("redefinition: post-redef call missing; stdout:\n%s", stdout)
+	}
+	// :show must reflect last-wins — only the HELLO version.
+	if strings.Count(stdout, "HELLO") == 0 || strings.Contains(stdout, `func greet(n: string) { fmt.println("hi", n) }`) {
+		t.Errorf(":show should display only the latest greet definition; stdout:\n%s", stdout)
+	}
+}
+
+func TestReplClassRedefinitionSameShape(t *testing.T) {
+	// Redefine a class with the same field shape — semantic
+	// change in method bodies / constructor logic but no
+	// signature break. The old `let c = Counter(7)` still
+	// compiles against the new class.
+	input := "class Counter { var n: int }\n" +
+		"let c = Counter(7)\n" +
+		"c\n" +
+		"class Counter { var n: int }\n" +
+		"c\n" +
+		":quit\n"
+	stdout, _, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d", exit)
+	}
+	if !strings.Contains(stdout, "Counter{n: 7}") {
+		t.Errorf("post-redef class instance should still print; stdout:\n%s", stdout)
+	}
+}
+
+func TestReplTypeRedefinition(t *testing.T) {
+	input := "type Point = int\n" +
+		"type Point = int\n" +
+		":quit\n"
+	_, stderr, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d (stderr: %s)", exit, stderr)
+	}
+	// No "duplicate declaration" Go-side error should escape.
+	if strings.Contains(stderr, "redeclared") || strings.Contains(stderr, "duplicate") {
+		t.Errorf("type redef should not surface Go's duplicate-decl error; stderr:\n%s", stderr)
+	}
+}
+
+func TestReplFailedRedefinitionRestoresOld(t *testing.T) {
+	// A redefinition that fails to compile must restore the
+	// prior decl so the user does not silently lose their
+	// working function.
+	input := "import fmt\n" +
+		"func greet(n: string) { fmt.println(\"hi\", n) }\n" +
+		"greet(\"alpha\")\n" +
+		"func greet(n: string) { fmt.println(oops, n) }\n" +
+		"greet(\"beta\")\n" +
+		":quit\n"
+	stdout, _, exit := runTideStdin(t, input, "repl")
+	if exit != 0 {
+		t.Fatalf("repl exit = %d", exit)
+	}
+	if !strings.Contains(stdout, "hi beta") {
+		t.Errorf("after failed redef, original greet should still print 'hi beta'; stdout:\n%s", stdout)
+	}
+}
+
 func TestReplResetMainKeepsDecls(t *testing.T) {
 	// `:reset main` clears the main() body but keeps imports
 	// and decls so the user can iterate on stmts against an
