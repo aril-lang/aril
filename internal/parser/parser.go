@@ -1080,11 +1080,63 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 	for {
 		switch {
 		case p.at(lexer.KindPunct, "("):
-			call, err := p.parseCallSuffix(e)
+			call, err := p.parseCallSuffix(e, nil)
 			if err != nil {
 				return nil, err
 			}
 			e = call
+		case p.at(lexer.KindOp, "<") && p.couldBeGenericCallSite():
+			// `<TypeArgs>` postfix per grammar.ebnf
+			// §Generic-argument disambiguation. After the closing
+			// `>` exactly one of `(`, `{`, or `.` may follow.
+			typeArgs, err := p.parseCallTypeArgs()
+			if err != nil {
+				return nil, err
+			}
+			switch {
+			case p.at(lexer.KindPunct, "("):
+				call, err := p.parseCallSuffix(e, typeArgs)
+				if err != nil {
+					return nil, err
+				}
+				e = call
+			case p.at(lexer.KindPunct, "."):
+				// Generic static-method call:
+				//   `ClassName<T1, ...>.method(args)`
+				// The type-args bind to the *class*, not the
+				// method. Build a Field with the class as the
+				// receiver, then a Call that wraps the Field and
+				// carries the type-args to codegen.
+				p.advance() // consume '.'
+				if !p.at(lexer.KindIdent) {
+					t := p.peek()
+					return nil, p.diag("E0112", "expected method name after `.`", t.Line, t.Col)
+				}
+				name := p.advance()
+				field := &ast.Field{
+					Span: ast.Span{
+						StartLine: e.NodeSpan().StartLine, StartCol: e.NodeSpan().StartCol,
+						EndLine: name.Line, EndCol: name.Col + len(name.Lexeme),
+					},
+					Receiver: e,
+					Name:     name.Lexeme,
+				}
+				call, err := p.parseCallSuffix(field, typeArgs)
+				if err != nil {
+					return nil, err
+				}
+				e = call
+			case p.at(lexer.KindPunct, "{"):
+				t := p.peek()
+				return nil, p.diag("E0112",
+					"generic literal `T<...>{ ... }` (BraceLit) not yet supported — use the `T<...>(...)` constructor form",
+					t.Line, t.Col)
+			default:
+				t := p.peek()
+				return nil, p.diag("E0112",
+					fmt.Sprintf("expected `(`, `.`, or `{{` after generic type arguments, got %s %q", t.Kind, t.Lexeme),
+					t.Line, t.Col)
+			}
 		case p.at(lexer.KindPunct, "."):
 			p.advance()
 			if !p.at(lexer.KindIdent) {
@@ -1185,11 +1237,89 @@ func (p *parser) parseIndexOrSlice(recv ast.Expr) (ast.Expr, *Diag) {
 	}, nil
 }
 
-func (p *parser) parseCallSuffix(callee ast.Expr) (*ast.Call, *Diag) {
+// couldBeGenericCallSite peeks at the token stream starting at
+// the current `<` and returns true iff the `<` opens a
+// generic-argument list. Per `lang-spec/grammar.ebnf`
+// §Generic-argument disambiguation: commit when the matching
+// `>` is followed by one of `(`, `{`, or `.` — function call,
+// generic literal, or generic static-method call respectively.
+// Otherwise the `<` is the comparison operator.
+//
+// Implementation is token-only depth-counting (no rewind /
+// speculative parse). It is equivalent to the speculative-parse
+// shape for the v1 type-argument grammar (Ident, `.`, `[`, `]`,
+// `,`, nested `<>`). Adding richer type forms to TypeArgs
+// (TupleType, FuncType, ParenType, ...) must extend the
+// allowed-token set below or the disambig will silently
+// false-negative on those shapes.
+func (p *parser) couldBeGenericCallSite() bool {
+	pos := p.pos
+	if pos >= len(p.toks) || p.toks[pos].Kind != lexer.KindOp || p.toks[pos].Lexeme != "<" {
+		return false
+	}
+	depth := 0
+	for i := pos; i < len(p.toks); i++ {
+		t := p.toks[i]
+		switch {
+		case t.Kind == lexer.KindOp && t.Lexeme == "<":
+			depth++
+		case t.Kind == lexer.KindOp && t.Lexeme == ">":
+			depth--
+			if depth == 0 {
+				// Next non-newline token decides per
+				// `grammar.ebnf` §Generic-argument disambiguation:
+				// commit on `(`, `{`, or `.`.
+				for j := i + 1; j < len(p.toks); j++ {
+					n := p.toks[j]
+					if n.Kind == lexer.KindNewline {
+						continue
+					}
+					if n.Kind != lexer.KindPunct {
+						return false
+					}
+					return n.Lexeme == "(" || n.Lexeme == "{" || n.Lexeme == "."
+				}
+				return false
+			}
+		case t.Kind == lexer.KindIdent,
+			t.Kind == lexer.KindPunct && (t.Lexeme == "," || t.Lexeme == "." || t.Lexeme == "[" || t.Lexeme == "]"):
+			// allowed inside a type-arg list
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (p *parser) parseCallTypeArgs() ([]ast.TypeExpr, *Diag) {
+	if _, err := p.expect(lexer.KindOp, "<"); err != nil {
+		return nil, err
+	}
+	var args []ast.TypeExpr
+	for {
+		p.skipNewlines()
+		t, err := p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, t)
+		if p.at(lexer.KindPunct, ",") {
+			p.advance()
+			continue
+		}
+		break
+	}
+	if _, err := p.expect(lexer.KindOp, ">"); err != nil {
+		return nil, err
+	}
+	return args, nil
+}
+
+func (p *parser) parseCallSuffix(callee ast.Expr, typeArgs []ast.TypeExpr) (*ast.Call, *Diag) {
 	if _, err := p.expect(lexer.KindPunct, "("); err != nil {
 		return nil, err
 	}
-	c := &ast.Call{Callee: callee}
+	c := &ast.Call{Callee: callee, TypeArgs: typeArgs}
 	p.skipNewlines()
 	if !p.at(lexer.KindPunct, ")") {
 		for {
