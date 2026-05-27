@@ -1,22 +1,21 @@
 --- TITLE ---
-reflection bootstrap — reflect.box / typeOf / typeName / unbox over a class + int
+reflection — reflect.show pretty-prints class + primitive Dynamic values
 
 --- INPUT ---
 import fmt
 import reflect
 
-class Counter {
-  var n: int
+class Point {
+  var x: int
+  var y: int
 }
 
 func main() {
-  let c = Counter(7)
-  let d = reflect.box(c)
-  fmt.println(reflect.typeName(reflect.typeOf(d)))
-  match reflect.unbox<int>(reflect.box(42)) {
-    Ok(v) => fmt.println("got", v),
-    Err(e) => fmt.println("err", e),
-  }
+  let p = Point(3, 4)
+  fmt.println(reflect.show(reflect.box(p)))
+  fmt.println(reflect.show(reflect.box(42)))
+  fmt.println(reflect.show(reflect.box("hi")))
+  fmt.println(reflect.show(reflect.box(true)))
 }
 
 --- GO ---
@@ -286,49 +285,48 @@ func tideShowPrimitive(d Dynamic) string {
 	}
 }
 
-var tideDesc_Counter = &TypeDescriptor{Name: "Counter", Kind: KindClass}
+var tideDesc_Point = &TypeDescriptor{Name: "Point", Kind: KindClass}
 
-func tideFieldOf_Counter(v any, name string) (Dynamic, bool) {
-	c, _ := v.(*Counter)
+func tideFieldOf_Point(v any, name string) (Dynamic, bool) {
+	c, _ := v.(*Point)
 	if c == nil {
 		return Dynamic{}, false
 	}
 	switch name {
-	case "n":
-		return Dynamic{Payload: c.n, Desc: tideDesc_int}, true
+	case "x":
+		return Dynamic{Payload: c.x, Desc: tideDesc_int}, true
+	case "y":
+		return Dynamic{Payload: c.y, Desc: tideDesc_int}, true
 	}
 	return Dynamic{}, false
 }
 func init() {
-	tideDescRegistry["*main.Counter"] = tideDesc_Counter
-	tideDesc_Counter.fields = []FieldInfo{
-		{name: "n", desc: tideDesc_int},
+	tideDescRegistry["*main.Point"] = tideDesc_Point
+	tideDesc_Point.fields = []FieldInfo{
+		{name: "x", desc: tideDesc_int},
+		{name: "y", desc: tideDesc_int},
 	}
-	tideFieldAccessors["Counter"] = tideFieldOf_Counter
+	tideFieldAccessors["Point"] = tideFieldOf_Point
 }
 
-type Counter struct {
-	n int
+type Point struct {
+	x int
+	y int
 }
 
 func main() {
-	var c = &Counter{7}
-	var d = tideBox(c)
-	fmt.Println(tideTypeName(tideTypeOf(d)))
-	__tide_match_1 := tideUnbox[int](tideBox(42))
-	switch __tide_match_1.Tag {
-	case 0:
-		v := __tide_match_1.V
-		fmt.Println("got", v)
-	case 1:
-		e := __tide_match_1.E
-		fmt.Println("err", e)
-	}
+	var p = &Point{3, 4}
+	fmt.Println(tideShow(tideBox(p)))
+	fmt.Println(tideShow(tideBox(42)))
+	fmt.Println(tideShow(tideBox("hi")))
+	fmt.Println(tideShow(tideBox(true)))
 }
 
 --- STDOUT ---
-Counter
-got 42
+Point{x: 3, y: 4}
+42
+"hi"
+true
 
 --- EXIT ---
 0
