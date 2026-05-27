@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mattn/go-isatty"
 )
 
 // cmdRepl implements `tide repl` per RFC-0003. PR-REPL-1 lands
@@ -32,12 +34,19 @@ func cmdRepl(args []string) int {
 		fmt.Fprintln(os.Stderr, "tide repl: takes no positional arguments")
 		return 2
 	}
+	// TTY → go-prompt path with up-arrow history and a coloured
+	// prompt; non-TTY (pipe / test harness) → bufio.Scanner
+	// fallback so input from stdin pipes still works for tests.
+	if isatty.IsTerminal(os.Stdin.Fd()) {
+		return runReplPrompt()
+	}
 	return runRepl(os.Stdin, os.Stdout, os.Stderr)
 }
 
 const (
 	replPrompt     = "tide> "
 	replContPrompt = "... > "
+	replBanner     = "tide repl 0.2 — type :help for commands, :quit to exit."
 )
 
 // replSession holds the accumulated session source. Each
@@ -102,7 +111,7 @@ type replStmt struct {
 // Stdout / Stderr` out of the loop lets cmd/tide/main_test.go
 // drive the prompt without spawning a subprocess.
 func runRepl(stdin io.Reader, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stdout, "tide repl 0.1 — type :help for commands, :quit to exit.")
+	fmt.Fprintln(stdout, replBanner)
 	sess := &replSession{}
 	scanner := bufio.NewScanner(stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
