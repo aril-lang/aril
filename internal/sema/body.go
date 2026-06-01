@@ -63,7 +63,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 	case *ast.AssignStmt:
 		lt := c.inferExpr(v.LValue)
 		vt := c.inferExpr(v.Value)
-		if concrete(lt) && concrete(vt) && !assignable(lt, vt) {
+		if !c.fits(lt, v.Value, vt) {
 			c.report("E0201", "Type mismatch — cannot assign "+vt.String()+" to "+lt.String(), v.Span)
 		}
 	case *ast.IfStmt:
@@ -97,11 +97,18 @@ func (c *checker) checkStmt(s ast.Stmt) {
 // or the VarStmt itself); a destructuring let with no single
 // IdentPat passes a nil pattern and only type-checks the value.
 func (c *checker) checkBinding(bindNode ast.Node, pat ast.Pattern, ann ast.TypeExpr, value ast.Expr) {
-	vt := c.inferExpr(value)
+	var vt Type = &Unknown{}
+	if value != nil {
+		vt = c.inferExpr(value)
+	}
 	var declared Type
 	if ann != nil {
 		declared = c.typeFromExpr(ann)
-		if concrete(declared) && concrete(vt) && !assignable(declared, vt) {
+		// Only compare against an actual initialiser; a bare
+		// `var x: T` (no value) is a separate concern, not a
+		// type mismatch. fits() applies integer-literal and
+		// slice-literal narrowing and the E0204 range check.
+		if value != nil && !c.fits(declared, value, vt) {
 			c.report("E0201", "Type mismatch — annotation is "+declared.String()+" but value is "+vt.String(), value.NodeSpan())
 		}
 	}

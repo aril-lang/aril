@@ -48,19 +48,18 @@ func (c *checker) inferExpr(e ast.Expr) Type {
 		c.inferExpr(v.Inner)
 		t = &Unknown{} // try-unwrap typing lands with the collection / Result PR
 	case *ast.SliceLit:
-		for _, it := range v.Items {
-			c.inferExpr(it)
-		}
-		t = &Unknown{}
+		t = c.inferSliceLit(v)
 	case *ast.Index:
-		c.inferExpr(v.Receiver)
-		c.inferExpr(v.Idx)
-		t = &Unknown{}
+		t = c.inferIndex(v)
 	case *ast.Slice:
-		c.inferExpr(v.Receiver)
-		c.inferExpr(v.Low)
-		c.inferExpr(v.High)
-		t = &Unknown{}
+		recv := c.inferExpr(v.Receiver)
+		c.expectInt(v.Low)
+		c.expectInt(v.High)
+		if _, ok := recv.(*Slice); ok {
+			t = recv // s[lo:hi] : []T
+		} else {
+			t = &Unknown{}
+		}
 	default:
 		t = &Unknown{}
 	}
@@ -102,6 +101,10 @@ func (c *checker) inferCall(call *ast.Call) Type {
 			case SymUserVariant:
 				// Payload-variant constructor: its value is the sum.
 				ret = sym.Type
+			case SymBuiltinType:
+				ret = c.inferBuiltinTypeCall(id.Name, call, args)
+			case SymBuiltinFunc:
+				ret = c.inferBuiltinFuncCall(id.Name, call, args)
 			}
 		}
 	} else if f, ok := call.Callee.(*ast.Field); ok {
@@ -139,7 +142,7 @@ func (c *checker) checkArgTypes(params, args []Type, nodes []ast.Expr, callee st
 		n = len(args)
 	}
 	for i := 0; i < n; i++ {
-		if concrete(params[i]) && concrete(args[i]) && !assignable(params[i], args[i]) {
+		if !c.fits(params[i], nodes[i], args[i]) {
 			c.report("E0201",
 				"Type mismatch — argument "+strconv.Itoa(i+1)+" to "+callee+
 					" expects "+params[i].String()+", got "+args[i].String(),
@@ -177,6 +180,7 @@ func (c *checker) inferField(f *ast.Field) Type {
 func (c *checker) inferBinary(b *ast.Binary) Type {
 	lt := c.inferExpr(b.Left)
 	rt := c.inferExpr(b.Right)
+	lt, rt = c.adaptIntLiteralOperands(b, lt, rt)
 	switch b.Op {
 	case "+":
 		// `+` is numeric addition or string concatenation.
@@ -187,9 +191,19 @@ func (c *checker) inferBinary(b *ast.Binary) Type {
 		return c.numericResult(lt, rt, b)
 	case "-", "*", "/", "%":
 		return c.numericResult(lt, rt, b)
-	case "==", "!=", "<", "<=", ">", ">=":
-		// Operand agreement is checked; comparability (E0401) and
-		// ordering domains land with the comparability PR.
+	case "==", "!=":
+		// Equality demands a comparable type (T-Cmp); class
+		// operands route to refEq, collections / funcs are not
+		// comparable at all.
+		if (concrete(lt) && !comparable(lt)) || (concrete(rt) && !comparable(rt)) {
+			c.report("E0401", "`"+b.Op+"` on non-comparable type — compare field-wise, or use `refEq` for class identity", b.Span)
+		} else {
+			c.expectSame(lt, rt, b, "comparison")
+		}
+		return &Builtin{N: "bool"}
+	case "<", "<=", ">", ">=":
+		// Ordering-domain enforcement (Ord) lands with a later PR;
+		// here we only require the two operands to agree.
 		c.expectSame(lt, rt, b, "comparison")
 		return &Builtin{N: "bool"}
 	case "&&", "||":
@@ -203,6 +217,26 @@ func (c *checker) inferBinary(b *ast.Binary) Type {
 	default:
 		return &Unknown{}
 	}
+}
+
+// adaptIntLiteralOperands narrows an integer-literal operand to the
+// other operand's concrete integer type (type-system.md §Literals):
+// `b == 0` on a `byte`, `r + 1` on a `rune`. Returns the adjusted
+// operand types and records the narrowed type / range-checks the
+// literal. When both operands are literals nothing changes (both
+// stay `int`).
+func (c *checker) adaptIntLiteralOperands(b *ast.Binary, lt, rt Type) (Type, Type) {
+	if _, ok := b.Right.(*ast.IntLitExpr); ok && isIntegerType(lt) {
+		c.info.Type[b.Right] = lt
+		c.checkIntLitRange(lt, b.Right)
+		rt = lt
+	}
+	if _, ok := b.Left.(*ast.IntLitExpr); ok && isIntegerType(rt) {
+		c.info.Type[b.Left] = rt
+		c.checkIntLitRange(rt, b.Left)
+		lt = rt
+	}
+	return lt, rt
 }
 
 // numericResult checks both operands are the same numeric type and
@@ -290,7 +324,15 @@ func (c *checker) checkReturn(r *ast.ReturnExpr) {
 	if want == nil {
 		want = &Unit{}
 	}
-	if concrete(want) && concrete(got) && !assignable(want, got) {
+	// A bare `return` yields unit; only narrow / range-check when
+	// there is an actual value expression.
+	if r.Value == nil {
+		if concrete(want) && !assignable(want, got) {
+			c.report("E0203", "Wrong return type — function returns "+want.String()+", got "+got.String(), r.Span)
+		}
+		return
+	}
+	if !c.fits(want, r.Value, got) {
 		c.report("E0203", "Wrong return type — function returns "+want.String()+", got "+got.String(), r.Span)
 	}
 }
