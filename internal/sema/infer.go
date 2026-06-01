@@ -207,10 +207,13 @@ func (c *checker) inferBinary(b *ast.Binary) Type {
 		c.expectSame(lt, rt, b, "comparison")
 		return &Builtin{N: "bool"}
 	case "&&", "||":
-		if concrete(lt) && !isBool(lt) {
+		// Dynamic / Any operands are a boundary concern, not a
+		// bool-operand mismatch — consistent with the numeric /
+		// comparison paths.
+		if concrete(lt) && !isBool(lt) && !isDynamic(lt) && !isAny(lt) {
 			c.report("E0201", "Type mismatch — `"+b.Op+"` expects bool, got "+lt.String(), b.Left.NodeSpan())
 		}
-		if concrete(rt) && !isBool(rt) {
+		if concrete(rt) && !isBool(rt) && !isDynamic(rt) && !isAny(rt) {
 			c.report("E0201", "Type mismatch — `"+b.Op+"` expects bool, got "+rt.String(), b.Right.NodeSpan())
 		}
 		return &Builtin{N: "bool"}
@@ -242,6 +245,11 @@ func (c *checker) adaptIntLiteralOperands(b *ast.Binary, lt, rt Type) (Type, Typ
 // numericResult checks both operands are the same numeric type and
 // returns it; mismatches fire E0201.
 func (c *checker) numericResult(lt, rt Type, b *ast.Binary) Type {
+	// Dynamic / Any operands are governed by the boundary rules,
+	// not by arithmetic typing — don't mislabel them here.
+	if isDynamic(lt) || isDynamic(rt) || isAny(lt) || isAny(rt) {
+		return &Unknown{}
+	}
 	if concrete(lt) && !isNumeric(lt) {
 		c.report("E0201", "Type mismatch — `"+b.Op+"` expects a numeric type, got "+lt.String(), b.Left.NodeSpan())
 		return &Unknown{}
@@ -269,6 +277,11 @@ func (c *checker) expectSame(lt, rt Type, b *ast.Binary, what string) {
 		return
 	}
 	if _, ok := rt.(*Named); ok {
+		return
+	}
+	// Dynamic / Any operand agreement is a boundary concern, not a
+	// generic equality mismatch.
+	if isDynamic(lt) || isDynamic(rt) || isAny(lt) || isAny(rt) {
 		return
 	}
 	if concrete(lt) && concrete(rt) && !equal(lt, rt) {
