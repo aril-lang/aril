@@ -385,7 +385,7 @@ func (g *gen) writePredeclaredSums() {
 	// them as `tidert.Option[T]` / `tidert.Result[T, E]`; PR-F5b
 	// emits them inline in `main` as a v1 transitional state.
 	// Block R relocates them to `tidert/` without changing the
-	// struct shape (tracked in backlog.md).
+	// struct shape.
 	if g.usesOption {
 		g.b.WriteString("type Option[T any] struct {\n\tTag uint8\n\tV   T\n}\n")
 		g.b.WriteString("func OptionSome[T any](value T) Option[T] {\n\treturn Option[T]{Tag: 1, V: value}\n}\n")
