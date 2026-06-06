@@ -453,8 +453,8 @@ Each spec artefact maps to exactly one place in sema:
 When the spec adds a rule, the corresponding sema case lands in
 the same PR (D17 paired edit). When a sema case is added without
 a spec citation, the audit is supposed to catch it — the
-atomic-fixture rule (CLAUDE.md "Every spec artefact carries
-coverage") provides the cross-check.
+atomic-fixture rule ("every spec artefact carries coverage")
+provides the cross-check.
 
 ## 6. Diagnostics
 
