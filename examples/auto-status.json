@@ -136,7 +136,7 @@
     {
       "path": "examples/interview/rpn_calculator.td",
       "stage": "parse",
-      "blocker": "error[E0112]: expected expression, got FloatLit \"0.0\""
+      "blocker": "error[E0112]: generic literal `T<...>{ ... }` (BraceLit) not yet supported — use the `T<...>(...)` constructor form"
     },
     {
       "path": "examples/interview/vending_machine.td",
