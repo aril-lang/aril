@@ -327,20 +327,35 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 	}
 	g.line(s.Span.StartLine)
 	g.writeIndent()
-	idPat, ok := s.Pattern.(*ast.IdentPat)
-	if !ok {
-		return fmt.Errorf("codegen: only IdentPat loop var in PR-C, got %T", s.Pattern)
+	// Loop variable: an IdentPat binds its name; a WildcardPat (`for
+	// _ in …`) discards the element. For a wildcard *range* the Go
+	// `i++` form still needs a real counter name, so synthesise a
+	// throwaway; for wildcard *collection* iteration `_` suffices.
+	var loopName string
+	switch p := s.Pattern.(type) {
+	case *ast.IdentPat:
+		loopName = goIdent(p.Name)
+	case *ast.WildcardPat:
+		loopName = "_"
+	default:
+		return fmt.Errorf("codegen: unsupported loop var %T", s.Pattern)
 	}
+	idPat := &ast.IdentPat{Name: loopName}
 	switch iter := s.Iterable.(type) {
 	case *ast.RangeExpr:
+		counter := loopName
+		if counter == "_" {
+			g.loopTempCounter++
+			counter = fmt.Sprintf("_tideRange%d", g.loopTempCounter)
+		}
 		g.b.WriteString("for ")
-		g.b.WriteString(goIdent(idPat.Name))
+		g.b.WriteString(counter)
 		g.b.WriteString(" := ")
 		if err := g.emitExpr(iter.Low); err != nil {
 			return err
 		}
 		g.b.WriteString("; ")
-		g.b.WriteString(goIdent(idPat.Name))
+		g.b.WriteString(counter)
 		if iter.Inclusive {
 			g.b.WriteString(" <= ")
 		} else {
@@ -350,7 +365,7 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 			return err
 		}
 		g.b.WriteString("; ")
-		g.b.WriteString(goIdent(idPat.Name))
+		g.b.WriteString(counter)
 		g.b.WriteString("++ {\n")
 	default:
 		// Any other Iterable is a slice / map / set / channel
@@ -424,6 +439,13 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 // types need call-site context, which v1 codegen lacks). The return
 // type comes from the annotation, else sema's inferred Func.Return.
 func (g *gen) emitClosure(cl *ast.ClosureLit) error {
+	// A closure boundary breaks the spawn-return frame: a `return`
+	// in the closure body is the closure's return, not the enclosing
+	// spawn's group-error conversion (mirrors the sema scopeDepth
+	// reset in inferClosure).
+	savedSpawn := g.inSpawnBody
+	g.inSpawnBody = false
+	defer func() { g.inSpawnBody = savedSpawn }()
 	g.b.WriteString("func(")
 	for i, prm := range cl.Params {
 		if i > 0 {
