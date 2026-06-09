@@ -590,9 +590,9 @@ func TestReplOpenDepthTracksBraces(t *testing.T) {
 		{"func f() {", 1},
 		{"func f() {\n  if x {", 2},
 		{"func f() {\n  if x {\n  }", 1},
-		{`x := "{{{"`, 0},          // braces inside string don't count
-		{`x := '{'`, 0},            // braces inside char don't count
-		{"x := 1 // { foo", 0},     // braces in line comment don't count
+		{`x := "{{{"`, 0},            // braces inside string don't count
+		{`x := '{'`, 0},              // braces inside char don't count
+		{"x := 1 // { foo", 0},       // braces in line comment don't count
 		{"x := 1 /* { */ y := 2", 0}, // braces in block comment don't count
 	}
 	for _, c := range cases {

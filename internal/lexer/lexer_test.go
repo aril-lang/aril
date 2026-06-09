@@ -203,20 +203,20 @@ func TestRuneLiteral(t *testing.T) {
 func TestOperatorsLongestMatch(t *testing.T) {
 	got := tokensCanonical(t, "..=...==!=<=>=&&||=><-->|+-")
 	wantPieces := []string{
-		"Op<..=>",  // 1:1
-		"Op<...>",  // 1:4
-		"Op<==>",   // 1:7
-		"Op<!=>",   // 1:9
-		"Op<<=>",   // 1:11
-		"Op<>=>",   // 1:13
-		"Op<&&>",   // 1:15
-		"Op<||>",   // 1:17
-		"Op<=>>",   // 1:19
-		"Op<<->",   // 1:21
-		"Op<->>",   // arrow-like; -> is in multi-char list
-		"Op<|>",    // 1:26
-		"Op<+>",    // 1:27
-		"Op<->",    // 1:28
+		"Op<..=>", // 1:1
+		"Op<...>", // 1:4
+		"Op<==>",  // 1:7
+		"Op<!=>",  // 1:9
+		"Op<<=>",  // 1:11
+		"Op<>=>",  // 1:13
+		"Op<&&>",  // 1:15
+		"Op<||>",  // 1:17
+		"Op<=>>",  // 1:19
+		"Op<<->",  // 1:21
+		"Op<->>",  // arrow-like; -> is in multi-char list
+		"Op<|>",   // 1:26
+		"Op<+>",   // 1:27
+		"Op<->",   // 1:28
 	}
 	_ = wantPieces
 	// The full expected sequence is awkward — instead verify each
@@ -297,4 +297,3 @@ func TestBlockCommentUnterminated(t *testing.T) {
 		t.Fatalf("expected E0102; got %v", err)
 	}
 }
-
