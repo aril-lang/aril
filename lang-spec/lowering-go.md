@@ -592,9 +592,30 @@ A **generic class brace literal** instantiates the Go type
 directly — `Box<int>{ v: 42 }` ⟿ `&Box[int]{v: 42}`. Go cannot
 infer struct type parameters from a composite literal, so the
 type-args are emitted explicitly; a generic class brace literal
-without type-args is a codegen error. (Generic *record-type*
-declarations — `type Pair<T> = {…}` — are not yet parsed; the same
-value-form lowering applies once they are.)
+without type-args is a codegen error. **Generic record-type
+declarations** lower the same way: `type Pair<A, B> = {…}` ⟿
+`type Pair[A any, B any] struct {…}`, and `Pair<int, string>{…}` ⟿
+`Pair[int, string]{…}`.
+
+**Generic sum-type declarations** (`type Tree<T> = | Leaf | Node(…)`)
+carry the type params onto the tagged struct and every constructor:
+`type Tree[T any] struct {…}`, `func TreeNode[T any](…) Tree[T]`. A
+**nullary** variant of a generic sum cannot be a package-level `var`
+(the value would need a type argument), so it becomes a parameterless
+generic constructor — `func TreeLeaf[T any]() Tree[T]` — the same
+shape as `OptionNone`. Go infers the type args of a *payload*
+constructor call from its value arguments, but a nullary constructor
+call has none, so codegen stamps explicit type args at the use site:
+from the expected type in a return / typed-binding position
+(`return Leaf` ⟿ `TreeLeaf[T]()`), or from the inferred instantiation
+of the enclosing payload-constructor call when nested as an argument
+(`Node(1, Leaf, Leaf)` ⟿ `TreeNode(1, TreeLeaf[int](), TreeLeaf[int]())`).
+The instantiation is read off a value argument whose field type is a
+bare type-parameter (`value: T`). A v1 limitation: if no field pins the
+parameter directly (`Node(left: Tree<T>, right: Tree<T>)` with a nested
+nullary `Node(Leaf, Leaf)`), the type-arg cannot be inferred at the
+nullary use site and the construct does not yet lower — proper inference
+for that shape is deferred to a sema generic-instantiation pass.
 
 Type parameters lower with constraint `any` **by default**, with
 one v1 exception: **constraint propagation from container key
