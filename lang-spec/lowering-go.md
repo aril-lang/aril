@@ -487,7 +487,15 @@ general exported-method rewrite arrives with the bindgen pipeline.)
 ```
 s.len()           → len(s)
 s.push(e)         → append(s, e)              (returns the new slice)
-s.copy()          → cloned := make([]T, len(s)); copy(cloned, s); cloned
+s.copy()          → append(s[:0:0], s...)     (fresh-backing clone: the
+                                                zero-cap reslice forces
+                                                append to allocate, so the
+                                                result never aliases s —
+                                                expression-form, no element
+                                                type named; the receiver is
+                                                emitted twice, so v1 expects
+                                                a side-effect-free receiver
+                                                — an Ident in the corpus)
 s[i]              → s[i]                       (panics on out-of-bounds,
                                                 Go semantics)
 s[lo:hi]          → s[lo:hi]
