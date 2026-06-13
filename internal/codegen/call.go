@@ -110,6 +110,21 @@ func (g *gen) emitCall(c *ast.Call) error {
 			}
 		}
 	}
+	// sort.sorted(s, less) — comparator sort that returns a NEW slice
+	// (binding-surface.md §sort). Lowers to the inline tideSorted helper
+	// (copy + sort.SliceStable), preserving the input's immutability.
+	// The comparator's omitted param types are stamped from sema's
+	// inferred Func (emitClosure reads g.info.Type) — T-Closure. Gated on
+	// the receiver resolving to the predeclared `sort` module (mirrors
+	// the refEq / error-ctor gates) so a user value named `sort` with its
+	// own `.sorted(a, b)` method is not hijacked.
+	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 2 && f.Name == "sorted" {
+		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
+			g.usesSortSorted = true
+			g.b.WriteString("tideSorted")
+			return g.emitArgList(c.Args)
+		}
+	}
 	// Conversion binding — `pkg.method(arg)` that lowers to a Go type
 	// conversion `target(arg)` (e.g. strings.fromBytes → string(b)),
 	// not a package call (bindings.go §stdlibConversion).
@@ -476,10 +491,22 @@ func isStdlibNamespace(e ast.Expr) bool {
 	return ok && isStdlibNamespaceName(id.Name)
 }
 
+// isBuiltinModule reports whether ident resolves (via sema) to a
+// predeclared stdlib module, not a user value that merely shares the
+// name. Used to gate name-matched binding intercepts so a local
+// shadowing the module is dispatched as an ordinary value.
+func (g *gen) isBuiltinModule(id *ast.Ident) bool {
+	if g.info == nil {
+		return false
+	}
+	sym := g.info.Symbol[id]
+	return sym != nil && sym.Kind == sema.SymBuiltinModule
+}
+
 func isStdlibNamespaceName(name string) bool {
 	switch name {
 	case "fmt", "os", "strings", "strconv", "bufio", "context",
-		"time", "sync", "io", "log", "net", "encoding", "math":
+		"time", "sync", "io", "log", "net", "encoding", "math", "sort":
 		return true
 	}
 	return false
