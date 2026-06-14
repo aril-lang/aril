@@ -211,6 +211,38 @@ reads only the field associated with that tag. Pattern
 desugaring in `desugaring.md` Stage 4 (`try`) and Stage 5
 (`match`) preserves the invariant.
 
+**`try` lowering (preamble specialisation).** Although
+`desugaring.md` Stage 4 models `try e` as a `match` rewrite,
+codegen specialises the two well-known shapes (Result / Option)
+to an inline *early-return preamble* rather than a full match —
+semantically equivalent, smaller output:
+
+```
+__tide_try_N := e
+if __tide_try_N.Tag == <bail> {        // 1 = Err (Result), 0 = None (Option)
+	return <wrapped bail of the enclosing return type>
+}
+// the value of `try e` is __tide_try_N.V
+```
+
+In **expression position** (`f(try e)`, `a + try e`) the preamble
+cannot sit inline, so it is **hoisted** to precede the enclosing
+statement; the `try` node itself lowers to `__tide_try_N.V`.
+
+Hoisting is only applied when it preserves observable evaluation
+order. Lifting a `try`'s early-return ahead of the surrounding
+expression would defer (or, on bail, skip) any *side-effecting
+expression evaluated before it* — so a `try` is hoisted only when
+every expression preceding it in its frame is pure; otherwise the
+`try` is left in place and rejected (lift it to a `let`/`var`/
+`return` binding). Two adjacent tries are always safe — both move
+out, in order — which is the common shape (`f(try a(), try b())`).
+The walk also stops at any construct introducing a new return
+frame (closure, value-position `match`/`if`/block, `scope`/`spawn`)
+— a `try` there belongs to that frame — and does not descend the
+right operand of `&&`/`||` (conditional evaluation; an
+unconditional preamble would change short-circuit semantics).
+
 `tidert.NewError(msg string) error` is a thin wrapper around
 `errors.New(msg)` from the Go stdlib; signature `func
 NewError(msg string) error`. It exists so codegen can emit
