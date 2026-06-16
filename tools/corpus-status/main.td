@@ -50,6 +50,17 @@ type Totals = {
   build_ok: int
   diag_ok: int
   diag_total: int
+  run_ok: int
+  run_total: int
+}
+
+// RunRow records one run-pass example's behavioural outcome. status is
+// "ok" (built and exited 0), "build-fail", "run-fail" (non-zero exit), or
+// "timeout".
+type RunRow = {
+  path: string
+  status: string
+  code: int
 }
 
 type Status = {
@@ -57,6 +68,7 @@ type Status = {
   totals: Totals
   files: []Row
   diag_misses: []Miss
+  run_fails: []RunRow
 }
 
 // --- subprocess helpers ---
@@ -439,9 +451,90 @@ func evalNegatives(tide: string): EvalResult {
   return EvalResult{ diag_ok: diagOk, diag_total: diagTotal, misses: sort.sorted(misses, lessMiss) }
 }
 
+// --- run_ok: the behavioural metric (run each run-pass example) ---
+//
+// run_ok counts run-pass examples whose entry builds AND, when run, exits 0
+// (exit-only for now; an expected-stdout sidecar diff lands with the
+// invocation spec). `no-run` examples (servers / blocking demos) are excluded
+// from the denominator. A per-example wall-clock timeout (ms) guards the
+// harness against a non-terminating example — see corpusexec.TimeoutCode.
+
+func runTimeoutMs(): int {
+  return 10000
+}
+
+type RunSpec = {
+  dir: string
+  entry: string
+  expects: string
+}
+
+type RunEval = {
+  run_ok: int
+  run_total: int
+  fails: []RunRow
+}
+
+// parseRunSpec extracts the run-relevant top-level fields of one example.toml.
+func parseRunSpec(manifest: string, text: string): RunSpec {
+  var entry = ""
+  var expects = ""
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if strings.hasPrefix(line, "entry") {
+      entry = tomlScalar(line)
+    } else if strings.hasPrefix(line, "expects") {
+      expects = tomlScalar(line)
+    }
+  }
+  return RunSpec{ dir: pathDir(manifest), entry: entry, expects: expects }
+}
+
+func lessRunRow(a: RunRow, b: RunRow): bool {
+  return a.path < b.path
+}
+
+func evalRuns(tide: string, tmp: string): RunEval {
+  let listed = runOk("git", ["ls-files", "examples", "user_tests"])
+  var manifests = []string{}
+  for ln in strings.split(listed, "\n") {
+    if pathBase(ln) == "example.toml" {
+      manifests = manifests.push(ln)
+    }
+  }
+  manifests = sort.sorted(manifests, lessStr)
+
+  var nOk = 0
+  var nTotal = 0
+  var fails = []RunRow{}
+  for mf in manifests {
+    let spec = parseRunSpec(mf, readFileOrEmpty(mf))
+    if spec.expects != "run-pass" || spec.entry == "" {
+      continue
+    }
+    nTotal = nTotal + 1
+    let entryPath = pathJoin(spec.dir, spec.entry)
+    let outBin = pathJoin(tmp, "run.bin")
+    let b = run(tide, ["build", "-o", outBin, entryPath])
+    if b.code() != 0 {
+      fails = fails.push(RunRow{ path: spec.dir, status: "build-fail", code: b.code() })
+      continue
+    }
+    let r = runExample(outBin, []string{}, "", runTimeoutMs())
+    if r.code() == 0 {
+      nOk = nOk + 1
+    } else if r.code() == 124 {
+      fails = fails.push(RunRow{ path: spec.dir, status: "timeout", code: r.code() })
+    } else {
+      fails = fails.push(RunRow{ path: spec.dir, status: "run-fail", code: r.code() })
+    }
+  }
+  return RunEval{ run_ok: nOk, run_total: nTotal, fails: sort.sorted(fails, lessRunRow) }
+}
+
 // --- collect ---
 
-func collect(): Status {
+func collect(measureRun: bool): Status {
   var tmp = ""
   match mkdirTemp("", "corpus-status-") {
     Ok(d) => tmp = d,
@@ -472,12 +565,16 @@ func collect(): Status {
     }
   }
   let ev = evalNegatives(tide)
+  var rv = RunEval{ run_ok: 0, run_total: 0, fails: []RunRow{} }
+  if measureRun {
+    rv = evalRuns(tide, tmp)
+  }
   match removeAll(tmp) {
     Ok(_) => fmt.print(""),
     Err(_) => fmt.print(""),
   }
   return Status{
-    schema_version: 2,
+    schema_version: 3,
     totals: Totals{
       total: files.len(),
       parse_fail: nparse,
@@ -486,9 +583,12 @@ func collect(): Status {
       build_ok: nbuild,
       diag_ok: ev.diag_ok,
       diag_total: ev.diag_total,
+      run_ok: rv.run_ok,
+      run_total: rv.run_total,
     },
     files: rows,
     diag_misses: ev.misses,
+    run_fails: rv.fails,
   }
 }
 
@@ -571,9 +671,10 @@ func renderMarkdown(s: Status): string {
   var out = ""
   out = out + "# Example conformance status\n\n"
   out = out + "Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/corpus-status`) — do not edit by hand. Build and run the tool to refresh.\n\n"
-  out = out + "Two tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:\n\n"
+  out = out + "Three tracked metrics; build_ok / diag_ok each carry a CI-enforced floor in `metric-floors.toml`:\n\n"
   out = out + fmt.sprintf("- **build_ok — %d / %d examples build end-to-end** (floor %d).\n", t.build_ok, t.total, floors.build_ok_min)
-  out = out + fmt.sprintf("- **diag_ok — %d / %d negative cases produce their expected diagnostic** (floor %d).\n\n", t.diag_ok, t.diag_total, floors.diag_ok_min)
+  out = out + fmt.sprintf("- **diag_ok — %d / %d negative cases produce their expected diagnostic** (floor %d).\n", t.diag_ok, t.diag_total, floors.diag_ok_min)
+  out = out + fmt.sprintf("- **run_ok — %d / %d run-pass examples build and exit 0 when run** (behavioural; `no-run` examples excluded).\n\n", t.run_ok, t.run_total)
   out = out + "| Stage reached | Count |\n"
   out = out + "|---|---|\n"
   out = out + fmt.sprintf("| ✅ build (full pipeline) | %d |\n", t.build_ok)
@@ -600,6 +701,14 @@ func renderMarkdown(s: Status): string {
     var got = m.got
     if got == "" { got = "—" }
     out = out + fmt.sprintf("| `%s` | %s | %s |\n", m.case, mdEscape(strings.replace(want, "\n", " ", -1)), mdEscape(got))
+  }
+  out = out + "\n## Run failures\n\n"
+  out = out + "Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.\n\n"
+  out = out + fmt.sprintf("**%d of %d run-pass examples fall short of run_ok.**\n\n", s.run_fails.len(), t.run_total)
+  out = out + "| Example | Status | Exit |\n"
+  out = out + "|---|---|---|\n"
+  for f in s.run_fails {
+    out = out + fmt.sprintf("| `%s` | %s | %d |\n", f.path, f.status, f.code)
   }
   return out
 }
@@ -643,10 +752,37 @@ func writeOrDie(path: string, content: string) {
 
 // --- --check: floor enforcement + snapshot freshness ---
 
-func cmdCheck(cur: Status): int {
+// withCommittedRun returns cur with its run_ok/run_total/run_fails replaced by
+// the committed snapshot's. Running examples is non-deterministic (scheduler-
+// and timeout-sensitive), so --check must NOT re-measure run_ok into a
+// byte-exact freshness comparison — that would flake CI red with no floor
+// breached. --check verifies the deterministic build/diag slice and carries
+// committed run data through unchanged; run_ok gains a deterministic,
+// cache-backed gate later in the epoch.
+func withCommittedRun(cur: Status, prev: Status): Status {
+  return Status{
+    schema_version: cur.schema_version,
+    totals: Totals{
+      total: cur.totals.total,
+      parse_fail: cur.totals.parse_fail,
+      sema_fail: cur.totals.sema_fail,
+      emit_fail: cur.totals.emit_fail,
+      build_ok: cur.totals.build_ok,
+      diag_ok: cur.totals.diag_ok,
+      diag_total: cur.totals.diag_total,
+      run_ok: prev.totals.run_ok,
+      run_total: prev.totals.run_total,
+    },
+    files: cur.files,
+    diag_misses: cur.diag_misses,
+    run_fails: prev.run_fails,
+  }
+}
+
+func cmdCheck(cur0: Status): int {
   let floors = readFloors()
-  let ab = cur.totals.build_ok
-  let ad = cur.totals.diag_ok
+  let ab = cur0.totals.build_ok
+  let ad = cur0.totals.diag_ok
   if ab < floors.build_ok_min {
     fmt.println(fmt.sprintf("corpus-status: REGRESSION: build_ok %d < floor %d — a previously-building example no longer builds", ab, floors.build_ok_min))
     return 1
@@ -660,6 +796,13 @@ func cmdCheck(cur: Status): int {
     fmt.println("corpus-status:", jsonPath(), "missing — run corpus-status")
     return 1
   }
+  // Carry the committed run data through (see withCommittedRun); a malformed
+  // committed snapshot leaves cur0's run fields and fails the freshness check.
+  var cur = cur0
+  match json.parse<Status>(toBytes(committed)) {
+    Ok(prev) => cur = withCommittedRun(cur0, prev),
+    Err(_) => fmt.print(""),
+  }
   if strings.trimSpace(statusJson(cur)) != strings.trimSpace(committed) {
     fmt.println(fmt.sprintf("corpus-status: snapshot stale (build_ok=%d, diag_ok=%d) — run corpus-status and commit the result", ab, ad))
     return 1
@@ -668,7 +811,7 @@ func cmdCheck(cur: Status): int {
     fmt.println("corpus-status:", mdPath(), "stale — run corpus-status and commit")
     return 1
   }
-  fmt.println(fmt.sprintf("corpus-status: up to date (build_ok %d/%d, diag_ok %d/%d)", ab, cur.totals.total, ad, cur.totals.diag_total))
+  fmt.println(fmt.sprintf("corpus-status: up to date (build_ok %d/%d, diag_ok %d/%d, run_ok %d/%d)", ab, cur.totals.total, ad, cur.totals.diag_total, cur.totals.run_ok, cur.totals.run_total))
   return 0
 }
 
@@ -682,6 +825,8 @@ type HistTotals = {
   emit_fail: int
   sema_fail: int
   parse_fail: int
+  run_ok: int
+  run_total: int
 }
 
 type HistStatus = {
@@ -700,8 +845,8 @@ func jsonStrLit(s: string): string {
   return "\"" + b + "\""
 }
 
-// historyLine renders one JSONL row with the Python tool's exact field order
-// and `", "` / `": "` separators.
+// historyLine renders one JSONL trend row. run_ok/run_total are 0 for
+// pre-run_ok (schema v2) blobs, which simply lacked the metric.
 func historyLine(date: string, commit: string, subject: string, t: HistTotals): string {
   return ("{"
     + "\"date\": " + jsonStrLit(date)
@@ -714,6 +859,8 @@ func historyLine(date: string, commit: string, subject: string, t: HistTotals): 
     + ", \"emit_fail\": " + strconv.itoa(t.emit_fail)
     + ", \"sema_fail\": " + strconv.itoa(t.sema_fail)
     + ", \"parse_fail\": " + strconv.itoa(t.parse_fail)
+    + ", \"run_ok\": " + strconv.itoa(t.run_ok)
+    + ", \"run_total\": " + strconv.itoa(t.run_total)
     + "}")
 }
 
@@ -729,7 +876,7 @@ func cmdHistory() {
     if blob.code() != 0 { continue }
     var hs = HistStatus{
       schema_version: 0,
-      totals: HistTotals{ total: 0, build_ok: 0, diag_ok: 0, diag_total: 0, emit_fail: 0, sema_fail: 0, parse_fail: 0 },
+      totals: HistTotals{ total: 0, build_ok: 0, diag_ok: 0, diag_total: 0, emit_fail: 0, sema_fail: 0, parse_fail: 0, run_ok: 0, run_total: 0 },
     }
     var parsed = false
     match json.parse<HistStatus>(toBytes(blob.out())) {
@@ -739,9 +886,9 @@ func cmdHistory() {
       },
       Err(_) => parsed = false,
     }
-    // Skip blobs from an incompatible (future/older) schema rather than
-    // mis-reading them.
-    if !parsed || hs.schema_version != 2 { continue }
+    // Accept the run_ok-era schema (v3) and its predecessor (v2, run fields
+    // absent → 0); skip anything else rather than mis-reading it.
+    if !parsed || (hs.schema_version != 2 && hs.schema_version != 3) { continue }
     fmt.println(historyLine(parts[1], sha[:12], parts[2], hs.totals))
   }
 }
@@ -758,25 +905,47 @@ func main() {
   }
   let args = os.args
   var mode = "write"
-  if args.len() > 1 {
-    if args[1] == "--check" {
+  var noRun = false
+  var i = 1
+  while i < args.len() {
+    let a = args[i]
+    if a == "--check" {
       mode = "check"
-    } else if args[1] == "--history" {
+    } else if a == "--history" {
       mode = "history"
+    } else if a == "--no-run" {
+      noRun = true
     } else {
-      fmt.println("usage: corpus-status [--check|--history]")
+      fmt.println("usage: corpus-status [--check|--history] [--no-run]")
       os.exit(2)
     }
+    i = i + 1
+  }
+  if noRun && mode != "write" {
+    fmt.println("corpus-status: --no-run cannot be combined with --check/--history")
+    os.exit(2)
   }
   if mode == "history" {
     cmdHistory()
     os.exit(0)
   }
-  let status = collect()
+  // --check verifies the deterministic build/diag slice and carries committed
+  // run data through (see withCommittedRun), so it skips the non-deterministic
+  // run pass — keeping CI fast and flake-free.
   if mode == "check" {
-    os.exit(cmdCheck(status))
+    os.exit(cmdCheck(collect(false)))
   }
+  // --no-run is the fast local pass: build_ok + diag_ok only, never running
+  // the examples and never touching the committed artifacts (which carry the
+  // full run_ok measurement).
+  if noRun {
+    let s = collect(false)
+    let t = s.totals
+    fmt.println(fmt.sprintf("corpus-status: --no-run (run_ok skipped): build_ok %d/%d, diag_ok %d/%d", t.build_ok, t.total, t.diag_ok, t.diag_total))
+    os.exit(0)
+  }
+  let status = collect(true)
   writeArtifacts(status)
   let t = status.totals
-  fmt.println(fmt.sprintf("corpus-status: wrote examples/auto-status.json + examples/STATUS.md (%d/%d build)", t.build_ok, t.total))
+  fmt.println(fmt.sprintf("corpus-status: wrote examples/auto-status.json + examples/STATUS.md (build_ok %d/%d, run_ok %d/%d)", t.build_ok, t.total, t.run_ok, t.run_total))
 }
