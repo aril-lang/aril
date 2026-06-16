@@ -24,9 +24,17 @@ them inside-out — the closest match wins.
    names of the enclosing `ClassDecl`. The receiver `this` is
    bound here; `ScopeRef` (`scope`) is *not* a class-scope name
    — it's a control-flow construct (see §Special names).
-4. **File scope.** Top-level `TopLevelLet` constants, `FuncDecl`,
-   `TypeDecl`, `ClassDecl`, `InterfaceDecl`, and imported
-   package aliases from `Import` declarations in the same file.
+4. **Package scope.** Top-level `TopLevelLet` constants, `FuncDecl`,
+   `TypeDecl`, `ClassDecl`, `InterfaceDecl` of **every `.td` file in
+   the package** (a package is a directory of `.td` files — RFC-0002
+   §"Package = directory"), plus the imported package aliases from
+   `Import` declarations. A single-file program is the degenerate
+   one-file package. All top-level names share this one flat scope, so
+   a declaration in one file is visible (unqualified) from any sibling
+   file with no `import` needed; a top-level name declared twice in the
+   package — within one file or across two — is **E0113**. Imports stay
+   per-file (each file lists the package aliases it uses), but the
+   resolved top-level names are package-wide.
 5. **Predeclared (built-in) scope.** Identifiers shipped by the
    language itself — the primitive type names, the generic
    containers (`Option`, `Result`, `Map`, `Set`, `Stack`,
@@ -42,7 +50,7 @@ them inside-out — the closest match wins.
 For each unqualified `Ident` AST node, lookup proceeds:
 
 ```
-for scope in (local, function/method, class, file, predeclared):
+for scope in (local, function/method, class, package, predeclared):
     # class scope is only present when resolving inside an
     # instance method body; skipped in functions, static
     # methods, and at the top level.
@@ -190,11 +198,11 @@ should rename or annotate.
 A variant of a sum type lives in **two** scopes simultaneously:
 
 - The sum type's namespace: `Direction.Up`, fully qualified.
-- The file scope, unqualified: `Up`, when no other binding with
+- The package scope, unqualified: `Up`, when no other binding with
   that name exists in the resolved chain.
 
 The resolver prefers the unqualified form when unambiguous. When
-two sum types in the same file expose a same-named variant, only
+two sum types in the same package expose a same-named variant, only
 the qualified form is legal — the unqualified form triggers
 **E0104 Ambiguous variant name**.
 
@@ -217,23 +225,27 @@ not.
 
 ## Imports and module-level scope
 
-`import fmt` introduces `fmt` into file scope; qualified member
-access (`fmt.println`) resolves through the package's
-declaration list. v1 has no `as` alias for imports —
-`fmt.println` always uses the package's natural name.
+`import fmt` introduces `fmt` into the importing file's scope;
+qualified member access (`fmt.println`) resolves through the
+package's declaration list. v1 has no `as` alias for imports —
+`fmt.println` always uses the package's natural name. Imports stay
+**per-file** (each file lists the package aliases it uses), even
+though the top-level declarations they sit beside are package-wide
+(§Scopes item 4).
 
-(Decl visibility across the whole file is covered in
+(Decl visibility across the whole package is covered in
 §Forward references below.)
 
 ## Forward references
 
 - **Top-level declarations:** all visible everywhere in the
-  file — no forward-reference errors. (`Decl` order in source
-  does not constrain reference order; the file scope is built
-  in one pass before any body is resolved.)
+  package — no forward-reference errors. (`Decl` order in source,
+  and which file of the package a decl sits in, do not constrain
+  reference order; the package scope is built in one pass over
+  every file before any body is resolved.)
 - **Block-local `let` / `var`:** visible only from their
   declaration point onward. A reference to an unresolved local
-  shadowed by an outer file-scope decl falls back to file scope.
+  shadowed by an outer package-scope decl falls back to package scope.
 - **Class fields / methods:** visible to each other regardless
   of order in the class body (the class scope is also built in
   one pass). v1 has **no field initializers** — fields are set
