@@ -195,6 +195,40 @@ func main() {
 	}
 }
 
+// TestUserTypeShadowsRuntimeName guards the R3 fix for a user type whose
+// name collides with a runtime type (Dynamic / Kind / …): in vendored
+// mode emitTypeExpr must emit the user's own type, not arilrt.X. Without
+// the isShadowedRuntimeType guard a field `k: Kind` mis-emits as
+// `arilrt.Kind` (or `undefined: arilrt` with no reflect import).
+func TestUserTypeShadowsRuntimeName(t *testing.T) {
+	src := `import fmt
+
+class Kind { var n: int }
+class Dynamic { var s: string }
+
+func describe(k: Kind): int { return k.n }
+
+func main() {
+  let k = Kind(5)
+  let d = Dynamic("hi")
+  fmt.println(describe(k), d.s)
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shadow.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	vOut, vErr, vExit := runAril(t, "run", path)
+	if vExit != 0 {
+		t.Fatalf("vendored run of a user type shadowing a runtime name failed (exit %d): %s", vExit, vErr)
+	}
+	iOut, _, _ := runAril(t, "run", "--inline-runtime", path)
+	if vOut != "5 hi\n" || iOut != vOut {
+		t.Errorf("shadow: stdout vendored=%q inline=%q; want \"5 hi\\n\" in both", vOut, iOut)
+	}
+}
+
 func TestVersion(t *testing.T) {
 	stdout, _, exit := runAril(t, "version")
 	if exit != 0 {

@@ -526,13 +526,35 @@ func (g *gen) sumOwnerName(owner string) string {
 
 // isRuntimeTypeName reports whether name is a predeclared runtime type
 // emitted from the arilrt package (Option / Result / Map / Set / Stack).
+// isRuntimeTypeName reports whether name is an arilrt runtime type that
+// can appear in a user type annotation (so emitTypeExpr must qualify it
+// in vendored mode). Limited to the names sema actually exposes as types:
+// the sums/containers (Option/Result/Map/Set/Stack) and the reflect
+// Dynamic wrapper. TypeDescriptor/FieldInfo/Kind are NOT here — sema does
+// not let user code name them in type position, and the reflect lowering
+// qualifies them directly via rt(); listing them would mis-qualify a
+// user type that merely shares the name.
 func isRuntimeTypeName(name string) bool {
 	switch name {
-	case "Option", "Result", "Map", "Set", "Stack",
-		"Dynamic", "TypeDescriptor", "FieldInfo", "Kind":
+	case "Option", "Result", "Map", "Set", "Stack", "Dynamic":
 		return true
 	}
 	return false
+}
+
+// isShadowedRuntimeType reports whether a user declaration shadows the
+// runtime type `name` — in which case emitTypeExpr must emit the user's
+// own (unqualified) type, not the arilrt one. Map/Set/Stack are
+// codegen-predeclared g.class entries (sema rejects user redeclaration),
+// so they are never shadows; any other runtime-type name found in
+// g.class was declared by the user (e.g. a `class Dynamic`).
+func (g *gen) isShadowedRuntimeType(name string) bool {
+	switch name {
+	case "Map", "Set", "Stack":
+		return false
+	}
+	_, ok := g.class[name]
+	return ok
 }
 
 // resolveRuntimeMode fixes the effective runtime mode now that the
@@ -1938,10 +1960,10 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 				g.b.WriteByte('*')
 			}
 		}
-		// Predeclared runtime types (Option / Result / Map / Set / Stack)
-		// take the arilrt package selector in vendored mode; everything
-		// else (user types, qualified names) keeps its plain spelling.
-		if len(v.QName) == 1 && isRuntimeTypeName(v.QName[0]) {
+		// Predeclared runtime types take the arilrt package selector in
+		// vendored mode; everything else (user types, qualified names, a
+		// user type shadowing a runtime name) keeps its plain spelling.
+		if len(v.QName) == 1 && isRuntimeTypeName(v.QName[0]) && !g.isShadowedRuntimeType(v.QName[0]) {
 			g.b.WriteString(g.rt(v.QName[0]))
 		} else {
 			g.b.WriteString(strings.Join(v.QName, "."))
