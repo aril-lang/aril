@@ -610,7 +610,7 @@ func (g *gen) inferArmResultType(e ast.Expr) (string, error) {
 	switch v := e.(type) {
 	case *ast.Ident:
 		if info, ok := g.variant[v.Name]; ok {
-			return goIdent(info.owner), nil
+			return g.sumOwnerName(info.owner), nil
 		}
 		if k := g.varKindOf(v); k != "" {
 			return k, nil
@@ -618,7 +618,7 @@ func (g *gen) inferArmResultType(e ast.Expr) (string, error) {
 	case *ast.Call:
 		if id, ok := v.Callee.(*ast.Ident); ok {
 			if info, ok := g.variant[id.Name]; ok {
-				return goIdent(info.owner), nil
+				return g.sumOwnerName(info.owner), nil
 			}
 		}
 	case *ast.IntLitExpr:
@@ -686,11 +686,11 @@ func (g *gen) goTypeFromSema(t sema.Type) (string, bool) {
 		tt, okT := g.goTypeFromSema(v.T)
 		et, okE := g.goTypeFromSema(v.E)
 		if okT && okE {
-			return "Result[" + tt + ", " + et + "]", true
+			return g.rt("Result") + "[" + tt + ", " + et + "]", true
 		}
 	case *sema.Option:
 		if tt, ok := g.goTypeFromSema(v.T); ok {
-			return "Option[" + tt + "]", true
+			return g.rt("Option") + "[" + tt + "]", true
 		}
 	case *sema.Tuple:
 		var sb strings.Builder

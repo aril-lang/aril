@@ -134,9 +134,9 @@ func (g *gen) externLiftOpen(kind externResultKind) bool {
 	g.markExternLift(kind)
 	switch kind {
 	case resultValue:
-		g.b.WriteString("ResultOf(")
+		g.b.WriteString(g.rt("ResultOf") + "(")
 	case resultUnit:
-		g.b.WriteString("ResultUnit(")
+		g.b.WriteString(g.rt("ResultUnit") + "(")
 	default:
 		return false
 	}

@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strings"
 
+	aril "github.com/aril-lang/aril"
 	"github.com/aril-lang/aril/internal/ast"
 	"github.com/aril-lang/aril/internal/bindgen"
 	"github.com/aril-lang/aril/internal/codegen"
@@ -61,8 +62,9 @@ func cmdEmit(args []string) int {
 	fs := flag.NewFlagSet("aril emit", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	noLine := fs.Bool("no-line", false, "strip //line directives from the lowered Go (for human reading)")
+	vendor := fs.Bool("vendor-runtime", false, "emit `import .../arilrt` + arilrt.X instead of inlining the runtime (not self-contained)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] [-vendor-runtime] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -72,7 +74,7 @@ func cmdEmit(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril emit: expected exactly one <file.aril>")
 		return 2
 	}
-	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine)
+	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine, *vendor)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -114,8 +116,9 @@ func cmdBuild(args []string) int {
 	fs := flag.NewFlagSet("aril build", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	out := fs.String("o", "", "output binary path (default: ./<basename>)")
+	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-inline-runtime] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -126,7 +129,7 @@ func cmdBuild(args []string) int {
 		return 2
 	}
 	srcPath := fs.Arg(0)
-	src, err := compileToTempGo(srcPath)
+	src, err := compileToTempGo(srcPath, !*inlineRT)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -142,7 +145,11 @@ func cmdBuild(args []string) int {
 		fmt.Fprintf(os.Stderr, "aril build: %v\n", err)
 		return 1
 	}
-	cmd := exec.Command("go", "build", "-o", absOut, "./...")
+	// Build the root main package (".") rather than "./..." — vendored
+	// mode adds the arilrt subpackage to the module, and `go build -o
+	// <file> ./...` refuses to write multiple packages to one output.
+	// arilrt is pulled in as main's dependency either way.
+	cmd := exec.Command("go", "build", "-o", absOut, ".")
 	cmd.Dir = src.dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -187,7 +194,7 @@ func gatherSources(path string) ([]string, error) {
 // generated Go source string. Used by cmdEmit and (indirectly via
 // compileToTempGo) by build / run.
 func emitGoSource(path string) (string, error) {
-	return emitGoSourceOpts(path, false)
+	return emitGoSourceOpts(path, false, false)
 }
 
 // emitGoSourceOpts is the variant that takes the `no-line` flag —
@@ -196,12 +203,12 @@ func emitGoSource(path string) (string, error) {
 // Build / run keep them on so panic traces and `go vet` errors
 // still point at Aril source coordinates. `emit` does not require a
 // `func main` (it lowers any package for inspection); build / run do.
-func emitGoSourceOpts(path string, stripLine bool) (string, error) {
+func emitGoSourceOpts(path string, stripLine, vendored bool) (string, error) {
 	files, userImports, err := buildUnit(path)
 	if err != nil {
 		return "", err
 	}
-	return compilePackage(files, userImports, stripLine, false)
+	return compilePackage(files, userImports, stripLine, false, vendored)
 }
 
 // buildUnit resolves a build target into its full source-file set. It
@@ -238,7 +245,7 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 // each file's real path; //line labels are suppressed when stripLine is
 // set. requireMain enforces exactly one `func main` across the package
 // (RFC-0002) — on for build / run, off for emit.
-func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain bool) (string, error) {
+func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain, vendored bool) (string, error) {
 	trees := make([]*ast.File, len(paths))
 	labels := make([]string, len(paths))
 	for i, p := range paths {
@@ -286,7 +293,12 @@ func compilePackage(paths []string, userImports map[string]bool, stripLine, requ
 			return "", err
 		}
 	}
-	goSrc, err := codegen.EmitFilesWithInfo(trees, labels, info)
+	opts := codegen.Options{}
+	if vendored {
+		opts.Vendored = true
+		opts.RuntimeImportPath = runtimeImportPath
+	}
+	goSrc, err := codegen.EmitFilesWithOptions(trees, labels, info, opts)
 	if err != nil {
 		return "", fmt.Errorf("aril: %s", err)
 	}
@@ -351,8 +363,9 @@ func emitGoFromText(src, file string) (string, error) {
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("aril run", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril run <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril run [-inline-runtime] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -362,14 +375,17 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril run: expected exactly one <file.aril>")
 		return 2
 	}
-	src, err := compileToTempGo(fs.Arg(0))
+	src, err := compileToTempGo(fs.Arg(0), !*inlineRT)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	defer os.RemoveAll(src.dir)
 
-	cmd := exec.Command("go", "run", "./...")
+	// Run the root main package (".") not "./..." — vendored mode adds
+	// the arilrt subpackage and `go run ./...` would try to run multiple
+	// packages. arilrt is compiled as main's dependency.
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = src.dir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -394,12 +410,12 @@ type compiledSource struct {
 // file or a package directory) and writes main.go + go.mod into a fresh
 // temp dir. The caller must RemoveAll the returned dir. Unlike emit, a
 // runnable build requires exactly one `func main` (RFC-0002).
-func compileToTempGo(path string) (*compiledSource, error) {
+func compileToTempGo(path string, vendored bool) (*compiledSource, error) {
 	files, userImports, err := buildUnit(path)
 	if err != nil {
 		return nil, err
 	}
-	goSrc, err := compilePackage(files, userImports, false, true)
+	goSrc, err := compilePackage(files, userImports, false, true, vendored)
 	if err != nil {
 		return nil, err
 	}
@@ -436,6 +452,18 @@ func writeTempModule(goSrc string) (*compiledSource, error) {
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
 		os.RemoveAll(dir)
 		return nil, fmt.Errorf("aril: write go.mod: %w", err)
+	}
+	// Vendored-mode programs import the arilrt runtime as a subpackage of
+	// the build module; copy the embedded sources into <dir>/arilrt so
+	// `go build/run ./...` resolves it (Block R, D18 CT2 — the compiler
+	// binary carries the exact runtime it emits). A program that emitted
+	// inline (no arilrt import — e.g. reflection fell back to inline) gets
+	// no subpackage. Keyed on the actual import so the two stay in step.
+	if strings.Contains(goSrc, `"`+runtimeImportPath+`"`) {
+		if _, err := aril.WriteVendoredRuntime(dir); err != nil {
+			os.RemoveAll(dir)
+			return nil, fmt.Errorf("aril: vendor runtime: %w", err)
+		}
 	}
 	return &compiledSource{dir: dir}, nil
 }

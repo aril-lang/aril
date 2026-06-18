@@ -29,7 +29,7 @@ func (g *gen) emitJSONCall(c *ast.Call) (bool, error) {
 		// json.parse<T>(data) → JSONParse[T](data): a generic
 		// helper around json.Unmarshal's pointer-mutation API, wrapped
 		// into Result<T, error>.
-		g.b.WriteString("JSONParse")
+		g.b.WriteString(g.rt("JSONParse"))
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return true, err
 		}
@@ -48,7 +48,7 @@ func (g *gen) emitJSONCall(c *ast.Call) (bool, error) {
 // emitResultOfCall emits `ResultOf(<goFn>(<args>))` — the wrap for a
 // Go `(T, error)`-returning binding into Result<T, error>.
 func (g *gen) emitResultOfCall(goFn string, args []ast.Expr) error {
-	g.b.WriteString("ResultOf(")
+	g.b.WriteString(g.rt("ResultOf") + "(")
 	g.b.WriteString(goFn)
 	if err := g.emitArgList(args); err != nil {
 		return err

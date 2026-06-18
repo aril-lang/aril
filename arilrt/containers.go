@@ -21,6 +21,10 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 func (m *Map[K, V]) Len() int     { return len(m.order) }
 func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
 
+// At is the raw index read backing `m[k]`: V's zero value for a missing
+// key (Go map semantics). Get is the Option-returning form.
+func (m *Map[K, V]) At(k K) V { return m.m[k] }
+
 func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}

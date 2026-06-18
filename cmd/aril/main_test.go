@@ -118,6 +118,36 @@ func TestFizzBuzzEndToEnd(t *testing.T) {
 	}
 }
 
+// TestRuntimeModeEquivalence is the Block R divergence guard: a program
+// must behave identically whether the runtime is vendored (the build/run
+// default) or inlined (--inline-runtime). It runs a spread of examples
+// exercising the runtime clusters (scope/concurrency, sort, sum types,
+// Map, Stack) in both modes and asserts the stdout + exit code agree —
+// catching any drift between the arilrt package and the inline emitter.
+func TestRuntimeModeEquivalence(t *testing.T) {
+	examples := []string{
+		"examples/concurrency/pipeline/pipeline.aril",                       // scope / spawn / Result
+		"examples/core-language/merge_intervals/merge_intervals.aril",       // sort.sorted / Result
+		"examples/core-language/invert_binary_tree/invert_binary_tree.aril", // sum types
+		"examples/core-language/two_sum/two_sum.aril",                       // Map
+		"examples/core-language/valid_parentheses/valid_parentheses.aril",   // Stack
+		"examples/stdlib-binding/config_loader/config_loader.aril",          // json.parse → arilrt.JSONParse
+		"examples/core-language/p1820/p1820.aril",                           // fmt.scan2 — the inline tuple-payload exception
+	}
+	for _, ex := range examples {
+		t.Run(filepath.Base(ex), func(t *testing.T) {
+			vOut, _, vExit := runAril(t, "run", ex)
+			iOut, _, iExit := runAril(t, "run", "--inline-runtime", ex)
+			if vExit != iExit {
+				t.Errorf("%s: exit differs — vendored %d, inline %d", ex, vExit, iExit)
+			}
+			if vOut != iOut {
+				t.Errorf("%s: stdout differs between runtime modes\n--- vendored ---\n%s\n--- inline ---\n%s", ex, vOut, iOut)
+			}
+		})
+	}
+}
+
 func TestVersion(t *testing.T) {
 	stdout, _, exit := runAril(t, "version")
 	if exit != 0 {

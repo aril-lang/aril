@@ -37,6 +37,27 @@ func EmitWithInfo(f *ast.File, file string, info *sema.Info) (string, error) {
 // to the right `.aril` file. `paths[i]` is the //line path for files[i]
 // ("" suppresses directives for that file).
 func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (string, error) {
+	return EmitFilesWithOptions(files, paths, info, Options{})
+}
+
+// Options selects how the emitted program obtains the arilrt runtime
+// (Block R, D18).
+type Options struct {
+	// Vendored emits `import <RuntimeImportPath>` plus qualified
+	// `arilrt.X` references, with the runtime supplied by the imported
+	// arilrt package (the build harness vendors it into the build
+	// module). When false the runtime is emitted inline as a
+	// self-contained single file. A reflection-using program always
+	// emits inline for now (resolveRuntimeMode).
+	Vendored bool
+	// RuntimeImportPath is the Go import path of the vendored arilrt
+	// package, e.g. "aril-output/arilrt"; required when Vendored.
+	RuntimeImportPath string
+}
+
+// EmitFilesWithOptions is EmitFilesWithInfo with explicit runtime-mode
+// Options.
+func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, opts Options) (string, error) {
 	merged := &ast.File{}
 	declFile := map[ast.Decl]string{}
 	seenImport := map[string]bool{}
@@ -59,17 +80,19 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 	f := merged
 	file := firstFile
 	g := &gen{
-		file:          file,
-		info:          info,
-		variant:       map[string]variantInfo{},
-		class:         map[string]classInfo{},
-		fieldTypes:    map[string]map[string]ast.TypeExpr{},
-		usedGoPkgs:    map[string]bool{},
-		externFunc:    map[string]*ast.ExternFuncDecl{},
-		externType:    map[string]*ast.ExternTypeDecl{},
-		externMethods: map[string]map[string]*ast.ExternMethod{},
-		externFields:  map[string]map[string]*ast.ExternField{},
-		externPkgs:    map[string]bool{},
+		file:              file,
+		info:              info,
+		vendoredRequested: opts.Vendored,
+		runtimeImport:     opts.RuntimeImportPath,
+		variant:           map[string]variantInfo{},
+		class:             map[string]classInfo{},
+		fieldTypes:        map[string]map[string]ast.TypeExpr{},
+		usedGoPkgs:        map[string]bool{},
+		externFunc:        map[string]*ast.ExternFuncDecl{},
+		externType:        map[string]*ast.ExternTypeDecl{},
+		externMethods:     map[string]map[string]*ast.ExternMethod{},
+		externFields:      map[string]map[string]*ast.ExternField{},
+		externPkgs:        map[string]bool{},
 	}
 	// Pre-scan foreign-binding decls (ffi.md) so call / type / member
 	// lowering and the import pre-walk can resolve them.
@@ -231,6 +254,7 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 			g.variant[name] = variantInfo{owner: "Kind", tag: i}
 		}
 	}
+	g.resolveRuntimeMode()
 	g.writeHeader(f)
 	for _, d := range f.Decls {
 		// Attribute this decl's //line directives to its own source
@@ -295,6 +319,17 @@ type gen struct {
 	file   string
 	info   *sema.Info
 	indent int
+	// Runtime emission mode (Block R, D18). vendoredRequested records
+	// the caller's choice; runtimePrefix is the package selector
+	// resolved after the predeclared-usage pre-walk ("arilrt." in
+	// effective vendored mode, "" inline) and prepended to every runtime
+	// symbol via rt(); runtimeImport is the Go import path of the
+	// vendored arilrt package. A reflection-using program falls back to
+	// inline (the reflect layer is not vendored yet), so runtimePrefix
+	// stays "" even when vendoredRequested — see resolveRuntimeMode.
+	vendoredRequested bool
+	runtimePrefix     string
+	runtimeImport     string
 	// emittedLine tracks the source line whose //line directive
 	// has most recently been written, so we avoid emitting the
 	// same directive twice in a row.
@@ -469,6 +504,59 @@ type fieldDescInfo struct {
 	descRef  string
 }
 
+// rt qualifies a runtime symbol with the active package selector:
+// "Option" → "arilrt.Option" in vendored mode, "Option" in inline
+// single-file mode (runtimePrefix == ""). Every emission of an
+// arilrt-provided type / constructor / helper routes through here so the
+// vendored/inline choice is a single prefix toggle (Block R, D18).
+func (g *gen) rt(name string) string { return g.runtimePrefix + name }
+
+// sumOwnerName spells a sum-type owner for constructor / type emission:
+// the predeclared Option / Result are runtime-provided and take the
+// package selector in vendored mode; a user sum keeps its plain Go name.
+func (g *gen) sumOwnerName(owner string) string {
+	if owner == "Option" || owner == "Result" {
+		return g.rt(owner)
+	}
+	return goIdent(owner)
+}
+
+// isRuntimeTypeName reports whether name is a predeclared runtime type
+// emitted from the arilrt package (Option / Result / Map / Set / Stack).
+func isRuntimeTypeName(name string) bool {
+	switch name {
+	case "Option", "Result", "Map", "Set", "Stack":
+		return true
+	}
+	return false
+}
+
+// resolveRuntimeMode fixes the effective runtime mode now that the
+// predeclared-usage pre-walk has run. Vendored emission is used only
+// when the caller asked for it AND the program does not use reflection
+// (the reflect layer is still emitted inline; Block R R3 vendors it).
+// Until then a reflection-using program emits the whole runtime inline,
+// so its inline reflect prelude and the vendored sums never disagree on
+// where Option/Result live.
+func (g *gen) resolveRuntimeMode() {
+	if g.vendoredRequested && !g.usesReflect {
+		g.runtimePrefix = "arilrt."
+	}
+}
+
+func (g *gen) vendored() bool { return g.runtimePrefix != "" }
+
+// usesRuntime reports whether the program references any arilrt-provided
+// symbol — the gate for emitting the arilrt import in vendored mode.
+// usesReflect is excluded: a reflection program emits inline (see
+// resolveRuntimeMode) and never reaches vendored().
+func (g *gen) usesRuntime() bool {
+	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
+		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
+		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
+		g.usesScope || g.usesSortSorted
+}
+
 func (g *gen) writeHeader(f *ast.File) {
 	g.b.WriteString("package main\n\n")
 	// PR-C bindings shortcut: every Aril import resolves to the
@@ -511,19 +599,42 @@ func (g *gen) writeHeader(f *ast.File) {
 		add("strconv")
 	}
 	if g.usesScope {
-		// Structured-concurrency scopes lower onto an inline group
-		// helper built from the standard library (no errgroup dep —
-		// generated modules are stdlib-only).
+		// Structured-concurrency scopes lower onto the Group helper. The
+		// scope IIFE in main still spells context.Background() directly,
+		// so context is needed in both modes; sync is used only by the
+		// Group implementation, which lives in arilrt under vendored mode.
 		add("context")
-		add("sync")
+		if !g.vendored() {
+			add("sync")
+		}
 	}
 	if g.usesErrorCtor {
 		// `error(msg)` lowers to errors.New(msg) (builtins.md §error).
 		add("errors")
 	}
-	if g.usesSortSorted {
-		// sort.sorted lowers onto the Sorted helper (sort.SliceStable).
+	if g.usesSortSorted && !g.vendored() {
+		// sort.sorted lowers onto the Sorted helper (sort.SliceStable),
+		// which lives in arilrt under vendored mode — no sort in main.
 		add("sort")
+	}
+	// The scan helpers (fmt.scan* → Scan*) are emitted inline in main in
+	// both modes (their anonymous tuple-payload struct must be declared
+	// in main so the user's `Ok((a, b))` destructure can read its
+	// unexported _0/_1 fields — those are not reachable across the arilrt
+	// package boundary), so main always needs fmt for them. json.parse →
+	// JSONParse lives in arilrt under vendored mode (single-type payload,
+	// no boundary issue), so its encoding/json need is inline-only.
+	if g.usesScan || g.usesScan2 || g.usesScan3 {
+		add("fmt")
+	}
+	if g.usesJSONParse && !g.vendored() {
+		add("encoding/json")
+	}
+	if g.vendored() && g.usesRuntime() {
+		// The runtime is the imported arilrt package, not inline defs.
+		// Only import it when the program actually references a runtime
+		// symbol — a runtime-free program (hello world) imports nothing.
+		add(g.runtimeImport)
 	}
 	// Foreign-binding packages (ffi.md) — the Go import paths named by
 	// `@go` attributes of the extern funcs/handles actually used. These
@@ -550,12 +661,21 @@ func (g *gen) writeHeader(f *ast.File) {
 		}
 		g.b.WriteString(")\n\n")
 	}
-	g.writePredeclaredSums()
-	g.writePredeclaredContainers()
-	g.writePredeclaredMakeSlice()
+	// The scan helpers are emitted inline in both modes (see the fmt note
+	// above); their Result references route through rt() so they read
+	// from arilrt under vendored mode.
 	g.writePredeclaredScan()
 	g.writePredeclaredScan2()
 	g.writePredeclaredScan3()
+	// Everything else: in vendored mode the runtime is the imported arilrt
+	// package, so emit no inline definitions. In inline mode each helper
+	// is emitted only when used (the writePredeclared* usage gates).
+	if g.vendored() {
+		return
+	}
+	g.writePredeclaredSums()
+	g.writePredeclaredContainers()
+	g.writePredeclaredMakeSlice()
 	g.writePredeclaredResultOf()
 	g.writePredeclaredResultUnit()
 	g.writePredeclaredJSONParse()
@@ -625,14 +745,14 @@ func (g *gen) writePredeclaredScan() {
 	if !g.usesScan {
 		return
 	}
-	g.b.WriteString(`func Scan[T any]() Result[T, error] {
-	var v T
-	if _, err := fmt.Scan(&v); err != nil {
-		return ResultErr[T, error](err)
-	}
-	return ResultOk[T, error](v)
-}
-`)
+	res, ok, er := g.rt("Result"), g.rt("ResultOk"), g.rt("ResultErr")
+	g.b.WriteString("func Scan[T any]() " + res + "[T, error] {\n")
+	g.b.WriteString("\tvar v T\n")
+	g.b.WriteString("\tif _, err := fmt.Scan(&v); err != nil {\n")
+	g.b.WriteString("\t\treturn " + er + "[T, error](err)\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + ok + "[T, error](v)\n")
+	g.b.WriteString("}\n")
 }
 
 // writePredeclaredScan2 / writePredeclaredScan3 emit the multi-value
@@ -647,31 +767,30 @@ func (g *gen) writePredeclaredScan2() {
 	if !g.usesScan2 {
 		return
 	}
-	g.b.WriteString(`func Scan2[A any, B any]() Result[struct { _0 A; _1 B }, error] {
-	var a A
-	var b B
-	if _, err := fmt.Scan(&a, &b); err != nil {
-		return ResultErr[struct { _0 A; _1 B }, error](err)
-	}
-	return ResultOk[struct { _0 A; _1 B }, error](struct { _0 A; _1 B }{a, b})
-}
-`)
+	res, ok, er := g.rt("Result"), g.rt("ResultOk"), g.rt("ResultErr")
+	tup := "struct { _0 A; _1 B }"
+	g.b.WriteString("func Scan2[A any, B any]() " + res + "[" + tup + ", error] {\n")
+	g.b.WriteString("\tvar a A\n\tvar b B\n")
+	g.b.WriteString("\tif _, err := fmt.Scan(&a, &b); err != nil {\n")
+	g.b.WriteString("\t\treturn " + er + "[" + tup + ", error](err)\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + ok + "[" + tup + ", error](" + tup + "{a, b})\n")
+	g.b.WriteString("}\n")
 }
 
 func (g *gen) writePredeclaredScan3() {
 	if !g.usesScan3 {
 		return
 	}
-	g.b.WriteString(`func Scan3[A any, B any, C any]() Result[struct { _0 A; _1 B; _2 C }, error] {
-	var a A
-	var b B
-	var c C
-	if _, err := fmt.Scan(&a, &b, &c); err != nil {
-		return ResultErr[struct { _0 A; _1 B; _2 C }, error](err)
-	}
-	return ResultOk[struct { _0 A; _1 B; _2 C }, error](struct { _0 A; _1 B; _2 C }{a, b, c})
-}
-`)
+	res, ok, er := g.rt("Result"), g.rt("ResultOk"), g.rt("ResultErr")
+	tup := "struct { _0 A; _1 B; _2 C }"
+	g.b.WriteString("func Scan3[A any, B any, C any]() " + res + "[" + tup + ", error] {\n")
+	g.b.WriteString("\tvar a A\n\tvar b B\n\tvar c C\n")
+	g.b.WriteString("\tif _, err := fmt.Scan(&a, &b, &c); err != nil {\n")
+	g.b.WriteString("\t\treturn " + er + "[" + tup + ", error](err)\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + ok + "[" + tup + ", error](" + tup + "{a, b, c})\n")
+	g.b.WriteString("}\n")
 }
 
 // writePredeclaredResultOf emits the ResultOf helper backing the
@@ -811,6 +930,7 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 }
 func (m *Map[K, V]) Len() int { return len(m.order) }
 func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) At(k K) V { return m.m[k] }
 func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
@@ -1259,7 +1379,14 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			// rather than a package call (strings.fromBytes →
 			// string(...)), which needs no import.
 			if recv, ok := v.Receiver.(*ast.Ident); ok && isStdlibNamespaceName(recv.Name) {
-				if !isConversionBinding(recv.Name, v.Name) {
+				// A conversion binding lowers to a Go cast (no import); a
+				// runtime-helper binding (sort.sorted, fmt.scan*,
+				// json.parse) lowers to an arilrt helper, so its stdlib
+				// package is referenced only by the inline helper body —
+				// not by main, and never in vendored mode. Both are
+				// excluded from the used-package set here; the inline
+				// helpers add their own stdlib needs in writeHeader.
+				if !isConversionBinding(recv.Name, v.Name) && !isRuntimeHelperBinding(recv.Name, v.Name) {
 					g.usedGoPkgs[recv.Name] = true
 				}
 			}
@@ -1805,7 +1932,14 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 				g.b.WriteByte('*')
 			}
 		}
-		g.b.WriteString(strings.Join(v.QName, "."))
+		// Predeclared runtime types (Option / Result / Map / Set / Stack)
+		// take the arilrt package selector in vendored mode; everything
+		// else (user types, qualified names) keeps its plain spelling.
+		if len(v.QName) == 1 && isRuntimeTypeName(v.QName[0]) {
+			g.b.WriteString(g.rt(v.QName[0]))
+		} else {
+			g.b.WriteString(strings.Join(v.QName, "."))
+		}
 		if err := g.emitTypeArgs(v.Args); err != nil {
 			return err
 		}
@@ -2120,7 +2254,7 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 // helpers (Go infers `SetFrom`'s `T` from the slice literal).
 func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) == 0 {
-		g.b.WriteString("NewSet")
+		g.b.WriteString(g.rt("NewSet"))
 		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 			return err
 		}
@@ -2130,7 +2264,7 @@ func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 	if len(b.TypeName.Args) != 1 {
 		return fmt.Errorf("codegen: Set literal needs an element type argument — write Set<T>{…}")
 	}
-	g.b.WriteString("SetFrom([]")
+	g.b.WriteString(g.rt("SetFrom") + "([]")
 	if err := g.emitTypeExpr(b.TypeName.Args[0]); err != nil {
 		return err
 	}
@@ -2158,7 +2292,7 @@ func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 // literal a single Go expression.
 func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) == 0 {
-		g.b.WriteString("NewMap")
+		g.b.WriteString(g.rt("NewMap"))
 		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 			return err
 		}
@@ -2202,7 +2336,7 @@ func (g *gen) emitStackBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) != 0 {
 		return fmt.Errorf("codegen: Stack literal must be empty — push elements after construction")
 	}
-	g.b.WriteString("NewStack")
+	g.b.WriteString(g.rt("NewStack"))
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
@@ -2552,7 +2686,7 @@ func (g *gen) emitExpr(e ast.Expr) error {
 			// all other variants emit bare.
 			if len(info.sumTypeParams) > 0 {
 				if len(g.sumCtorArgs) == len(info.sumTypeParams) {
-					g.b.WriteString(goIdent(info.owner))
+					g.b.WriteString(g.sumOwnerName(info.owner))
 					g.b.WriteString(goIdent(v.Name))
 					g.b.WriteByte('[')
 					g.b.WriteString(strings.Join(g.sumCtorArgs, ", "))
@@ -2560,7 +2694,7 @@ func (g *gen) emitExpr(e ast.Expr) error {
 					return nil
 				}
 				if targs, ok := g.userSumCtorArgsFromExpect(info, g.expectType); ok {
-					g.b.WriteString(goIdent(info.owner))
+					g.b.WriteString(g.sumOwnerName(info.owner))
 					g.b.WriteString(goIdent(v.Name))
 					if err := g.emitTypeArgs(targs); err != nil {
 						return err
@@ -2570,7 +2704,7 @@ func (g *gen) emitExpr(e ast.Expr) error {
 				}
 			}
 			if targs, _, ok := g.predeclaredCtorTypeArgs(v.Name, g.expectType); ok {
-				g.b.WriteString(goIdent(info.owner))
+				g.b.WriteString(g.sumOwnerName(info.owner))
 				g.b.WriteString(goIdent(v.Name))
 				if err := g.emitTypeArgs(targs); err != nil {
 					return err
@@ -2578,7 +2712,7 @@ func (g *gen) emitExpr(e ast.Expr) error {
 				g.b.WriteString("()")
 				return nil
 			}
-			g.b.WriteString(goIdent(info.owner))
+			g.b.WriteString(g.sumOwnerName(info.owner))
 			g.b.WriteString(goIdent(v.Name))
 			return nil
 		}
@@ -2634,17 +2768,20 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// `m[k]` where m is a Map<K, V> lowers to the wrapper's
 		// internal `m.m[k]` direct map access — returns V's
 		// Go zero value for a missing key (mirrors Go's map
-		// semantics). `m.get(k)` is the explicit-Option form
-		// when the user wants the missing case to surface.
+		// semantics). `m.Get(k)` is the explicit-Option form
+		// when the user wants the missing case to surface. The raw read
+		// goes through the exported At accessor (not the unexported `m`
+		// field) so the same emission works across the arilrt package
+		// boundary in vendored mode.
 		if id, ok := v.Receiver.(*ast.Ident); ok && g.varKindOf(id) == "Map" {
 			if err := g.emitExpr(id); err != nil {
 				return err
 			}
-			g.b.WriteString(".m[")
+			g.b.WriteString(".At(")
 			if err := g.emitExpr(v.Idx); err != nil {
 				return err
 			}
-			g.b.WriteByte(']')
+			g.b.WriteByte(')')
 			return nil
 		}
 		if err := g.emitExpr(v.Receiver); err != nil {

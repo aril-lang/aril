@@ -38,6 +38,7 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 }
 func (m *Map[K, V]) Len() int     { return len(m.order) }
 func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) At(k K) V     { return m.m[k] }
 func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
@@ -77,8 +78,8 @@ func (m *Map[K, V]) Values() []V {
 func main() {
 	var counts = NewMap[rune, int]()
 	counts.Set('a', 1)
-	counts.Set('b', counts.m['b']+5)
-	fmt.Println(counts.m['a'], counts.m['b'], counts.m['z'])
+	counts.Set('b', counts.At('b')+5)
+	fmt.Println(counts.At('a'), counts.At('b'), counts.At('z'))
 }
 
 --- STDOUT ---
