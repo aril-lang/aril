@@ -46,14 +46,14 @@ type Stack[T any] struct {
 	xs []T
 }
 
-func stackNew[T any]() *Stack[T] {
+func NewStack[T any]() *Stack[T] {
 	return &Stack[T]{xs: nil}
 }
-func (s *Stack[T]) len() int { return len(s.xs) }
-func (s *Stack[T]) push(e T) {
+func (s *Stack[T]) Len() int { return len(s.xs) }
+func (s *Stack[T]) Push(e T) {
 	s.xs = append(s.xs, e)
 }
-func (s *Stack[T]) pop() Result[T, error] {
+func (s *Stack[T]) Pop() Result[T, error] {
 	n := len(s.xs)
 	if n == 0 {
 		var zero T
@@ -63,7 +63,7 @@ func (s *Stack[T]) pop() Result[T, error] {
 	s.xs = s.xs[:n-1]
 	return Result[T, error]{Tag: 0, V: v}
 }
-func (s *Stack[T]) peek() Option[T] {
+func (s *Stack[T]) Peek() Option[T] {
 	n := len(s.xs)
 	if n == 0 {
 		return Option[T]{Tag: 0}
@@ -77,8 +77,8 @@ type arilEmptyStackError struct{}
 
 func (arilEmptyStackError) Error() string { return "empty stack" }
 func main() {
-	var s = stackNew[int]()
-	__aril_match_1 := s.pop()
+	var s = NewStack[int]()
+	__aril_match_1 := s.Pop()
 	switch __aril_match_1.Tag {
 	case 0:
 		v := __aril_match_1.V

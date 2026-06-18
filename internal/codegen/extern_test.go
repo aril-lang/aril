@@ -63,8 +63,8 @@ func TestGoRefMember(t *testing.T) {
 
 // externResultKindOf drives the boundary lift (lowering-go.md
 // §ForeignCall): a Go `(T, error)` referent (Aril `Result<T, error>`)
-// lifts via arilResultOf; a bare-`error` referent (Aril
-// `Result<unit, error>`) via arilResultUnit; anything else lowers bare.
+// lifts via ResultOf; a bare-`error` referent (Aril
+// `Result<unit, error>`) via ResultUnit; anything else lowers bare.
 func TestExternResultKindOf(t *testing.T) {
 	result := func(args ...ast.TypeExpr) *ast.NamedType {
 		return &ast.NamedType{QName: []string{"Result"}, Args: args}
@@ -90,7 +90,7 @@ func TestExternResultKindOf(t *testing.T) {
 
 // The method site of the unit lift (emitExternMethodCall) shares the
 // classifier with the func site but is a distinct code path; assert a
-// handle method returning Result<unit, error> lowers via arilResultUnit.
+// handle method returning Result<unit, error> lowers via ResultUnit.
 func TestExternMethodUnitLift(t *testing.T) {
 	src := `import fmt
 
@@ -111,7 +111,7 @@ func main() {
 }
 `
 	got := emitString(t, src)
-	if !strings.Contains(got, "arilResultUnit(b.WriteByte(") {
-		t.Errorf("method unit lift not lowered via arilResultUnit:\n%s", got)
+	if !strings.Contains(got, "ResultUnit(b.WriteByte(") {
+		t.Errorf("method unit lift not lowered via ResultUnit:\n%s", got)
 	}
 }

@@ -46,7 +46,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilResultOf[T any](v T, err error) Result[T, error] {
+func ResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -66,7 +66,7 @@ func render(e error) string {
 func main() {
 	var m = &MyErr{Msg: "custom"}
 	fmt.Println(m.error())
-	__aril_match_1 := arilResultOf(strconv.Atoi("xx"))
+	__aril_match_1 := ResultOf(strconv.Atoi("xx"))
 	switch __aril_match_1.Tag {
 	case 0:
 		fmt.Println("ok")

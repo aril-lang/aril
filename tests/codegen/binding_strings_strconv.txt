@@ -45,7 +45,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilResultOf[T any](v T, err error) Result[T, error] {
+func ResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -54,7 +54,7 @@ func arilResultOf[T any](v T, err error) Result[T, error] {
 func sum(csv string) Result[int, error] {
 	var total = 0
 	for _, p := range strings.Split(csv, ",") {
-		__aril_try_1 := arilResultOf(strconv.Atoi(strings.TrimSpace(p)))
+		__aril_try_1 := ResultOf(strconv.Atoi(strings.TrimSpace(p)))
 		if __aril_try_1.Tag == 1 {
 			return Result[int, error]{Tag: 1, E: __aril_try_1.E}
 		}

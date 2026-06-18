@@ -48,19 +48,19 @@ func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
 
-type arilGroup struct {
+type Group struct {
 	wg     sync.WaitGroup
 	once   sync.Once
 	err    error
 	cancel context.CancelFunc
 }
 
-func arilNewGroup(parent context.Context) (*arilGroup, context.Context) {
+func NewGroup(parent context.Context) (*Group, context.Context) {
 	ctx, cancel := context.WithCancel(parent)
-	return &arilGroup{cancel: cancel}, ctx
+	return &Group{cancel: cancel}, ctx
 }
 
-func (g *arilGroup) Go(f func() error) {
+func (g *Group) Go(f func() error) {
 	g.wg.Add(1)
 	go func() {
 		defer g.wg.Done()
@@ -73,7 +73,7 @@ func (g *arilGroup) Go(f func() error) {
 	}()
 }
 
-func (g *arilGroup) Wait() error {
+func (g *Group) Wait() error {
 	g.wg.Wait()
 	g.cancel()
 	return g.err
@@ -81,10 +81,10 @@ func (g *arilGroup) Wait() error {
 func main() {
 	var ch = make(chan int, 1)
 	var r = func() Result[int, error] {
-		_arilEg0, _ := arilNewGroup(context.Background())
+		_arilEg0, _ := NewGroup(context.Background())
 		_arilEg0.Go(func() error {
 			var inner = func() Result[int, error] {
-				_arilEg1, _ := arilNewGroup(context.Background())
+				_arilEg1, _ := NewGroup(context.Background())
 				_arilEg1.Go(func() error {
 					return nil
 				})

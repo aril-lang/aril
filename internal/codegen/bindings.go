@@ -15,7 +15,7 @@ package codegen
 //                 Go referent is value-returning (no error), so the
 //                 call/field lowers straight through with only an
 //                 identifier swap. Handled by mapFieldName.
-//   - resultWrap: `pkg.method(args)` → `arilResultOf(pkg.GoName(args))`.
+//   - resultWrap: `pkg.method(args)` → `ResultOf(pkg.GoName(args))`.
 //                 The Go referent returns `(T, error)`; the helper
 //                 folds that into the predeclared `Result<T, error>`.
 //                 Handled by emitCall.
@@ -83,7 +83,7 @@ var stdlibRename = map[[2]string]string{
 
 // stdlibResultWrap maps a stdlib binding whose Go referent returns
 // `(T, error)` to its Go identifier. The call lowers to
-// `arilResultOf(pkg.GoName(args))`, folding the two-value Go return
+// `ResultOf(pkg.GoName(args))`, folding the two-value Go return
 // into the predeclared `Result<T, error>` (binding-surface.md — the
 // `(T, error)` → Result wrapper convention). Go infers T from the
 // referent's first return, so one generic helper serves every row.

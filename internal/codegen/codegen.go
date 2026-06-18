@@ -337,24 +337,24 @@ type gen struct {
 	usesScan      bool
 	// usesScan2 / usesScan3 — the multi-value stdin bindings
 	// `fmt.scan2<A,B>()` / `fmt.scan3<A,B,C>()`, lowered to the
-	// arilScan2 / arilScan3 helpers (Result<(A,B[,C]), error>).
+	// Scan2 / Scan3 helpers (Result<(A,B[,C]), error>).
 	usesScan2    bool
 	usesScan3    bool
 	usesResultOf bool
 	// usesResultUnit — an extern referent returning a bare Go `error`
-	// (Aril `Result<unit, error>`) is lifted via the arilResultUnit
+	// (Aril `Result<unit, error>`) is lifted via the ResultUnit
 	// helper (lowering-go.md §ForeignCall).
 	usesResultUnit bool
 	// usesJSON — any json.* binding is used, so Go's encoding/json is
 	// imported and (with usesOption) the Option ⇄ null/value JSON
 	// methods are emitted. usesJSONParse additionally forces the
-	// arilJSONParse helper (json.parse<T>).
+	// JSONParse helper (json.parse<T>).
 	usesJSON      bool
 	usesJSONParse bool
 	usesTryRecv   bool
 	usesScope     bool
 	// usesSortSorted — `sort.sorted(s, less)` is used, so its inline
-	// arilSorted helper (copy + sort.SliceStable) and Go's "sort"
+	// Sorted helper (copy + sort.SliceStable) and Go's "sort"
 	// import are needed.
 	usesSortSorted bool
 	// usesErrorCtor — the `error(msg)` free constructor (builtins.md)
@@ -522,7 +522,7 @@ func (g *gen) writeHeader(f *ast.File) {
 		add("errors")
 	}
 	if g.usesSortSorted {
-		// sort.sorted lowers onto the arilSorted helper (sort.SliceStable).
+		// sort.sorted lowers onto the Sorted helper (sort.SliceStable).
 		add("sort")
 	}
 	// Foreign-binding packages (ffi.md) — the Go import paths named by
@@ -612,11 +612,11 @@ func (g *gen) writePredeclaredMakeSlice() {
 	if !g.usesMakeSlice {
 		return
 	}
-	g.b.WriteString(`func arilMakeSlice[T any](n int) []T { return make([]T, n) }
+	g.b.WriteString(`func MakeSlice[T any](n int) []T { return make([]T, n) }
 `)
 }
 
-// writePredeclaredScan emits the arilScan helper backing the
+// writePredeclaredScan emits the Scan helper backing the
 // `fmt.scan<T>()` binding (binding-surface.md §fmt). It wraps Go's
 // pointer-mutation `fmt.Scan(&v)` into Result<T, error>: a read error
 // becomes Err, a successful parse becomes Ok(v). Requires the
@@ -625,7 +625,7 @@ func (g *gen) writePredeclaredScan() {
 	if !g.usesScan {
 		return
 	}
-	g.b.WriteString(`func arilScan[T any]() Result[T, error] {
+	g.b.WriteString(`func Scan[T any]() Result[T, error] {
 	var v T
 	if _, err := fmt.Scan(&v); err != nil {
 		return ResultErr[T, error](err)
@@ -647,7 +647,7 @@ func (g *gen) writePredeclaredScan2() {
 	if !g.usesScan2 {
 		return
 	}
-	g.b.WriteString(`func arilScan2[A any, B any]() Result[struct { _0 A; _1 B }, error] {
+	g.b.WriteString(`func Scan2[A any, B any]() Result[struct { _0 A; _1 B }, error] {
 	var a A
 	var b B
 	if _, err := fmt.Scan(&a, &b); err != nil {
@@ -662,7 +662,7 @@ func (g *gen) writePredeclaredScan3() {
 	if !g.usesScan3 {
 		return
 	}
-	g.b.WriteString(`func arilScan3[A any, B any, C any]() Result[struct { _0 A; _1 B; _2 C }, error] {
+	g.b.WriteString(`func Scan3[A any, B any, C any]() Result[struct { _0 A; _1 B; _2 C }, error] {
 	var a A
 	var b B
 	var c C
@@ -674,7 +674,7 @@ func (g *gen) writePredeclaredScan3() {
 `)
 }
 
-// writePredeclaredResultOf emits the arilResultOf helper backing the
+// writePredeclaredResultOf emits the ResultOf helper backing the
 // `(T, error)` → Result<T, error> stdlib bindings (bindings.go —
 // `strconv.atoi`, `os.readFile`, …). A non-nil error becomes Err, a
 // successful value becomes Ok. Requires the predeclared Result sum
@@ -683,7 +683,7 @@ func (g *gen) writePredeclaredResultOf() {
 	if !g.usesResultOf {
 		return
 	}
-	g.b.WriteString(`func arilResultOf[T any](v T, err error) Result[T, error] {
+	g.b.WriteString(`func ResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -692,7 +692,7 @@ func (g *gen) writePredeclaredResultOf() {
 `)
 }
 
-// writePredeclaredResultUnit emits the arilResultUnit helper backing
+// writePredeclaredResultUnit emits the ResultUnit helper backing
 // the bare-`error` → Result<unit, error> boundary lift for extern
 // referents that return only an `error` (`os.Chdir`, `os.WriteFile`,
 // …). `unit` lowers to Go's zero-byte struct{} (lowering-go.md
@@ -702,7 +702,7 @@ func (g *gen) writePredeclaredResultUnit() {
 	if !g.usesResultUnit {
 		return
 	}
-	g.b.WriteString(`func arilResultUnit(err error) Result[struct{}, error] {
+	g.b.WriteString(`func ResultUnit(err error) Result[struct{}, error] {
 	if err != nil {
 		return ResultErr[struct{}, error](err)
 	}
@@ -711,7 +711,7 @@ func (g *gen) writePredeclaredResultUnit() {
 `)
 }
 
-// writePredeclaredSortSorted emits the arilSorted helper backing
+// writePredeclaredSortSorted emits the Sorted helper backing
 // `sort.sorted(s, less)` (binding-surface.md §sort): a comparator sort
 // that returns a NEW slice (Aril preserves the input's immutability),
 // built on Go's sort.SliceStable for a stable order. Conditional on use.
@@ -719,7 +719,7 @@ func (g *gen) writePredeclaredSortSorted() {
 	if !g.usesSortSorted {
 		return
 	}
-	g.b.WriteString(`func arilSorted[T any](s []T, less func(T, T) bool) []T {
+	g.b.WriteString(`func Sorted[T any](s []T, less func(T, T) bool) []T {
 	out := make([]T, len(s))
 	copy(out, s)
 	sort.SliceStable(out, func(i, j int) bool { return less(out[i], out[j]) })
@@ -736,7 +736,7 @@ func (g *gen) writePredeclaredTryRecv() {
 	if !g.usesTryRecv {
 		return
 	}
-	g.b.WriteString(`func arilTryRecv[T any](ch <-chan T) Option[T] {
+	g.b.WriteString(`func TryRecv[T any](ch <-chan T) Option[T] {
 	select {
 	case v := <-ch:
 		return OptionSome[T](v)
@@ -758,19 +758,19 @@ func (g *gen) writePredeclaredGroup() {
 	if !g.usesScope {
 		return
 	}
-	g.b.WriteString(`type arilGroup struct {
+	g.b.WriteString(`type Group struct {
 	wg     sync.WaitGroup
 	once   sync.Once
 	err    error
 	cancel context.CancelFunc
 }
 
-func arilNewGroup(parent context.Context) (*arilGroup, context.Context) {
+func NewGroup(parent context.Context) (*Group, context.Context) {
 	ctx, cancel := context.WithCancel(parent)
-	return &arilGroup{cancel: cancel}, ctx
+	return &Group{cancel: cancel}, ctx
 }
 
-func (g *arilGroup) Go(f func() error) {
+func (g *Group) Go(f func() error) {
 	g.wg.Add(1)
 	go func() {
 		defer g.wg.Done()
@@ -783,7 +783,7 @@ func (g *arilGroup) Go(f func() error) {
 	}()
 }
 
-func (g *arilGroup) Wait() error {
+func (g *Group) Wait() error {
 	g.wg.Wait()
 	g.cancel()
 	return g.err
@@ -806,24 +806,24 @@ func (g *gen) writePredeclaredContainers() {
 	m     map[K]V
 	order []K
 }
-func mapNew[K comparable, V any]() *Map[K, V] {
+func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{m: map[K]V{}, order: nil}
 }
-func (m *Map[K, V]) len() int { return len(m.order) }
-func (m *Map[K, V]) has(k K) bool { _, ok := m.m[k]; return ok }
-func (m *Map[K, V]) get(k K) Option[V] {
+func (m *Map[K, V]) Len() int { return len(m.order) }
+func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
 	}
 	return Option[V]{Tag: 0}
 }
-func (m *Map[K, V]) set(k K, v V) {
+func (m *Map[K, V]) Set(k K, v V) {
 	if _, ok := m.m[k]; !ok {
 		m.order = append(m.order, k)
 	}
 	m.m[k] = v
 }
-func (m *Map[K, V]) delete(k K) {
+func (m *Map[K, V]) Delete(k K) {
 	if _, ok := m.m[k]; !ok {
 		return
 	}
@@ -835,12 +835,12 @@ func (m *Map[K, V]) delete(k K) {
 		}
 	}
 }
-func (m *Map[K, V]) keys() []K {
+func (m *Map[K, V]) Keys() []K {
 	out := make([]K, len(m.order))
 	copy(out, m.order)
 	return out
 }
-func (m *Map[K, V]) values() []V {
+func (m *Map[K, V]) Values() []V {
 	out := make([]V, 0, len(m.order))
 	for _, k := range m.order {
 		out = append(out, m.m[k])
@@ -854,26 +854,26 @@ func (m *Map[K, V]) values() []V {
 	m     map[T]struct{}
 	order []T
 }
-func setNew[T comparable]() *Set[T] {
+func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{m: map[T]struct{}{}, order: nil}
 }
-func setFrom[T comparable](elems []T) *Set[T] {
-	s := setNew[T]()
+func SetFrom[T comparable](elems []T) *Set[T] {
+	s := NewSet[T]()
 	for _, e := range elems {
-		s.add(e)
+		s.Add(e)
 	}
 	return s
 }
-func (s *Set[T]) len() int { return len(s.order) }
-func (s *Set[T]) has(e T) bool { _, ok := s.m[e]; return ok }
-func (s *Set[T]) add(e T) {
+func (s *Set[T]) Len() int { return len(s.order) }
+func (s *Set[T]) Has(e T) bool { _, ok := s.m[e]; return ok }
+func (s *Set[T]) Add(e T) {
 	if _, ok := s.m[e]; ok {
 		return
 	}
 	s.m[e] = struct{}{}
 	s.order = append(s.order, e)
 }
-func (s *Set[T]) delete(e T) {
+func (s *Set[T]) Delete(e T) {
 	if _, ok := s.m[e]; !ok {
 		return
 	}
@@ -885,7 +885,7 @@ func (s *Set[T]) delete(e T) {
 		}
 	}
 }
-func (s *Set[T]) toSlice() []T {
+func (s *Set[T]) ToSlice() []T {
 	out := make([]T, len(s.order))
 	copy(out, s.order)
 	return out
@@ -896,14 +896,14 @@ func (s *Set[T]) toSlice() []T {
 		g.b.WriteString(`type Stack[T any] struct {
 	xs []T
 }
-func stackNew[T any]() *Stack[T] {
+func NewStack[T any]() *Stack[T] {
 	return &Stack[T]{xs: nil}
 }
-func (s *Stack[T]) len() int { return len(s.xs) }
-func (s *Stack[T]) push(e T) {
+func (s *Stack[T]) Len() int { return len(s.xs) }
+func (s *Stack[T]) Push(e T) {
 	s.xs = append(s.xs, e)
 }
-func (s *Stack[T]) pop() Result[T, error] {
+func (s *Stack[T]) Pop() Result[T, error] {
 	n := len(s.xs)
 	if n == 0 {
 		var zero T
@@ -913,7 +913,7 @@ func (s *Stack[T]) pop() Result[T, error] {
 	s.xs = s.xs[:n-1]
 	return Result[T, error]{Tag: 0, V: v}
 }
-func (s *Stack[T]) peek() Option[T] {
+func (s *Stack[T]) Peek() Option[T] {
 	n := len(s.xs)
 	if n == 0 {
 		return Option[T]{Tag: 0}
@@ -1158,13 +1158,13 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				walk(arm.Body)
 			}
 		case *ast.Call:
-			// `fmt.scan<T>()` lowers to the arilScan helper, which
+			// `fmt.scan<T>()` lowers to the Scan helper, which
 			// returns Result<T, error> — pull both into the binary.
 			if isFmtScan(v.Callee) {
 				g.usesScan = true
 				g.usesResult = true
 			}
-			// `fmt.scan2`/`fmt.scan3` lower to the arilScan2/arilScan3
+			// `fmt.scan2`/`fmt.scan3` lower to the Scan2/Scan3
 			// helpers, which return Result<(…), error> — pull both in.
 			if n := fmtScanMultiArity(v.Callee); n == 2 {
 				g.usesScan2 = true
@@ -1174,7 +1174,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				g.usesResult = true
 			}
 			// A `(T, error)` stdlib binding (`strconv.atoi`,
-			// `os.readFile`, …) lowers via the arilResultOf helper,
+			// `os.readFile`, …) lowers via the ResultOf helper,
 			// which returns Result<T, error> — pull both in.
 			if f, ok := v.Callee.(*ast.Field); ok {
 				if recv, ok := f.Receiver.(*ast.Ident); ok {
@@ -1184,7 +1184,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 					}
 				}
 			}
-			// `ch.tryRecv()` lowers to the arilTryRecv helper, which
+			// `ch.tryRecv()` lowers to the TryRecv helper, which
 			// returns Option<T> — pull both into the binary. Keyed on
 			// the method name (the receiver's channel kind is a sema
 			// fact); a same-named user method would over-pull the
@@ -1193,7 +1193,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if g.isErrorCtorCall(v) {
 				g.usesErrorCtor = true
 			}
-			// `sort.sorted(s, less)` lowers to the inline arilSorted
+			// `sort.sorted(s, less)` lowers to the inline Sorted
 			// helper, which needs Go's "sort". Gated on the sema symbol
 			// (as the emitCall intercept is) so a user `sort` value
 			// doesn't drag in the import + helper.
@@ -1204,8 +1204,8 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			}
 			// json.* bindings (binding-surface.md §encoding/json). Gated
 			// on the sema symbol like sort.sorted. parse<T> needs the
-			// arilJSONParse helper; serialize/serializeIndent reuse
-			// arilResultOf. Either marks usesJSON so the Option JSON
+			// JSONParse helper; serialize/serializeIndent reuse
+			// ResultOf. Either marks usesJSON so the Option JSON
 			// methods + encoding/json import are pulled in.
 			if f, ok := v.Callee.(*ast.Field); ok {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "json" && g.isBuiltinModule(recv) {
@@ -1227,7 +1227,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			}
 			// Foreign bindings (ffi.md): an extern func call pulls its
 			// `@go` package into the import block, and a `Result<…>`
-			// return (func or handle method) pulls the arilResultOf helper.
+			// return (func or handle method) pulls the ResultOf helper.
 			if id, ok := v.Callee.(*ast.Ident); ok {
 				if efd, isExtern := g.externFunc[id.Name]; isExtern {
 					if pkg, _ := goRefPkgSym(efd.Go, efd.Name); pkg != "" {
@@ -1644,6 +1644,26 @@ func staticMethodName(className, methodName string) string {
 	return lowerFirst(className) + capFirst(methodName)
 }
 
+// containerStaticCtorName returns the exported runtime constructor for a
+// predeclared-container static call (`Map.new` → NewMap, `Set.from` →
+// SetFrom, …), matching the arilrt package's exported names. Returns
+// ("", false) for non-container static calls, which fall back to the
+// user-class staticMethodName spelling. Block R: these names live in
+// arilrt; the constructor name is the same in inline and vendored modes
+// (the vendored caller prefixes it with the package selector).
+func containerStaticCtorName(className, methodName string) (string, bool) {
+	switch className {
+	case "Map", "Set", "Stack":
+		switch methodName {
+		case "new":
+			return "New" + className, true
+		case "from":
+			return className + capFirst(methodName), true
+		}
+	}
+	return "", false
+}
+
 func (g *gen) emitFuncDecl(fn *ast.FuncDecl) error {
 	g.line(fn.Span.StartLine)
 	g.b.WriteString("func ")
@@ -2000,7 +2020,7 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 				if err := g.emitExpr(id); err != nil {
 					return err
 				}
-				g.b.WriteString(".set(")
+				g.b.WriteString(".Set(")
 				if err := g.emitExpr(idx.Idx); err != nil {
 					return err
 				}
@@ -2095,12 +2115,12 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 	return nil
 }
 
-// emitSetBraceLit lowers `Set<T>{}` → `setNew[T]()` and
-// `Set<T>{e1,…}` → `setFrom([]T{e1,…})`, reusing the predeclared Set
-// helpers (Go infers `setFrom`'s `T` from the slice literal).
+// emitSetBraceLit lowers `Set<T>{}` → `NewSet[T]()` and
+// `Set<T>{e1,…}` → `SetFrom([]T{e1,…})`, reusing the predeclared Set
+// helpers (Go infers `SetFrom`'s `T` from the slice literal).
 func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) == 0 {
-		g.b.WriteString("setNew")
+		g.b.WriteString("NewSet")
 		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 			return err
 		}
@@ -2110,7 +2130,7 @@ func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 	if len(b.TypeName.Args) != 1 {
 		return fmt.Errorf("codegen: Set literal needs an element type argument — write Set<T>{…}")
 	}
-	g.b.WriteString("setFrom([]")
+	g.b.WriteString("SetFrom([]")
 	if err := g.emitTypeExpr(b.TypeName.Args[0]); err != nil {
 		return err
 	}
@@ -2131,14 +2151,14 @@ func (g *gen) emitSetBraceLit(b *ast.BraceLit) error {
 	return nil
 }
 
-// emitMapBraceLit lowers `Map<K,V>{}` → `mapNew[K,V]()` and a
+// emitMapBraceLit lowers `Map<K,V>{}` → `NewMap[K,V]()` and a
 // non-empty `Map<K,V>{ k: v, … }` to an insertion IIFE
-// (`func() *Map[K,V] { m := mapNew[K,V](); m.set(k, v); …; return m }()`)
+// (`func() *Map[K,V] { m := NewMap[K,V](); m.set(k, v); …; return m }()`)
 // — Map has no construct-from-entries helper, and an IIFE keeps the
 // literal a single Go expression.
 func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) == 0 {
-		g.b.WriteString("mapNew")
+		g.b.WriteString("NewMap")
 		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 			return err
 		}
@@ -2152,7 +2172,7 @@ func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
-	g.b.WriteString(" { m := mapNew")
+	g.b.WriteString(" { m := NewMap")
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
@@ -2162,7 +2182,7 @@ func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 		if !ok {
 			return fmt.Errorf("codegen: non-map entry %T in Map literal", e)
 		}
-		g.b.WriteString("m.set(")
+		g.b.WriteString("m.Set(")
 		if err := g.emitExpr(me.Key); err != nil {
 			return err
 		}
@@ -2176,13 +2196,13 @@ func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 	return nil
 }
 
-// emitStackBraceLit lowers `Stack<T>{}` → `stackNew[T]()`. A Stack
+// emitStackBraceLit lowers `Stack<T>{}` → `NewStack[T]()`. A Stack
 // literal is always empty (ast.md §BraceLit); sema rejects entries.
 func (g *gen) emitStackBraceLit(b *ast.BraceLit) error {
 	if len(b.Entries) != 0 {
 		return fmt.Errorf("codegen: Stack literal must be empty — push elements after construction")
 	}
-	g.b.WriteString("stackNew")
+	g.b.WriteString("NewStack")
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
@@ -2809,15 +2829,36 @@ func (g *gen) isDataFieldSelector(receiver ast.Expr, name string) bool {
 }
 
 // goMethodName maps a Aril method-call selector `recv.name(...)` to its
-// Go spelling — the pre-export behaviour (stdlib renames + the
-// `error`→`Error` boundary, otherwise the verbatim lowercase name).
-// Methods stay unexported (package main reaches them); only data fields
-// are exported (goFieldName), so the two paths must not be conflated.
+// Go spelling. Container methods (Map / Set / Stack) take the EXPORTED
+// spelling (`.get` → `.Get`) so vendored-mode code can call them across
+// the arilrt package boundary; the same exported spelling is used inline
+// for a single naming scheme. Other methods keep the pre-export
+// behaviour (stdlib renames + the `error`→`Error` boundary, otherwise
+// the verbatim lowercase name).
 func (g *gen) goMethodName(receiver ast.Expr, name string) string {
 	if name == "error" && g.isErrorBuiltinReceiver(receiver) {
 		return "Error"
 	}
+	if g.isContainerTypedExpr(receiver) {
+		return exportFieldName(name)
+	}
 	return mapFieldName(receiver, name)
+}
+
+// isContainerTypedExpr reports whether sema typed receiver as one of the
+// predeclared container types (Map / Set / Stack), whose methods are
+// emitted with their exported Go spelling. Unlike isContainerReceiver
+// (Ident-only, container-or-channel), this matches any expression and
+// excludes channels.
+func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	switch g.info.Type[receiver].(type) {
+	case *sema.Map, *sema.Set, *sema.Stack:
+		return true
+	}
+	return false
 }
 
 // isErrorBuiltinReceiver reports whether sema typed receiver as the

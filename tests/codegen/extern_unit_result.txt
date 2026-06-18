@@ -1,5 +1,5 @@
 --- TITLE ---
-Go-FFI bare-`error` lift: extern returning Result<unit, error> → arilResultUnit
+Go-FFI bare-`error` lift: extern returning Result<unit, error> → ResultUnit
 
 --- INPUT ---
 import fmt
@@ -33,14 +33,14 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilResultUnit(err error) Result[struct{}, error] {
+func ResultUnit(err error) Result[struct{}, error] {
 	if err != nil {
 		return ResultErr[struct{}, error](err)
 	}
 	return ResultOk[struct{}, error](struct{}{})
 }
 func main() {
-	__aril_match_1 := arilResultUnit(os.Setenv("ARIL_FIXTURE", "1"))
+	__aril_match_1 := ResultUnit(os.Setenv("ARIL_FIXTURE", "1"))
 	switch __aril_match_1.Tag {
 	case 0:
 		fmt.Println("ok")

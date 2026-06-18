@@ -1,5 +1,5 @@
 --- TITLE ---
-encoding/json round-trip into a typed record with an Option field. json.serialize → arilResultOf(json.Marshal); json.parse<T> → arilJSONParse helper; the record's fields are exported + json-tagged; Option marshals as bare value / null (None in a brace literal stamps OptionNone[string]()). Some round-trips to Some, None to None.
+encoding/json round-trip into a typed record with an Option field. json.serialize → ResultOf(json.Marshal); json.parse<T> → JSONParse helper; the record's fields are exported + json-tagged; Option marshals as bare value / null (None in a brace literal stamps OptionNone[string]()). Some round-trips to Some, None to None.
 
 --- INPUT ---
 import fmt
@@ -65,13 +65,13 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilResultOf[T any](v T, err error) Result[T, error] {
+func ResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
 	return ResultOk[T, error](v)
 }
-func arilJSONParse[T any](data []byte) Result[T, error] {
+func JSONParse[T any](data []byte) Result[T, error] {
 	var v T
 	if err := json.Unmarshal(data, &v); err != nil {
 		return Result[T, error]{Tag: 1, E: err}
@@ -104,12 +104,12 @@ type Item struct {
 }
 
 func roundtrip(it Item) Result[Item, error] {
-	__aril_try_1 := arilResultOf(json.Marshal(it))
+	__aril_try_1 := ResultOf(json.Marshal(it))
 	if __aril_try_1.Tag == 1 {
 		return Result[Item, error]{Tag: 1, E: __aril_try_1.E}
 	}
 	var data = __aril_try_1.V
-	__aril_try_2 := arilJSONParse[Item](data)
+	__aril_try_2 := JSONParse[Item](data)
 	if __aril_try_2.Tag == 1 {
 		return Result[Item, error]{Tag: 1, E: __aril_try_2.E}
 	}

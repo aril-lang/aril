@@ -45,11 +45,11 @@ func (g *gen) emitCall(c *ast.Call) error {
 		g.b.WriteByte(')')
 		return nil
 	}
-	// fmt.scan<T>() — stdin binding. Lowers to the arilScan helper,
+	// fmt.scan<T>() — stdin binding. Lowers to the Scan helper,
 	// which wraps Go's pointer-mutation `fmt.Scan(&v)` into the
 	// Result<T, error> return form (binding-surface.md §fmt).
 	if isFmtScan(c.Callee) {
-		g.b.WriteString("arilScan")
+		g.b.WriteString("Scan")
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err
 		}
@@ -58,16 +58,16 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// fmt.scan2<A,B>() / fmt.scan3<A,B,C>() — multi-value stdin bindings
 	// returning Result<(A,B[,C]), error> (binding-surface.md §fmt). Lower
-	// to the arilScan2 / arilScan3 helpers (one fmt.Scan of N pointers,
+	// to the Scan2 / Scan3 helpers (one fmt.Scan of N pointers,
 	// folded into a tuple Ok). The tuple Ok payload destructures through
 	// the existing tuple-in-variant-payload match path.
 	if n := fmtScanMultiArity(c.Callee); n > 0 && len(c.TypeArgs) == n {
 		if n == 2 {
 			g.usesScan2 = true
-			g.b.WriteString("arilScan2")
+			g.b.WriteString("Scan2")
 		} else {
 			g.usesScan3 = true
-			g.b.WriteString("arilScan3")
+			g.b.WriteString("Scan3")
 		}
 		g.usesResult = true
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
@@ -98,7 +98,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Result-wrapping stdlib binding — `pkg.method(args)` whose Go
 	// referent returns `(T, error)`, lowered to
-	// `arilResultOf(pkg.GoName(args))` (bindings.go). Go spreads the
+	// `ResultOf(pkg.GoName(args))` (bindings.go). Go spreads the
 	// referent's two-value return across the helper's two params and
 	// infers T, folding it into the predeclared Result<T, error>.
 	if f, ok := c.Callee.(*ast.Field); ok {
@@ -106,7 +106,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 			if goName, ok := stdlibResultWrapOf(recv.Name, f.Name); ok {
 				g.usesResultOf = true
 				g.usesResult = true
-				g.b.WriteString("arilResultOf(")
+				g.b.WriteString("ResultOf(")
 				g.b.WriteString(recv.Name)
 				g.b.WriteByte('.')
 				g.b.WriteString(goName)
@@ -137,7 +137,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// sort.sorted(s, less) — comparator sort that returns a NEW slice
-	// (binding-surface.md §sort). Lowers to the inline arilSorted helper
+	// (binding-surface.md §sort). Lowers to the inline Sorted helper
 	// (copy + sort.SliceStable), preserving the input's immutability.
 	// The comparator's omitted param types are stamped from sema's
 	// inferred Func (emitClosure reads g.info.Type) — T-Closure. Gated on
@@ -147,7 +147,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 2 && f.Name == "sorted" {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
 			g.usesSortSorted = true
-			g.b.WriteString("arilSorted")
+			g.b.WriteString("Sorted")
 			return g.emitArgList(c.Args)
 		}
 	}
@@ -168,9 +168,9 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// makeSlice<T>(n, v) — predeclared generic builtin lowering
-	// to the inline arilMakeSlice helper.
+	// to the inline MakeSlice helper.
 	if id, ok := c.Callee.(*ast.Ident); ok && id.Name == "makeSlice" {
-		g.b.WriteString("arilMakeSlice")
+		g.b.WriteString("MakeSlice")
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// Channel instance methods (lowering-go.md §Channel lowering):
 	//   ch.send(v)  → ch <- v
 	//   ch.recv()   → <-ch
-	//   ch.tryRecv()→ arilTryRecv(ch)   (non-blocking select helper)
+	//   ch.tryRecv()→ TryRecv(ch)   (non-blocking select helper)
 	//   ch.close()  → close(ch)
 	if f, ok := c.Callee.(*ast.Field); ok && g.isChannelReceiver(f.Receiver) {
 		switch f.Name {
@@ -232,7 +232,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		case "tryRecv":
 			g.usesTryRecv = true
 			g.usesOption = true
-			g.b.WriteString("arilTryRecv(")
+			g.b.WriteString("TryRecv(")
 			if err := g.emitExpr(f.Receiver); err != nil {
 				return err
 			}
@@ -249,7 +249,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Foreign-binding call (ffi.md §ForeignCall): an extern function
 	// `f(args)` → `pkg.Sym(args)`; an extern method `recv.m(args)` on
-	// an opaque handle → `recv.GoName(args)`. Both wrap in arilResultOf
+	// an opaque handle → `recv.GoName(args)`. Both wrap in ResultOf
 	// when their curated return is `Result<…>`.
 	if id, ok := c.Callee.(*ast.Ident); ok {
 		if efd, isExtern := g.externFunc[id.Name]; isExtern {
@@ -294,7 +294,11 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if f, ok := c.Callee.(*ast.Field); ok {
 		if recvID, ok := f.Receiver.(*ast.Ident); ok {
 			if ci, isClass := g.class[recvID.Name]; isClass && ci.statics[f.Name] {
-				g.b.WriteString(staticMethodName(recvID.Name, f.Name))
+				if ctor, ok := containerStaticCtorName(recvID.Name, f.Name); ok {
+					g.b.WriteString(ctor)
+				} else {
+					g.b.WriteString(staticMethodName(recvID.Name, f.Name))
+				}
 				// Thread the call-site TypeArgs onto the generated
 				// package-level Go function (per `lowering-go.md`
 				// §Generics — `Box<int>.new(...)` → `boxNew[int](...)`).
@@ -415,11 +419,12 @@ func (g *gen) emitCall(c *ast.Call) error {
 		return g.emitArgList(c.Args)
 	}
 	// A method-call selector `recv.method(...)` is spelled by
-	// goMethodName (lowercase — methods stay unexported), NOT by the
-	// field-value path (emitField → goFieldName), which exports its
-	// name. Routing the callee through emitExpr here would wrongly
-	// export the method. Non-Field callees (free functions, closures,
-	// indexes) keep the generic emit.
+	// goMethodName (lowercase for user/stdlib methods; exported for
+	// predeclared-container methods, which must cross the arilrt
+	// boundary), NOT by the field-value path (emitField → goFieldName),
+	// which always exports its name. Routing the callee through emitExpr
+	// here would wrongly export the method. Non-Field callees (free
+	// functions, closures, indexes) keep the generic emit.
 	if fld, ok := c.Callee.(*ast.Field); ok {
 		if err := g.emitExpr(fld.Receiver); err != nil {
 			return err

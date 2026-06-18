@@ -5,7 +5,7 @@ package codegen
 // `pkg.Sym(args)` / `recv.Method(args)`; an opaque `extern type` lowers
 // to the Go pointer type `*pkg.Sym`. A `(T,error)`-shaped return (written
 // in the curated `.aril` as `Result<T, error>`) is wrapped with the same
-// `arilResultOf` helper the stdlib binding table uses. The Go type checker
+// `ResultOf` helper the stdlib binding table uses. The Go type checker
 // re-verifies every emitted call (the "verify, don't trust" property).
 
 import (
@@ -88,9 +88,9 @@ func goRefMember(ref *ast.GoRef, arilName string) string {
 // boundary lift (lowering-go.md §ForeignCall):
 //
 //	resultNone  — not a Result; the Go call lowers bare.
-//	resultValue — Result<T, E> over a Go `(T, error)`; wrap arilResultOf.
+//	resultValue — Result<T, E> over a Go `(T, error)`; wrap ResultOf.
 //	resultUnit  — Result<unit, error> over a Go bare `error`; wrap
-//	              arilResultUnit (the success value is `unit` → struct{}).
+//	              ResultUnit (the success value is `unit` → struct{}).
 type externResultKind int
 
 const (
@@ -101,7 +101,7 @@ const (
 
 // externResultKindOf inspects a return annotation. A `Result<unit, …>`
 // names a Go referent that returns a bare `error` (no value), so it
-// needs the unit-wrapper rather than the two-value arilResultOf.
+// needs the unit-wrapper rather than the two-value ResultOf.
 func externResultKindOf(rt ast.TypeExpr) externResultKind {
 	nt, ok := rt.(*ast.NamedType)
 	if !ok || len(nt.QName) != 1 || nt.QName[0] != "Result" {
@@ -134,9 +134,9 @@ func (g *gen) externLiftOpen(kind externResultKind) bool {
 	g.markExternLift(kind)
 	switch kind {
 	case resultValue:
-		g.b.WriteString("arilResultOf(")
+		g.b.WriteString("ResultOf(")
 	case resultUnit:
-		g.b.WriteString("arilResultUnit(")
+		g.b.WriteString("ResultUnit(")
 	default:
 		return false
 	}
@@ -190,7 +190,7 @@ func (g *gen) externFieldOf(f *ast.Field) (*ast.ExternField, bool) {
 }
 
 // emitExternFuncCall lowers `f(args)` for an extern function to
-// `[arilResultOf(]pkg.Sym(args)[)]`.
+// `[ResultOf(]pkg.Sym(args)[)]`.
 func (g *gen) emitExternFuncCall(efd *ast.ExternFuncDecl, c *ast.Call) error {
 	pkg, sym := goRefPkgSym(efd.Go, efd.Name)
 	if pkg == "" {
@@ -210,7 +210,7 @@ func (g *gen) emitExternFuncCall(efd *ast.ExternFuncDecl, c *ast.Call) error {
 }
 
 // emitExternMethodCall lowers `recv.m(args)` on a foreign handle to
-// `[arilResultOf(]recv.GoName(args)[)]`.
+// `[ResultOf(]recv.GoName(args)[)]`.
 func (g *gen) emitExternMethodCall(m *ast.ExternMethod, f *ast.Field, c *ast.Call) error {
 	goName := goRefMember(m.Go, m.Name)
 	lift := g.externLiftOpen(externResultKindOf(m.ReturnType))
