@@ -189,7 +189,7 @@ state is a singleton class instead.
 ## Container types — runtime representation
 
 ```go
-// arilrt/runtime.go
+// package arilrt (Option/Result in runtime.go, the containers in containers.go)
 
 type Option[T any] struct {
     Tag uint8                 // 0 = None, 1 = Some
@@ -217,8 +217,8 @@ type Stack[T any] struct {
 }
 ```
 
-Method bodies for these types live in `arilrt/runtime.go`. The
-codegen pass calls them by Go-qualified name; e.g.,
+Method bodies for these types live in the `arilrt` package
+(`containers.go`). The codegen pass calls them by Go-qualified name; e.g.,
 `m.set(k, v)` in Aril IR lowers to `m.Set(k, v)` in Go (note
 the capital — runtime methods are exported).
 
@@ -403,7 +403,7 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
   (in Go, as an expression — wrapped in an immediate function:)
 
   func() arilrt.Result[T, E] {
-    eg, _ := arilNewGroup(<lowering of P; defaults to
+    eg, _ := arilrt.NewGroup(<lowering of P; defaults to
                            context.Background()>)
     <lowering of B>                             // ends with a trailing
                                                 //  arilrt.Result[T, E]
