@@ -1,5 +1,5 @@
 --- TITLE ---
-fmt.scan3<A, B, C> — three-value stdin read returning Result<(A, B, C), error>, lowered to the arilScan3 helper (one fmt.Scan of three pointers folded into a 3-tuple Ok); the Ok payload destructures through the tuple-in-variant-payload match path.
+fmt.scan3<A, B, C> — three-value stdin read returning Result<(A, B, C), error>, lowered to the Scan3 helper (one fmt.Scan of three pointers folded into a 3-tuple Ok); the Ok payload destructures through the tuple-in-variant-payload match path.
 
 --- INPUT ---
 import fmt

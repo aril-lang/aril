@@ -1,5 +1,5 @@
 --- TITLE ---
-encoding/json round-trip into a typed record with an Option field. json.serialize → arilResultOf(json.Marshal); json.parse<T> → arilJSONParse helper; the record's fields are exported + json-tagged; Option marshals as bare value / null (None in a brace literal stamps OptionNone[string]()). Some round-trips to Some, None to None.
+encoding/json round-trip into a typed record with an Option field. json.serialize → ResultOf(json.Marshal); json.parse<T> → JSONParse helper; the record's fields are exported + json-tagged; Option marshals as bare value / null (None in a brace literal stamps OptionNone[string]()). Some round-trips to Some, None to None.
 
 --- INPUT ---
 import fmt

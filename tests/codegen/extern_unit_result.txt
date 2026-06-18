@@ -1,5 +1,5 @@
 --- TITLE ---
-Go-FFI bare-`error` lift: extern returning Result<unit, error> → arilResultUnit
+Go-FFI bare-`error` lift: extern returning Result<unit, error> → ResultUnit
 
 --- INPUT ---
 import fmt

@@ -1,5 +1,5 @@
 --- TITLE ---
-fmt.scan2<A, B> — multi-value stdin read returning Result<(A, B), error>, lowered to the arilScan2 helper (one fmt.Scan of two pointers folded into a tuple Ok); the Ok payload destructures through the tuple-in-variant-payload match path.
+fmt.scan2<A, B> — multi-value stdin read returning Result<(A, B), error>, lowered to the Scan2 helper (one fmt.Scan of two pointers folded into a tuple Ok); the Ok payload destructures through the tuple-in-variant-payload match path.
 
 --- INPUT ---
 import fmt

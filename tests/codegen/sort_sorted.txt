@@ -1,5 +1,5 @@
 --- TITLE ---
-sort.sorted(s, less): the comparator binding lowers to the inline arilSorted helper (copy + sort.SliceStable, returning a new slice), and the untyped short-closure params are stamped from the slice element type (T-Closure).
+sort.sorted(s, less): the comparator binding lowers to the inline Sorted helper (copy + sort.SliceStable, returning a new slice), and the untyped short-closure params are stamped from the slice element type (T-Closure).
 
 --- INPUT ---
 import fmt
