@@ -131,6 +131,8 @@ func TestRuntimeModeEquivalence(t *testing.T) {
 		"examples/core-language/invert_binary_tree/invert_binary_tree.aril", // sum types
 		"examples/core-language/two_sum/two_sum.aril",                       // Map
 		"examples/core-language/valid_parentheses/valid_parentheses.aril",   // Stack
+		"examples/stdlib-binding/config_loader/config_loader.aril",          // json.parse → arilrt.JSONParse
+		"examples/core-language/p1820/p1820.aril",                           // fmt.scan2 — the inline tuple-payload exception
 	}
 	for _, ex := range examples {
 		t.Run(filepath.Base(ex), func(t *testing.T) {
