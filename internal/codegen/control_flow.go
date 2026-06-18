@@ -309,7 +309,7 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		if err := g.emitExpr(id); err != nil {
 			return err
 		}
-		g.b.WriteString(".order {\n")
+		g.b.WriteString(".Keys() {\n")
 		g.indent++
 		if b != "_" {
 			g.writeIndent()
@@ -318,9 +318,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 			if err := g.emitExpr(id); err != nil {
 				return err
 			}
-			g.b.WriteString(".m[")
+			g.b.WriteString(".At(")
 			g.b.WriteString(keyVar)
-			g.b.WriteString("]\n")
+			g.b.WriteString(")\n")
 		}
 		if err := g.emitBlockBody(s.Body); err != nil {
 			return err
@@ -436,7 +436,15 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 				if err := g.emitExpr(id); err != nil {
 					return err
 				}
-				g.b.WriteString(".order {\n")
+				// Iterate the insertion-order view via the exported
+				// accessor (Map keys / Set elements) so the same emission
+				// works against the arilrt package boundary in vendored
+				// mode. Returns a copy — safe for read-only iteration.
+				if k == "Map" {
+					g.b.WriteString(".Keys() {\n")
+				} else {
+					g.b.WriteString(".ToSlice() {\n")
+				}
 				break
 			}
 			// Channel iteration — `for v in ch` drains the channel

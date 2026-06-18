@@ -35,7 +35,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	g.inSpawnBody = false
 	defer func() { g.inSpawnBody = savedSpawn }()
 
-	g.b.WriteString("func() Result[")
+	g.b.WriteString("func() " + g.rt("Result") + "[")
 	if err := g.emitScopeTType(tArg); err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	// used by every spawn and by Wait below.
 	g.writeIndent()
 	g.b.WriteString(gv)
-	g.b.WriteString(", _ := NewGroup(")
+	g.b.WriteString(", _ := " + g.rt("NewGroup") + "(")
 	if s.Parent != nil {
 		if err := g.emitExpr(s.Parent); err != nil {
 			return err
@@ -70,7 +70,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	g.b.WriteString(".Wait(); _err != nil {\n")
 	g.indent++
 	g.writeIndent()
-	g.b.WriteString("return ResultErr[")
+	g.b.WriteString("return " + g.rt("ResultErr") + "[")
 	if err := g.emitScopeTType(tArg); err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 
 	// Success: wrap the trailing value (or unit) Ok.
 	g.writeIndent()
-	g.b.WriteString("return ResultOk[")
+	g.b.WriteString("return " + g.rt("ResultOk") + "[")
 	if err := g.emitScopeTType(tArg); err != nil {
 		return err
 	}

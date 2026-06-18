@@ -16,18 +16,6 @@ package main
 
 import "fmt"
 
-type Result[T any, E any] struct {
-	Tag uint8
-	V   T
-	E   E
-}
-
-func ResultOk[T any, E any](value T) Result[T, E] {
-	return Result[T, E]{Tag: 0, V: value}
-}
-func ResultErr[T any, E any](err E) Result[T, E] {
-	return Result[T, E]{Tag: 1, E: err}
-}
 func Scan3[A any, B any, C any]() Result[struct {
 	_0 A
 	_1 B
@@ -52,6 +40,19 @@ func Scan3[A any, B any, C any]() Result[struct {
 		_1 B
 		_2 C
 	}{a, b, c})
+}
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
 }
 func main() {
 	__aril_match_1 := Scan3[int, int, int]()

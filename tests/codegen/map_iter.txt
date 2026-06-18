@@ -47,6 +47,7 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 }
 func (m *Map[K, V]) Len() int     { return len(m.order) }
 func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) At(k K) V     { return m.m[k] }
 func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
@@ -130,13 +131,13 @@ func main() {
 	m.Set('a', 1)
 	m.Set('b', 2)
 	m.Set('c', 3)
-	for _, k := range m.order {
-		fmt.Println(k, m.m[k])
+	for _, k := range m.Keys() {
+		fmt.Println(k, m.At(k))
 	}
 	var s = NewSet[int]()
 	s.Add(10)
 	s.Add(20)
-	for _, e := range s.order {
+	for _, e := range s.ToSlice() {
 		fmt.Println("elem", e)
 	}
 }

@@ -106,7 +106,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 			if goName, ok := stdlibResultWrapOf(recv.Name, f.Name); ok {
 				g.usesResultOf = true
 				g.usesResult = true
-				g.b.WriteString("ResultOf(")
+				g.b.WriteString(g.rt("ResultOf") + "(")
 				g.b.WriteString(recv.Name)
 				g.b.WriteByte('.')
 				g.b.WriteString(goName)
@@ -147,7 +147,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 2 && f.Name == "sorted" {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
 			g.usesSortSorted = true
-			g.b.WriteString("Sorted")
+			g.b.WriteString(g.rt("Sorted"))
 			return g.emitArgList(c.Args)
 		}
 	}
@@ -170,7 +170,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// makeSlice<T>(n, v) — predeclared generic builtin lowering
 	// to the inline MakeSlice helper.
 	if id, ok := c.Callee.(*ast.Ident); ok && id.Name == "makeSlice" {
-		g.b.WriteString("MakeSlice")
+		g.b.WriteString(g.rt("MakeSlice"))
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// Go's inference to fail on (lowering-go.md §Container types).
 	if id, ok := c.Callee.(*ast.Ident); ok {
 		if targs, info, ok := g.predeclaredCtorTypeArgs(id.Name, expect); ok {
-			g.b.WriteString(goIdent(info.owner))
+			g.b.WriteString(g.sumOwnerName(info.owner))
 			g.b.WriteString(goIdent(id.Name))
 			if err := g.emitTypeArgs(targs); err != nil {
 				return err
@@ -232,7 +232,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		case "tryRecv":
 			g.usesTryRecv = true
 			g.usesOption = true
-			g.b.WriteString("TryRecv(")
+			g.b.WriteString(g.rt("TryRecv") + "(")
 			if err := g.emitExpr(f.Receiver); err != nil {
 				return err
 			}
@@ -295,7 +295,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		if recvID, ok := f.Receiver.(*ast.Ident); ok {
 			if ci, isClass := g.class[recvID.Name]; isClass && ci.statics[f.Name] {
 				if ctor, ok := containerStaticCtorName(recvID.Name, f.Name); ok {
-					g.b.WriteString(ctor)
+					g.b.WriteString(g.rt(ctor))
 				} else {
 					g.b.WriteString(staticMethodName(recvID.Name, f.Name))
 				}
@@ -396,7 +396,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// (§Generics) where the bare-variant emit consumes it.
 	if id, ok := c.Callee.(*ast.Ident); ok {
 		if info, isVar := g.variant[id.Name]; isVar && len(info.sumTypeParams) > 0 && len(info.fields) > 0 {
-			g.b.WriteString(goIdent(info.owner))
+			g.b.WriteString(g.sumOwnerName(info.owner))
 			g.b.WriteString(goIdent(id.Name))
 			prev := g.sumCtorArgs
 			g.sumCtorArgs = g.genericSumCtorArgs(info, c.Args)
@@ -619,6 +619,25 @@ func IsStdlibNamespace(name string) bool { return isStdlibNamespaceName(name) }
 func isConversionBinding(pkg, method string) bool {
 	_, ok := stdlibConversionOf(pkg, method)
 	return ok
+}
+
+// isRuntimeHelperBinding reports whether the stdlib binding pkg.method
+// lowers to an arilrt runtime helper (sort.sorted → Sorted, fmt.scan* →
+// Scan*, json.parse → JSONParse) rather than a direct pkg.* call. Such a
+// binding references its stdlib package only from the helper body, so it
+// must not mark the package used in main; the inline helper adds its own
+// stdlib need in writeHeader, and the vendored helper carries it inside
+// arilrt (Block R).
+func isRuntimeHelperBinding(pkg, method string) bool {
+	switch pkg {
+	case "sort":
+		return method == "sorted"
+	case "fmt":
+		return method == "scan" || method == "scan2" || method == "scan3"
+	case "json":
+		return method == "parse"
+	}
+	return false
 }
 
 // mapFieldName lowers a `pkg.method` / `pkg.value` reference to its

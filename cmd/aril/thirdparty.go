@@ -14,6 +14,16 @@ import (
 	"strings"
 )
 
+// buildModuleName is the module path of the temporary build module the
+// harness writes main.go into; runtimeImportPath is the import path of
+// the arilrt runtime vendored beside it under vendored-mode builds
+// (Block R). The package selector is the last element, "arilrt", which
+// is the prefix codegen emits (arilrt.Option, …).
+const (
+	buildModuleName   = "aril-output"
+	runtimeImportPath = buildModuleName + "/arilrt"
+)
+
 // thirdPartyDep is one entry of the binding manifest (std/bindings.json).
 type thirdPartyDep struct {
 	ImportPath string `json:"importPath"`
@@ -91,7 +101,7 @@ func usedThirdParty(goSrc string, m manifest) []thirdPartyDep {
 // third-party dep.
 func goModText(root string, used []thirdPartyDep) string {
 	var b strings.Builder
-	b.WriteString("module aril-output\n\ngo 1.22\n")
+	b.WriteString("module " + buildModuleName + "\n\ngo 1.22\n")
 	for _, d := range used {
 		fmt.Fprintf(&b, "\nrequire %s %s\n", d.Module, d.Version)
 		abs := d.Vendor
