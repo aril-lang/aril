@@ -544,6 +544,40 @@ a module.
 
 ---
 
+### D26 — The runtime is the `arilrt` package; emission is dual-mode
+
+D18 established that Aril has a runtime and that it is part of the
+language contract. D26 makes it concrete: the runtime is a real,
+unit-tested Go package, **`arilrt`** — the single source of truth for
+the helpers the compiler's lowering depends on (Option/Result and their
+boundary lifts, the Map/Set/Stack containers, the stdin scan helpers,
+the structured-concurrency group, the JSON round-trip, and the
+reflection layer).
+
+Codegen emits one of two forms off that one source, chosen per command:
+
+- **Vendored** (default for `aril build` / `aril run`): the program
+  imports `arilrt` and references `arilrt.X`; the build tooling copies
+  the runtime beside the generated code. The compiler binary *embeds*
+  the runtime sources, so the runtime a program links against is
+  version-locked to the compiler that produced it, by construction — and
+  the build output is self-contained and portable.
+- **Inline single-file** (`--inline-runtime`; default for `aril emit`):
+  the compiler inlines only the *used* parts of the runtime into the
+  single generated file, keeping `emit` a self-contained `.go` artifact.
+
+The dual mode is deliberate: a single-file lowering is a real use case
+(inspection, a minimal artifact to read or paste-and-run), and the
+vendored default must not foreclose it. Generated Go remains an
+implementation artifact, not a human-facing target (D1) — neither mode
+changes that.
+
+The runtime carries its own license: the compiler is Apache-2.0, the
+emitted `arilrt` runtime is 0BSD (`arilrt/LICENSE`), so programs built
+with Aril carry no attribution obligation.
+
+---
+
 ## What's not here
 
 A handful of decisions and open questions are intentionally out of scope

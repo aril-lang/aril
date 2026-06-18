@@ -735,11 +735,9 @@ func (g *gen) writePredeclaredSums() {
 	// Struct shape exactly per `lang-spec/lowering-go.md`
 	// §Container types — runtime representation: `Option[T]`
 	// fields `Tag` + `V`; `Result[T, E]` fields `Tag` + `V` + `E`.
-	// The spec puts these in `arilrt/runtime.go` and refers to
-	// them as `arilrt.Option[T]` / `arilrt.Result[T, E]`; PR-F5b
-	// emits them inline in `main` as a v1 transitional state.
-	// Block R relocates them to `arilrt/` without changing the
-	// struct shape.
+	// These mirror arilrt's exported definitions; this inline form is
+	// the single-file (--inline-runtime) emission, used when the runtime
+	// is not vendored (writeHeader gates it on !vendored).
 	if g.usesOption {
 		g.b.WriteString("type Option[T any] struct {\n\tTag uint8\n\tV   T\n}\n")
 		g.b.WriteString("func OptionSome[T any](value T) Option[T] {\n\treturn Option[T]{Tag: 1, V: value}\n}\n")
@@ -947,10 +945,9 @@ func (g *Group) Wait() error {
 // `lang-spec/builtins.md` §Map / §Set / §Stack and
 // `lang-spec/lowering-go.md` §Container types. Conditional —
 // programs that don't reference a container emit no Go-side
-// noise for it. Like writePredeclaredSums, the spec authoritative
-// location is `arilrt/runtime.go`; PR-F6 emits them inline in
-// `main` as a v1 transitional state. Block R relocates without
-// changing the struct shape.
+// noise for it. Like writePredeclaredSums, these mirror arilrt's
+// exported definitions; this is the inline single-file emission
+// (vendored mode imports them from arilrt instead).
 func (g *gen) writePredeclaredContainers() {
 	if g.usesMap {
 		g.b.WriteString(`type Map[K comparable, V any] struct {
@@ -2960,7 +2957,8 @@ func (g *gen) emitField(f *ast.Field) error {
 // The package-namespace check gates on the receiver's sema *symbol*
 // (SymBuiltinModule), not its spelling — a local value that shadows a
 // package name (`let sort = Sorter{…}`) is a user value whose fields
-// must still export (the recurring name-match footgun, AI.md §3.10/§3.13).
+// must still export (the recurring name-match footgun: dispatch on the
+// resolved symbol, never the spelling).
 func (g *gen) goFieldName(receiver ast.Expr, name string) string {
 	if name == "error" && g.isErrorBuiltinReceiver(receiver) {
 		return "Error"

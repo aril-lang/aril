@@ -17,27 +17,45 @@ canonical `GO` / `STDOUT` / `EXIT` sections in fixtures).
 
 ## Output tree shape
 
-For an input package consisting of `.aril` files in a single
-directory, codegen emits a sibling directory with:
+The runtime is the **`arilrt`** package — the single source of truth
+for the helpers codegen depends on (Option/Result and their boundary
+lifts, the Map/Set/Stack containers, the stdin scan helpers, the
+structured-concurrency group, the JSON round-trip, and the reflection
+layer). Codegen emits one of two forms, selectable per command:
 
-```
-<out>/main.go                  // generated user package
-<out>/arilrt/runtime.go        // package arilrt — runtime helpers
-                               //  (Option/Result/Map/Set/Stack representations,
-                               //  panic helper, channel wrappers, refEq)
-<out>/bindings/<pkg>.go        // package bindings — generated stdlib
-                               //  wrappers, one file per imported Go package
-                               //  (fmt, os, strings, context, etc.)
-<out>/go.mod                   // module declaration; toolchain `go 1.22`
-```
+- **Vendored** (default for `build` / `run`): `main.go` imports the
+  `arilrt` package (qualified `arilrt.Option`, `arilrt.NewMap`, …) and
+  the build harness copies the runtime sources beside it. This is
+  version-locked by construction — the compiler binary embeds the exact
+  runtime it emits.
 
-Both helper directories use **plain Go package names**
-(`arilrt`, `bindings`) — leading `_` would make them invisible
-to `go build` (Go convention). Collision protection is at the
-**Aril source level**: user-source identifiers `arilrt` and
-`bindings` are reserved (see §Identifier encoding, E0107
-applies). The full `<out>` location is set by the `aril build`
-CLI; this file fixes only the relative layout.
+  ```
+  <out>/main.go                  // generated user package; imports <module>/arilrt
+  <out>/arilrt/*.go              // package arilrt — runtime helpers (copied
+                                 //  from the compiler's embedded sources)
+  <out>/go.mod                   // module declaration; toolchain `go 1.22`
+  ```
+
+- **Inline single-file** (`--inline-runtime`; default for `emit`):
+  codegen inlines only the *used* parts of the runtime into `main.go`
+  with bare names, keeping `emit` a self-contained `.go` artifact. No
+  `arilrt/` directory is emitted.
+
+The reflect layer carries one wrinkle: its fixed runtime lives in
+`arilrt` (vendored) or inline (single-file), but the *per-program*
+descriptors and field accessors are always emitted into `main.go` (they
+name user types), qualifying the arilrt-provided types under vendored
+mode. The scan tuple helpers (`Scan2`/`Scan3`) likewise stay in `main`
+in both modes — their anonymous tuple-payload struct must be declared
+there so a user `Ok((a, b))` destructure can read its unexported fields.
+
+The `arilrt` package uses a **plain Go package name** — a leading `_`
+would make it invisible to `go build`. Collision protection is at the
+**Aril source level**: the user-source identifier `arilrt` is reserved
+(see §Identifier encoding, E0107 applies); a user type whose name
+shadows a runtime type (e.g. a user `type Dynamic`) keeps its own
+spelling and is *not* qualified. The full `<out>` location is set by the
+`aril build` CLI; this file fixes only the relative layout.
 
 ## Identifier encoding
 
@@ -315,9 +333,8 @@ short typed errors without import-rewriting the standard
 
 The user-level `error(msg): error` free constructor
 (`builtins.md` §error) lowers directly to `errors.New(msg)`,
-pulling in Go's `errors` import on demand (the v1 prelude is
-emitted inline, so there is no `arilrt` package to route
-through). It is recognised by the bare-`error` identifier callee
+pulling in Go's `errors` import on demand (it is a stdlib call,
+not an `arilrt` helper, so it is the same in both runtime modes). It is recognised by the bare-`error` identifier callee
 with exactly one argument — the `error(): string` interface
 method takes none, and `.error()` calls are receiver-qualified,
 so the form is unambiguous.
@@ -398,17 +415,18 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
   }()
 ```
 
-**Inline group helper (no external dependency).** Generated modules
-are stdlib-only — they carry no `errgroup` import — so the group is
-the inline `arilGroup` helper, emitted into the prelude (conditional
-on a `scope` appearing). It is built from `sync` + `context` and
+**Group helper (no external dependency).** Generated modules carry no
+`errgroup` import — so the group is the `arilrt` `Group` helper
+(vendored mode) or its inline equivalent (single-file mode), emitted
+conditional on a `scope` appearing. It is built from `sync` + `context`
+and
 replicates `errgroup.WithContext` semantics: the first spawned func
 to return a non-nil error stores it (once) and cancels the derived
 context; `Wait` blocks for every spawn and returns that error.
-`arilNewGroup(parent)` returns `(*arilGroup, context.Context)`. Like
-`arilrt.Result` / the containers, the canonical home is
-`arilrt/runtime.go`; v1 emits it inline (the transitional state
-Block R relocates).
+`NewGroup(parent)` returns `(*Group, context.Context)`. Like
+`arilrt.Result` / the containers, its home is the `arilrt` package
+(vendored mode imports it; inline single-file mode emits it into the
+prelude).
 
 `ScopeRef` (the `scope` identifier — value access to the scope's
 context) is a v1 follow-up: the derived context is currently
