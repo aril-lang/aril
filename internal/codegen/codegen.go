@@ -84,6 +84,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		info:              info,
 		vendoredRequested: opts.Vendored,
 		runtimeImport:     opts.RuntimeImportPath,
+		userTypeNames:     map[string]bool{},
 		variant:           map[string]variantInfo{},
 		class:             map[string]classInfo{},
 		fieldTypes:        map[string]map[string]ast.TypeExpr{},
@@ -210,6 +211,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// constructor calls and static-method calls.
 	for _, d := range f.Decls {
 		if td, ok := d.(*ast.TypeDecl); ok {
+			g.userTypeNames[td.Name] = true
 			if sb, ok := td.Body.(*ast.SumTypeBody); ok {
 				for i, v := range sb.Variants {
 					g.variant[v.Name] = variantInfo{owner: td.Name, tag: i, fields: v.Fields, sumTypeParams: td.TypeParams}
@@ -224,6 +226,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			}
 		}
 		if cd, ok := d.(*ast.ClassDecl); ok {
+			g.userTypeNames[cd.Name] = true
 			ci := classInfo{
 				statics: map[string]bool{},
 				generic: len(cd.TypeParams) > 0,
@@ -333,6 +336,12 @@ type gen struct {
 	vendoredRequested bool
 	runtimePrefix     string
 	runtimeImport     string
+	// userTypeNames holds the names of user-declared types (classes,
+	// sums, records) — used to detect a user type that shadows a runtime
+	// type name (e.g. a user `class Map` or `type Dynamic`), so
+	// emitTypeExpr emits the user's own type rather than arilrt.X. Unlike
+	// g.class, it excludes the codegen-injected predeclared Map/Set/Stack.
+	userTypeNames map[string]bool
 	// emittedLine tracks the source line whose //line directive
 	// has most recently been written, so we avoid emitting the
 	// same directive twice in a row.
@@ -542,19 +551,14 @@ func isRuntimeTypeName(name string) bool {
 	return false
 }
 
-// isShadowedRuntimeType reports whether a user declaration shadows the
-// runtime type `name` — in which case emitTypeExpr must emit the user's
-// own (unqualified) type, not the arilrt one. Map/Set/Stack are
-// codegen-predeclared g.class entries (sema rejects user redeclaration),
-// so they are never shadows; any other runtime-type name found in
-// g.class was declared by the user (e.g. a `class Dynamic`).
+// isShadowedRuntimeType reports whether a user-declared type (class, sum,
+// or record) shadows the runtime type `name` — in which case emitTypeExpr
+// must emit the user's own (unqualified) type, not the arilrt one. Keyed
+// on userTypeNames, which (unlike g.class) excludes the codegen-injected
+// predeclared Map/Set/Stack, so the predeclared containers stay
+// qualified while a genuine user `class Map` / `type Dynamic` does not.
 func (g *gen) isShadowedRuntimeType(name string) bool {
-	switch name {
-	case "Map", "Set", "Stack":
-		return false
-	}
-	_, ok := g.class[name]
-	return ok
+	return g.userTypeNames[name]
 }
 
 // resolveRuntimeMode fixes the effective runtime mode now that the

@@ -201,17 +201,21 @@ func main() {
 // the isShadowedRuntimeType guard a field `k: Kind` mis-emits as
 // `arilrt.Kind` (or `undefined: arilrt` with no reflect import).
 func TestUserTypeShadowsRuntimeName(t *testing.T) {
+	// Covers a class, a sum, and a record all shadowing runtime type
+	// names (Kind / Dynamic / FieldInfo), each used in type position.
 	src := `import fmt
 
 class Kind { var n: int }
-class Dynamic { var s: string }
+type Dynamic = | Lo | Hi
+type FieldInfo = { tag: int }
 
 func describe(k: Kind): int { return k.n }
+func name(d: Dynamic): string { match d { Lo => return "lo", Hi => return "hi" } }
+func tagOf(f: FieldInfo): int { return f.tag }
 
 func main() {
   let k = Kind(5)
-  let d = Dynamic("hi")
-  fmt.println(describe(k), d.s)
+  fmt.println(describe(k), name(Hi), tagOf(FieldInfo{ tag: 9 }))
 }
 `
 	dir := t.TempDir()
@@ -224,8 +228,8 @@ func main() {
 		t.Fatalf("vendored run of a user type shadowing a runtime name failed (exit %d): %s", vExit, vErr)
 	}
 	iOut, _, _ := runAril(t, "run", "--inline-runtime", path)
-	if vOut != "5 hi\n" || iOut != vOut {
-		t.Errorf("shadow: stdout vendored=%q inline=%q; want \"5 hi\\n\" in both", vOut, iOut)
+	if vOut != "5 hi 9\n" || iOut != vOut {
+		t.Errorf("shadow: stdout vendored=%q inline=%q; want \"5 hi 9\\n\" in both", vOut, iOut)
 	}
 }
 
