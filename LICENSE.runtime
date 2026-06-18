@@ -1,0 +1,28 @@
+Aril runtime support code — license
+====================================
+
+The Aril *compiler* is licensed under the Apache License 2.0 (see LICENSE).
+
+Separately, the Aril *runtime support code* — the code the Aril compiler emits
+into the programs it compiles, and (once it is factored into its own package)
+the `arilrt` runtime library — is licensed under the BSD Zero Clause License
+(0BSD), reproduced below. This means programs you compile with Aril carry no
+Aril attribution or licensing obligation — mirroring how TypeScript's emitted
+helpers (tslib) are 0BSD.
+
+----------------------------------------------------------------------
+
+BSD Zero Clause License
+
+Copyright (C) 2026 The Aril Authors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.

@@ -64,3 +64,11 @@ Source files use the `.aril` extension.
 | The language surface (working draft) | [`docs/language-spec.md`](docs/language-spec.md) |
 | Target spelling of every stdlib call used by the suite | [`docs/binding-surface.md`](docs/binding-surface.md) |
 | What v1 must be able to do — the acceptance suite | [`examples/README.md`](examples/README.md) |
+
+## License
+
+The Aril compiler is licensed under the [Apache License 2.0](LICENSE) (patent
+grant included). The runtime support code Aril emits into the programs it
+compiles is licensed under the [BSD Zero Clause License (0BSD)](LICENSE.runtime),
+so programs you build with Aril carry no Aril attribution obligation — the same
+split TypeScript uses (Apache-2.0 compiler, 0BSD `tslib` helpers).
