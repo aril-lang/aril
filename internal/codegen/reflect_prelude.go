@@ -6,27 +6,135 @@ import (
 	"github.com/aril-lang/aril/internal/ast"
 )
 
-// writePredeclaredReflect emits Aril's reflection layer per
-// `lang-spec/builtins.md` §reflect and `docs/design-decisions.md`
-// D18: Dynamic wrapper, TypeDescriptor, Kind sum, descriptor
-// registry, and the minimal reflect.* surface (box / unbox /
-// typeOf / typeName / kind). Only emitted when usesReflect.
-// Per D18, the spec location is `arilrt/reflect`; PR-R1 emits
-// inline in main as a v1 transitional state (same precedent as
-// Option/Result/containers).
+// writePredeclaredReflect emits Aril's reflection layer (lang-spec/
+// builtins.md §reflect, D18): the Dynamic wrapper, TypeDescriptor, Kind,
+// the descriptor registry, and the reflect.* surface. The fixed part is
+// the authoritative arilrt/reflect.go — emitted inline only in
+// single-file mode; in vendored mode it comes from the imported arilrt
+// package. The per-program part (per-class descriptors + accessors + the
+// init registration) is always emitted into main, qualifying the
+// arilrt-provided types/vars via rt() under vendored mode.
 func (g *gen) writePredeclaredReflect() {
 	if !g.usesReflect {
 		return
 	}
+	if !g.vendored() {
+		g.writeReflectPreludeFixed()
+	}
+	// Per-user-type descriptors collected during emit, with init
+	// block registering them into the runtime map.
+	if len(g.descriptors) == 0 {
+		return
+	}
+	td := g.rt("TypeDescriptor")
+	dyn := g.rt("Dynamic")
+	for _, d := range g.descriptors {
+		g.b.WriteString("var arilDesc_")
+		g.b.WriteString(d.arilName)
+		g.b.WriteString(" = &" + td + "{Name: ")
+		g.b.WriteString(strconv.Quote(d.arilName))
+		g.b.WriteString(", Kind: ")
+		g.b.WriteString(g.rt(d.kind))
+		g.b.WriteString("}\n")
+	}
+	// Per-class field accessor functions — emitted after the
+	// classes themselves are emitted into the package, so the
+	// accessor body can refer to the class struct's field by
+	// its exported Go-side name (exportFieldName); the `case`
+	// label stays the Aril name for runtime lookup. The accessor takes any so
+	// the dispatcher in FieldValue can call it through the
+	// map without per-class typed indirection.
+	for _, d := range g.descriptors {
+		if d.kind != "KindClass" {
+			continue
+		}
+		g.b.WriteString("func arilFieldOf_")
+		g.b.WriteString(d.arilName)
+		g.b.WriteString("(v any, name string) (" + dyn + ", bool) {\n")
+		g.b.WriteString("\tc, _ := v.(*")
+		g.b.WriteString(d.arilName)
+		g.b.WriteString(")\n")
+		g.b.WriteString("\tif c == nil {\n\t\treturn " + dyn + "{}, false\n\t}\n")
+		g.b.WriteString("\tswitch name {\n")
+		for _, fi := range d.fields {
+			g.b.WriteString("\tcase ")
+			g.b.WriteString(strconv.Quote(fi.arilName))
+			g.b.WriteString(":\n")
+			if fi.descRef != "" {
+				g.b.WriteString("\t\treturn " + dyn + "{Payload: c.")
+				g.b.WriteString(exportFieldName(fi.arilName))
+				g.b.WriteString(", Desc: ")
+				g.b.WriteString(fi.descRef)
+				g.b.WriteString("}, true\n")
+			} else {
+				// Unknown-static-type — fall back to BoxAny so the
+				// descriptor is at least synthesised at runtime.
+				g.b.WriteString("\t\treturn " + g.rt("BoxAny") + "(c.")
+				g.b.WriteString(exportFieldName(fi.arilName))
+				g.b.WriteString("), true\n")
+			}
+		}
+		g.b.WriteString("\t}\n\treturn " + dyn + "{}, false\n}\n")
+	}
+	g.b.WriteString("func init() {\n")
+	reg := g.rt("DescRegistry")
+	for _, d := range g.descriptors {
+		g.b.WriteString("\t" + reg + "[")
+		g.b.WriteString(strconv.Quote(d.goType))
+		g.b.WriteString("] = arilDesc_")
+		g.b.WriteString(d.arilName)
+		g.b.WriteString("\n")
+	}
+	// Populate field metadata + accessor registry for each
+	// class descriptor. Fields list is emitted as a literal
+	// inside init() so it can reference the per-field type
+	// descriptors that were declared above.
+	fi := g.rt("FieldInfo")
+	acc := g.rt("FieldAccessors")
+	for _, d := range g.descriptors {
+		if d.kind != "KindClass" {
+			continue
+		}
+		if len(d.fields) > 0 {
+			g.b.WriteString("\tarilDesc_")
+			g.b.WriteString(d.arilName)
+			g.b.WriteString(".FieldList = []" + fi + "{\n")
+			for _, fd := range d.fields {
+				g.b.WriteString("\t\t{Name: ")
+				g.b.WriteString(strconv.Quote(fd.arilName))
+				g.b.WriteString(", Desc: ")
+				if fd.descRef != "" {
+					g.b.WriteString(fd.descRef)
+				} else {
+					g.b.WriteString("nil")
+				}
+				g.b.WriteString("},\n")
+			}
+			g.b.WriteString("\t}\n")
+		}
+		g.b.WriteString("\t" + acc + "[")
+		g.b.WriteString(strconv.Quote(d.arilName))
+		g.b.WriteString("] = arilFieldOf_")
+		g.b.WriteString(d.arilName)
+		g.b.WriteString("\n")
+	}
+	g.b.WriteString("}\n")
+}
+
+// writeReflectPreludeFixed emits the fixed reflection runtime inline —
+// byte-for-byte the body of arilrt/reflect.go (exported names), used in
+// single-file mode. Vendored mode imports the same definitions from
+// arilrt instead.
+func (g *gen) writeReflectPreludeFixed() {
 	g.b.WriteString(`type Dynamic struct {
 	Payload any
 	Desc    *TypeDescriptor
 }
 
 type TypeDescriptor struct {
-	Name   string
-	Kind   Kind
-	fields []FieldInfo
+	Name      string
+	Kind      Kind
+	FieldList []FieldInfo
 }
 
 type FieldInfo struct {
@@ -47,144 +155,108 @@ var (
 	KindUnit      = Kind{Tag: 5}
 )
 
-var arilDescRegistry = map[string]*TypeDescriptor{}
+var DescRegistry = map[string]*TypeDescriptor{}
 
-// Primitive descriptors — registered eagerly so reflect.box on
-// any primitive value finds a descriptor. Notes:
-//   - byte is Go's alias for uint8 (reflect.TypeOf returns "uint8"
-//     for both byte and uint8 values), so we register a single
-//     descriptor for that runtime type with Name "byte".
-//   - rune is Go's alias for int32, so int32 / rune collapse to
-//     one descriptor with Name "int32".
-//   PR-Sema-2 tightens this: when sema knows the user wrote
-//   "let r: rune = ...", reflect.typeName can return "rune" via
-//   compile-time-resolved descriptor.
 var (
-	arilDesc_int     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
-	arilDesc_int64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
-	arilDesc_int32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
-	arilDesc_string  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
-	arilDesc_bool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
-	arilDesc_float64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
-	arilDesc_byte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
+	DescInt     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
+	DescInt64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
+	DescInt32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
+	DescString  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
+	DescBool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
+	DescFloat64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
+	DescByte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
 )
 
 func init() {
-	arilDescRegistry["int"] = arilDesc_int
-	arilDescRegistry["int64"] = arilDesc_int64
-	arilDescRegistry["int32"] = arilDesc_int32
-	arilDescRegistry["string"] = arilDesc_string
-	arilDescRegistry["bool"] = arilDesc_bool
-	arilDescRegistry["float64"] = arilDesc_float64
-	arilDescRegistry["uint8"] = arilDesc_byte
+	DescRegistry["int"] = DescInt
+	DescRegistry["int64"] = DescInt64
+	DescRegistry["int32"] = DescInt32
+	DescRegistry["string"] = DescString
+	DescRegistry["bool"] = DescBool
+	DescRegistry["float64"] = DescFloat64
+	DescRegistry["uint8"] = DescByte
 }
 
-func arilBox[T any](v T) Dynamic {
-	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
+func Box[T any](v T) Dynamic {
+	return Dynamic{Payload: v, Desc: DescForKey(reflect.TypeOf(v).String())}
 }
 
-// arilDescForKey looks up (and caches) a descriptor for the
-// Go-runtime type-name key. The cache preserves CT1 (descriptor
-// uniqueness): two reflect.box calls on the same Go-runtime
-// type return Dynamic values whose Desc pointers compare equal.
-// Concurrent first-time-seen unknown types may briefly race on
-// the registry write — a later Block-R PR adds synchronisation.
-func arilDescForKey(key string) *TypeDescriptor {
-	if d, ok := arilDescRegistry[key]; ok {
+func DescForKey(key string) *TypeDescriptor {
+	if d, ok := DescRegistry[key]; ok {
 		return d
 	}
 	d := &TypeDescriptor{Name: key, Kind: KindPrimitive}
-	arilDescRegistry[key] = d
+	DescRegistry[key] = d
 	return d
 }
 
-func arilTypeOf(d Dynamic) *TypeDescriptor { return d.Desc }
-func arilTypeName(t *TypeDescriptor) string { return t.Name }
-func arilKind(t *TypeDescriptor) Kind { return t.Kind }
+func TypeOf(d Dynamic) *TypeDescriptor     { return d.Desc }
+func TypeName(t *TypeDescriptor) string    { return t.Name }
+func KindOf(t *TypeDescriptor) Kind        { return t.Kind }
+func Fields(t *TypeDescriptor) []FieldInfo { return t.FieldList }
 
-func arilUnbox[T any](d Dynamic) Result[T, error] {
+func Unbox[T any](d Dynamic) Result[T, error] {
 	v, ok := d.Payload.(T)
 	if !ok {
 		var zero T
-		return Result[T, error]{Tag: 1, E: arilUnboxError(d.Desc.Name), V: zero}
+		return Result[T, error]{Tag: 1, E: unboxError(d.Desc.Name), V: zero}
 	}
 	return Result[T, error]{Tag: 0, V: v}
 }
 
-type arilUnboxErr struct{ typeName string }
+type unboxErr struct{ typeName string }
 
-func (e arilUnboxErr) Error() string {
+func (e unboxErr) Error() string {
 	return "reflect.unbox: payload is not the requested type (have " + e.typeName + ")"
 }
 
-func arilUnboxError(typeName string) error { return arilUnboxErr{typeName: typeName} }
+func unboxError(typeName string) error { return unboxErr{typeName: typeName} }
 
-// Per-class field accessor functions are registered into this
-// map at init time (one per non-generic class declared in the
-// program). The accessor reads a named field off the Aril-side
-// pointer-to-struct and returns it boxed as Dynamic.
-type arilFieldAccessor = func(v any, name string) (Dynamic, bool)
+type FieldAccessor = func(v any, name string) (Dynamic, bool)
 
-var arilFieldAccessors = map[string]arilFieldAccessor{}
+var FieldAccessors = map[string]FieldAccessor{}
 
-func arilFields(t *TypeDescriptor) []FieldInfo { return t.fields }
-
-func arilFieldValue(d Dynamic, name string) Result[Dynamic, error] {
+func FieldValue(d Dynamic, name string) Result[Dynamic, error] {
 	if d.Desc == nil {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("Dynamic has no descriptor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: fieldErr("Dynamic has no descriptor"), V: zero}
 	}
-	fn, ok := arilFieldAccessors[d.Desc.Name]
+	fn, ok := FieldAccessors[d.Desc.Name]
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: fieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
 	}
 	v, ok := fn(d.Payload, name)
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: fieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
 	}
 	return Result[Dynamic, error]{Tag: 0, V: v}
 }
 
-type arilFieldErrT struct{ msg string }
+type fieldErrT struct{ msg string }
 
-func (e arilFieldErrT) Error() string { return e.msg }
+func (e fieldErrT) Error() string { return e.msg }
 
-func arilFieldErr(msg string) error { return arilFieldErrT{msg: msg} }
+func fieldErr(msg string) error { return fieldErrT{msg: msg} }
 
-// arilBoxAny boxes an arbitrary value (with type known only at
-// runtime via Go's reflect). Used by per-class field accessors
-// when reading a field's value. Routes through arilDescForKey so
-// descriptor identity follows CT1.
-func arilBoxAny(v any) Dynamic {
+func BoxAny(v any) Dynamic {
 	if v == nil {
-		return Dynamic{Payload: nil, Desc: arilDescForKey("<nil>")}
+		return Dynamic{Payload: nil, Desc: DescForKey("<nil>")}
 	}
-	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
+	return Dynamic{Payload: v, Desc: DescForKey(reflect.TypeOf(v).String())}
 }
 
-// arilShow renders a Dynamic value as a human-readable string.
-// It is the runtime building block for the REPL auto-printer
-// and ` + "`" + `:inspect` + "`" + ` (RFC-0003). Kinds beyond Primitive /
-// Class fall back to a "<TypeName>" placeholder for now; PR-R4
-// adds Sum / Slice / Map rendering once the matching descriptor
-// metadata lands. Panic-free per D18 CT2 — class graphs with
-// cycles render the back-edge as "<cycle>" instead of blowing
-// the stack.
-func arilShow(d Dynamic) string {
-	return arilShowWalk(d, map[any]bool{})
+func Show(d Dynamic) string {
+	return showWalk(d, map[any]bool{})
 }
 
-func arilShowWalk(d Dynamic, seen map[any]bool) string {
+func showWalk(d Dynamic, seen map[any]bool) string {
 	if d.Desc == nil {
 		return "<nil>"
 	}
 	switch d.Desc.Kind {
 	case KindClass:
-		// Classes are pointer-to-struct on the Go side; use the
-		// payload as a cycle key. Non-class kinds skip the check
-		// because their payloads aren't reliably comparable.
 		if d.Payload != nil {
 			if seen[d.Payload] {
 				return "<cycle " + d.Desc.Name + ">"
@@ -192,26 +264,26 @@ func arilShowWalk(d Dynamic, seen map[any]bool) string {
 			seen[d.Payload] = true
 		}
 		out := d.Desc.Name + "{"
-		for i, fi := range d.Desc.fields {
+		for i, fi := range d.Desc.FieldList {
 			if i > 0 {
 				out += ", "
 			}
-			fv := arilFieldValue(d, fi.Name)
+			fv := FieldValue(d, fi.Name)
 			if fv.Tag != 0 {
 				out += fi.Name + ": <unreadable>"
 				continue
 			}
-			out += fi.Name + ": " + arilShowWalk(fv.V, seen)
+			out += fi.Name + ": " + showWalk(fv.V, seen)
 		}
 		return out + "}"
 	case KindPrimitive:
-		return arilShowPrimitive(d)
+		return showPrimitive(d)
 	default:
 		return "<" + d.Desc.Name + ">"
 	}
 }
 
-func arilShowPrimitive(d Dynamic) string {
+func showPrimitive(d Dynamic) string {
 	switch v := d.Payload.(type) {
 	case nil:
 		return "<nil>"
@@ -251,121 +323,32 @@ func arilShowPrimitive(d Dynamic) string {
 	}
 }
 `)
-	// Per-user-type descriptors collected during emit, with init
-	// block registering them into the runtime map.
-	if len(g.descriptors) == 0 {
-		return
-	}
-	for _, d := range g.descriptors {
-		g.b.WriteString("var arilDesc_")
-		g.b.WriteString(d.arilName)
-		g.b.WriteString(" = &TypeDescriptor{Name: ")
-		g.b.WriteString(strconv.Quote(d.arilName))
-		g.b.WriteString(", Kind: ")
-		g.b.WriteString(d.kind)
-		g.b.WriteString("}\n")
-	}
-	// Per-class field accessor functions — emitted after the
-	// classes themselves are emitted into the package, so the
-	// accessor body can refer to the class struct's field by
-	// its exported Go-side name (exportFieldName); the `case`
-	// label stays the Aril name for runtime lookup. The accessor takes any so
-	// the dispatcher in arilFieldValue can call it through the
-	// map without per-class typed indirection.
-	for _, d := range g.descriptors {
-		if d.kind != "KindClass" {
-			continue
-		}
-		g.b.WriteString("func arilFieldOf_")
-		g.b.WriteString(d.arilName)
-		g.b.WriteString("(v any, name string) (Dynamic, bool) {\n")
-		g.b.WriteString("\tc, _ := v.(*")
-		g.b.WriteString(d.arilName)
-		g.b.WriteString(")\n")
-		g.b.WriteString("\tif c == nil {\n\t\treturn Dynamic{}, false\n\t}\n")
-		g.b.WriteString("\tswitch name {\n")
-		for _, fi := range d.fields {
-			g.b.WriteString("\tcase ")
-			g.b.WriteString(strconv.Quote(fi.arilName))
-			g.b.WriteString(":\n")
-			if fi.descRef != "" {
-				g.b.WriteString("\t\treturn Dynamic{Payload: c.")
-				g.b.WriteString(exportFieldName(fi.arilName))
-				g.b.WriteString(", Desc: ")
-				g.b.WriteString(fi.descRef)
-				g.b.WriteString("}, true\n")
-			} else {
-				// Unknown-static-type — fall back to arilBoxAny so
-				// the descriptor is at least synthesised at runtime.
-				g.b.WriteString("\t\treturn arilBoxAny(c.")
-				g.b.WriteString(exportFieldName(fi.arilName))
-				g.b.WriteString("), true\n")
-			}
-		}
-		g.b.WriteString("\t}\n\treturn Dynamic{}, false\n}\n")
-	}
-	g.b.WriteString("func init() {\n")
-	for _, d := range g.descriptors {
-		g.b.WriteString("\tarilDescRegistry[")
-		g.b.WriteString(strconv.Quote(d.goType))
-		g.b.WriteString("] = arilDesc_")
-		g.b.WriteString(d.arilName)
-		g.b.WriteString("\n")
-	}
-	// Populate field metadata + accessor registry for each
-	// class descriptor. Fields list is emitted as a literal
-	// inside init() so it can reference the per-field type
-	// descriptors that were declared above.
-	for _, d := range g.descriptors {
-		if d.kind != "KindClass" {
-			continue
-		}
-		if len(d.fields) > 0 {
-			g.b.WriteString("\tarilDesc_")
-			g.b.WriteString(d.arilName)
-			g.b.WriteString(".fields = []FieldInfo{\n")
-			for _, fi := range d.fields {
-				g.b.WriteString("\t\t{Name: ")
-				g.b.WriteString(strconv.Quote(fi.arilName))
-				g.b.WriteString(", Desc: ")
-				if fi.descRef != "" {
-					g.b.WriteString(fi.descRef)
-				} else {
-					g.b.WriteString("nil")
-				}
-				g.b.WriteString("},\n")
-			}
-			g.b.WriteString("\t}\n")
-		}
-		g.b.WriteString("\tarilFieldAccessors[")
-		g.b.WriteString(strconv.Quote(d.arilName))
-		g.b.WriteString("] = arilFieldOf_")
-		g.b.WriteString(d.arilName)
-		g.b.WriteString("\n")
-	}
-	g.b.WriteString("}\n")
 }
 
-// descRefForType resolves a Aril TypeExpr to the Go-side var
-// name of its type descriptor. Returns "" when the type has no
-// emitted descriptor (slices, generics, function types, ...);
-// callers handle the empty case by emitting a placeholder.
+// descRefForType resolves a Aril TypeExpr to the Go-side reference of its
+// type descriptor — a primitive descriptor from arilrt (rt-qualified) or
+// a per-class descriptor var emitted into main (arilDesc_<class>).
+// Returns "" when the type has no emitted descriptor (slices, generics,
+// function types, ...); callers handle the empty case with a placeholder.
 //
-// classNames lists the names of non-generic user classes that
-// will have descriptors emitted in this compilation.
-func descRefForType(t ast.TypeExpr, classNames map[string]bool) string {
+// classNames lists the names of non-generic user classes that will have
+// descriptors emitted in this compilation.
+func (g *gen) descRefForType(t ast.TypeExpr, classNames map[string]bool) string {
 	switch v := t.(type) {
 	case *ast.PrimitiveType:
-		// rune and byte alias to int32 / uint8 at the Go-runtime
-		// level (see writePredeclaredReflect's primitive notes);
-		// the descriptors collapse accordingly.
+		// rune and byte alias to int32 / uint8 at the Go-runtime level
+		// (see the primitive descriptors above); the descriptors
+		// collapse accordingly.
 		switch v.Name {
 		case "rune":
-			return "arilDesc_int32"
+			return g.rt("DescInt32")
 		case "byte":
-			return "arilDesc_byte"
+			return g.rt("DescByte")
 		default:
-			return "arilDesc_" + v.Name
+			if name, ok := primDescName[v.Name]; ok {
+				return g.rt(name)
+			}
+			return ""
 		}
 	case *ast.NamedType:
 		if len(v.QName) == 1 && classNames[v.QName[0]] {
@@ -373,4 +356,15 @@ func descRefForType(t ast.TypeExpr, classNames map[string]bool) string {
 		}
 	}
 	return ""
+}
+
+// primDescName maps a primitive type name to its arilrt descriptor var.
+var primDescName = map[string]string{
+	"int":     "DescInt",
+	"int64":   "DescInt64",
+	"int32":   "DescInt32",
+	"string":  "DescString",
+	"bool":    "DescBool",
+	"float64": "DescFloat64",
+	"byte":    "DescByte",
 }

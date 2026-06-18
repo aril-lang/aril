@@ -148,6 +148,53 @@ func TestRuntimeModeEquivalence(t *testing.T) {
 	}
 }
 
+// TestReflectModeEquivalence extends the Block R divergence guard to the
+// reflection layer (R3): a program using reflect.box/unbox/typeName/
+// fields/show must behave identically vendored vs inline. There is no
+// reflect example in the corpus, so the source is written to a temp file.
+func TestReflectModeEquivalence(t *testing.T) {
+	src := `import fmt
+import reflect
+
+class Point {
+  var x: int
+  var y: int
+}
+
+func main() {
+  let p = Point(3, 4)
+  let d = reflect.box(p)
+  fmt.println(reflect.typeName(reflect.typeOf(d)))
+  fmt.println(reflect.show(d))
+  for f in reflect.fields(reflect.typeOf(d)) {
+    fmt.println("field", f.name)
+  }
+  match reflect.unbox<int>(reflect.box(42)) {
+    Ok(v) => fmt.println("ok", v),
+    Err(e) => fmt.println("err", e),
+  }
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "refl.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	vOut, vErr, vExit := runAril(t, "run", path)
+	iOut, _, iExit := runAril(t, "run", "--inline-runtime", path)
+	if vExit != iExit {
+		t.Errorf("reflect: exit differs — vendored %d, inline %d (stderr: %s)", vExit, iExit, vErr)
+	}
+	if vOut != iOut {
+		t.Errorf("reflect: stdout differs between modes\n--- vendored ---\n%s\n--- inline ---\n%s", vOut, iOut)
+	}
+	// Guard against both modes being silently broken: the output must be
+	// the real reflection result, not a fallback.
+	if !strings.Contains(vOut, "Point{x: 3, y: 4}") {
+		t.Errorf("reflect: vendored output missing the shown value; got:\n%s", vOut)
+	}
+}
+
 func TestVersion(t *testing.T) {
 	stdout, _, exit := runAril(t, "version")
 	if exit != 0 {
