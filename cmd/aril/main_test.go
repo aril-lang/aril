@@ -148,6 +148,91 @@ func TestRuntimeModeEquivalence(t *testing.T) {
 	}
 }
 
+// TestReflectModeEquivalence extends the Block R divergence guard to the
+// reflection layer (R3): a program using reflect.box/unbox/typeName/
+// fields/show must behave identically vendored vs inline. There is no
+// reflect example in the corpus, so the source is written to a temp file.
+func TestReflectModeEquivalence(t *testing.T) {
+	src := `import fmt
+import reflect
+
+class Point {
+  var x: int
+  var y: int
+}
+
+func main() {
+  let p = Point(3, 4)
+  let d = reflect.box(p)
+  fmt.println(reflect.typeName(reflect.typeOf(d)))
+  fmt.println(reflect.show(d))
+  for f in reflect.fields(reflect.typeOf(d)) {
+    fmt.println("field", f.name)
+  }
+  match reflect.unbox<int>(reflect.box(42)) {
+    Ok(v) => fmt.println("ok", v),
+    Err(e) => fmt.println("err", e),
+  }
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "refl.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	vOut, vErr, vExit := runAril(t, "run", path)
+	iOut, _, iExit := runAril(t, "run", "--inline-runtime", path)
+	if vExit != iExit {
+		t.Errorf("reflect: exit differs — vendored %d, inline %d (stderr: %s)", vExit, iExit, vErr)
+	}
+	if vOut != iOut {
+		t.Errorf("reflect: stdout differs between modes\n--- vendored ---\n%s\n--- inline ---\n%s", vOut, iOut)
+	}
+	// Guard against both modes being silently broken: the output must be
+	// the real reflection result, not a fallback.
+	if !strings.Contains(vOut, "Point{x: 3, y: 4}") {
+		t.Errorf("reflect: vendored output missing the shown value; got:\n%s", vOut)
+	}
+}
+
+// TestUserTypeShadowsRuntimeName guards the R3 fix for a user type whose
+// name collides with a runtime type (Dynamic / Kind / …): in vendored
+// mode emitTypeExpr must emit the user's own type, not arilrt.X. Without
+// the isShadowedRuntimeType guard a field `k: Kind` mis-emits as
+// `arilrt.Kind` (or `undefined: arilrt` with no reflect import).
+func TestUserTypeShadowsRuntimeName(t *testing.T) {
+	// Covers a class, a sum, and a record all shadowing runtime type
+	// names (Kind / Dynamic / FieldInfo), each used in type position.
+	src := `import fmt
+
+class Kind { var n: int }
+type Dynamic = | Lo | Hi
+type FieldInfo = { tag: int }
+
+func describe(k: Kind): int { return k.n }
+func name(d: Dynamic): string { match d { Lo => return "lo", Hi => return "hi" } }
+func tagOf(f: FieldInfo): int { return f.tag }
+
+func main() {
+  let k = Kind(5)
+  fmt.println(describe(k), name(Hi), tagOf(FieldInfo{ tag: 9 }))
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shadow.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	vOut, vErr, vExit := runAril(t, "run", path)
+	if vExit != 0 {
+		t.Fatalf("vendored run of a user type shadowing a runtime name failed (exit %d): %s", vExit, vErr)
+	}
+	iOut, _, _ := runAril(t, "run", "--inline-runtime", path)
+	if vOut != "5 hi 9\n" || iOut != vOut {
+		t.Errorf("shadow: stdout vendored=%q inline=%q; want \"5 hi 9\\n\" in both", vOut, iOut)
+	}
+}
+
 func TestVersion(t *testing.T) {
 	stdout, _, exit := runAril(t, "version")
 	if exit != 0 {

@@ -84,6 +84,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		info:              info,
 		vendoredRequested: opts.Vendored,
 		runtimeImport:     opts.RuntimeImportPath,
+		userTypeNames:     map[string]bool{},
 		variant:           map[string]variantInfo{},
 		class:             map[string]classInfo{},
 		fieldTypes:        map[string]map[string]ast.TypeExpr{},
@@ -150,6 +151,10 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	if g.usesStack {
 		g.usesResult = true
 	}
+	// Fix the runtime mode now that usesReflect is final — it must be
+	// resolved before the reflect descriptor pre-collection below, whose
+	// descRefForType() consults rt().
+	g.resolveRuntimeMode()
 	// reflect.unbox<T> returns Result<T, error>; reflect.fields /
 	// reflect.fieldValue (PR-R2) will return Result<Dynamic>, so
 	// any reflection use pulls Result + Option into the binary.
@@ -179,7 +184,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 				for _, cf := range v.Fields {
 					fields = append(fields, fieldDescInfo{
 						arilName: cf.Name,
-						descRef:  descRefForType(cf.DeclType, classNames),
+						descRef:  g.descRefForType(cf.DeclType, classNames),
 					})
 				}
 				g.descriptors = append(g.descriptors, descInfo{
@@ -206,6 +211,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// constructor calls and static-method calls.
 	for _, d := range f.Decls {
 		if td, ok := d.(*ast.TypeDecl); ok {
+			g.userTypeNames[td.Name] = true
 			if sb, ok := td.Body.(*ast.SumTypeBody); ok {
 				for i, v := range sb.Variants {
 					g.variant[v.Name] = variantInfo{owner: td.Name, tag: i, fields: v.Fields, sumTypeParams: td.TypeParams}
@@ -220,6 +226,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			}
 		}
 		if cd, ok := d.(*ast.ClassDecl); ok {
+			g.userTypeNames[cd.Name] = true
 			ci := classInfo{
 				statics: map[string]bool{},
 				generic: len(cd.TypeParams) > 0,
@@ -254,7 +261,6 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			g.variant[name] = variantInfo{owner: "Kind", tag: i}
 		}
 	}
-	g.resolveRuntimeMode()
 	g.writeHeader(f)
 	for _, d := range f.Decls {
 		// Attribute this decl's //line directives to its own source
@@ -330,6 +336,12 @@ type gen struct {
 	vendoredRequested bool
 	runtimePrefix     string
 	runtimeImport     string
+	// userTypeNames holds the names of user-declared types (classes,
+	// sums, records) — used to detect a user type that shadows a runtime
+	// type name (e.g. a user `class Map` or `type Dynamic`), so
+	// emitTypeExpr emits the user's own type rather than arilrt.X. Unlike
+	// g.class, it excludes the codegen-injected predeclared Map/Set/Stack.
+	userTypeNames map[string]bool
 	// emittedLine tracks the source line whose //line directive
 	// has most recently been written, so we avoid emitting the
 	// same directive twice in a row.
@@ -523,23 +535,38 @@ func (g *gen) sumOwnerName(owner string) string {
 
 // isRuntimeTypeName reports whether name is a predeclared runtime type
 // emitted from the arilrt package (Option / Result / Map / Set / Stack).
+// isRuntimeTypeName reports whether name is an arilrt runtime type that
+// can appear in a user type annotation (so emitTypeExpr must qualify it
+// in vendored mode). Limited to the names sema actually exposes as types:
+// the sums/containers (Option/Result/Map/Set/Stack) and the reflect
+// Dynamic wrapper. TypeDescriptor/FieldInfo/Kind are NOT here — sema does
+// not let user code name them in type position, and the reflect lowering
+// qualifies them directly via rt(); listing them would mis-qualify a
+// user type that merely shares the name.
 func isRuntimeTypeName(name string) bool {
 	switch name {
-	case "Option", "Result", "Map", "Set", "Stack":
+	case "Option", "Result", "Map", "Set", "Stack", "Dynamic":
 		return true
 	}
 	return false
 }
 
+// isShadowedRuntimeType reports whether a user-declared type (class, sum,
+// or record) shadows the runtime type `name` — in which case emitTypeExpr
+// must emit the user's own (unqualified) type, not the arilrt one. Keyed
+// on userTypeNames, which (unlike g.class) excludes the codegen-injected
+// predeclared Map/Set/Stack, so the predeclared containers stay
+// qualified while a genuine user `class Map` / `type Dynamic` does not.
+func (g *gen) isShadowedRuntimeType(name string) bool {
+	return g.userTypeNames[name]
+}
+
 // resolveRuntimeMode fixes the effective runtime mode now that the
-// predeclared-usage pre-walk has run. Vendored emission is used only
-// when the caller asked for it AND the program does not use reflection
-// (the reflect layer is still emitted inline; Block R R3 vendors it).
-// Until then a reflection-using program emits the whole runtime inline,
-// so its inline reflect prelude and the vendored sums never disagree on
-// where Option/Result live.
+// predeclared-usage pre-walk (incl. usesReflect) has run: "arilrt." in
+// vendored mode, "" inline. The whole runtime — sums, containers, and
+// the reflection layer — is qualified uniformly under vendored mode.
 func (g *gen) resolveRuntimeMode() {
-	if g.vendoredRequested && !g.usesReflect {
+	if g.vendoredRequested {
 		g.runtimePrefix = "arilrt."
 	}
 }
@@ -592,9 +619,10 @@ func (g *gen) writeHeader(f *ast.File) {
 		// other stdlib bindings share the name.
 		add(goImportPath(im.Path))
 	}
-	if g.usesReflect {
-		// reflect.TypeOf for the descriptor registry lookup, plus
-		// strconv for the show-helper's primitive formatting.
+	if g.usesReflect && !g.vendored() {
+		// reflect.TypeOf for the descriptor registry lookup, plus strconv
+		// for the show-helper's primitive formatting — both used only by
+		// the inline reflect prelude; vendored mode carries them in arilrt.
 		add("reflect")
 		add("strconv")
 	}
@@ -667,6 +695,11 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredScan()
 	g.writePredeclaredScan2()
 	g.writePredeclaredScan3()
+	// Reflection: the fixed runtime is inline-only (writePredeclaredReflect
+	// self-gates it on !vendored), but the per-program descriptors and
+	// init registration are emitted into main in both modes (qualified via
+	// rt() under vendored mode).
+	g.writePredeclaredReflect()
 	// Everything else: in vendored mode the runtime is the imported arilrt
 	// package, so emit no inline definitions. In inline mode each helper
 	// is emitted only when used (the writePredeclared* usage gates).
@@ -683,7 +716,6 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredSortSorted()
 	g.writePredeclaredTryRecv()
 	g.writePredeclaredGroup()
-	g.writePredeclaredReflect()
 }
 
 // writePredeclaredSums emits Go-side definitions for Option<T>
@@ -1932,10 +1964,10 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 				g.b.WriteByte('*')
 			}
 		}
-		// Predeclared runtime types (Option / Result / Map / Set / Stack)
-		// take the arilrt package selector in vendored mode; everything
-		// else (user types, qualified names) keeps its plain spelling.
-		if len(v.QName) == 1 && isRuntimeTypeName(v.QName[0]) {
+		// Predeclared runtime types take the arilrt package selector in
+		// vendored mode; everything else (user types, qualified names, a
+		// user type shadowing a runtime name) keeps its plain spelling.
+		if len(v.QName) == 1 && isRuntimeTypeName(v.QName[0]) && !g.isShadowedRuntimeType(v.QName[0]) {
 			g.b.WriteString(g.rt(v.QName[0]))
 		} else {
 			g.b.WriteString(strings.Join(v.QName, "."))
@@ -2383,10 +2415,21 @@ func (g *gen) emitTupleLit(t *ast.TupleLit) error {
 // typeOf / typeName / kind / fields / fieldValue / show
 // (PR-R1 .. PR-R3). Variants / methods / typeArgs / elementType
 // land with later Block-R PRs.
+// reflectFuncName maps a reflect.* method name to its arilrt export.
+// kind → KindOf avoids clashing with the Kind type.
+var reflectFuncName = map[string]string{
+	"typeOf":     "TypeOf",
+	"typeName":   "TypeName",
+	"kind":       "KindOf",
+	"fields":     "Fields",
+	"fieldValue": "FieldValue",
+	"show":       "Show",
+}
+
 func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.Expr) error {
 	switch name {
 	case "box":
-		g.b.WriteString("arilBox")
+		g.b.WriteString(g.rt("Box"))
 		if len(typeArgs) > 0 {
 			g.b.WriteByte('[')
 			if err := g.emitTypeExpr(typeArgs[0]); err != nil {
@@ -2407,7 +2450,7 @@ func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.E
 		if len(typeArgs) != 1 {
 			return fmt.Errorf("codegen: reflect.unbox requires exactly one explicit type argument `reflect.unbox<T>(d)`")
 		}
-		g.b.WriteString("arilUnbox[")
+		g.b.WriteString(g.rt("Unbox") + "[")
 		if err := g.emitTypeExpr(typeArgs[0]); err != nil {
 			return err
 		}
@@ -2421,9 +2464,7 @@ func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.E
 		g.b.WriteByte(')')
 		return nil
 	case "typeOf", "typeName", "kind", "fields", "fieldValue", "show":
-		g.b.WriteString("aril")
-		g.b.WriteString(strings.ToUpper(name[:1]))
-		g.b.WriteString(name[1:])
+		g.b.WriteString(g.rt(reflectFuncName[name]))
 		g.b.WriteByte('(')
 		for i, a := range args {
 			if i > 0 {
