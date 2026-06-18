@@ -69,6 +69,7 @@ Source files use the `.aril` extension.
 
 The Aril compiler is licensed under the [Apache License 2.0](LICENSE) (patent
 grant included). The runtime support code Aril emits into the programs it
-compiles is licensed under the [BSD Zero Clause License (0BSD)](LICENSE.runtime),
-so programs you build with Aril carry no Aril attribution obligation — the same
-split TypeScript uses (Apache-2.0 compiler, 0BSD `tslib` helpers).
+compiles — the `arilrt` package — is licensed under the
+[BSD Zero Clause License (0BSD)](arilrt/LICENSE), so programs you build with
+Aril carry no Aril attribution obligation — the same split TypeScript uses
+(Apache-2.0 compiler, 0BSD `tslib` helpers).
