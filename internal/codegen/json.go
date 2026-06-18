@@ -26,17 +26,17 @@ func (g *gen) emitJSONCall(c *ast.Call) (bool, error) {
 	}
 	switch f.Name {
 	case "parse":
-		// json.parse<T>(data) → arilJSONParse[T](data): a generic
+		// json.parse<T>(data) → JSONParse[T](data): a generic
 		// helper around json.Unmarshal's pointer-mutation API, wrapped
 		// into Result<T, error>.
-		g.b.WriteString("arilJSONParse")
+		g.b.WriteString("JSONParse")
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return true, err
 		}
 		return true, g.emitArgList(c.Args)
 	case "serialize":
-		// json.serialize(v) → arilResultOf(json.Marshal(v)): Marshal's
-		// ([]byte, error) is exactly the arilResultOf shape.
+		// json.serialize(v) → ResultOf(json.Marshal(v)): Marshal's
+		// ([]byte, error) is exactly the ResultOf shape.
 		return true, g.emitResultOfCall("json.Marshal", c.Args)
 	case "serializeIndent":
 		// json.serializeIndent(v, prefix, indent) → MarshalIndent.
@@ -45,10 +45,10 @@ func (g *gen) emitJSONCall(c *ast.Call) (bool, error) {
 	return false, nil
 }
 
-// emitResultOfCall emits `arilResultOf(<goFn>(<args>))` — the wrap for a
+// emitResultOfCall emits `ResultOf(<goFn>(<args>))` — the wrap for a
 // Go `(T, error)`-returning binding into Result<T, error>.
 func (g *gen) emitResultOfCall(goFn string, args []ast.Expr) error {
-	g.b.WriteString("arilResultOf(")
+	g.b.WriteString("ResultOf(")
 	g.b.WriteString(goFn)
 	if err := g.emitArgList(args); err != nil {
 		return err
@@ -68,7 +68,7 @@ func goImportPath(arilName string) string {
 	return arilName
 }
 
-// writePredeclaredJSONParse emits the arilJSONParse helper backing
+// writePredeclaredJSONParse emits the JSONParse helper backing
 // json.parse<T> (binding-surface.md §encoding/json). json.Unmarshal
 // populates through a pointer, so the generic helper allocates a T,
 // unmarshals into it, and folds the (value, error) into Result.
@@ -77,7 +77,7 @@ func (g *gen) writePredeclaredJSONParse() {
 	if !g.usesJSONParse {
 		return
 	}
-	g.b.WriteString(`func arilJSONParse[T any](data []byte) Result[T, error] {
+	g.b.WriteString(`func JSONParse[T any](data []byte) Result[T, error] {
 	var v T
 	if err := json.Unmarshal(data, &v); err != nil {
 		return Result[T, error]{Tag: 1, E: err}

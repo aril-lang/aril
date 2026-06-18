@@ -53,24 +53,24 @@ type Map[K comparable, V any] struct {
 	order []K
 }
 
-func mapNew[K comparable, V any]() *Map[K, V] {
+func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{m: map[K]V{}, order: nil}
 }
-func (m *Map[K, V]) len() int     { return len(m.order) }
-func (m *Map[K, V]) has(k K) bool { _, ok := m.m[k]; return ok }
-func (m *Map[K, V]) get(k K) Option[V] {
+func (m *Map[K, V]) Len() int     { return len(m.order) }
+func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
 	}
 	return Option[V]{Tag: 0}
 }
-func (m *Map[K, V]) set(k K, v V) {
+func (m *Map[K, V]) Set(k K, v V) {
 	if _, ok := m.m[k]; !ok {
 		m.order = append(m.order, k)
 	}
 	m.m[k] = v
 }
-func (m *Map[K, V]) delete(k K) {
+func (m *Map[K, V]) Delete(k K) {
 	if _, ok := m.m[k]; !ok {
 		return
 	}
@@ -82,12 +82,12 @@ func (m *Map[K, V]) delete(k K) {
 		}
 	}
 }
-func (m *Map[K, V]) keys() []K {
+func (m *Map[K, V]) Keys() []K {
 	out := make([]K, len(m.order))
 	copy(out, m.order)
 	return out
 }
-func (m *Map[K, V]) values() []V {
+func (m *Map[K, V]) Values() []V {
 	out := make([]V, 0, len(m.order))
 	for _, k := range m.order {
 		out = append(out, m.m[k])
@@ -100,26 +100,26 @@ type Set[T comparable] struct {
 	order []T
 }
 
-func setNew[T comparable]() *Set[T] {
+func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{m: map[T]struct{}{}, order: nil}
 }
-func setFrom[T comparable](elems []T) *Set[T] {
-	s := setNew[T]()
+func SetFrom[T comparable](elems []T) *Set[T] {
+	s := NewSet[T]()
 	for _, e := range elems {
-		s.add(e)
+		s.Add(e)
 	}
 	return s
 }
-func (s *Set[T]) len() int     { return len(s.order) }
-func (s *Set[T]) has(e T) bool { _, ok := s.m[e]; return ok }
-func (s *Set[T]) add(e T) {
+func (s *Set[T]) Len() int     { return len(s.order) }
+func (s *Set[T]) Has(e T) bool { _, ok := s.m[e]; return ok }
+func (s *Set[T]) Add(e T) {
 	if _, ok := s.m[e]; ok {
 		return
 	}
 	s.m[e] = struct{}{}
 	s.order = append(s.order, e)
 }
-func (s *Set[T]) delete(e T) {
+func (s *Set[T]) Delete(e T) {
 	if _, ok := s.m[e]; !ok {
 		return
 	}
@@ -131,7 +131,7 @@ func (s *Set[T]) delete(e T) {
 		}
 	}
 }
-func (s *Set[T]) toSlice() []T {
+func (s *Set[T]) ToSlice() []T {
 	out := make([]T, len(s.order))
 	copy(out, s.order)
 	return out
@@ -141,14 +141,14 @@ type Stack[T any] struct {
 	xs []T
 }
 
-func stackNew[T any]() *Stack[T] {
+func NewStack[T any]() *Stack[T] {
 	return &Stack[T]{xs: nil}
 }
-func (s *Stack[T]) len() int { return len(s.xs) }
-func (s *Stack[T]) push(e T) {
+func (s *Stack[T]) Len() int { return len(s.xs) }
+func (s *Stack[T]) Push(e T) {
 	s.xs = append(s.xs, e)
 }
-func (s *Stack[T]) pop() Result[T, error] {
+func (s *Stack[T]) Pop() Result[T, error] {
 	n := len(s.xs)
 	if n == 0 {
 		var zero T
@@ -158,7 +158,7 @@ func (s *Stack[T]) pop() Result[T, error] {
 	s.xs = s.xs[:n-1]
 	return Result[T, error]{Tag: 0, V: v}
 }
-func (s *Stack[T]) peek() Option[T] {
+func (s *Stack[T]) Peek() Option[T] {
 	n := len(s.xs)
 	if n == 0 {
 		return Option[T]{Tag: 0}
@@ -172,17 +172,17 @@ type arilEmptyStackError struct{}
 
 func (arilEmptyStackError) Error() string { return "empty stack" }
 func main() {
-	var s = setFrom([]int{1, 2, 3})
-	var e = setNew[int]()
-	var m = func() *Map[string, int] { m := mapNew[string, int](); m.set("a", 1); m.set("b", 2); return m }()
-	var me = mapNew[string, int]()
-	var st = stackNew[int]()
-	st.push(10)
-	fmt.Println(s.len())
-	fmt.Println(e.len())
-	fmt.Println(m.len())
-	fmt.Println(me.len())
-	fmt.Println(st.len())
+	var s = SetFrom([]int{1, 2, 3})
+	var e = NewSet[int]()
+	var m = func() *Map[string, int] { m := NewMap[string, int](); m.Set("a", 1); m.Set("b", 2); return m }()
+	var me = NewMap[string, int]()
+	var st = NewStack[int]()
+	st.Push(10)
+	fmt.Println(s.Len())
+	fmt.Println(e.Len())
+	fmt.Println(m.Len())
+	fmt.Println(me.Len())
+	fmt.Println(st.Len())
 }
 
 --- STDOUT ---

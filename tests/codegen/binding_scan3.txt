@@ -28,7 +28,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilScan3[A any, B any, C any]() Result[struct {
+func Scan3[A any, B any, C any]() Result[struct {
 	_0 A
 	_1 B
 	_2 C
@@ -54,7 +54,7 @@ func arilScan3[A any, B any, C any]() Result[struct {
 	}{a, b, c})
 }
 func main() {
-	__aril_match_1 := arilScan3[int, int, int]()
+	__aril_match_1 := Scan3[int, int, int]()
 	switch __aril_match_1.Tag {
 	case 1:
 		fmt.Println("eof")

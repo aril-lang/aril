@@ -41,24 +41,24 @@ type Map[K comparable, V any] struct {
 	order []K
 }
 
-func mapNew[K comparable, V any]() *Map[K, V] {
+func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{m: map[K]V{}, order: nil}
 }
-func (m *Map[K, V]) len() int     { return len(m.order) }
-func (m *Map[K, V]) has(k K) bool { _, ok := m.m[k]; return ok }
-func (m *Map[K, V]) get(k K) Option[V] {
+func (m *Map[K, V]) Len() int     { return len(m.order) }
+func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
+func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
 	}
 	return Option[V]{Tag: 0}
 }
-func (m *Map[K, V]) set(k K, v V) {
+func (m *Map[K, V]) Set(k K, v V) {
 	if _, ok := m.m[k]; !ok {
 		m.order = append(m.order, k)
 	}
 	m.m[k] = v
 }
-func (m *Map[K, V]) delete(k K) {
+func (m *Map[K, V]) Delete(k K) {
 	if _, ok := m.m[k]; !ok {
 		return
 	}
@@ -70,12 +70,12 @@ func (m *Map[K, V]) delete(k K) {
 		}
 	}
 }
-func (m *Map[K, V]) keys() []K {
+func (m *Map[K, V]) Keys() []K {
 	out := make([]K, len(m.order))
 	copy(out, m.order)
 	return out
 }
-func (m *Map[K, V]) values() []V {
+func (m *Map[K, V]) Values() []V {
 	out := make([]V, 0, len(m.order))
 	for _, k := range m.order {
 		out = append(out, m.m[k])
@@ -83,11 +83,11 @@ func (m *Map[K, V]) values() []V {
 	return out
 }
 func main() {
-	var m = mapNew[string, int]()
-	m.set("a", 1)
-	m.set("b", 2)
-	fmt.Println(m.len())
-	__aril_match_1 := m.get("a")
+	var m = NewMap[string, int]()
+	m.Set("a", 1)
+	m.Set("b", 2)
+	fmt.Println(m.Len())
+	__aril_match_1 := m.Get("a")
 	switch __aril_match_1.Tag {
 	case 1:
 		v := __aril_match_1.V
@@ -95,7 +95,7 @@ func main() {
 	case 0:
 		fmt.Println("no a")
 	}
-	__aril_match_2 := m.get("z")
+	__aril_match_2 := m.Get("z")
 	switch __aril_match_2.Tag {
 	case 1:
 		v := __aril_match_2.V

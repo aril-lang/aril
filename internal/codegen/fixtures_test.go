@@ -55,6 +55,19 @@ func TestFixtures(t *testing.T) {
 			if !ok {
 				t.Fatalf("%s: missing GO section", name)
 			}
+			// UPDATE_CODEGEN_GOLDENS=1 rewrites the GO section in place
+			// (Block R regeneration affordance) — splices the freshly
+			// emitted Go into the manifest, leaving every other section
+			// byte-identical. Off by default; never runs in CI.
+			if os.Getenv("UPDATE_CODEGEN_GOLDENS") == "1" {
+				if strings.TrimRight(got, "\n") != strings.TrimRight(want, "\n") {
+					if err := rewriteGoSection(path, string(data), got); err != nil {
+						t.Fatalf("%s: update golden: %v", name, err)
+					}
+					t.Logf("%s: GO section updated", name)
+				}
+				return
+			}
 			if strings.TrimRight(got, "\n") != strings.TrimRight(want, "\n") {
 				t.Errorf("%s: GO mismatch\n--- got ---\n%s\n--- want ---\n%s",
 					name, got, want)
@@ -116,6 +129,34 @@ func TestFixtures(t *testing.T) {
 			}
 		})
 	}
+}
+
+// rewriteGoSection replaces the body of the `--- GO ---` section in the
+// manifest at path with newGo, preserving every other section verbatim,
+// and writes the file back. Used only under UPDATE_CODEGEN_GOLDENS.
+func rewriteGoSection(path, orig, newGo string) error {
+	delim := regexp.MustCompile(`(?m)^---\s+([A-Z_]+)\s+---\s*$`)
+	matches := delim.FindAllStringSubmatchIndex(orig, -1)
+	for i, m := range matches {
+		if orig[m[2]:m[3]] != "GO" {
+			continue
+		}
+		bodyStart := m[1] // end of the "--- GO ---" line
+		bodyEnd := len(orig)
+		if i+1 < len(matches) {
+			bodyEnd = matches[i+1][0]
+		}
+		// The section body is "\n" + content + "\n\n" (blank line before
+		// the next delimiter, or trailing newline at EOF). Normalise to
+		// one leading newline + trimmed body + the original tail spacing.
+		tail := "\n"
+		if i+1 < len(matches) {
+			tail = "\n\n"
+		}
+		rebuilt := orig[:bodyStart] + "\n" + strings.TrimRight(newGo, "\n") + tail + orig[bodyEnd:]
+		return os.WriteFile(path, []byte(rebuilt), 0o644)
+	}
+	return os.WriteFile(path, []byte(orig), 0o644)
 }
 
 func parseManifest(s string) map[string]string {

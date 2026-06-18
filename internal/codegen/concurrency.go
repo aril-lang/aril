@@ -47,7 +47,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	// used by every spawn and by Wait below.
 	g.writeIndent()
 	g.b.WriteString(gv)
-	g.b.WriteString(", _ := arilNewGroup(")
+	g.b.WriteString(", _ := NewGroup(")
 	if s.Parent != nil {
 		if err := g.emitExpr(s.Parent); err != nil {
 			return err

@@ -35,7 +35,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilScan[T any]() Result[T, error] {
+func Scan[T any]() Result[T, error] {
 	var v T
 	if _, err := fmt.Scan(&v); err != nil {
 		return ResultErr[T, error](err)
@@ -43,7 +43,7 @@ func arilScan[T any]() Result[T, error] {
 	return ResultOk[T, error](v)
 }
 func main() {
-	__aril_match_1 := arilScan[int]()
+	__aril_match_1 := Scan[int]()
 	switch __aril_match_1.Tag {
 	case 1:
 		fmt.Println("eof")

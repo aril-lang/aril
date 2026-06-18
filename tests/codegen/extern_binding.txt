@@ -45,7 +45,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func arilResultOf[T any](v T, err error) Result[T, error] {
+func ResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -55,7 +55,7 @@ func main() {
 	var re = regexp.MustCompile("a+")
 	fmt.Println(re.MatchString("aaa"))
 	fmt.Println(re.MatchString("bbb"))
-	__aril_match_1 := arilResultOf(strconv.Atoi("42"))
+	__aril_match_1 := ResultOf(strconv.Atoi("42"))
 	switch __aril_match_1.Tag {
 	case 0:
 		n := __aril_match_1.V

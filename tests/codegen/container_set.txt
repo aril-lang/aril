@@ -24,26 +24,26 @@ type Set[T comparable] struct {
 	order []T
 }
 
-func setNew[T comparable]() *Set[T] {
+func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{m: map[T]struct{}{}, order: nil}
 }
-func setFrom[T comparable](elems []T) *Set[T] {
-	s := setNew[T]()
+func SetFrom[T comparable](elems []T) *Set[T] {
+	s := NewSet[T]()
 	for _, e := range elems {
-		s.add(e)
+		s.Add(e)
 	}
 	return s
 }
-func (s *Set[T]) len() int     { return len(s.order) }
-func (s *Set[T]) has(e T) bool { _, ok := s.m[e]; return ok }
-func (s *Set[T]) add(e T) {
+func (s *Set[T]) Len() int     { return len(s.order) }
+func (s *Set[T]) Has(e T) bool { _, ok := s.m[e]; return ok }
+func (s *Set[T]) Add(e T) {
 	if _, ok := s.m[e]; ok {
 		return
 	}
 	s.m[e] = struct{}{}
 	s.order = append(s.order, e)
 }
-func (s *Set[T]) delete(e T) {
+func (s *Set[T]) Delete(e T) {
 	if _, ok := s.m[e]; !ok {
 		return
 	}
@@ -55,19 +55,19 @@ func (s *Set[T]) delete(e T) {
 		}
 	}
 }
-func (s *Set[T]) toSlice() []T {
+func (s *Set[T]) ToSlice() []T {
 	out := make([]T, len(s.order))
 	copy(out, s.order)
 	return out
 }
 func main() {
-	var s = setNew[int]()
-	s.add(1)
-	s.add(2)
-	s.add(1)
-	fmt.Println(s.len())
-	fmt.Println(s.has(1))
-	fmt.Println(s.has(99))
+	var s = NewSet[int]()
+	s.Add(1)
+	s.Add(2)
+	s.Add(1)
+	fmt.Println(s.Len())
+	fmt.Println(s.Has(1))
+	fmt.Println(s.Has(99))
 }
 
 --- STDOUT ---
