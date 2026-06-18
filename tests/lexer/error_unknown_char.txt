@@ -5,4 +5,4 @@ E0101: `#` is not a valid token-start character
 let x = #1
 
 --- ERRORS ---
-src.td:1:9: error[E0101]: Unexpected character
+src.aril:1:9: error[E0101]: Unexpected character

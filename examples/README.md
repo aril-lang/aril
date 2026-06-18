@@ -13,18 +13,18 @@ implementation that makes it compile.
 
 The corpus is organised **by purpose**, not by where a problem came from
 (the problem's origin lives in each example's `source` metadata). Every
-example is a **directory** holding its program (one or more `.td` files) and
+example is a **directory** holding its program (one or more `.aril` files) and
 an `example.toml` manifest:
 
 ```
 examples/<category>/<name>/
   example.toml      # description, source, category, showcase, forces, status, expects…
-  <name>.td         # the program (the manifest `entry` field names it)
+  <name>.aril         # the program (the manifest `entry` field names it)
   expected.out      # expected stdout (when expects = output-check)
   errors/           # optional: negative cases (expected-diagnostic patches)
 ```
 
-`★` marks **showcase** examples — those that demonstrate Tide's value over
+`★` marks **showcase** examples — those that demonstrate Aril's value over
 plain Go (sum types, exhaustive matching, ergonomic errors, uncolored
 concurrency, interface conformance). `showcase` is an orthogonal flag, not a
 category.
@@ -50,7 +50,7 @@ category.
 | `hello` | toolchain smoke test |
 
 The binary-tree problem is the headline: a recursive generic discriminated
-union with pattern matching is exactly where Tide's type system pays off over
+union with pattern matching is exactly where Aril's type system pays off over
 Go, which has no sum types.
 
 ## `modeling-errors/` — failure as values
@@ -68,7 +68,7 @@ Go, which has no sum types.
 |---|---|
 | `config_loader` | typed structs, the `encoding/json` binding, error handling |
 | `wc` | a CLI: `os`/args, `io`, file reading, exit codes |
-| `healthcheck_server` ★ | `net/http`; **Go interface conformance** (a Tide type as `http.Handler`) |
+| `healthcheck_server` ★ | `net/http`; **Go interface conformance** (a Aril type as `http.Handler`) |
 | `todo_api` | JSON REST CRUD; DTO structs; `Result` mapped to HTTP status codes |
 | `counterstack` | sum-typed wire protocol, TCP + JSON Lines via `net` + `bufio`, an `interface Strategy` |
 
@@ -105,7 +105,7 @@ Beyond "compiles and runs", an example may carry **negative cases** under
 `errors/`: a marker-anchored unified-diff patch that injects a specific mistake
 into the program, plus the expected diagnostic (stable code, stage, message),
 registered as an `[[error]]` entry in `example.toml`. These validate that
-mistakes yield legible Tide diagnostics. See RFC-0004 for the mechanism.
+mistakes yield legible Aril diagnostics. See RFC-0004 for the mechanism.
 
 ## Conformance status
 

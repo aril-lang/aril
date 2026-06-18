@@ -1,4 +1,4 @@
-module github.com/heni/tide-lang
+module github.com/aril-lang/aril
 
 go 1.22
 

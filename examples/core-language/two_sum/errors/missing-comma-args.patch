@@ -1,5 +1,5 @@
---- two_sum.td
-+++ two_sum.td
+--- two_sum.aril
++++ two_sum.aril
 @@ -23,7 +23,7 @@
    let target = 9
  

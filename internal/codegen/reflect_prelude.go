@@ -3,15 +3,15 @@ package codegen
 import (
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
-// writePredeclaredReflect emits Tide's reflection layer per
+// writePredeclaredReflect emits Aril's reflection layer per
 // `lang-spec/builtins.md` §reflect and `docs/design-decisions.md`
 // D18: Dynamic wrapper, TypeDescriptor, Kind sum, descriptor
 // registry, and the minimal reflect.* surface (box / unbox /
 // typeOf / typeName / kind). Only emitted when usesReflect.
-// Per D18, the spec location is `tidert/reflect`; PR-R1 emits
+// Per D18, the spec location is `arilrt/reflect`; PR-R1 emits
 // inline in main as a v1 transitional state (same precedent as
 // Option/Result/containers).
 func (g *gen) writePredeclaredReflect() {
@@ -47,7 +47,7 @@ var (
 	KindUnit      = Kind{Tag: 5}
 )
 
-var tideDescRegistry = map[string]*TypeDescriptor{}
+var arilDescRegistry = map[string]*TypeDescriptor{}
 
 // Primitive descriptors — registered eagerly so reflect.box on
 // any primitive value finds a descriptor. Notes:
@@ -60,111 +60,111 @@ var tideDescRegistry = map[string]*TypeDescriptor{}
 //   "let r: rune = ...", reflect.typeName can return "rune" via
 //   compile-time-resolved descriptor.
 var (
-	tideDesc_int     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
-	tideDesc_int64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
-	tideDesc_int32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
-	tideDesc_string  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
-	tideDesc_bool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
-	tideDesc_float64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
-	tideDesc_byte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
+	arilDesc_int     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
+	arilDesc_int64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
+	arilDesc_int32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
+	arilDesc_string  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
+	arilDesc_bool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
+	arilDesc_float64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
+	arilDesc_byte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
 )
 
 func init() {
-	tideDescRegistry["int"] = tideDesc_int
-	tideDescRegistry["int64"] = tideDesc_int64
-	tideDescRegistry["int32"] = tideDesc_int32
-	tideDescRegistry["string"] = tideDesc_string
-	tideDescRegistry["bool"] = tideDesc_bool
-	tideDescRegistry["float64"] = tideDesc_float64
-	tideDescRegistry["uint8"] = tideDesc_byte
+	arilDescRegistry["int"] = arilDesc_int
+	arilDescRegistry["int64"] = arilDesc_int64
+	arilDescRegistry["int32"] = arilDesc_int32
+	arilDescRegistry["string"] = arilDesc_string
+	arilDescRegistry["bool"] = arilDesc_bool
+	arilDescRegistry["float64"] = arilDesc_float64
+	arilDescRegistry["uint8"] = arilDesc_byte
 }
 
-func tideBox[T any](v T) Dynamic {
-	return Dynamic{Payload: v, Desc: tideDescForKey(reflect.TypeOf(v).String())}
+func arilBox[T any](v T) Dynamic {
+	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
 }
 
-// tideDescForKey looks up (and caches) a descriptor for the
+// arilDescForKey looks up (and caches) a descriptor for the
 // Go-runtime type-name key. The cache preserves CT1 (descriptor
 // uniqueness): two reflect.box calls on the same Go-runtime
 // type return Dynamic values whose Desc pointers compare equal.
 // Concurrent first-time-seen unknown types may briefly race on
 // the registry write — a later Block-R PR adds synchronisation.
-func tideDescForKey(key string) *TypeDescriptor {
-	if d, ok := tideDescRegistry[key]; ok {
+func arilDescForKey(key string) *TypeDescriptor {
+	if d, ok := arilDescRegistry[key]; ok {
 		return d
 	}
 	d := &TypeDescriptor{Name: key, Kind: KindPrimitive}
-	tideDescRegistry[key] = d
+	arilDescRegistry[key] = d
 	return d
 }
 
-func tideTypeOf(d Dynamic) *TypeDescriptor { return d.Desc }
-func tideTypeName(t *TypeDescriptor) string { return t.Name }
-func tideKind(t *TypeDescriptor) Kind { return t.Kind }
+func arilTypeOf(d Dynamic) *TypeDescriptor { return d.Desc }
+func arilTypeName(t *TypeDescriptor) string { return t.Name }
+func arilKind(t *TypeDescriptor) Kind { return t.Kind }
 
-func tideUnbox[T any](d Dynamic) Result[T, error] {
+func arilUnbox[T any](d Dynamic) Result[T, error] {
 	v, ok := d.Payload.(T)
 	if !ok {
 		var zero T
-		return Result[T, error]{Tag: 1, E: tideUnboxError(d.Desc.Name), V: zero}
+		return Result[T, error]{Tag: 1, E: arilUnboxError(d.Desc.Name), V: zero}
 	}
 	return Result[T, error]{Tag: 0, V: v}
 }
 
-type tideUnboxErr struct{ typeName string }
+type arilUnboxErr struct{ typeName string }
 
-func (e tideUnboxErr) Error() string {
+func (e arilUnboxErr) Error() string {
 	return "reflect.unbox: payload is not the requested type (have " + e.typeName + ")"
 }
 
-func tideUnboxError(typeName string) error { return tideUnboxErr{typeName: typeName} }
+func arilUnboxError(typeName string) error { return arilUnboxErr{typeName: typeName} }
 
 // Per-class field accessor functions are registered into this
 // map at init time (one per non-generic class declared in the
-// program). The accessor reads a named field off the Tide-side
+// program). The accessor reads a named field off the Aril-side
 // pointer-to-struct and returns it boxed as Dynamic.
-type tideFieldAccessor = func(v any, name string) (Dynamic, bool)
+type arilFieldAccessor = func(v any, name string) (Dynamic, bool)
 
-var tideFieldAccessors = map[string]tideFieldAccessor{}
+var arilFieldAccessors = map[string]arilFieldAccessor{}
 
-func tideFields(t *TypeDescriptor) []FieldInfo { return t.fields }
+func arilFields(t *TypeDescriptor) []FieldInfo { return t.fields }
 
-func tideFieldValue(d Dynamic, name string) Result[Dynamic, error] {
+func arilFieldValue(d Dynamic, name string) Result[Dynamic, error] {
 	if d.Desc == nil {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("Dynamic has no descriptor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("Dynamic has no descriptor"), V: zero}
 	}
-	fn, ok := tideFieldAccessors[d.Desc.Name]
+	fn, ok := arilFieldAccessors[d.Desc.Name]
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
 	}
 	v, ok := fn(d.Payload, name)
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
 	}
 	return Result[Dynamic, error]{Tag: 0, V: v}
 }
 
-type tideFieldErrT struct{ msg string }
+type arilFieldErrT struct{ msg string }
 
-func (e tideFieldErrT) Error() string { return e.msg }
+func (e arilFieldErrT) Error() string { return e.msg }
 
-func tideFieldErr(msg string) error { return tideFieldErrT{msg: msg} }
+func arilFieldErr(msg string) error { return arilFieldErrT{msg: msg} }
 
-// tideBoxAny boxes an arbitrary value (with type known only at
+// arilBoxAny boxes an arbitrary value (with type known only at
 // runtime via Go's reflect). Used by per-class field accessors
-// when reading a field's value. Routes through tideDescForKey so
+// when reading a field's value. Routes through arilDescForKey so
 // descriptor identity follows CT1.
-func tideBoxAny(v any) Dynamic {
+func arilBoxAny(v any) Dynamic {
 	if v == nil {
-		return Dynamic{Payload: nil, Desc: tideDescForKey("<nil>")}
+		return Dynamic{Payload: nil, Desc: arilDescForKey("<nil>")}
 	}
-	return Dynamic{Payload: v, Desc: tideDescForKey(reflect.TypeOf(v).String())}
+	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
 }
 
-// tideShow renders a Dynamic value as a human-readable string.
+// arilShow renders a Dynamic value as a human-readable string.
 // It is the runtime building block for the REPL auto-printer
 // and ` + "`" + `:inspect` + "`" + ` (RFC-0003). Kinds beyond Primitive /
 // Class fall back to a "<TypeName>" placeholder for now; PR-R4
@@ -172,11 +172,11 @@ func tideBoxAny(v any) Dynamic {
 // metadata lands. Panic-free per D18 CT2 — class graphs with
 // cycles render the back-edge as "<cycle>" instead of blowing
 // the stack.
-func tideShow(d Dynamic) string {
-	return tideShowWalk(d, map[any]bool{})
+func arilShow(d Dynamic) string {
+	return arilShowWalk(d, map[any]bool{})
 }
 
-func tideShowWalk(d Dynamic, seen map[any]bool) string {
+func arilShowWalk(d Dynamic, seen map[any]bool) string {
 	if d.Desc == nil {
 		return "<nil>"
 	}
@@ -196,22 +196,22 @@ func tideShowWalk(d Dynamic, seen map[any]bool) string {
 			if i > 0 {
 				out += ", "
 			}
-			fv := tideFieldValue(d, fi.Name)
+			fv := arilFieldValue(d, fi.Name)
 			if fv.Tag != 0 {
 				out += fi.Name + ": <unreadable>"
 				continue
 			}
-			out += fi.Name + ": " + tideShowWalk(fv.V, seen)
+			out += fi.Name + ": " + arilShowWalk(fv.V, seen)
 		}
 		return out + "}"
 	case KindPrimitive:
-		return tideShowPrimitive(d)
+		return arilShowPrimitive(d)
 	default:
 		return "<" + d.Desc.Name + ">"
 	}
 }
 
-func tideShowPrimitive(d Dynamic) string {
+func arilShowPrimitive(d Dynamic) string {
 	switch v := d.Payload.(type) {
 	case nil:
 		return "<nil>"
@@ -257,10 +257,10 @@ func tideShowPrimitive(d Dynamic) string {
 		return
 	}
 	for _, d := range g.descriptors {
-		g.b.WriteString("var tideDesc_")
-		g.b.WriteString(d.tideName)
+		g.b.WriteString("var arilDesc_")
+		g.b.WriteString(d.arilName)
 		g.b.WriteString(" = &TypeDescriptor{Name: ")
-		g.b.WriteString(strconv.Quote(d.tideName))
+		g.b.WriteString(strconv.Quote(d.arilName))
 		g.b.WriteString(", Kind: ")
 		g.b.WriteString(d.kind)
 		g.b.WriteString("}\n")
@@ -269,36 +269,36 @@ func tideShowPrimitive(d Dynamic) string {
 	// classes themselves are emitted into the package, so the
 	// accessor body can refer to the class struct's field by
 	// its exported Go-side name (exportFieldName); the `case`
-	// label stays the Tide name for runtime lookup. The accessor takes any so
-	// the dispatcher in tideFieldValue can call it through the
+	// label stays the Aril name for runtime lookup. The accessor takes any so
+	// the dispatcher in arilFieldValue can call it through the
 	// map without per-class typed indirection.
 	for _, d := range g.descriptors {
 		if d.kind != "KindClass" {
 			continue
 		}
-		g.b.WriteString("func tideFieldOf_")
-		g.b.WriteString(d.tideName)
+		g.b.WriteString("func arilFieldOf_")
+		g.b.WriteString(d.arilName)
 		g.b.WriteString("(v any, name string) (Dynamic, bool) {\n")
 		g.b.WriteString("\tc, _ := v.(*")
-		g.b.WriteString(d.tideName)
+		g.b.WriteString(d.arilName)
 		g.b.WriteString(")\n")
 		g.b.WriteString("\tif c == nil {\n\t\treturn Dynamic{}, false\n\t}\n")
 		g.b.WriteString("\tswitch name {\n")
 		for _, fi := range d.fields {
 			g.b.WriteString("\tcase ")
-			g.b.WriteString(strconv.Quote(fi.tideName))
+			g.b.WriteString(strconv.Quote(fi.arilName))
 			g.b.WriteString(":\n")
 			if fi.descRef != "" {
 				g.b.WriteString("\t\treturn Dynamic{Payload: c.")
-				g.b.WriteString(exportFieldName(fi.tideName))
+				g.b.WriteString(exportFieldName(fi.arilName))
 				g.b.WriteString(", Desc: ")
 				g.b.WriteString(fi.descRef)
 				g.b.WriteString("}, true\n")
 			} else {
-				// Unknown-static-type — fall back to tideBoxAny so
+				// Unknown-static-type — fall back to arilBoxAny so
 				// the descriptor is at least synthesised at runtime.
-				g.b.WriteString("\t\treturn tideBoxAny(c.")
-				g.b.WriteString(exportFieldName(fi.tideName))
+				g.b.WriteString("\t\treturn arilBoxAny(c.")
+				g.b.WriteString(exportFieldName(fi.arilName))
 				g.b.WriteString("), true\n")
 			}
 		}
@@ -306,10 +306,10 @@ func tideShowPrimitive(d Dynamic) string {
 	}
 	g.b.WriteString("func init() {\n")
 	for _, d := range g.descriptors {
-		g.b.WriteString("\ttideDescRegistry[")
+		g.b.WriteString("\tarilDescRegistry[")
 		g.b.WriteString(strconv.Quote(d.goType))
-		g.b.WriteString("] = tideDesc_")
-		g.b.WriteString(d.tideName)
+		g.b.WriteString("] = arilDesc_")
+		g.b.WriteString(d.arilName)
 		g.b.WriteString("\n")
 	}
 	// Populate field metadata + accessor registry for each
@@ -321,12 +321,12 @@ func tideShowPrimitive(d Dynamic) string {
 			continue
 		}
 		if len(d.fields) > 0 {
-			g.b.WriteString("\ttideDesc_")
-			g.b.WriteString(d.tideName)
+			g.b.WriteString("\tarilDesc_")
+			g.b.WriteString(d.arilName)
 			g.b.WriteString(".fields = []FieldInfo{\n")
 			for _, fi := range d.fields {
 				g.b.WriteString("\t\t{Name: ")
-				g.b.WriteString(strconv.Quote(fi.tideName))
+				g.b.WriteString(strconv.Quote(fi.arilName))
 				g.b.WriteString(", Desc: ")
 				if fi.descRef != "" {
 					g.b.WriteString(fi.descRef)
@@ -337,16 +337,16 @@ func tideShowPrimitive(d Dynamic) string {
 			}
 			g.b.WriteString("\t}\n")
 		}
-		g.b.WriteString("\ttideFieldAccessors[")
-		g.b.WriteString(strconv.Quote(d.tideName))
-		g.b.WriteString("] = tideFieldOf_")
-		g.b.WriteString(d.tideName)
+		g.b.WriteString("\tarilFieldAccessors[")
+		g.b.WriteString(strconv.Quote(d.arilName))
+		g.b.WriteString("] = arilFieldOf_")
+		g.b.WriteString(d.arilName)
 		g.b.WriteString("\n")
 	}
 	g.b.WriteString("}\n")
 }
 
-// descRefForType resolves a Tide TypeExpr to the Go-side var
+// descRefForType resolves a Aril TypeExpr to the Go-side var
 // name of its type descriptor. Returns "" when the type has no
 // emitted descriptor (slices, generics, function types, ...);
 // callers handle the empty case by emitting a placeholder.
@@ -361,15 +361,15 @@ func descRefForType(t ast.TypeExpr, classNames map[string]bool) string {
 		// the descriptors collapse accordingly.
 		switch v.Name {
 		case "rune":
-			return "tideDesc_int32"
+			return "arilDesc_int32"
 		case "byte":
-			return "tideDesc_byte"
+			return "arilDesc_byte"
 		default:
-			return "tideDesc_" + v.Name
+			return "arilDesc_" + v.Name
 		}
 	case *ast.NamedType:
 		if len(v.QName) == 1 && classNames[v.QName[0]] {
-			return "tideDesc_" + v.QName[0]
+			return "arilDesc_" + v.QName[0]
 		}
 	}
 	return ""

@@ -10,13 +10,13 @@
 
 ## Summary
 
-Tide binds Go libraries through a **semi-automatic foreign-function
+Aril binds Go libraries through a **semi-automatic foreign-function
 interface**: a generator reads a Go package's *type* information and
-emits **declaration files** — Tide source whose function/method bodies
+emits **declaration files** — Aril source whose function/method bodies
 are the marker `EXT`, meaning "implemented by this Go symbol." A human
 then curates those declarations and writes thin **adapter** functions
 on top for ergonomics. The generated layer is allowed to be ugly; the
-adapter layer is where the nice Tide API lives. This is the
+adapter layer is where the nice Aril API lives. This is the
 "automation does the routine, humans build the interfaces and
 adapters" split: binding *signatures* are derived mechanically from
 Go type info, and humans write only the idiomatic wrapper layer.
@@ -24,7 +24,7 @@ Go type info, and humans write only the idiomatic wrapper layer.
 The interface covers the **whole FFI surface** — any Go package,
 stdlib or third-party — not a fixed binding list. Its forcing
 use-case is reimplementing the corpus-status analyzer (today a Python
-script) in Tide, which needs `os/exec`, file/temp I/O, `path/filepath`,
+script) in Aril, which needs `os/exec`, file/temp I/O, `path/filepath`,
 and a *non-stdlib* TOML parser — proving third-party binding end to
 end.
 
@@ -61,28 +61,28 @@ Three forces make this necessary now.
 ### Overview — two layers, one verified boundary
 
 ```
-   Go package  ──[ tide import ]──►  raw declaration file (.td, EXT bodies)   ◄── generated, ugly, stable
+   Go package  ──[ aril import ]──►  raw declaration file (.aril, EXT bodies)   ◄── generated, ugly, stable
                                           │  human curates (rename, prune, Option-lift)
                                           ▼
-                                     curated binding module (.td)              ◄── reviewed once
+                                     curated binding module (.aril)              ◄── reviewed once
                                           │  human writes adapters on top
                                           ▼
-                                     adapter module (.td, ordinary Tide)       ◄── the nice API programs call
+                                     adapter module (.aril, ordinary Aril)       ◄── the nice API programs call
 ```
 
 The architecture is the **`*-sys` / safe-wrapper split** that Rust's
 C-binding ecosystem converged on (`bindgen` → raw `unsafe` `-sys`
 crate; hand-written safe crate on top), chosen there for a *technical*
 reason beyond ergonomics — a shared raw layer guarantees the foreign
-library resolves once. Tide adopts the same split:
+library resolves once. Aril adopts the same split:
 
 - **Raw binding layer** (generated, curated): one module per Go
   package, mechanical, minimal, *not* documented beyond a pointer to
   the upstream Go docs. Stays close to the Go shapes.
-- **Adapter layer** (hand-written): ordinary Tide functions/classes
-  that wrap the raw layer into an idiomatic, safe Tide API. This is
+- **Adapter layer** (hand-written): ordinary Aril functions/classes
+  that wrap the raw layer into an idiomatic, safe Aril API. This is
   where nullability is lifted, ownership/cleanup is modelled, panics
-  are trapped, and names are made Tide-ish.
+  are trapped, and names are made Aril-ish.
 
 ### Principle: verify the declaration, do not trust it
 
@@ -92,8 +92,8 @@ docs: *"the compiler … cannot verify that the function … returns the
 specified types, or even that it exists."* A wrong `external`
 declaration does not error — it **miscompiles silently**.
 
-Tide does not have this weakness, and the RFC mandates that it never
-acquires it. Because Tide emits Go and then compiles it, **the Go type
+Aril does not have this weakness, and the RFC mandates that it never
+acquires it. Because Aril emits Go and then compiles it, **the Go type
 checker re-verifies every `EXT` declaration against the real package**.
 This is cxx's "static-assert the boundary, don't translate the header"
 move, available to us for free:
@@ -103,20 +103,20 @@ move, available to us for free:
 - At **build** time, the emitted call (`pkg.GoName(args)`) is
   type-checked by Go against the imported package; a binding that has
   drifted from its package fails the build.
-- Such a failure must be surfaced in **`.td` coordinates and Tide
+- Such a failure must be surfaced in **`.aril` coordinates and Aril
   terminology**, never as a raw `go/types` diagnostic pointing at
   generated Go. (A binding-drift diagnostic is a new obligation; see
   Paired edits.)
 
-The lineage's silent footgun becomes Tide's build-time error.
+The lineage's silent footgun becomes Aril's build-time error.
 
 ### Declaration surface (`extern` / `EXT`)
 
-A binding module is ordinary Tide source marked as foreign. Sketch
+A binding module is ordinary Aril source marked as foreign. Sketch
 (exact spelling is an open question — semantics are firm):
 
-```td
-// bindings/exec.td — generated by `tide import os/exec`, then curated.
+```aril
+// bindings/exec.aril — generated by `aril import os/exec`, then curated.
 @go("os/exec")                      // package header: Go import path
 
 extern type Cmd                     // opaque foreign handle — no visible layout
@@ -142,8 +142,8 @@ Elements:
   for the FFI surface alone — the same binding-boundary carve-out
   that lets `Any` exist only at binding edges. Its exact spelling
   (a header attribute vs a per-item form) is Open question 1.
-- **`extern type T`** — an **opaque foreign handle**. Empty body: Tide
-  knows the name, never the layout. Cannot be constructed by a Tide
+- **`extern type T`** — an **opaque foreign handle**. Empty body: Aril
+  knows the name, never the layout. Cannot be constructed by a Aril
   literal (only returned from an `extern fn`), cannot be pattern-
   destructured. It is a **reference type**; admitting opaque handles
   into `refEq` (today class-only, per `builtins.md`) is a paired edit
@@ -158,13 +158,13 @@ Elements:
   `*regexp.Regexp`, `os.File`, `*sql.Rows`, … — the 90 % case, since
   Go library types are used *through methods*.
 - **`extern struct T { f: U, … }`** — a **transparent foreign struct**:
-  a Go struct whose *exported fields* Tide reads/writes directly
+  a Go struct whose *exported fields* Aril reads/writes directly
   (translated as a record). Used when a binding needs field access,
   not just methods.
 - **`extern fn name(...): R = "GoName"`** — a package-level function.
   The body *is* the Go symbol; `= "GoName"` is the name override
-  (Go `Command` ↔ Tide `command`, the standard case convention). The form
-  `{ EXT }` (no override, Tide name = Go name) is equivalent.
+  (Go `Command` ↔ Aril `command`, the standard case convention). The form
+  `{ EXT }` (no override, Aril name = Go name) is equivalent.
 - **`extern impl T { … }`** — methods and fields on a foreign type.
   A method's receiver is the foreign value; an `extern var f: U` is an
   exported-field accessor (read for `let`, read/write for `var`).
@@ -173,11 +173,11 @@ Elements:
   one overloaded shape. The generator and the type-checker both key
   off the kind.
 
-Adapters are **not** special syntax — they are ordinary Tide functions
+Adapters are **not** special syntax — they are ordinary Aril functions
 in a separate module that call the raw `extern` items:
 
-```td
-// adapters/proc.td — hand-written, ordinary Tide.
+```aril
+// adapters/proc.aril — hand-written, ordinary Aril.
 import exec
 fn run(name: string, args: []string): Result<string, error> {
     let c = exec.command(name, ...args)
@@ -188,9 +188,9 @@ fn run(name: string, args: []string): Result<string, error> {
 
 ### Type translation (the mechanical part)
 
-The generator maps each Go type to a Tide type. The total rule:
+The generator maps each Go type to a Aril type. The total rule:
 
-| Go | Tide | Notes |
+| Go | Aril | Notes |
 |---|---|---|
 | `bool int int8…int64 uint…uint64 byte rune float32/64 string` | same | direct |
 | `[]byte` | `[]byte` | |
@@ -205,16 +205,16 @@ The generator maps each Go type to a Tide type. The total rule:
 | **`(T, bool)`** (comma-ok) | **`Option<T>`** | boundary lift, below |
 | `*T` (named) | opaque handle `T` | raw stays a handle; nil→`Option` is an adapter lift, never automatic (below) |
 | exported `struct{…}` | `extern struct` (record) **or** opaque `extern type` | human chooses (field-access vs method-only) |
-| `interface{ … }` | Tide `interface` | exported methods translated |
-| Go type param `[T any]` | Tide generic `<T>` | unbounded only (bounded generics are out of v1 scope) |
+| `interface{ … }` | Aril `interface` | exported methods translated |
+| Go type param `[T any]` | Aril generic `<T>` | unbounded only (bounded generics are out of v1 scope) |
 
 **Boundary lifts** happen *at the binding*, not deep in user code
 (ReScript's `@return(nullable)` / PureScript's `toMaybe` lesson):
 
 - `(T, error)` → `Result<T, error>` — reuses the existing
-  `resultWrap` lowering (`tideResultOf`). A referent whose *sole*
+  `resultWrap` lowering (`arilResultOf`). A referent whose *sole*
   return is `error` (no value) is the value-free case: bare `error` →
-  `Result<unit, error>`, lowered via `tideResultUnit` (`unit` →
+  `Result<unit, error>`, lowered via `arilResultUnit` (`unit` →
   `struct{}`).
 - `(T, bool)` comma-ok → `Option<T>` — but a Go function legitimately
   returning a `bool` is **ambiguous** with comma-ok. The generator's
@@ -226,7 +226,7 @@ The generator maps each Go type to a Tide type. The total rule:
   case, not an automatic one. Arity-≥3 returns are never lifted (they
   bail; see the bindable subset).
 - A nil-able `*T` → the adapter lifts to `Option<T>`; the raw layer may
-  keep it as a handle that is never compared to nil in Tide.
+  keep it as a handle that is never compared to nil in Aril.
 
 **Panics never cross the boundary.** gobind's rule: a foreign panic
 that unwinds across the FFI boundary terminates the process. Adapters
@@ -250,45 +250,45 @@ generic *constraints* beyond `any` (bounded generics are out of v1 scope).
 cautionary tale: demoting an untranslatable struct to an opaque type
 silently makes *every function that takes it by pointer* un-callable
 ("C pointers cannot point to opaque types") — one bail sterilises a
-whole module. Tide instead emits the unbindable symbol as a **poison
+whole module. Aril instead emits the unbindable symbol as a **poison
 declaration**: it compiles, but *referencing* it raises a binding
-diagnostic in `.td` coordinates ("`exec.foo` is not bindable: returns
+diagnostic in `.aril` coordinates ("`exec.foo` is not bindable: returns
 `unsafe.Pointer`"). One untranslatable symbol does not block the rest
 of the package, and the failure names the real reason at the use site.
 
 ### Name and namespace mapping
 
 - **Symbol rename** — the trailing `= "GoName"` string decouples the
-  Tide name from the Go symbol (universal across the lineage: OCaml
+  Aril name from the Go symbol (universal across the lineage: OCaml
   `="caml_…"`, ReScript `="jsName"`, Crystal `= "c_name"`). Default is
   the standard case convention (`ServeHTTP` ↔ `serveHTTP`, `Compile` ↔
   `compile`).
 - **Namespace/path** — `@go("net/http")` supplies the Go import path;
-  the Tide namespace is the package's short name (`http`). Nested
+  the Aril namespace is the package's short name (`http`). Nested
   packages (`io/fs`) are addressed by the manifest, not hardcoded.
 
 ### Adapter-facing runtime ABI is frozen
 
 PureScript's sharpest footgun: FFI code that calls *generated* host
 code is brittle to codegen changes and breaks dead-code elimination;
-the fix is to depend only on stable, passed-in values. Tide's analog:
+the fix is to depend only on stable, passed-in values. Aril's analog:
 **hand-written adapters and any Go-side shim depend only on a frozen,
 documented runtime/ABI surface** (the `Option`/`Result`/container
-prelude, the `tideResultOf` family), never on the incidental shape of
+prelude, the `arilResultOf` family), never on the incidental shape of
 generated Go. This contract is part of the runtime; changing it
 is a breaking change with its own review. Without this freeze, every
 codegen tweak risks breaking every binding.
 
-### The importer tool (`tide import`)
+### The importer tool (`aril import`)
 
 `internal/bindgen`, finally implemented, as a **batch dev tool** — not
-runtime/compile-time magic. `tide import <go/import/path>`:
+runtime/compile-time magic. `aril import <go/import/path>`:
 
 1. Loads the package with `go/packages` (full type info — *not* Borgo's
    `go/ast`/`go/doc`, which loses types).
 2. Walks exported funcs / types / methods / fields, translating each
    signature by the table above.
-3. Emits a **deterministic** (name-sorted) `.td` declaration file —
+3. Emits a **deterministic** (name-sorted) `.aril` declaration file —
    so re-running produces a stable diff over human curation.
 4. Marks every bail-out inline (`// UNBINDABLE: returns unsafe.Pointer`)
    and every guessed lift (`// GUESS: (T,bool) → Option<T>`) so the
@@ -302,12 +302,12 @@ source, and the Go type checker catches any residual error at build.
 
 Drift policy (bindgen's two strategies): bindings are **pre-generated
 and committed** (stdlib and pinned third-party are append-only enough);
-re-running `tide import` after a dependency bump shows a reviewable
+re-running `aril import` after a dependency bump shows a reviewable
 diff. No regenerate-on-every-build.
 
 ### Dependency plumbing (stdlib and third-party)
 
-- A **binding manifest** (the `modules.json` analog) maps Tide
+- A **binding manifest** (the `modules.json` analog) maps Aril
   namespaces to Go import paths and, for third-party packages, to a
   module + version. This replaces hardcoded path rewriting.
 - **Stdlib bindings** need no module dependency — the emitted `go.mod`
@@ -327,9 +327,9 @@ diff. No regenerate-on-every-build.
 ### Relationship to D19 — third-party dependencies (a proposed amendment)
 
 D19 ("Third-party Go dependencies are reserved for UX-only surfaces")
-currently states a blanket rule: *"Generated user code (Tide → Go
+currently states a blanket rule: *"Generated user code (Aril → Go
 output) must never depend on a third-party Go module. The runtime in
-`tidert/` and the stdlib bindings are the only Go-side surface a Tide
+`arilrt/` and the stdlib bindings are the only Go-side surface a Aril
 program is allowed to reach."* The third-party half of this RFC (binding
 a non-stdlib package such as TOML, and emitting a `go.mod` `require` for
 it) **directly conflicts with that rule** — so this RFC cannot be
@@ -356,7 +356,7 @@ was written in the REPL/UX-shell context.
 If the amendment is declined, the fallback is a **stdlib-only FFI**:
 everything in this RFC stands except third-party binding, the TOML
 proving case is dropped, and the corpus analyzer must hand-roll its
-TOML-lite parsing in Tide (as the Python analog already does) instead
+TOML-lite parsing in Aril (as the Python analog already does) instead
 of binding a real library. The third-party capability would then need
 its own later RFC + D19 amendment. The recommendation is to amend now —
 "bind libraries written in Go" is the stated goal, and a binding
@@ -373,7 +373,7 @@ including a **`tests/lexer/`** fixture for the new `extern`/`EXT`
 tokens and the `@go` attribute (a new keyword owes lexer coverage). Live
 coverage is the corpus analyzer itself (soft until it lands). The Go
 type-checker re-verification is itself a testable invariant (a binding
-whose Go symbol is removed must fail with the `.td`-coord drift
+whose Go symbol is removed must fail with the `.aril`-coord drift
 diagnostic, not a `go/types` leak).
 
 ## Alternatives considered
@@ -390,10 +390,10 @@ diagnostic, not a `go/types` leak).
   across two tables per package, no signature oracle, and it cannot
   reach real library surface area (motivation §1).
 - **Go-side shim packages as the only adapter mechanism** (write a Go
-  adapter exposing a Tide-shaped API, bind that). Considered and kept
-  as an *option* for impedance the Tide adapter layer cannot express,
+  adapter exposing a Aril-shaped API, bind that). Considered and kept
+  as an *option* for impedance the Aril adapter layer cannot express,
   but not the primary path: it splits the adapter across two languages
-  and still needs the third-party-module plumbing. Pure-Tide adapters
+  and still needs the third-party-module plumbing. Pure-Aril adapters
   over raw `extern` items are the default.
 - **Borgo's `go/ast`/`go/doc` importer verbatim.** Rejected: it is
   untyped (loses the very type info that makes mechanical signature
@@ -429,7 +429,7 @@ On acceptance / implementation, these `lang-spec/` edits land:
 - **`lang-spec/diagnostics.md`** — new FFI diagnostics in a **free
   category** (suggested **E10xx** — E06xx is already the "special
   names" category, so FFI must not reuse it): unbindable-symbol-
-  referenced, binding-drift (`.td`-coord wrapper over the Go type
+  referenced, binding-drift (`.aril`-coord wrapper over the Go type
   error), foreign-panic-uncaught, third-party-module-unresolved. Also
   **amend `E0206`** ("`refEq` on non-class operands") so an opaque
   handle is no longer rejected, in step with the `T-RefEq` relaxation.
@@ -463,10 +463,10 @@ accepted with them open, resolved before `implemented`.
 1. **Exact declaration spelling.** `extern fn … = "GoName"` vs
    `{ EXT }` body vs an `@go`-attribute-per-item form; `extern impl T`
    vs methods-inside-`extern type`. Semantics are firm; the surface is
-   a bikeshed to settle against Tide's existing `class`/`func` style.
-2. **Opaque handle ↔ Tide interface conformance.** May an opaque
-   `extern type` *implement* a Tide `interface` (so a `*os.File`
-   satisfies a Tide `io.Writer`)? Likely yes — needed for the I/O
+   a bikeshed to settle against Aril's existing `class`/`func` style.
+2. **Opaque handle ↔ Aril interface conformance.** May an opaque
+   `extern type` *implement* a Aril `interface` (so a `*os.File`
+   satisfies a Aril `io.Writer`)? Likely yes — needed for the I/O
    bindings — but the conformance check across the FFI boundary needs
    specifying.
 3. **Panic-trapping primitive.** The shape of the adapter-level
@@ -477,9 +477,9 @@ accepted with them open, resolved before `implemented`.
    assert syntactic origins), or whether human override is always the
    answer.
 5. **Third-party hermeticity mechanism.** `replace`-to-vendored vs a
-   committed module cache vs a `tide.toml`-declared dependency set —
+   committed module cache vs a `aril.toml`-declared dependency set —
    which gives reproducible builds with the least ceremony.
-6. **Callbacks Go→Tide.** Passing a Tide closure as a Go `func`
+6. **Callbacks Go→Aril.** Passing a Aril closure as a Go `func`
    argument (needed for `sort.Slice`-style APIs) across the boundary —
    in scope for v1 of the FFI, or deferred? (The corpus analyzer does
    not need it; other corpus files might.)
@@ -487,7 +487,7 @@ accepted with them open, resolved before `implemented`.
    resources needing `Close()` (files, processes) want a `defer`-shaped
    discipline. Whether the FFI models this or leaves it to adapters.
 8. **Generic instantiation of bound generics.** The table maps Go
-   `[T any]` → Tide `<T>`, but Tide's type-arg *inference* for generics
+   `[T any]` → Aril `<T>`, but Aril's type-arg *inference* for generics
    is incomplete and lives partly in codegen. A bound generic
    (`toml.parse<T>`, a generic Go container fn) raises the same
    "where do the type args come from at the call site" problem the
@@ -497,10 +497,10 @@ accepted with them open, resolved before `implemented`.
    work?
 9. **Bindable subset vs the supported-Go-version range.** The
    bail-list is static, but the Go surface bindgen must understand
-   grows across Go releases (Tide pins a stable Go subset as its IR
+   grows across Go releases (Aril pins a stable Go subset as its IR
    contract) — a third-party lib may use generics constraints / type
    aliases / embedding outside today's subset. Which Go version's
-   surface must `tide import` understand, and how is the bail-list
+   surface must `aril import` understand, and how is the bail-list
    pinned to that supported range?
 10. **Runtime trust boundary for third-party code.** Build hermeticity
     (vendored `replace`) is handled, but a bound third-party package
@@ -524,6 +524,6 @@ accepted with them open, resolved before `implemented`.
   pinned, hermetic binding); the D19 amendment was applied to the
   public decision record. The ten open questions are flagged, not
   blockers (they resolve before `implemented`). Implementation — the
-  `tide import` tool, the `extern` surface, third-party plumbing, and
+  `aril import` tool, the `extern` surface, third-party plumbing, and
   the corpus-analyzer port that motivated this RFC — is the next
   epoch's work, with this RFC as its contract.

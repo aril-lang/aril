@@ -1,4 +1,4 @@
-# RFC-0002 — Multi-file Tide programs
+# RFC-0002 — Multi-file Aril programs
 
 | Field | Value |
 |---|---|
@@ -6,21 +6,21 @@
 | Status | accepted |
 | Created | 2026-05-26 |
 | Supersedes | — |
-| Target | `lang-spec/grammar.ebnf` (import production), `lang-spec/name-resolution.md` (cross-package visibility), `lang-spec/lowering-go.md` (multi-package output tree), new `lang-spec/manifest.md` (project file), `internal/parser` + `internal/codegen` + `cmd/tide` (resolver and bundler) |
+| Target | `lang-spec/grammar.ebnf` (import production), `lang-spec/name-resolution.md` (cross-package visibility), `lang-spec/lowering-go.md` (multi-package output tree), new `lang-spec/manifest.md` (project file), `internal/parser` + `internal/codegen` + `cmd/aril` (resolver and bundler) |
 
 ## Summary
 
-Define how a Tide program is built from more than one `.td` source.
-A package is a directory of `.td` files (Go-style); cross-package
+Define how a Aril program is built from more than one `.aril` source.
+A package is a directory of `.aril` files (Go-style); cross-package
 imports use the same `import <path>` form the language already
-has. A small optional manifest file `tide.toml` defines project
+has. A small optional manifest file `aril.toml` defines project
 root and module name for projects that span more than one
 package. Single-file programs (the current PR-D state) work
 unchanged.
 
 ## Motivation
 
-The compiler today reads one `.td` file, emits one `main.go`, and
+The compiler today reads one `.aril` file, emits one `main.go`, and
 runs the Go toolchain on the temporary directory. There is no
 notion of a package, no cross-file imports, no way to factor
 out code. Every example in `examples/` is single-file by
@@ -30,16 +30,16 @@ be expressed.
 
 The corpus also reveals that user-extensible package layout
 will be needed before Phase 2's larger examples (e.g.,
-`agents/counterstack/pentix_agent.td` already lives in a deep
+`agents/counterstack/pentix_agent.aril` already lives in a deep
 subdirectory; once it grows past one file we have nothing).
 
 The point of the RFC is to pick a model that:
 
 1. Keeps simple programs simple (no manifest required for a
-   single .td file or a small directory).
+   single .aril file or a small directory).
 2. Aligns with the runtime (Go) without forcing TypeScript-style
    relative-path import churn back onto users — TS developers
-   chose Tide partly to leave that behind.
+   chose Aril partly to leave that behind.
 3. Stays inside the existing grammar where possible — the
    current `import Ident ("/" Ident)*` production already
    handles slash-paths.
@@ -48,7 +48,7 @@ The point of the RFC is to pick a model that:
 
 ### Package = directory
 
-A **package** is a non-empty set of `.td` files in a single
+A **package** is a non-empty set of `.aril` files in a single
 directory. All top-level declarations in those files share one
 scope; no `import` is needed to reference a sibling file's
 top-level name. Cross-file visibility is the natural extension
@@ -56,9 +56,9 @@ of the existing file-scope rule in `name-resolution.md`.
 
 Build-unit selection mirrors Go:
 
-- `tide build path/to/file.td` — compile a single-file program
+- `aril build path/to/file.aril` — compile a single-file program
   (current behaviour, unchanged).
-- `tide build path/to/dir/` — compile every `.td` in that
+- `aril build path/to/dir/` — compile every `.aril` in that
   directory as one package, find the unique `func main()`,
   produce a binary.
 
@@ -71,9 +71,9 @@ or has none and is the build entry, it's an error.
 > it. A *duplicate* `func main` is already caught by the shared
 > package scope as **E0113** (duplicate top-level declaration). A
 > *missing* main is reported by the build/run driver as a
-> Tide-phrased error (`tide: no \`func main\` in package <dir>`) —
+> Aril-phrased error (`aril: no \`func main\` in package <dir>`) —
 > no leaked Go-toolchain diagnostic. A dedicated diagnostic code can
-> be assigned later if the message needs `.td` coordinates.
+> be assigned later if the message needs `.aril` coordinates.
 
 ### Cross-package imports
 
@@ -102,7 +102,7 @@ Go.)
 When the resolver sees `import P`:
 
 1. **Local lookup.** Walk up from the source file's directory
-   to the nearest `tide.toml`. If found:
+   to the nearest `aril.toml`. If found:
    - If `P` starts with the manifest's `name` segment (e.g.
      `import myproj/utils` with `name = "myproj"`), strip the
      prefix and look up the remaining path as a directory
@@ -126,14 +126,14 @@ When the resolver sees `import P`:
 > proposed (`E0113`/`E0114`/`E0115`) were all later allocated to
 > unrelated diagnostics. The implemented codes are **E0116 Cyclic
 > package import** and **E0117 Unknown import path**; the no/multiple
-> `func main` case is a Tide-phrased driver error (see the §"Package =
+> `func main` case is a Aril-phrased driver error (see the §"Package =
 > directory" note). References below predate the reassignment.
 
-If a project has no `tide.toml`, step 1 is skipped — the file
+If a project has no `aril.toml`, step 1 is skipped — the file
 behaves as a **single-package, stdlib-only** program. This is
 a feature, not a limitation: it keeps single-file scripts
 zero-config. To organise sources into multiple user packages,
-add a `tide.toml`.
+add a `aril.toml`.
 
 **Edge case — manifest `name` collides with a stdlib package**
 (e.g. `name = "fmt"`). The local lookup wins: `import fmt` then
@@ -167,8 +167,8 @@ decides export**:
   exported. Callable from importers as `utils.Parse(...)`.
 - **Lower-case a–z** (`parseInternal`, `helper`) →
   package-private. Not visible to importers.
-- **Underscore** (`_helper`, `_tide_…`) — same as
-  lower-case: package-private. (`_tide_…` is already
+- **Underscore** (`_helper`, `_aril_…`) — same as
+  lower-case: package-private. (`_aril_…` is already
   reserved by the lexer per E0107; user code cannot
   produce it.)
 
@@ -200,7 +200,7 @@ lists `pub` under "not a keyword (deliberately)", which means
 it remains free for user identifiers if some future
 direction does need fine-grained visibility.
 
-### Manifest — `tide.toml`
+### Manifest — `aril.toml`
 
 A minimal TOML file at the project root tells the compiler
 where the project starts and what to call it. Without a
@@ -220,7 +220,7 @@ go = "1.22"                   # Pinned Go toolchain (matches the
 [bindings]
 # Optional: extend the stdlib binding registry with extra Go
 # packages exposed as bare-ident imports. Each entry is a Go
-# import path; the local Tide name is the last segment of
+# import path; the local Aril name is the last segment of
 # that path (e.g. "golang.org/x/exp/slices" → import as
 # `slices`). Two entries that share a last segment
 # (collision) emit a manifest-level error at compiler start.
@@ -234,29 +234,29 @@ external packages — pre-alpha doesn't ship a package manager.
 ### Lowering — multi-package output
 
 Per `lowering-go.md` §Output tree shape, the emitted Go tree
-has been described as supporting `bindings/` and `tidert/`
+has been described as supporting `bindings/` and `arilrt/`
 sibling directories. Extending it to user packages is
-straightforward: **one Go file per Tide source file**, all
+straightforward: **one Go file per Aril source file**, all
 within the same Go package directory. The Go-side file name
-mirrors the `.td` filename (`utils/parse.td → utils/parse.go`).
+mirrors the `.aril` filename (`utils/parse.aril → utils/parse.go`).
 
 ```
 <tmp>/
-  main.go              # main package — entry-point .td's body
-  go.mod               # module tide-output; go 1.22
+  main.go              # main package — entry-point .aril's body
+  go.mod               # module aril-output; go 1.22
   utils/
-    parse.go           # one Go file per Tide source file
+    parse.go           # one Go file per Aril source file
     format.go          # ...same Go package `utils`
   svc/store/
-    order.go           # nested Tide package → nested dir
+    order.go           # nested Aril package → nested dir
     customer.go
   bindings/...         # stdlib wrappers (forthcoming bindgen)
-  tidert/...           # runtime helpers (forthcoming)
+  arilrt/...           # runtime helpers (forthcoming)
 ```
 
-(When a Tide package has exactly one `.td` file, the
+(When a Aril package has exactly one `.aril` file, the
 directory still gets exactly one Go file. The previous
-single-file case — `tide build foo.td` — emits the existing
+single-file case — `aril build foo.aril` — emits the existing
 flat `main.go` shape; only directory-as-entry triggers the
 package-aware layout.)
 
@@ -264,12 +264,12 @@ package-aware layout.)
 extra work for the toolchain.
 
 `//line` directives carry the **original repo-relative** path,
-not the temp path, so panics still point at `examples/proj/svc/store/order.td`,
-not at `/tmp/tide-build-X/svc/store/store.go`.
+not the temp path, so panics still point at `examples/proj/svc/store/order.aril`,
+not at `/tmp/aril-build-X/svc/store/store.go`.
 
 ## Alternatives considered
 
-- **Model B (TS-style file=module).** Each `.td` is its own
+- **Model B (TS-style file=module).** Each `.aril` is its own
   namespace; cross-file uses `import { foo } from "./utils"`.
   Rejected: misaligns with Go runtime (would force one Go
   package per file with `init()` glue), brings back the
@@ -302,26 +302,26 @@ not at `/tmp/tide-build-X/svc/store/store.go`.
 - `lang-spec/lowering-go.md` — extend §Output tree shape with
   the multi-package example; cross-link to this RFC.
 - `lang-spec/manifest.md` — new file specifying the
-  `tide.toml` schema and the resolver algorithm.
+  `aril.toml` schema and the resolver algorithm.
 - `lang-spec/diagnostics.md` — add **E0116 Cyclic package
   import** (the user-package import graph is rejected if cyclic;
   D20) and **E0117 Unknown import path**. (The no/multiple `main`
-  case is a Tide-phrased driver error, not a coded diagnostic — see
+  case is a Aril-phrased driver error, not a coded diagnostic — see
   the §"Package = directory" note. Codes reassigned from the RFC's
   original E0113/E0114/E0115, now taken.)
 - `internal/parser` — no grammar change; resolver code lands
   with the multi-file build (see implementation plan).
-- `internal/codegen` — emit one Go package per Tide package;
+- `internal/codegen` — emit one Go package per Aril package;
   retire the `mapFieldName` hack in favour of the registry.
-- `cmd/tide` — accept directory inputs to `build` / `run`;
-  resolver walks for `tide.toml`.
+- `cmd/aril` — accept directory inputs to `build` / `run`;
+  resolver walks for `aril.toml`.
 
 ## Transition / compatibility
 
 Strictly additive. Every PR-D corpus example continues to
 compile and run unchanged (they are single-file with
 stdlib-only imports). The new code paths activate only when
-either the build entry is a directory or `tide.toml` is
+either the build entry is a directory or `aril.toml` is
 found by the resolver walk.
 
 ## Open questions
@@ -332,7 +332,7 @@ found by the resolver walk.
   RFC (or a one-line PR adjusting the table)? Lean toward
   "RFC-bypass for purely additive registry entries", but flag.
 - **Cyclic imports between user packages.** Go forbids them at
-  the toolchain level; we inherit the rejection. Tide surfaces
+  the toolchain level; we inherit the rejection. Aril surfaces
   it as **E0116 Cyclic package import** (see paired edits).
 - **Import aliasing.** `import myproj/utils as u` — useful
   when two packages share a last segment
@@ -342,11 +342,11 @@ found by the resolver walk.
   member from a wrapping package. Not in v0.x. Easy to add
   later as a `re-export` modifier or an explicit re-declaration.
 - **Package-level `init()`** (Go has it for setup side-effects).
-  Tide currently has no analogue and the corpus does not need
+  Aril currently has no analogue and the corpus does not need
   one — top-level `let` is evaluated lazily by codegen. Park
   until a real use-case surfaces.
 - **Test files.** Go uses `_test.go` to separate test code from
-  package code. Mirror with `_test.td`? Defer until tests need
+  package code. Mirror with `_test.aril`? Defer until tests need
   to live in user packages — currently all tests are Go-side
   (`internal/*_test.go` and fixture runners).
 - **Versioned dependencies.** Out of scope; pre-alpha has no
@@ -358,10 +358,10 @@ found by the resolver walk.
 Not part of the RFC contract, but useful to size the work:
 
 1. PR-E1: parser & codegen support multi-file packages (single
-   directory). `tide build dir/` works, `func main` is
-   located, codegen emits one Go file per Tide file inside one
+   directory). `aril build dir/` works, `func main` is
+   located, codegen emits one Go file per Aril file inside one
    Go package.
-2. PR-E2: `tide.toml` reader + resolver walk. `import P` with
+2. PR-E2: `aril.toml` reader + resolver walk. `import P` with
    a project name prefix resolves locally.
 3. PR-E3: registry extraction. `mapFieldName` retired in
    favour of a registry table read from a `lang-spec/`-

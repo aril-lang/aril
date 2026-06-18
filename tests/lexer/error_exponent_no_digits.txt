@@ -5,4 +5,4 @@ E0109: bare 1e with no exponent digits is malformed
 let x = 1e
 
 --- ERRORS ---
-src.td:1:10: error[E0109]: Malformed numeric literal
+src.aril:1:10: error[E0109]: Malformed numeric literal

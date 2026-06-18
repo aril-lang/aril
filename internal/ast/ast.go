@@ -20,7 +20,7 @@ type Node interface {
 // Top level
 // ---------------------------------------------------------------
 
-// File is the root of a single .td source file.
+// File is the root of a single .aril source file.
 type File struct {
 	Span    Span
 	Imports []*Import
@@ -263,8 +263,8 @@ func (n *GoRef) NodeSpan() Span   { return n.Span }
 func (n *GoRef) NodeKind() string { return "GoRef" }
 
 // ExternTypeDecl — `extern type T @go("pkg")` — an opaque foreign handle.
-// Tide knows the name, never the layout (ffi.md §ExternType). Go is nil
-// when the attribute is omitted (symbol defaults to the Tide name).
+// Aril knows the name, never the layout (ffi.md §ExternType). Go is nil
+// when the attribute is omitted (symbol defaults to the Aril name).
 type ExternTypeDecl struct {
 	Span Span
 	Name string
@@ -852,7 +852,7 @@ func (n *UnitLit) NodeKind() string { return "UnitLit" }
 func (n *UnitLit) exprMarker()      {}
 
 // RuneLitExpr is a single-quoted code-point literal (`'a'`,
-// `'\n'`). Lowers to Go's identical syntax — Tide's `rune` is
+// `'\n'`). Lowers to Go's identical syntax — Aril's `rune` is
 // Go's `rune` (alias for `int32`).
 type RuneLitExpr struct {
 	Span    Span

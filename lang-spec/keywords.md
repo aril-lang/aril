@@ -1,6 +1,6 @@
 # Reserved words, operators, and punctuation
 
-This file is the **canonical, exhaustive** list of Tide's reserved
+This file is the **canonical, exhaustive** list of Aril's reserved
 lexical surface. The lexer is generated from it; if a token does not
 appear here, the lexer does not produce it and the parser does not
 recognise it. Prose in `../docs/language-spec.md` mirrors this list;
@@ -94,7 +94,7 @@ them but doing so is bad style. Full signatures live in
 
 - `Any` is the **binding-boundary** escape type — it appears only
   in variadic stdlib binding signatures (e.g., `fmt.println(args:
-  ...Any)`). User-authored Tide code does not introduce `Any`-typed
+  ...Any)`). User-authored Aril code does not introduce `Any`-typed
   parameters, fields, or return types. See `type-system.md` §`Any`.
 - `Dynamic` is the **user-facing** runtime-erased wrapper used by
   the reflection API. Introduced only via implicit widening at
@@ -196,7 +196,7 @@ disagreement, `grammar.ebnf` wins (D17).
 ## What is NOT a keyword (deliberately)
 
 The following words look reserved in other languages but are
-ordinary identifiers in Tide; user code is free to shadow them
+ordinary identifiers in Aril; user code is free to shadow them
 (though bad style):
 
 - `goto`, `do`, `enum`, `struct`, `pub`, `fn`, `async`, `await`,

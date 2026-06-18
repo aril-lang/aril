@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "config_loader.td"
+entry    = "config_loader.aril"
 args            = ["sample.json"]
 expected_output = "expected-output.txt"
 

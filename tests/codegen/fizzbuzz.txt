@@ -1,5 +1,5 @@
 --- TITLE ---
-fizzbuzz.td — inclusive for-range, chained else-if, % and == operators
+fizzbuzz.aril — inclusive for-range, chained else-if, % and == operators
 
 --- INPUT ---
 import fmt

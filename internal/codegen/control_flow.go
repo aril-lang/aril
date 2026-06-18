@@ -3,8 +3,8 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 // isDivergingExpr reports whether e never produces a value: the
@@ -397,7 +397,7 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 		counter := loopName
 		if counter == "_" {
 			g.loopTempCounter++
-			counter = fmt.Sprintf("_tideRange%d", g.loopTempCounter)
+			counter = fmt.Sprintf("_arilRange%d", g.loopTempCounter)
 		}
 		g.b.WriteString("for ")
 		g.b.WriteString(counter)

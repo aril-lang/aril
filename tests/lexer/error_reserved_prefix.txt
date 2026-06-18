@@ -1,8 +1,8 @@
 --- TITLE ---
-E0107: _tide_ prefix on user identifier is rejected at lex time
+E0107: _aril_ prefix on user identifier is rejected at lex time
 
 --- INPUT ---
-let _tide_99 = 7
+let _aril_99 = 7
 
 --- ERRORS ---
-src.td:1:5: error[E0107]: Reserved identifier prefix
+src.aril:1:5: error[E0107]: Reserved identifier prefix

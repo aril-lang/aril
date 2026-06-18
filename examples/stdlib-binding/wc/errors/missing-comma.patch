@@ -1,5 +1,5 @@
---- wc.td
-+++ wc.td
+--- wc.aril
++++ wc.aril
 @@ -20,7 +20,7 @@
  func count(data: []byte): Counts {
    let text = strings.fromBytes(data)

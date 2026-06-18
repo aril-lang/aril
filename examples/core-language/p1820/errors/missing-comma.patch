@@ -1,5 +1,5 @@
---- p1820.td
-+++ p1820.td
+--- p1820.aril
++++ p1820.aril
 @@ -10,7 +10,7 @@
  import fmt
  import os

@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "merge_intervals.td"
+entry    = "merge_intervals.aril"
 
 [[error]]
 patch   = "errors/dup-field-interval.patch"   # Interval has two fields named start

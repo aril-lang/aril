@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "parse_int.td"
+entry    = "parse_int.aril"
 
 [[error]]
 patch   = "errors/try-error-type-mismatch.patch"   # declared error type string ≠ propagated error

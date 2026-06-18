@@ -4,16 +4,16 @@ package codegen
 // §ForeignCall). An `extern func`/method call lowers to a direct Go
 // `pkg.Sym(args)` / `recv.Method(args)`; an opaque `extern type` lowers
 // to the Go pointer type `*pkg.Sym`. A `(T,error)`-shaped return (written
-// in the curated `.td` as `Result<T, error>`) is wrapped with the same
-// `tideResultOf` helper the stdlib binding table uses. The Go type checker
+// in the curated `.aril` as `Result<T, error>`) is wrapped with the same
+// `arilResultOf` helper the stdlib binding table uses. The Go type checker
 // re-verifies every emitted call (the "verify, don't trust" property).
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 // scanExterns records the file's extern decls for later lowering.
@@ -42,16 +42,16 @@ func (g *gen) scanExterns(f *ast.File) {
 // goRefPkgSym splits an `@go("pkg")` / `@go("pkg.Sym")` on an extern
 // type or func into (importPath, goSymbol). The split is on the last
 // `.` after the last `/`; a bare path (or absent attribute) defaults
-// the symbol to the exported Tide name. pkg is "" when no attribute is
+// the symbol to the exported Aril name. pkg is "" when no attribute is
 // present (an error at the call/type site — a package is required).
 //
 // The heuristic assumes a **dot-free final path segment** — true for
 // the stdlib (v1 scope). A non-stdlib path with a dotted directory
 // segment (`gopkg.in/yaml.v3.Marshal`) would mis-split; that case is
 // the binding manifest's job (ffi.md §Dependency model), not here.
-func goRefPkgSym(ref *ast.GoRef, tideName string) (pkg, sym string) {
+func goRefPkgSym(ref *ast.GoRef, arilName string) (pkg, sym string) {
 	if ref == nil || ref.Raw == "" {
-		return "", exportFieldName(tideName)
+		return "", exportFieldName(arilName)
 	}
 	raw := ref.Raw
 	slash := strings.LastIndex(raw, "/")
@@ -59,7 +59,7 @@ func goRefPkgSym(ref *ast.GoRef, tideName string) (pkg, sym string) {
 	if dot > slash { // a `.Symbol` suffix on the final path segment
 		return raw[:dot], raw[dot+1:]
 	}
-	return raw, exportFieldName(tideName)
+	return raw, exportFieldName(arilName)
 }
 
 // goPkgRef is the reference qualifier for an import path — the base name
@@ -76,10 +76,10 @@ func goPkgRef(importPath string) string {
 }
 
 // goRefMember returns the Go method/field name an extern-impl member's
-// `@go` names — the bare string, or the exported Tide name if absent.
-func goRefMember(ref *ast.GoRef, tideName string) string {
+// `@go` names — the bare string, or the exported Aril name if absent.
+func goRefMember(ref *ast.GoRef, arilName string) string {
 	if ref == nil || ref.Raw == "" {
-		return exportFieldName(tideName)
+		return exportFieldName(arilName)
 	}
 	return ref.Raw
 }
@@ -88,9 +88,9 @@ func goRefMember(ref *ast.GoRef, tideName string) string {
 // boundary lift (lowering-go.md §ForeignCall):
 //
 //	resultNone  — not a Result; the Go call lowers bare.
-//	resultValue — Result<T, E> over a Go `(T, error)`; wrap tideResultOf.
+//	resultValue — Result<T, E> over a Go `(T, error)`; wrap arilResultOf.
 //	resultUnit  — Result<unit, error> over a Go bare `error`; wrap
-//	              tideResultUnit (the success value is `unit` → struct{}).
+//	              arilResultUnit (the success value is `unit` → struct{}).
 type externResultKind int
 
 const (
@@ -101,7 +101,7 @@ const (
 
 // externResultKindOf inspects a return annotation. A `Result<unit, …>`
 // names a Go referent that returns a bare `error` (no value), so it
-// needs the unit-wrapper rather than the two-value tideResultOf.
+// needs the unit-wrapper rather than the two-value arilResultOf.
 func externResultKindOf(rt ast.TypeExpr) externResultKind {
 	nt, ok := rt.(*ast.NamedType)
 	if !ok || len(nt.QName) != 1 || nt.QName[0] != "Result" {
@@ -134,9 +134,9 @@ func (g *gen) externLiftOpen(kind externResultKind) bool {
 	g.markExternLift(kind)
 	switch kind {
 	case resultValue:
-		g.b.WriteString("tideResultOf(")
+		g.b.WriteString("arilResultOf(")
 	case resultUnit:
-		g.b.WriteString("tideResultUnit(")
+		g.b.WriteString("arilResultUnit(")
 	default:
 		return false
 	}
@@ -190,7 +190,7 @@ func (g *gen) externFieldOf(f *ast.Field) (*ast.ExternField, bool) {
 }
 
 // emitExternFuncCall lowers `f(args)` for an extern function to
-// `[tideResultOf(]pkg.Sym(args)[)]`.
+// `[arilResultOf(]pkg.Sym(args)[)]`.
 func (g *gen) emitExternFuncCall(efd *ast.ExternFuncDecl, c *ast.Call) error {
 	pkg, sym := goRefPkgSym(efd.Go, efd.Name)
 	if pkg == "" {
@@ -210,7 +210,7 @@ func (g *gen) emitExternFuncCall(efd *ast.ExternFuncDecl, c *ast.Call) error {
 }
 
 // emitExternMethodCall lowers `recv.m(args)` on a foreign handle to
-// `[tideResultOf(]recv.GoName(args)[)]`.
+// `[arilResultOf(]recv.GoName(args)[)]`.
 func (g *gen) emitExternMethodCall(m *ast.ExternMethod, f *ast.Field, c *ast.Call) error {
 	goName := goRefMember(m.Go, m.Name)
 	lift := g.externLiftOpen(externResultKindOf(m.ReturnType))

@@ -6,4 +6,4 @@ forces   = []
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "config_reader.td"
+entry    = "config_reader.aril"

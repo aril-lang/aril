@@ -1,6 +1,6 @@
 package sema
 
-import "github.com/heni/tide-lang/internal/ast"
+import "github.com/aril-lang/aril/internal/ast"
 
 // bindings.go — interim sema-side stdlib binding signatures. Sema does
 // not yet derive stdlib signatures from go/packages (the D6 bindgen
@@ -11,7 +11,7 @@ import "github.com/heni/tide-lang/internal/ast"
 // collapse into one bindgen-derived source later. Keyed [pkg, method];
 // grows row-by-row until bindgen lands.
 
-// stdlibBindingReturn returns the modelled Tide return type of a stdlib
+// stdlibBindingReturn returns the modelled Aril return type of a stdlib
 // binding `pkg.method(...)`, or nil when the pair is not (yet) tabled.
 // The `(T, error)`-wrapping bindings (codegen's stdlibResultWrap) map to
 // Result<T, error>; their `Err` payload is the Go `error` boundary type.

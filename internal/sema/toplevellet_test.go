@@ -40,7 +40,7 @@ func f() {
 // produces no diagnostics.
 func TestTopLevelLetClean(t *testing.T) {
 	src := `let n = 5
-let label: string = "tide"
+let label: string = "aril"
 func use(): string {
   return label
 }

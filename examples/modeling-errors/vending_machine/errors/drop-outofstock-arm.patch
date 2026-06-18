@@ -1,5 +1,5 @@
---- vending_machine.td
-+++ vending_machine.td
+--- vending_machine.aril
++++ vending_machine.aril
 @@ -53,7 +53,6 @@
  
      // OutOfStock: only Restock leaves this state.

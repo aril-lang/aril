@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "reverse_linked_list.td"
+entry    = "reverse_linked_list.aril"
 
 [[error]]
 patch   = "errors/typo-node.patch"   # typo: node is not in scope

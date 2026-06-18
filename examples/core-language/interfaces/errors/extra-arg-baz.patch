@@ -1,5 +1,5 @@
---- interfaces.td
-+++ interfaces.td
+--- interfaces.aril
++++ interfaces.aril
 @@ -37,5 +37,5 @@
  
  func main() {

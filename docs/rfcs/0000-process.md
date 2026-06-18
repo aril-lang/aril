@@ -10,7 +10,7 @@
 
 ## Summary
 
-This RFC defines how RFCs work in the Tide project: when one is
+This RFC defines how RFCs work in the Aril project: when one is
 required, what shape it takes, how it moves between statuses,
 and who decides. It is intentionally lightweight — meant for a
 pre-alpha project where one or two contributors are the entire
@@ -21,7 +21,7 @@ the question.
 
 The formalization series (Formalization-A through Formalization-L)
 established `lang-spec/` as the authoritative contract for the
-current Tide compiler. From here on the language and compiler
+current Aril compiler. From here on the language and compiler
 will *change* — new features, relaxations of restrictions,
 removals. Without a paper trail, these changes either land
 silently or accumulate as undocumented drift. The RFC process

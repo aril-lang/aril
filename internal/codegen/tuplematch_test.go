@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 // Regression tests for the tuple value-switch component-ident scoping
@@ -36,7 +36,7 @@ func main() {
 	got := emitString(t, src)
 	// The catch-all arm binds `other` to the captured component and must
 	// NOT test `.Tag` against B.r's tag (which would shadow P and drop Q).
-	if !strings.Contains(got, "other := __tide_match_1") {
+	if !strings.Contains(got, "other := __aril_match_1") {
 		t.Errorf("expected `other` bound as a fresh component binding, got:\n%s", got)
 	}
 	// Exactly one tag test (arm 1's P); the fresh-binding arm is a default.

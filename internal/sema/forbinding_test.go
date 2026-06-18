@@ -3,23 +3,23 @@ package sema
 import (
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 // checkInfo parses + checks src and returns the Info side-table, for
 // tests that assert inferred types rather than diagnostics.
 func checkInfo(t *testing.T, src string) *Info {
 	t.Helper()
-	toks, lerr := lexer.LexFile(src, "test.td")
+	toks, lerr := lexer.LexFile(src, "test.aril")
 	if lerr != nil {
 		t.Fatalf("lex: %v", lerr)
 	}
-	f, perr := parser.ParseFile(toks, "test.td")
+	f, perr := parser.ParseFile(toks, "test.aril")
 	if perr != nil {
 		t.Fatalf("parse: %v", perr)
 	}
-	info, _ := Check(f, "test.td")
+	info, _ := Check(f, "test.aril")
 	return info
 }
 

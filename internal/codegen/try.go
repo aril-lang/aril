@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // try.go — `try` lowering. A statement-position `try e` becomes an
@@ -225,7 +225,7 @@ func (g *gen) emitTryPreamble(t *ast.TryExpr) (string, error) {
 		return "", err
 	}
 	g.tryTempCounter++
-	tmp := fmt.Sprintf("__tide_try_%d", g.tryTempCounter)
+	tmp := fmt.Sprintf("__aril_try_%d", g.tryTempCounter)
 	g.line(t.Span.StartLine)
 	g.writeIndent()
 	g.b.WriteString(tmp)

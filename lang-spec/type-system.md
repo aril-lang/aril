@@ -1,6 +1,6 @@
 # Type system
 
-Typing rules for Tide, in sequent notation where possible, with
+Typing rules for Aril, in sequent notation where possible, with
 pseudo-code for the few algorithms (unify, exhaustiveness)
 that don't fit naturally. The contract for the sema pass that
 runs after name resolution.
@@ -37,7 +37,7 @@ formatting parameters on bound stdlib functions like
 `fmt.println`). `Any` does **not** narrow back to a concrete
 type — a value of type `Any` cannot be used where a concrete `T`
 is expected, with no implicit cast. The resolver and sema
-together enforce that user-authored Tide code never introduces
+together enforce that user-authored Aril code never introduces
 an `Any`-typed parameter (per D11).
 
 `Dynamic` is the user-facing runtime-erased wrapper used by the
@@ -272,7 +272,7 @@ This preserves D18-P3 (no universal `Value` lowering through
 generics).
 
 **Cross-reference.** The `Any` paragraph at the top of this
-file describes Tide's other "top-ish" type. `Any` and `Dynamic`
+file describes Aril's other "top-ish" type. `Any` and `Dynamic`
 share no implicit-conversion path in either direction; mixing
 them across a call boundary is **E0212 Any/Dynamic cannot be
 implicitly converted** (the user must `reflect.box` to go
@@ -928,10 +928,10 @@ a `TypeExpr` position) are well-formed by **(WF-Inline-Itf)**.
 ```
 
 **Note on T-Class-Method-Inst.** The `func(C, ...): R` shape is
-the type Tide gives to an instance method when it is
+the type Aril gives to an instance method when it is
 referenced **as a free value** (`let f = C.m`, currently rare
 in the corpus). The receiver becomes the first parameter at the
-source level — Tide does not have separate "method-value" vs
+source level — Aril does not have separate "method-value" vs
 "method-expression" syntax like Go. Most uses are
 `obj.m(args)`, typed via `T-Field` → `T-Call` against the
 method's parameter list (no explicit receiver argument).
@@ -957,7 +957,7 @@ mapping; user-side conformance is by-the-letter.
 > does **not** yet verify the method-set premise (that `C` declares
 > every method of each `I_j`). A non-satisfying class is caught only
 > by the Go build, surfacing a `go/types` error rather than a
-> `.td`-coordinate diagnostic. Closing this needs the method-set check
+> `.aril`-coordinate diagnostic. Closing this needs the method-set check
 > in `satisfy.go` and a dedicated catalog code.
 
 ### Generic class / interface
@@ -993,7 +993,7 @@ the same class or opaque foreign handle**.
 ## Foreign handles — T-Extern
 
 An `extern type T` (`ffi.md`) introduces an **opaque foreign handle**:
-a nominal reference type whose layout Tide never sees.
+a nominal reference type whose layout Aril never sees.
 
 ```
 (T-Extern-Fn)   Γ(f) = extern func (P̄) : R          Γ ⊢ ā : P̄
@@ -1011,7 +1011,7 @@ a nominal reference type whose layout Tide never sees.
 ```
 
 An extern function/method is typed by its declared (curated) signature
-exactly like an ordinary call — the curated `.td` writes any boundary-
+exactly like an ordinary call — the curated `.aril` writes any boundary-
 lifted return type (`Result<·,error>`, `Option<·>`) directly, so there
 is no separate lift judgement at the type level (the lift is a lowering
 rule, `lowering-go.md` §ForeignCall).

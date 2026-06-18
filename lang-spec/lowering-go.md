@@ -1,6 +1,6 @@
-# Lowering — Tide IR → Go
+# Lowering — Aril IR → Go
 
-The contract for codegen: how the post-desugaring Tide IR
+The contract for codegen: how the post-desugaring Aril IR
 (`desugaring.md`) becomes Go source. The output is Go that
 `go build` accepts; it is **not** a human-reading goal —
 generated Go is an intermediate representation (D1, hard
@@ -17,12 +17,12 @@ canonical `GO` / `STDOUT` / `EXIT` sections in fixtures).
 
 ## Output tree shape
 
-For an input package consisting of `.td` files in a single
+For an input package consisting of `.aril` files in a single
 directory, codegen emits a sibling directory with:
 
 ```
 <out>/main.go                  // generated user package
-<out>/tidert/runtime.go        // package tidert — runtime helpers
+<out>/arilrt/runtime.go        // package arilrt — runtime helpers
                                //  (Option/Result/Map/Set/Stack representations,
                                //  panic helper, channel wrappers, refEq)
 <out>/bindings/<pkg>.go        // package bindings — generated stdlib
@@ -32,46 +32,46 @@ directory, codegen emits a sibling directory with:
 ```
 
 Both helper directories use **plain Go package names**
-(`tidert`, `bindings`) — leading `_` would make them invisible
+(`arilrt`, `bindings`) — leading `_` would make them invisible
 to `go build` (Go convention). Collision protection is at the
-**Tide source level**: user-source identifiers `tidert` and
+**Aril source level**: user-source identifiers `arilrt` and
 `bindings` are reserved (see §Identifier encoding, E0107
-applies). The full `<out>` location is set by the `tide build`
+applies). The full `<out>` location is set by the `aril build`
 CLI; this file fixes only the relative layout.
 
 ## Identifier encoding
 
 ```
-Tide identifier              Go identifier
+Aril identifier              Go identifier
 ─────────────────────────────────────────────────────
 foo                          foo                       (no change)
 fooBar                       fooBar
-$tide_NN                     _tide_NN                  (fresh locals — see desugaring.md)
-goReservedWord (e.g. type)   tide_type, tide_func, …   (`tide_` prefix to escape)
+$aril_NN                     _aril_NN                  (fresh locals — see desugaring.md)
+goReservedWord (e.g. type)   aril_type, aril_func, …   (`aril_` prefix to escape)
 camelCase                    camelCase
 SnakeCase                    SnakeCase
 ```
 
 **Reserved user-source prefix.** To guarantee no collision
-between user-source identifiers and codegen's `_tide_NN` fresh
+between user-source identifiers and codegen's `_aril_NN` fresh
 names, the lexer rejects any user-source identifier whose
-**first six characters** are `_tide_` (case-sensitive). Emits
+**first six characters** are `_aril_` (case-sensitive). Emits
 **E0107 Reserved identifier prefix** — a hard error at lex time.
 This is a paired edit with `grammar.ebnf` (lexical
 `Ident` production); a user-source identifier starting with
-`_tide_` is grammar-illegal.
+`_aril_` is grammar-illegal.
 
 The Go reserved-word list as of Go 1.22 is hard-coded into the
 codegen pass: `break case chan const continue default defer
 else fallthrough for func go goto if import interface map
-package range return select struct switch type var`. Any Tide
-identifier matching this list gets a `tide_` prefix at every
+package range return select struct switch type var`. Any Aril
+identifier matching this list gets a `aril_` prefix at every
 use site in generated Go.
 
-Exported visibility — Tide has no `pub` qualifier; every
+Exported visibility — Aril has no `pub` qualifier; every
 top-level decl is package-visible. Codegen capitalises the first
 letter of top-level declarations when they need to be visible
-from a sibling Go package (cross-file imports inside a Tide
+from a sibling Go package (cross-file imports inside a Aril
 project), and lower-cases otherwise. Since v1 has single-package
 projects, all decls stay lower-cased; the algorithm is here for
 future expansion.
@@ -79,10 +79,10 @@ future expansion.
 ## Record / struct field lowering
 
 A nominal record (`type X = { f: T }`) and a class lower to a named
-Go `struct`. Each Tide field `f` lowers to an **exported** Go field
+Go `struct`. Each Aril field `f` lowers to an **exported** Go field
 (`exportFieldName`: first letter capitalised; a leading non-letter
 gets an `X` prefix) carrying a `` `json:"f"` `` tag that pins the JSON
-key to the verbatim Tide name:
+key to the verbatim Aril name:
 
 ```
 type Config struct {
@@ -98,7 +98,7 @@ single-package v1). Struct fields export *unconditionally*: Go's
 field is invisible to marshal/unmarshal — exporting is what makes JSON
 round-trip work. The `json` tag keeps field-name == JSON-key
 (binding-surface.md §encoding/json) so the capitalised Go spelling is
-invisible at the Tide-source and wire levels.
+invisible at the Aril-source and wire levels.
 
 Every field *site* follows the same spelling: the struct decl, the
 record/class brace literal (`Config{Host: …}`), value-position field
@@ -131,7 +131,7 @@ fields, and no v1 program serialises a tuple to JSON.
 
 ## Primitive type lowering
 
-| Tide | Go |
+| Aril | Go |
 |---|---|
 | `bool` | `bool` |
 | `int` | `int` |
@@ -145,7 +145,7 @@ fields, and no v1 program serialises a tuple to JSON.
 | `Never` | `struct{}` (no value ever flows; codegen errors if encountered) |
 | `Any` | `interface{}` (also written `any` in Go 1.18+) |
 
-`unit` values (the `()` literal) emit as `tidert.Unit` — a
+`unit` values (the `()` literal) emit as `arilrt.Unit` — a
 package-level variable of type `struct{}` — so `unit`-typed
 expressions are non-empty Go expressions.
 
@@ -156,7 +156,7 @@ to a Go **package-level `var`**:
 
 ```
 let version = 5            ⟿  var version = 5
-let label: string = "tide" ⟿  var label string = "tide"
+let label: string = "aril" ⟿  var label string = "aril"
 ```
 
 The annotation, when present, becomes the Go var's declared type and
@@ -171,7 +171,7 @@ state is a singleton class instead.
 ## Container types — runtime representation
 
 ```go
-// tidert/runtime.go
+// arilrt/runtime.go
 
 type Option[T any] struct {
     Tag uint8                 // 0 = None, 1 = Some
@@ -199,9 +199,9 @@ type Stack[T any] struct {
 }
 ```
 
-Method bodies for these types live in `tidert/runtime.go`. The
+Method bodies for these types live in `arilrt/runtime.go`. The
 codegen pass calls them by Go-qualified name; e.g.,
-`m.set(k, v)` in Tide IR lowers to `m.Set(k, v)` in Go (note
+`m.set(k, v)` in Aril IR lowers to `m.Set(k, v)` in Go (note
 the capital — runtime methods are exported).
 
 **Option ⇄ JSON.** When a program uses both `Option` and an
@@ -230,7 +230,7 @@ Empty-state semantics (per `builtins.md`):
 - `Set.new()`: `&Set[T]{m: map[T]struct{}{}, order: nil}`.
 - `Stack.new()`: `&Stack[T]{xs: nil}`. `Stack.pop()` returns
   `Result[T, error]` with the canonical empty-stack error
-  (`tidert.NewError("empty stack")`).
+  (`arilrt.NewError("empty stack")`).
 
 **Container brace literals** (`Set<int>{1,2}`, `Map<K,V>{}`) lower to
 the same constructors, so the brace form and the `.new()` / `.from()`
@@ -282,16 +282,16 @@ to an inline *early-return preamble* rather than a full match —
 semantically equivalent, smaller output:
 
 ```
-__tide_try_N := e
-if __tide_try_N.Tag == <bail> {        // 1 = Err (Result), 0 = None (Option)
+__aril_try_N := e
+if __aril_try_N.Tag == <bail> {        // 1 = Err (Result), 0 = None (Option)
 	return <wrapped bail of the enclosing return type>
 }
-// the value of `try e` is __tide_try_N.V
+// the value of `try e` is __aril_try_N.V
 ```
 
 In **expression position** (`f(try e)`, `a + try e`) the preamble
 cannot sit inline, so it is **hoisted** to precede the enclosing
-statement; the `try` node itself lowers to `__tide_try_N.V`.
+statement; the `try` node itself lowers to `__aril_try_N.V`.
 
 Hoisting is only applied when it preserves observable evaluation
 order. Lifting a `try`'s early-return ahead of the surrounding
@@ -307,7 +307,7 @@ frame (closure, value-position `match`/`if`/block, `scope`/`spawn`)
 right operand of `&&`/`||` (conditional evaluation; an
 unconditional preamble would change short-circuit semantics).
 
-`tidert.NewError(msg string) error` is a thin wrapper around
+`arilrt.NewError(msg string) error` is a thin wrapper around
 `errors.New(msg)` from the Go stdlib; signature `func
 NewError(msg string) error`. It exists so codegen can emit
 short typed errors without import-rewriting the standard
@@ -316,7 +316,7 @@ short typed errors without import-rewriting the standard
 The user-level `error(msg): error` free constructor
 (`builtins.md` §error) lowers directly to `errors.New(msg)`,
 pulling in Go's `errors` import on demand (the v1 prelude is
-emitted inline, so there is no `tidert` package to route
+emitted inline, so there is no `arilrt` package to route
 through). It is recognised by the bare-`error` identifier callee
 with exactly one argument — the `error(): string` interface
 method takes none, and `.error()` calls are receiver-qualified,
@@ -335,12 +335,12 @@ makeChannel<T>(cap)   → make(chan T, cap)         (cap = 0 if absent)
 → a select with a default case:
 
 ```go
-func tryRecv[T any](ch <-chan T) tidert.Option[T] {
+func tryRecv[T any](ch <-chan T) arilrt.Option[T] {
     select {
     case v := <-ch:
-        return tidert.Option[T]{Tag: 1, V: v}
+        return arilrt.Option[T]{Tag: 1, V: v}
     default:
-        return tidert.Option[T]{Tag: 0}
+        return arilrt.Option[T]{Tag: 0}
     }
 }
 ```
@@ -385,14 +385,14 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
                                        ⟿
   (in Go, as an expression — wrapped in an immediate function:)
 
-  func() tidert.Result[T, E] {
-    eg, _ := tideNewGroup(<lowering of P; defaults to
+  func() arilrt.Result[T, E] {
+    eg, _ := arilNewGroup(<lowering of P; defaults to
                            context.Background()>)
     <lowering of B>                             // ends with a trailing
-                                                //  tidert.Result[T, E]
+                                                //  arilrt.Result[T, E]
                                                 //  value or unit-Ok
     if err := eg.Wait(); err != nil {
-        return tidert.Result[T, E]{Tag: 1, E: err.(E)}
+        return arilrt.Result[T, E]{Tag: 1, E: err.(E)}
     }
     return <the trailing-expression Ok-wrap>
   }()
@@ -400,14 +400,14 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
 
 **Inline group helper (no external dependency).** Generated modules
 are stdlib-only — they carry no `errgroup` import — so the group is
-the inline `tideGroup` helper, emitted into the prelude (conditional
+the inline `arilGroup` helper, emitted into the prelude (conditional
 on a `scope` appearing). It is built from `sync` + `context` and
 replicates `errgroup.WithContext` semantics: the first spawned func
 to return a non-nil error stores it (once) and cancels the derived
 context; `Wait` blocks for every spawn and returns that error.
-`tideNewGroup(parent)` returns `(*tideGroup, context.Context)`. Like
-`tidert.Result` / the containers, the canonical home is
-`tidert/runtime.go`; v1 emits it inline (the transitional state
+`arilNewGroup(parent)` returns `(*arilGroup, context.Context)`. Like
+`arilrt.Result` / the containers, the canonical home is
+`arilrt/runtime.go`; v1 emits it inline (the transitional state
 Block R relocates).
 
 `ScopeRef` (the `scope` identifier — value access to the scope's
@@ -510,7 +510,7 @@ a mismatched-constructor error.
 
 An arm whose every component is a wildcard or fresh ident has an
 empty conjunction and lowers to `default:`. Arm order is preserved,
-so Go's first-match `switch` semantics coincide with Tide's. The
+so Go's first-match `switch` semantics coincide with Aril's. The
 trailing `UnreachableIR` guard is emitted unless some arm produced a
 `default:` (which already makes the Go switch terminating — a guard
 after it would be unreachable code). Refining a component *inside* a
@@ -561,7 +561,7 @@ value. Such a field is **pointer-ized**: the struct field becomes
 `*Tree` (resp. `*Tree[T]`), the constructor stores the address of
 its by-value parameter (`NodeLeft: &left`), and the match-binding
 dereferences (`l := *subject.NodeLeft`) so the bound name keeps the
-sum's value type. Tide sum values are immutable, so the introduced
+sum's value type. Aril sum values are immutable, so the introduced
 sharing is unobservable. Only the **direct** self-reference is
 detected; recursion routed through a slice / map / channel
 (`[]Tree`, `Map<K, Tree>`) is already an indirection in Go and is
@@ -616,7 +616,7 @@ explicit `return`s has no trailing and emits nothing extra.
 `Field { receiver: This{type: C}, name: n }` lowers to the Go
 expression `t.N` — `t` is the receiver name chosen for the
 generated Go method (codegen uses `t` consistently for clarity;
-not exposed in Tide), and the field is exported per §"Record /
+not exposed in Aril), and the field is exported per §"Record /
 struct field lowering".
 
 Generic class methods carry their type parameters as Go-side
@@ -669,7 +669,7 @@ refEq(a, b)           →  a == b                (Go interface / pointer
 ```
 
 `panic` always reaches Go's runtime panic mechanism — there is
-no Tide-level recover (D7 / cut). Bound stdlib calls that may
+no Aril-level recover (D7 / cut). Bound stdlib calls that may
 panic at the Go level propagate naturally.
 
 ## For-loops
@@ -770,7 +770,7 @@ is recognised through redundant parentheses.
 
 ## Generics
 
-Tide generics lower to Go generics one-to-one:
+Aril generics lower to Go generics one-to-one:
 
 ```
 class Box<T> { var v: T; static new(v: T): Box<T> { ... } }
@@ -854,24 +854,24 @@ form is always safe).
 
 For each imported Go package (`fmt`, `os`, `strings`, ...),
 the binding generator emits an `bindings/<pkg>.go` file that
-re-exports the package's public API with Tide-shaped
+re-exports the package's public API with Aril-shaped
 signatures. The transformation rules:
 
-- A Go function `func F(a A, b B) (R, error)` becomes a Tide
+- A Go function `func F(a A, b B) (R, error)` becomes a Aril
   function returning `Result<R, error>` — the runtime helper
   is a one-line adapter that constructs the `Result`.
 - A Go function `func F(...) error` (single `error` return,
-  no `R`) becomes Tide `Result<unit, error>`.
-- A Go function `func F(...) R` (no error) becomes Tide
+  no `R`) becomes Aril `Result<unit, error>`.
+- A Go function `func F(...) R` (no error) becomes Aril
   `R`-returning.
 - A Go function `func F(...) (R, bool)` (comma-ok shape)
-  becomes Tide `Option<R>`.
-- A Go function `func F(...)` (no return) becomes Tide
+  becomes Aril `Option<R>`.
+- A Go function `func F(...)` (no return) becomes Aril
   `unit`-returning.
 - Go types pass through unchanged where possible. Go-only
-  receiver methods are re-exposed as Tide methods on the same
+  receiver methods are re-exposed as Aril methods on the same
   type.
-- Variadic Go parameters (`...T`) become Tide `...T`.
+- Variadic Go parameters (`...T`) become Aril `...T`.
 
 The full binding-surface spec is in
 `../docs/binding-surface.md`; this lowering chapter only
@@ -885,22 +885,22 @@ declarations themselves emit no Go (they are signature metadata).
 - **Opaque handle type.** `extern type T @go("pkg")` lowers, wherever
   `T` appears as a type, to the Go pointer type `*<ref>.Sym`, where
   `<ref>` is the import-path base name (`os/exec` → `exec`) and `Sym`
-  is the `@go` symbol (default = exported Tide name). This is the
+  is the `@go` symbol (default = exported Aril name). This is the
   `*regexp.Regexp` / `*exec.Cmd` shape Go libraries are used through.
 - **Function call.** `f(ā)` for an `extern func f … @go("pkg.Sym")`
   lowers to `<ref>.Sym(ā)`.
 - **Method call.** `r.m(ā)` on a handle `r : T` lowers to
   `r.GoName(ā)`, `GoName` from the member's `@go` (default = exported
-  Tide name). Field access `r.x` lowers to `r.GoField`; a `var` field
+  Aril name). Field access `r.x` lowers to `r.GoField`; a `var` field
   is assignable (`r.GoField = v`).
 - **Boundary lift.** A binding whose curated return is `Result<U,
   error>` wraps its Go referent at the boundary, keyed on `U`:
   - `U ≠ unit` — the Go referent returns `(U, error)`; wrap in the
-    shared `tideResultOf` helper — `tideResultOf(<ref>.Sym(ā))` —
+    shared `arilResultOf` helper — `arilResultOf(<ref>.Sym(ā))` —
     identical to the stdlib `resultWrap` shape above.
   - `U = unit` — the Go referent returns a **bare `error`** (no value,
     e.g. `os.Chdir`, `os.WriteFile`, `(*exec.Cmd).Run`); wrap in the
-    `tideResultUnit` helper — `tideResultUnit(<ref>.Sym(ā))` — which
+    `arilResultUnit` helper — `arilResultUnit(<ref>.Sym(ā))` — which
     folds the lone `error` into `Result<unit, error>` (`unit` →
     Go `struct{}`).
 
@@ -908,7 +908,7 @@ declarations themselves emit no Go (they are signature metadata).
   codegen wrapper is a later slice.)
 - **Imports.** The Go import path each used binding names via `@go` is
   added to the import block directly (it comes from `@go`, not the
-  `.td` imports). References use the path's base name; a Go package is
+  `.aril` imports). References use the path's base name; a Go package is
   imported only when one of its bindings is actually emitted.
 
 The emitted call is **re-checked by the Go type checker** against the
@@ -921,16 +921,16 @@ aliasing for colliding base names are later slices.
 
 ## Source maps (`//line` directives)
 
-Every emitted Go statement that originates from a `.td` source
-position carries a `//line file.td:NN` directive immediately
+Every emitted Go statement that originates from a `.aril` source
+position carries a `//line file.aril:NN` directive immediately
 above it. The runtime's panic stack traces, `go test -run`
 failures, and `go vet` diagnostics will then point at the
-original `.td` coordinates — required for D10.
+original `.aril` coordinates — required for D10.
 
 Conservative rule: `//line` is emitted at the *outermost* Go
 statement boundary for each source construct. Fine-grained
 sub-expression mapping is **not** v1; the directive form is
-canonical `//line file.td:NN:1` (line = source span's start
+canonical `//line file.aril:NN:1` (line = source span's start
 line, column = 1 unconditionally — Go accepts this form per
 [Go spec — Source file organisation](https://go.dev/ref/spec#Source_file_organization)).
 

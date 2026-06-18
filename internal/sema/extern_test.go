@@ -104,7 +104,7 @@ func bad(): bool {
 	}
 }
 
-// TestExternHandleNotConstructible — a handle cannot be built by a Tide
+// TestExternHandleNotConstructible — a handle cannot be built by a Aril
 // call (E1001); it is only obtained from an extern function.
 func TestExternHandleNotConstructible(t *testing.T) {
 	src := `extern type Cmd @go("os/exec")

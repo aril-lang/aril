@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 func emitString(t *testing.T, src string) string {
@@ -38,7 +38,7 @@ func TestEmitHello(t *testing.T) {
 	src := `import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 `
 	got := emitString(t, src)
@@ -47,7 +47,7 @@ func main() {
 import "fmt"
 
 func main() {
-	fmt.Println("Tide is rising.")
+	fmt.Println("Aril is rising.")
 }
 `
 	if got != want {
@@ -142,7 +142,7 @@ func main() {
 		t.Fatalf("write: %v", err)
 	}
 	// Need a go.mod so `go build` works on the temp dir.
-	mod := "module tide-codegen-test\n\ngo 1.22\n"
+	mod := "module aril-codegen-test\n\ngo 1.22\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
@@ -172,20 +172,20 @@ func main() {
   }
 }
 `
-	out := emitWithFile(t, src, "src.td")
+	out := emitWithFile(t, src, "src.aril")
 	// Must contain //line directives — at least one per
 	// top-level statement, and one for each else-if's nested
 	// condition.
-	if !strings.Contains(out, "//line src.td:3:1") {
+	if !strings.Contains(out, "//line src.aril:3:1") {
 		t.Errorf("missing //line for func main: %s", out)
 	}
-	if !strings.Contains(out, "//line src.td:4:1") {
+	if !strings.Contains(out, "//line src.aril:4:1") {
 		t.Errorf("missing //line for the for-loop: %s", out)
 	}
-	if !strings.Contains(out, "//line src.td:5:1") {
+	if !strings.Contains(out, "//line src.aril:5:1") {
 		t.Errorf("missing //line for the if condition: %s", out)
 	}
-	if !strings.Contains(out, "//line src.td:7:1") {
+	if !strings.Contains(out, "//line src.aril:7:1") {
 		t.Errorf("missing //line for else-if at line 7: %s", out)
 	}
 	// gofmt-stability — Emit already pipes through go/format, so
@@ -205,7 +205,7 @@ func main() {
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(out), 0644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module tide-codegen-test\n\ngo 1.22\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module aril-codegen-test\n\ngo 1.22\n"), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 	cmd := exec.Command("go", "build", "-o", "/dev/null", "./...")
@@ -225,7 +225,7 @@ func TestEmitRunHello(t *testing.T) {
 	src := `import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 `
 	out := emitString(t, src)
@@ -233,7 +233,7 @@ func main() {
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(out), 0644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	mod := "module tide-codegen-test\n\ngo 1.22\n"
+	mod := "module aril-codegen-test\n\ngo 1.22\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
@@ -243,8 +243,8 @@ func main() {
 	if err != nil {
 		t.Fatalf("go run failed: %v", err)
 	}
-	if got := string(stdout); got != "Tide is rising.\n" {
-		t.Errorf("hello stdout = %q; want %q", got, "Tide is rising.\n")
+	if got := string(stdout); got != "Aril is rising.\n" {
+		t.Errorf("hello stdout = %q; want %q", got, "Aril is rising.\n")
 	}
 }
 

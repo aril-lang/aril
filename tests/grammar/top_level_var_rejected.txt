@@ -5,4 +5,4 @@ Top-level `var` is intentionally not legal (grammar.ebnf §TopLevelLet — modul
 var x = 5
 
 --- ERRORS ---
-src.td:1:1: error[E0112]: expected top-level declaration, got Keyword "var"
+src.aril:1:1: error[E0112]: expected top-level declaration, got Keyword "var"

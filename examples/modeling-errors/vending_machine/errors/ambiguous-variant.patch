@@ -1,5 +1,5 @@
---- vending_machine.td
-+++ vending_machine.td
+--- vending_machine.aril
++++ vending_machine.aril
 @@ -7,6 +7,7 @@
  import strconv
  

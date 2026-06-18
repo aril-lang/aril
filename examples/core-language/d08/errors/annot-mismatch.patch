@@ -1,5 +1,5 @@
---- d08.td
-+++ d08.td
+--- d08.aril
++++ d08.aril
 @@ -107,7 +107,7 @@
  
  func solveSimple(n: int, pairs: []Pair, k: int): int {

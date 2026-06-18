@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 // emitErr lexes/parses/emits src and returns the codegen error (nil on
@@ -40,10 +40,10 @@ func TestTryExprHoistsWhenSafe(t *testing.T) {
 }
 `)
 	// Two preambles emitted before the combine call, in order.
-	if strings.Count(got, "if __tide_try_") < 2 {
+	if strings.Count(got, "if __aril_try_") < 2 {
 		t.Errorf("expected two hoisted try preambles, got:\n%s", got)
 	}
-	if !strings.Contains(got, "combine(__tide_try_1.V, __tide_try_2.V)") {
+	if !strings.Contains(got, "combine(__aril_try_1.V, __aril_try_2.V)") {
 		t.Errorf("expected both tries substituted by their temps, got:\n%s", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestTryExprSafeAfterTryBeforeEffect(t *testing.T) {
   return Ok<int, string>(s)
 }
 `)
-	if !strings.Contains(got, "combine(__tide_try_1.V, sideA())") {
+	if !strings.Contains(got, "combine(__aril_try_1.V, sideA())") {
 		t.Errorf("expected the leading try hoisted and sideA() left in place, got:\n%s", got)
 	}
 }

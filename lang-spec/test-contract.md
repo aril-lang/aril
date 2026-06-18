@@ -4,7 +4,7 @@ Every compiler stage has a **canonical text serialization** for its
 output. Tests are data files in `../tests/<stage>/`, not Go code:
 the runner reads the input, runs the stage, serializes the output,
 and diffs against an expected text. When the compiler is re-
-implemented in Tide (self-host), the runner is rewritten on Tide
+implemented in Aril (self-host), the runner is rewritten on Aril
 but the fixtures and expected text stay byte-identical.
 
 This file is the contract for those serializations. Implementations
@@ -25,7 +25,7 @@ comments and may be used as titles.
 short one-liner describing the case
 
 --- INPUT ---
-<.td source, verbatim>
+<.aril source, verbatim>
 
 --- TOKENS ---
 <canonical TOKENS form, see below>
@@ -173,12 +173,12 @@ One diagnostic per line, in the canonical emission format from
 catalog (e.g. `E0201`). Examples:
 
 ```
-src.td:1:1: error[E0103]: Unknown name
-src.td:4:9: warning[E0503]: Soft shadow
-src.td:7:5: error[E0303]: Non-exhaustive match
+src.aril:1:1: error[E0103]: Unknown name
+src.aril:4:9: warning[E0503]: Soft shadow
+src.aril:7:5: error[E0303]: Non-exhaustive match
 ```
 
-The `message` text is part of the contract — both Go and Tide
+The `message` text is part of the contract — both Go and Aril
 implementations must emit byte-identical strings matching the
 catalog's `message` column. Optional secondary lines (snippet,
 caret, fix hint) follow the primary line indented by two
@@ -189,11 +189,11 @@ contract.
 `tests/sema/` fixtures: the sema layer's coverage gate is
 satisfied by the Go table-tests in `internal/sema/*_test.go`, not
 by `ERRORS`-section fixtures. A sema diagnostic's contract is behavioural — *does code
-E fire (in `.td` coordinates) on the failure case, and stay silent
+E fire (in `.aril` coordinates) on the failure case, and stay silent
 on the corpus* — which the table-tests assert directly (input →
 the set of emitted codes). The `ERRORS` fixture format above stays
 the **cross-implementation** contract (byte-identical output once a
-Tide re-implementation of sema exists); until then the Go
+Aril re-implementation of sema exists); until then the Go
 table-tests are the authoritative sema coverage. New sema
 diagnostics satisfy the atomic-coverage rule with a table-test.
 
@@ -218,7 +218,7 @@ output is order-unspecified, use the variants:
 ## Normalization rules — shared
 
 - File paths in any position are **relative** to the repo root
-  (e.g. `examples/core-language/hello/hello.td`, not `/home/.../hello.td`).
+  (e.g. `examples/core-language/hello/hello.aril`, not `/home/.../hello.aril`).
 - Position / span format is always `line:col` or `line:col-line:col`,
   1-indexed, character-counted not byte-counted (UTF-8 aware) —
   applies uniformly to TOKENS, AST spans, TYPES rows, ERRORS lines.
@@ -241,6 +241,6 @@ output is order-unspecified, use the variants:
   name, and unified-diff body.
 - Exit non-zero if any test fails.
 
-The Go implementation lives in `../tests/harness/`; a Tide
+The Go implementation lives in `../tests/harness/`; a Aril
 re-implementation must produce the same output format for the same
 input.

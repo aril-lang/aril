@@ -1,7 +1,7 @@
 package sema
 
 import (
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // resolveExpr — name resolution over expressions. Field-access

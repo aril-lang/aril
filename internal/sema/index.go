@@ -3,11 +3,11 @@ package sema
 import (
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // newPackageScope builds the package's top-level scope (parented by
-// the predeclared scope). Every `.td` file in the package shares it
+// the predeclared scope). Every `.aril` file in the package shares it
 // (RFC-0002 §"Package = directory").
 func (c *checker) newPackageScope() *Scope {
 	pre := newScope(nil)
@@ -121,6 +121,6 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 
 func (c *checker) checkReservedName(name string, span ast.Span) {
 	if goReservedIdent(name) {
-		c.report("E0107", "Reserved identifier prefix `_tide_` — used by codegen", span)
+		c.report("E0107", "Reserved identifier prefix `_aril_` — used by codegen", span)
 	}
 }

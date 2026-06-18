@@ -1,5 +1,5 @@
---- vending_machine.td
-+++ vending_machine.td
+--- vending_machine.aril
++++ vending_machine.aril
 @@ -27,7 +27,7 @@
  type State =
    | Idle

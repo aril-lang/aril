@@ -1,5 +1,5 @@
---- reverse_linked_list.td
-+++ reverse_linked_list.td
+--- reverse_linked_list.aril
++++ reverse_linked_list.aril
 @@ -45,7 +45,7 @@
    var cur = head
    while true {

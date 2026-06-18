@@ -1,5 +1,5 @@
---- vending_machine.td
-+++ vending_machine.td
+--- vending_machine.aril
++++ vending_machine.aril
 @@ -77,6 +77,7 @@
  func intStr(n: int): string { return strconv.itoa(n) }
  

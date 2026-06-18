@@ -42,10 +42,10 @@ func StepForward(n int) Step {
 }
 func apply(pos int, s Step) int {
 	var p = pos
-	__tide_match_1 := s
-	switch __tide_match_1.Tag {
+	__aril_match_1 := s
+	switch __aril_match_1.Tag {
 	case 0:
-		n := __tide_match_1.ForwardN
+		n := __aril_match_1.ForwardN
 		p = p + n
 	case 1:
 		p = 0

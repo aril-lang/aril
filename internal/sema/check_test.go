@@ -3,22 +3,22 @@ package sema
 import (
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 func runCheck(t *testing.T, src string) []string {
 	t.Helper()
-	toks, lerr := lexer.LexFile(src, "test.td")
+	toks, lerr := lexer.LexFile(src, "test.aril")
 	if lerr != nil {
 		t.Fatalf("lex: %v", lerr)
 	}
-	f, perr := parser.ParseFile(toks, "test.td")
+	f, perr := parser.ParseFile(toks, "test.aril")
 	if perr != nil {
 		t.Fatalf("parse: %v", perr)
 	}
-	_, diags := Check(f, "test.td")
+	_, diags := Check(f, "test.aril")
 	codes := make([]string, 0, len(diags))
 	for _, d := range diags {
 		codes = append(codes, d.Code)
@@ -52,7 +52,7 @@ func main() {
 	}
 }
 
-// Note: E0107 (reserved `_tide_` prefix) is caught by the
+// Note: E0107 (reserved `_aril_` prefix) is caught by the
 // lexer before sema sees the AST. The defensive check in
 // builtins.go is unreachable via the public path today; it
 // stays as defence-in-depth for future synthesised-name
@@ -122,7 +122,7 @@ func greet(name: string) {
   let prefix = "hi"
   fmt.println(prefix, name)
 }
-func main() { greet("Tide") }
+func main() { greet("Aril") }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean, got %v", codes)
@@ -512,15 +512,15 @@ func main() {
   let ys = sort.sorted(xs, (a, b) => a.start < b.start)
 }
 `
-	toks, lerr := lexer.LexFile(src, "test.td")
+	toks, lerr := lexer.LexFile(src, "test.aril")
 	if lerr != nil {
 		t.Fatalf("lex: %v", lerr)
 	}
-	f, perr := parser.ParseFile(toks, "test.td")
+	f, perr := parser.ParseFile(toks, "test.aril")
 	if perr != nil {
 		t.Fatalf("parse: %v", perr)
 	}
-	info, diags := Check(f, "test.td")
+	info, diags := Check(f, "test.aril")
 	if len(diags) != 0 {
 		codes := make([]string, 0, len(diags))
 		for _, d := range diags {
@@ -580,15 +580,15 @@ func main() {
   fmt.println(top)
 }
 `
-	toks, lerr := lexer.LexFile(src, "test.td")
+	toks, lerr := lexer.LexFile(src, "test.aril")
 	if lerr != nil {
 		t.Fatalf("lex: %v", lerr)
 	}
-	f, perr := parser.ParseFile(toks, "test.td")
+	f, perr := parser.ParseFile(toks, "test.aril")
 	if perr != nil {
 		t.Fatalf("parse: %v", perr)
 	}
-	info, diags := Check(f, "test.td")
+	info, diags := Check(f, "test.aril")
 	if len(diags) != 0 {
 		codes := make([]string, 0, len(diags))
 		for _, d := range diags {
@@ -694,9 +694,9 @@ func main() {
   fmt.println(a)
 }
 `
-	toks, _ := lexer.LexFile(src, "test.td")
-	f, _ := parser.ParseFile(toks, "test.td")
-	_, diags := Check(f, "test.td")
+	toks, _ := lexer.LexFile(src, "test.aril")
+	f, _ := parser.ParseFile(toks, "test.aril")
+	_, diags := Check(f, "test.aril")
 	if len(diags) != 2 {
 		t.Fatalf("expected 2 diags, got %d: %v", len(diags), diags)
 	}

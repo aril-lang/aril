@@ -11,7 +11,7 @@ Two sections required:
 
 ```
 --- INPUT ---
-<.td source>
+<.aril source>
 
 --- TOKENS ---
 <canonical TOKENS form>

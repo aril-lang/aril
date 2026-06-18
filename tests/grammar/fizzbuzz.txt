@@ -1,5 +1,5 @@
 --- TITLE ---
-fizzbuzz.td — for-range with inclusive `..=`, chained if/else-if/else, % and == operators
+fizzbuzz.aril — for-range with inclusive `..=`, chained if/else-if/else, % and == operators
 
 --- INPUT ---
 import fmt

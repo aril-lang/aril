@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // The `@go` split is the one piece of non-trivial logic the FFI lowering
@@ -13,7 +13,7 @@ import (
 
 func TestGoRefPkgSym(t *testing.T) {
 	cases := []struct {
-		raw, tideName  string
+		raw, arilName  string
 		wantPkg, wantS string
 	}{
 		{"os/exec.Command", "command", "os/exec", "Command"},
@@ -25,10 +25,10 @@ func TestGoRefPkgSym(t *testing.T) {
 	}
 	for _, c := range cases {
 		ref := &ast.GoRef{Raw: c.raw}
-		pkg, sym := goRefPkgSym(ref, c.tideName)
+		pkg, sym := goRefPkgSym(ref, c.arilName)
 		if pkg != c.wantPkg || sym != c.wantS {
 			t.Errorf("goRefPkgSym(%q, %q) = (%q, %q); want (%q, %q)",
-				c.raw, c.tideName, pkg, sym, c.wantPkg, c.wantS)
+				c.raw, c.arilName, pkg, sym, c.wantPkg, c.wantS)
 		}
 	}
 	// Absent attribute → empty package (an error at the use site) and a
@@ -62,9 +62,9 @@ func TestGoRefMember(t *testing.T) {
 }
 
 // externResultKindOf drives the boundary lift (lowering-go.md
-// §ForeignCall): a Go `(T, error)` referent (Tide `Result<T, error>`)
-// lifts via tideResultOf; a bare-`error` referent (Tide
-// `Result<unit, error>`) via tideResultUnit; anything else lowers bare.
+// §ForeignCall): a Go `(T, error)` referent (Aril `Result<T, error>`)
+// lifts via arilResultOf; a bare-`error` referent (Aril
+// `Result<unit, error>`) via arilResultUnit; anything else lowers bare.
 func TestExternResultKindOf(t *testing.T) {
 	result := func(args ...ast.TypeExpr) *ast.NamedType {
 		return &ast.NamedType{QName: []string{"Result"}, Args: args}
@@ -90,7 +90,7 @@ func TestExternResultKindOf(t *testing.T) {
 
 // The method site of the unit lift (emitExternMethodCall) shares the
 // classifier with the func site but is a distinct code path; assert a
-// handle method returning Result<unit, error> lowers via tideResultUnit.
+// handle method returning Result<unit, error> lowers via arilResultUnit.
 func TestExternMethodUnitLift(t *testing.T) {
 	src := `import fmt
 
@@ -111,7 +111,7 @@ func main() {
 }
 `
 	got := emitString(t, src)
-	if !strings.Contains(got, "tideResultUnit(b.WriteByte(") {
-		t.Errorf("method unit lift not lowered via tideResultUnit:\n%s", got)
+	if !strings.Contains(got, "arilResultUnit(b.WriteByte(") {
+		t.Errorf("method unit lift not lowered via arilResultUnit:\n%s", got)
 	}
 }

@@ -1,5 +1,5 @@
---- merge_intervals.td
-+++ merge_intervals.td
+--- merge_intervals.aril
++++ merge_intervals.aril
 @@ -46,6 +46,8 @@
    return "[" + strconv.itoa(iv.start) + "," + strconv.itoa(iv.end) + "]"
  }

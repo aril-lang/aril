@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "vending_machine.td"
+entry    = "vending_machine.aril"
 
 [[error]]
 patch   = "errors/drop-outofstock-arm.patch"   # step's tuple match drops the OutOfStock fallthrough

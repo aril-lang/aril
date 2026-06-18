@@ -1,4 +1,4 @@
-// Package lexer turns Tide source text into a stream of tokens.
+// Package lexer turns Aril source text into a stream of tokens.
 //
 // Contract: lang-spec/grammar.ebnf lexical part.
 // Canonical token serialization: lang-spec/test-contract.md §TOKENS.

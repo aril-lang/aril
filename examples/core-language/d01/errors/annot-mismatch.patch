@@ -1,5 +1,5 @@
---- d01.td
-+++ d01.td
+--- d01.aril
++++ d01.aril
 @@ -33,7 +33,7 @@
  
  func solveSimple(steps: []Step): int {

@@ -39,13 +39,13 @@ func TreeNode(left Tree, right Tree) Tree {
 	return Tree{Tag: 1, NodeLeft: &left, NodeRight: &right}
 }
 func count(t Tree) int {
-	__tide_match_1 := t
-	switch __tide_match_1.Tag {
+	__aril_match_1 := t
+	switch __aril_match_1.Tag {
 	case 0:
 		return 0
 	case 1:
-		l := *__tide_match_1.NodeLeft
-		r := *__tide_match_1.NodeRight
+		l := *__aril_match_1.NodeLeft
+		r := *__aril_match_1.NodeRight
 		return 1 + count(l) + count(r)
 	}
 	panic("unreachable: non-exhaustive match")

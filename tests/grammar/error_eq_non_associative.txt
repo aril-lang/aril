@@ -9,4 +9,4 @@ func main() {
 }
 
 --- ERRORS ---
-src.td:2:13: error[E0112]: operator "==" is non-associative; parenthesise the operands
+src.aril:2:13: error[E0112]: operator "==" is non-associative; parenthesise the operands

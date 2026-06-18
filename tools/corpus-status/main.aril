@@ -1,0 +1,1164 @@
+import fmt
+import os
+import strings
+import sort
+import json
+import strconv
+
+// corpus-status — the corpus conformance scoreboard (see README.md).
+// Measures two metrics over the example corpus: `build_ok` (how far each
+// example gets through the build pipeline) and `diag_ok` (whether each
+// negative case reproduces its ideal diagnostic), renders the JSON snapshot
+// + STATUS.md, and offers `--check` (ratchet) and `--history` (trend).
+
+// Diagnostics emitted before a file parses; any other code means the file
+// parsed and a later stage rejected it.
+func isParseCode(code: string): bool {
+  return (code == "E0101" || code == "E0102" || code == "E0107"
+    || code == "E0109" || code == "E0110" || code == "E0111" || code == "E0112")
+}
+
+func isEmitCode(code: string): bool {
+  return code == "E0801" || code == "E0802" || code == "E0803"
+}
+
+func stageOf(code: string): string {
+  if isParseCode(code) { return "parse" }
+  if isEmitCode(code) { return "emit" }
+  return "sema"
+}
+
+// --- records ---
+
+type Row = {
+  path: string
+  stage: string
+  blocker: string
+}
+
+type Miss = {
+  case: string
+  want: string
+  got: string
+}
+
+type Totals = {
+  total: int
+  parse_fail: int
+  sema_fail: int
+  emit_fail: int
+  build_ok: int
+  diag_ok: int
+  diag_total: int
+  run_ok: int
+  run_total: int
+}
+
+// RunRow records one run-pass example's behavioural outcome. status is
+// "ok" (built and exited 0), "build-fail", "run-fail" (non-zero exit), or
+// "timeout".
+type RunRow = {
+  path: string
+  status: string
+  code: int
+}
+
+type Status = {
+  schema_version: int
+  totals: Totals
+  files: []Row
+  diag_misses: []Miss
+  run_fails: []RunRow
+}
+
+// --- subprocess helpers ---
+
+// runOk runs a command that must succeed; aborts (tooling failure) otherwise.
+func runOk(name: string, args: []string): string {
+  let r = run(name, args)
+  if r.code() != 0 {
+    fmt.println("corpus-status: command failed:", name, "exit", r.code())
+    fmt.println(r.out())
+    os.exit(1)
+  }
+  return strings.trimSpace(r.out())
+}
+
+// --- diagnostic parsing ---
+
+// diagPos returns the index of a aril diagnostic marker in line, or -1.
+func diagPos(line: string): int {
+  let i = indexOf(line, "error[")
+  if i >= 0 { return i }
+  return indexOf(line, "internal[")
+}
+
+// firstDiagLine returns the first diagnostic line sliced from its marker
+// (dropping the leading "<path>:<line>:<col>: " position prefix), or "".
+func firstDiagLine(out: string): string {
+  for ln in strings.split(out, "\n") {
+    let k = diagPos(ln)
+    if k >= 0 { return strings.trimSpace(ln[k:]) }
+  }
+  return ""
+}
+
+// errorCode extracts the diagnostic code (between the first `[` at/after the
+// marker and the next `]`), or "".
+func errorCode(line: string): string {
+  let i = diagPos(line)
+  if i < 0 { return "" }
+  let rest0 = line[i:]
+  let lb = indexOf(rest0, "[")
+  if lb < 0 { return "" }
+  let rest = rest0[lb + 1:]
+  let rb = indexOf(rest, "]")
+  if rb < 0 { return "" }
+  return rest[:rb]
+}
+
+// --- classify one file ---
+
+func classify(aril: string, file: string, out: string): Row {
+  let r = run(aril, ["build", "-o", out, file])
+  if r.code() == 0 {
+    return Row{ path: file, stage: "build", blocker: "" }
+  }
+  let combined = r.out()
+  let diag = firstDiagLine(combined)
+  let code = errorCode(diag)
+  if isParseCode(code) {
+    return Row{ path: file, stage: "parse", blocker: diag }
+  }
+  if isEmitCode(code) {
+    return Row{ path: file, stage: "emit", blocker: diag }
+  }
+  if strings.contains(combined, "go build failed") {
+    // Raw Go-toolchain output is non-deterministic; record a stable blocker.
+    return Row{ path: file, stage: "emit", blocker: "go build failed" }
+  }
+  if code != "" {
+    return Row{ path: file, stage: "sema", blocker: diag }
+  }
+  var blocker = diag
+  if blocker == "" { blocker = "unknown failure" }
+  return Row{ path: file, stage: "emit", blocker: blocker }
+}
+
+// --- corpus enumeration ---
+
+func lessStr(a: string, b: string): bool {
+  return a < b
+}
+
+// corpusFiles returns the git-tracked .aril files under examples/ + user_tests/,
+// sorted — so the snapshot reflects the committed suite (untracked scratch
+// .aril files don't perturb the metric).
+func corpusFiles(): []string {
+  let listed = runOk("git", ["ls-files", "examples", "user_tests"])
+  var files = []string{}
+  for ln in strings.split(listed, "\n") {
+    if strings.hasSuffix(ln, ".aril") {
+      files = files.push(ln)
+    }
+  }
+  return sort.sorted(files, lessStr)
+}
+
+func buildAril(tmp: string): string {
+  let binpath = pathJoin(tmp, "aril")
+  let r = run("go", ["build", "-o", binpath, "./cmd/aril"])
+  if r.code() != 0 {
+    fmt.println("corpus-status: building aril failed:")
+    fmt.println(r.out())
+    os.exit(1)
+  }
+  return binpath
+}
+
+// --- negative cases: the "correct error messages" metric (diag_ok) ---
+//
+// Each [[error]] in an example.toml is a patch that injects a mistake plus the
+// diagnostic it must provoke. diag_ok counts the cases that reproduce their
+// expected diagnostic (code set ⊆ emitted, stage matches, message substrings
+// present). A case that fails to reproduce is a *penalty* on diag_ok — never a
+// tooling error. A patch that no longer applies, or a compiler/subprocess that
+// cannot be run, *is* a tooling error and aborts the whole run.
+
+type NegCase = {
+  dir: string
+  entry: string
+  patch: string
+  expect: []string
+  stage: string
+  matches: string
+}
+
+type EvalResult = {
+  diag_ok: int
+  diag_total: int
+  misses: []Miss
+}
+
+func containsStr(xs: []string, x: string): bool {
+  for e in xs {
+    if e == x { return true }
+  }
+  return false
+}
+
+func trimQuotes(s: string): string {
+  return strings.trimSuffix(strings.trimPrefix(s, "\""), "\"")
+}
+
+// tomlScalar extracts a TOML-lite string value: the part after the first
+// `=`, the inner of a leading quoted run if present, else the pre-`#` text
+// with surrounding quotes stripped.
+func tomlScalar(line: string): string {
+  let eq = indexOf(line, "=")
+  if eq < 0 { return "" }
+  var v = strings.trimSpace(line[eq + 1:])
+  if strings.hasPrefix(v, "\"") {
+    let rest = v[1:]
+    let j = indexOf(rest, "\"")
+    if j >= 0 { return rest[:j] }
+  }
+  let h = indexOf(v, "#")
+  if h >= 0 { v = v[:h] }
+  return trimQuotes(strings.trimSpace(v))
+}
+
+// tomlCodes extracts the quoted strings of an array value: everything after
+// `=` up to the first `]`, then each `"..."`.
+func tomlCodes(line: string): []string {
+  let eq = indexOf(line, "=")
+  if eq < 0 { return []string{} }
+  var v = line[eq + 1:]
+  let rb = indexOf(v, "]")
+  if rb >= 0 { v = v[:rb] }
+  var out = []string{}
+  var rest = v
+  while true {
+    let q1 = indexOf(rest, "\"")
+    if q1 < 0 { break }
+    rest = rest[q1 + 1:]
+    let q2 = indexOf(rest, "\"")
+    if q2 < 0 { break }
+    out = out.push(rest[:q2])
+    rest = rest[q2 + 1:]
+  }
+  return out
+}
+
+func readFileOrEmpty(path: string): string {
+  match os.readFile(path) {
+    Ok(data) => return strings.fromBytes(data),
+    Err(_) => return "",
+  }
+}
+
+// parseNegCases extracts the [[error]] entries of one example.toml. `entry`
+// is the manifest's top-level entry, applied to every case (resolved in a
+// first pass so it is order-independent).
+func parseNegCases(manifest: string, text: string): []NegCase {
+  let dir = pathDir(manifest)
+  var entry = ""
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if strings.hasPrefix(line, "entry") {
+      entry = tomlScalar(line)
+    }
+  }
+  var cases = []NegCase{}
+  var cur = NegCase{ dir: dir, entry: entry, patch: "", expect: []string{}, stage: "", matches: "" }
+  var inCase = false
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if line == "[[error]]" {
+      if inCase { cases = cases.push(cur) }
+      cur = NegCase{ dir: dir, entry: entry, patch: "", expect: []string{}, stage: "", matches: "" }
+      inCase = true
+    } else if strings.hasPrefix(line, "[") {
+      if inCase { cases = cases.push(cur) }
+      inCase = false
+    } else if inCase {
+      if strings.hasPrefix(line, "patch") {
+        cur.patch = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expect") {
+        cur.expect = tomlCodes(line)
+      } else if strings.hasPrefix(line, "stage") {
+        cur.stage = tomlScalar(line)
+      } else if strings.hasPrefix(line, "matches") {
+        cur.matches = tomlScalar(line)
+      }
+    }
+  }
+  if inCase { cases = cases.push(cur) }
+  return cases
+}
+
+// emittedCodes returns the E-codes appearing as `error[E…]` in compiler
+// output (a findall over the combined stream).
+func emittedCodes(re: Regexp, combined: string): []string {
+  var out = []string{}
+  for m in re.findAll(combined, -1) {
+    if m.len() > 7 {
+      // strip the leading "error[" (6 chars) and the trailing "]".
+      out = out.push(m[6:m.len() - 1])
+    }
+  }
+  return out
+}
+
+func copyFile(src: string, dst: string) {
+  match os.readFile(src) {
+    Ok(data) => {
+      match writeFile(dst, data, 420) {
+        Ok(_) => fmt.print(""),
+        Err(e) => {
+          fmt.println("corpus-status: stage write failed:", dst, e)
+          os.exit(1)
+        },
+      }
+    },
+    Err(e) => {
+      fmt.println("corpus-status: stage read failed:", src, e)
+      os.exit(1)
+    },
+  }
+}
+
+func lessMiss(a: Miss, b: Miss): bool {
+  return a.case < b.case
+}
+
+// mustCompile compiles a known-good regexp, aborting on the impossible
+// failure (an opaque handle cannot be zero-constructed, so the value must
+// come from the extern call).
+func mustCompile(expr: string): Regexp {
+  match compileRegexp(expr) {
+    Ok(c) => return c,
+    Err(e) => {
+      fmt.println("corpus-status: internal regexp failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+func evalNegatives(aril: string): EvalResult {
+  let rx = mustCompile("error\\[E[0-9]+\\]")
+  let listed = runOk("git", ["ls-files", "examples"])
+  var manifests = []string{}
+  for ln in strings.split(listed, "\n") {
+    if pathBase(ln) == "example.toml" {
+      manifests = manifests.push(ln)
+    }
+  }
+  manifests = sort.sorted(manifests, lessStr)
+
+  var work = ""
+  match mkdirTemp("", "corpus-neg-") {
+    Ok(d) => work = d,
+    Err(e) => {
+      fmt.println("corpus-status: mkdirTemp failed:", e)
+      os.exit(1)
+    },
+  }
+
+  var diagOk = 0
+  var diagTotal = 0
+  var misses = []Miss{}
+  for mf in manifests {
+    let text = readFileOrEmpty(mf)
+    for c in parseNegCases(mf, text) {
+      if c.patch == "" || c.expect.len() == 0 || c.entry == "" {
+        continue
+      }
+      diagTotal = diagTotal + 1
+      let caseLabel = c.dir + "/" + c.patch
+      var tmp = ""
+      match mkdirTemp(work, "") {
+        Ok(d) => tmp = d,
+        Err(e) => {
+          fmt.println("corpus-status: mkdirTemp failed:", e)
+          os.exit(1)
+        },
+      }
+      let staged = pathJoin(tmp, c.entry)
+      copyFile(pathJoin(c.dir, c.entry), staged)
+      var patchfile = ""
+      match pathAbs(pathJoin(c.dir, c.patch)) {
+        Ok(p) => patchfile = p,
+        Err(e) => {
+          fmt.println("corpus-status: abs path failed:", e)
+          os.exit(1)
+        },
+      }
+      // Absolute -i: `patch -d tmp` resolves a relative -i against tmp.
+      let ap = run("patch", ["-p0", "-s", "-d", tmp, "-i", patchfile])
+      if ap.code() != 0 {
+        fmt.println("corpus-status: patch no longer applies", caseLabel, "— regenerate this case:")
+        fmt.println(ap.out())
+        os.exit(1)
+      }
+      let r = run(aril, ["build", "-o", pathJoin(tmp, "out.bin"), staged])
+      let combined = r.out()
+      var want = ""
+      if c.matches != "" {
+        want = strings.trimSpace(readFileOrEmpty(pathJoin(c.dir, c.matches)))
+      }
+      var got = firstDiagLine(combined)
+      if got == "" {
+        if r.code() == 0 {
+          got = "(built clean — no diagnostic)"
+        } else {
+          got = "(no diagnostic)"
+        }
+      }
+      if r.code() == 0 {
+        misses = misses.push(Miss{ case: caseLabel, want: want, got: got })
+        continue
+      }
+      let emitted = emittedCodes(rx, combined)
+      var ok = emitted.len() > 0
+      for code in c.expect {
+        if !containsStr(emitted, code) {
+          ok = false
+        }
+        if c.stage != "" && stageOf(code) != c.stage {
+          ok = false
+        }
+      }
+      if ok && want != "" {
+        for wl in strings.split(want, "\n") {
+          let wls = strings.trimSpace(wl)
+          if wls != "" && !strings.contains(combined, wls) {
+            ok = false
+          }
+        }
+      }
+      if ok {
+        diagOk = diagOk + 1
+      } else {
+        misses = misses.push(Miss{ case: caseLabel, want: want, got: got })
+      }
+    }
+  }
+  match removeAll(work) {
+    Ok(_) => fmt.print(""),
+    Err(_) => fmt.print(""),
+  }
+  return EvalResult{ diag_ok: diagOk, diag_total: diagTotal, misses: sort.sorted(misses, lessMiss) }
+}
+
+// --- run_ok: the behavioural metric (run each run-pass example) ---
+//
+// run_ok counts run-pass examples whose entry builds AND, when run with their
+// invocation spec, exit as expected (default 0) — and, when an
+// `expected_output` sidecar is present, whose stdout matches it. The
+// invocation spec is the example.toml fields `args` (argv), `stdin` (a file
+// piped to stdin), `expected_output` (a stdout sidecar), and `expected_exit`
+// (default 0); every path is relative to the example's own directory, where
+// the binary runs. `no-run` examples (servers / blocking demos) are excluded
+// from the denominator. A per-example wall-clock timeout guards the harness
+// against a non-terminating example — see corpusexec.TimeoutCode.
+
+func runTimeoutMs(): int {
+  return 10000
+}
+
+type RunSpec = {
+  dir: string
+  entry: string
+  expects: string
+  args: []string
+  stdin: string
+  expectedOutput: string
+  expectedExit: int
+}
+
+type RunEval = {
+  run_ok: int
+  run_total: int
+  fails: []RunRow
+}
+
+// parseRunSpec extracts the run-relevant top-level fields of one example.toml.
+func parseRunSpec(manifest: string, text: string): RunSpec {
+  var entry = ""
+  var expects = ""
+  var args = []string{}
+  var stdin = ""
+  var expectedOutput = ""
+  var expectedExit = 0
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if strings.hasPrefix(line, "entry") {
+      entry = tomlScalar(line)
+    } else if strings.hasPrefix(line, "expects") {
+      expects = tomlScalar(line)
+    } else if strings.hasPrefix(line, "args") {
+      args = tomlCodes(line)
+    } else if strings.hasPrefix(line, "stdin") {
+      stdin = tomlScalar(line)
+    } else if strings.hasPrefix(line, "expected_output") {
+      expectedOutput = tomlScalar(line)
+    } else if strings.hasPrefix(line, "expected_exit") {
+      match atoiSafe(tomlScalar(line)) {
+        Ok(n) => expectedExit = n,
+        Err(_) => expectedExit = 0,
+      }
+    }
+  }
+  return RunSpec{ dir: pathDir(manifest), entry: entry, expects: expects, args: args, stdin: stdin, expectedOutput: expectedOutput, expectedExit: expectedExit }
+}
+
+func lessRunRow(a: RunRow, b: RunRow): bool {
+  return a.path < b.path
+}
+
+// chomp drops a single trailing newline so a hand-edited sidecar (editors add
+// a final newline) compares equal to the program's stdout.
+func chomp(s: string): string {
+  if strings.hasSuffix(s, "\n") {
+    return s[:s.len() - 1]
+  }
+  return s
+}
+
+// runOutcome builds and runs one example, returning its RunRow outcome
+// ("ok" on success). This is the cache-miss path — the slow part. outBin must
+// be unique per concurrent caller (the worker pool passes a per-job path).
+func runOutcome(aril: string, outBin: string, spec: RunSpec): RunRow {
+  let entryPath = pathJoin(spec.dir, spec.entry)
+  let b = run(aril, ["build", "-o", outBin, entryPath])
+  if b.code() != 0 {
+    return RunRow{ path: spec.dir, status: "build-fail", code: b.code() }
+  }
+  var stdinData = ""
+  if spec.stdin != "" {
+    stdinData = readFileOrEmpty(pathJoin(spec.dir, spec.stdin))
+  }
+  let r = runExample(outBin, spec.args, stdinData, spec.dir, runTimeoutMs())
+  if r.code() == 124 {
+    return RunRow{ path: spec.dir, status: "timeout", code: r.code() }
+  }
+  if r.code() != spec.expectedExit {
+    return RunRow{ path: spec.dir, status: "run-fail", code: r.code() }
+  }
+  if spec.expectedOutput != "" && chomp(r.stdout()) != chomp(readFileOrEmpty(pathJoin(spec.dir, spec.expectedOutput))) {
+    return RunRow{ path: spec.dir, status: "output-diff", code: r.code() }
+  }
+  return RunRow{ path: spec.dir, status: "ok", code: 0 }
+}
+
+// --- run cache (emitted-Go-keyed) ---
+//
+// Running an example is the slow part of the run pass; re-running one whose
+// behaviour cannot have changed is wasted time. The cache keys each outcome on
+// sha256 of the EMITTED Go (not the .aril): a compiler change that alters an
+// example's codegen yields different Go — a new key — and the example re-runs
+// (regressions are caught), while unchanged Go hits the cache and skips
+// build+run. The key also folds in the invocation (args / stdin /
+// expected_output / expected_exit) so a manifest change re-runs even when the
+// Go is byte-identical. Committed (examples/run-cache.json, entries sorted by
+// key) so it is deterministic and portable (emit is deterministic across
+// machines). Only the measuring `write` path reads/rewrites it.
+
+type CacheEntry = {
+  key: string
+  status: string
+  code: int
+}
+
+type RunCache = {
+  schema_version: int
+  entries: []CacheEntry
+}
+
+func cachePath(): string {
+  return "examples/run-cache.json"
+}
+
+func lessCache(a: CacheEntry, b: CacheEntry): bool {
+  return a.key < b.key
+}
+
+func loadCache(): []CacheEntry {
+  match json.parse<RunCache>(toBytes(readFileOrEmpty(cachePath()))) {
+    Ok(c) => return c.entries,
+    Err(_) => return []CacheEntry{},
+  }
+}
+
+// cacheFind returns the entry for key, or a sentinel with status "" on a miss
+// (every real outcome status is non-empty).
+func cacheFind(entries: []CacheEntry, key: string): CacheEntry {
+  for e in entries {
+    if e.key == key {
+      return e
+    }
+  }
+  return CacheEntry{ key: "", status: "", code: 0 }
+}
+
+// runKey emits the example's Go and hashes it with the invocation; "" when
+// emit fails (the example then takes the uncached build path).
+func runKey(aril: string, spec: RunSpec): string {
+  let em = runExample(aril, ["emit", pathJoin(spec.dir, spec.entry)], "", "", runTimeoutMs())
+  if em.code() != 0 {
+    return ""
+  }
+  var inv = "args\n"
+  for a in spec.args {
+    // Fold both the arg itself and, if it names a data file under the
+    // example's dir, that file's content — else editing an argv-referenced
+    // input (e.g. wc's sample.txt) would leave the key unchanged and a stale
+    // outcome would mask the new behaviour. A non-file arg reads as "".
+    inv = inv + a + "\n" + readFileOrEmpty(pathJoin(spec.dir, a)) + "\nargend\n"
+  }
+  inv = inv + "stdin\n"
+  if spec.stdin != "" {
+    inv = inv + readFileOrEmpty(pathJoin(spec.dir, spec.stdin)) + "\n"
+  }
+  inv = inv + "expout\n"
+  if spec.expectedOutput != "" {
+    inv = inv + readFileOrEmpty(pathJoin(spec.dir, spec.expectedOutput)) + "\n"
+  }
+  inv = inv + "expexit\n" + strconv.itoa(spec.expectedExit)
+  return sha256hex(em.stdout() + "\n--invocation--\n" + inv)
+}
+
+func writeCache(entries: []CacheEntry) {
+  let c = RunCache{ schema_version: 1, entries: sort.sorted(entries, lessCache) }
+  match json.serializeIndent(c, "", "  ") {
+    Ok(b) => writeOrDie(cachePath(), strings.fromBytes(b) + "\n"),
+    Err(e) => {
+      fmt.println("corpus-status: run-cache serialise failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+// --- parallel run pass ---
+//
+// Running examples is subprocess-bound and independent per example, so a fixed
+// pool of workers (dogfooding Aril's own structured concurrency) processes
+// them concurrently. Determinism is preserved: outcomes are order-independent
+// and the fails/cache lists are sorted before use, so the snapshot is
+// identical regardless of scheduling.
+
+type WorkItem = {
+  spec: RunSpec
+  outBin: string
+}
+
+// WorkResult carries one example's outcome plus its cache key — empty when the
+// outcome must not be cached (emit failed, or a non-deterministic timeout).
+type WorkResult = {
+  row: RunRow
+  key: string
+}
+
+// classifyRun is the per-example body: emit+hash, consult the cache, and on a
+// miss build+run. outBin is unique per job so concurrent builds never collide.
+func classifyRun(aril: string, cache: []CacheEntry, outBin: string, spec: RunSpec): WorkResult {
+  let key = runKey(aril, spec)
+  var row = RunRow{ path: spec.dir, status: "", code: 0 }
+  if key != "" {
+    let hit = cacheFind(cache, key)
+    if hit.status != "" {
+      row = RunRow{ path: spec.dir, status: hit.status, code: hit.code }
+    }
+  }
+  if row.status == "" {
+    row = runOutcome(aril, outBin, spec)
+  }
+  // A timeout is a wall-clock verdict, not a property of the emitted Go —
+  // caching it would let machine load mask a real pass/fail. Drop its key so
+  // it is never persisted; every other outcome is deterministic and cached.
+  var cacheKey = key
+  if row.status == "timeout" {
+    cacheKey = ""
+  }
+  return WorkResult{ row: row, key: cacheKey }
+}
+
+func runWorker(aril: string, cache: []CacheEntry, jobs: RecvChan<WorkItem>, results: SendChan<WorkResult>) {
+  for job in jobs {
+    results.send(classifyRun(aril, cache, job.outBin, job.spec))
+  }
+}
+
+// evalRuns measures run_ok, cache-accelerated. persistCache writes the
+// refreshed cache (the `write` path); --check passes false so it stays
+// read-only — it still re-runs cache-missed examples, just doesn't rewrite
+// the committed cache file.
+func evalRuns(aril: string, tmp: string, persistCache: bool): RunEval {
+  let listed = runOk("git", ["ls-files", "examples", "user_tests"])
+  var manifests = []string{}
+  for ln in strings.split(listed, "\n") {
+    if pathBase(ln) == "example.toml" {
+      manifests = manifests.push(ln)
+    }
+  }
+  manifests = sort.sorted(manifests, lessStr)
+
+  var specs = []RunSpec{}
+  for mf in manifests {
+    let spec = parseRunSpec(mf, readFileOrEmpty(mf))
+    if spec.expects == "run-pass" && spec.entry != "" {
+      specs = specs.push(spec)
+    }
+  }
+
+  let cache = loadCache()
+  let n = specs.len()
+  let jobs = makeChannel<WorkItem>(n)
+  let results = makeChannel<WorkResult>(n)
+  var i = 0
+  for spec in specs {
+    jobs.send(WorkItem{ spec: spec, outBin: pathJoin(tmp, "run-" + strconv.itoa(i) + ".bin") })
+    i = i + 1
+  }
+  jobs.close()
+
+  // Eight workers drain the (closed, fully-buffered) jobs channel; at most n
+  // results are produced (one per job), so the n-buffered results channel
+  // never blocks a worker. The scope joins once every job is consumed; results
+  // are drained and aggregated sequentially afterwards.
+  match scope<unit, error> {
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+    spawn { runWorker(aril, cache, jobs, results); return Ok(()) }
+  } {
+    Ok(_) => {},
+    Err(e) => {
+      fmt.println("corpus-status: run pass failed:", e)
+      os.exit(1)
+    },
+  }
+
+  var nOk = 0
+  var fails = []RunRow{}
+  var fresh = []CacheEntry{}
+  for _ in 0..n {
+    let res = results.recv()
+    if res.row.status == "ok" {
+      nOk = nOk + 1
+    } else {
+      fails = fails.push(res.row)
+    }
+    if res.key != "" {
+      fresh = fresh.push(CacheEntry{ key: res.key, status: res.row.status, code: res.row.code })
+    }
+  }
+  if persistCache {
+    writeCache(fresh)
+  }
+  return RunEval{ run_ok: nOk, run_total: n, fails: sort.sorted(fails, lessRunRow) }
+}
+
+// --- collect ---
+
+func collect(measureRun: bool, persistCache: bool): Status {
+  var tmp = ""
+  match mkdirTemp("", "corpus-status-") {
+    Ok(d) => tmp = d,
+    Err(e) => {
+      fmt.println("corpus-status: mkdirTemp failed:", e)
+      os.exit(1)
+    },
+  }
+  let aril = buildAril(tmp)
+  let outp = pathJoin(tmp, "out")
+  let files = corpusFiles()
+  var rows = []Row{}
+  var nparse = 0
+  var nsema = 0
+  var nemit = 0
+  var nbuild = 0
+  for f in files {
+    let row = classify(aril, f, outp)
+    rows = rows.push(row)
+    if row.stage == "build" {
+      nbuild = nbuild + 1
+    } else if row.stage == "emit" {
+      nemit = nemit + 1
+    } else if row.stage == "sema" {
+      nsema = nsema + 1
+    } else {
+      nparse = nparse + 1
+    }
+  }
+  let ev = evalNegatives(aril)
+  var rv = RunEval{ run_ok: 0, run_total: 0, fails: []RunRow{} }
+  if measureRun {
+    rv = evalRuns(aril, tmp, persistCache)
+  }
+  match removeAll(tmp) {
+    Ok(_) => fmt.print(""),
+    Err(_) => fmt.print(""),
+  }
+  return Status{
+    schema_version: 3,
+    totals: Totals{
+      total: files.len(),
+      parse_fail: nparse,
+      sema_fail: nsema,
+      emit_fail: nemit,
+      build_ok: nbuild,
+      diag_ok: ev.diag_ok,
+      diag_total: ev.diag_total,
+      run_ok: rv.run_ok,
+      run_total: rv.run_total,
+    },
+    files: rows,
+    diag_misses: ev.misses,
+    run_fails: rv.fails,
+  }
+}
+
+// --- floors ---
+
+type Floors = {
+  build_ok_min: int
+  diag_ok_min: int
+  run_ok_min: int
+}
+
+func parseFloorLine(line: string, key: string): int {
+  let t = strings.trimSpace(line)
+  if !strings.hasPrefix(t, key) {
+    return -1
+  }
+  let parts = splitN(t, "=", 2)
+  if parts.len() < 2 {
+    return -1
+  }
+  // value may carry a trailing `# comment`; take the leading integer field.
+  let rhs = strings.trimSpace(parts[1])
+  let fields = strings.split(rhs, " ")
+  match atoiSafe(fields[0]) {
+    Ok(n) => return n,
+    Err(_) => return -1,
+  }
+}
+
+func atoiSafe(s: string): Result<int, error> {
+  return strconv.atoi(strings.trimSpace(s))
+}
+
+func readFloors(): Floors {
+  var text = ""
+  match os.readFile("examples/metric-floors.toml") {
+    Ok(data) => text = strings.fromBytes(data),
+    Err(_) => {
+      fmt.println("corpus-status: examples/metric-floors.toml missing — the metric floors are unset")
+      os.exit(1)
+    },
+  }
+  var bmin = -1
+  var dmin = -1
+  var rmin = -1
+  for line in strings.split(text, "\n") {
+    let b = parseFloorLine(line, "build_ok_min")
+    if b >= 0 { bmin = b }
+    let d = parseFloorLine(line, "diag_ok_min")
+    if d >= 0 { dmin = d }
+    let r = parseFloorLine(line, "run_ok_min")
+    if r >= 0 { rmin = r }
+  }
+  if bmin < 0 || dmin < 0 || rmin < 0 {
+    fmt.println("corpus-status: examples/metric-floors.toml missing or malformed floor keys")
+    os.exit(1)
+  }
+  return Floors{ build_ok_min: bmin, diag_ok_min: dmin, run_ok_min: rmin }
+}
+
+// --- markdown render ---
+
+func stageOrder(s: string): int {
+  if s == "build" { return 0 }
+  if s == "emit" { return 1 }
+  if s == "sema" { return 2 }
+  return 3
+}
+
+func lessRow(x: Row, y: Row): bool {
+  if stageOrder(x.stage) != stageOrder(y.stage) {
+    return stageOrder(x.stage) < stageOrder(y.stage)
+  }
+  return x.path < y.path
+}
+
+func mdEscape(s: string): string {
+  return strings.replace(s, "|", "\\|", -1)
+}
+
+func renderMarkdown(s: Status): string {
+  let t = s.totals
+  let floors = readFloors()
+  var out = ""
+  out = out + "# Example conformance status\n\n"
+  out = out + "Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/corpus-status`) — do not edit by hand. Build and run the tool to refresh.\n\n"
+  out = out + "Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:\n\n"
+  out = out + fmt.sprintf("- **build_ok — %d / %d examples build end-to-end** (floor %d).\n", t.build_ok, t.total, floors.build_ok_min)
+  out = out + fmt.sprintf("- **diag_ok — %d / %d negative cases produce their expected diagnostic** (floor %d).\n", t.diag_ok, t.diag_total, floors.diag_ok_min)
+  out = out + fmt.sprintf("- **run_ok — %d / %d run-pass examples build and run as specified** (floor %d; behavioural: exit code, and stdout vs an `expected_output` sidecar when present; `no-run` examples excluded).\n\n", t.run_ok, t.run_total, floors.run_ok_min)
+  out = out + "| Stage reached | Count |\n"
+  out = out + "|---|---|\n"
+  out = out + fmt.sprintf("| ✅ build (full pipeline) | %d |\n", t.build_ok)
+  out = out + fmt.sprintf("| emit / codegen fail | %d |\n", t.emit_fail)
+  out = out + fmt.sprintf("| sema fail | %d |\n", t.sema_fail)
+  out = out + fmt.sprintf("| parse fail | %d |\n", t.parse_fail)
+  out = out + "\n## Per-example\n\n"
+  out = out + "| Example | Stage | First blocker |\n"
+  out = out + "|---|---|---|\n"
+  let rows = sort.sorted(s.files, lessRow)
+  for f in rows {
+    var blk = f.blocker
+    if blk == "" { blk = "—" }
+    out = out + fmt.sprintf("| `%s` | %s | %s |\n", f.path, f.stage, mdEscape(blk))
+  }
+  out = out + "\n## Diagnostic-quality gaps\n\n"
+  out = out + "Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.\n\n"
+  out = out + fmt.sprintf("**%d of %d cases fall short of the ideal.**\n\n", s.diag_misses.len(), t.diag_total)
+  out = out + "| Case | Ideal (`.expected`) | Actual |\n"
+  out = out + "|---|---|---|\n"
+  for m in s.diag_misses {
+    var want = m.want
+    if want == "" { want = "—" }
+    var got = m.got
+    if got == "" { got = "—" }
+    out = out + fmt.sprintf("| `%s` | %s | %s |\n", m.case, mdEscape(strings.replace(want, "\n", " ", -1)), mdEscape(got))
+  }
+  out = out + "\n## Run failures\n\n"
+  out = out + "Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.\n\n"
+  out = out + fmt.sprintf("**%d of %d run-pass examples fall short of run_ok.**\n\n", s.run_fails.len(), t.run_total)
+  out = out + "| Example | Status | Exit |\n"
+  out = out + "|---|---|---|\n"
+  for f in s.run_fails {
+    out = out + fmt.sprintf("| `%s` | %s | %d |\n", f.path, f.status, f.code)
+  }
+  return out
+}
+
+// --- write artifacts ---
+
+func jsonPath(): string {
+  return "examples/auto-status.json"
+}
+
+func mdPath(): string {
+  return "examples/STATUS.md"
+}
+
+// statusJson renders the deterministic snapshot (json.dumps(indent=2) shape,
+// trailing newline) shared by the write and --check paths.
+func statusJson(s: Status): string {
+  match json.serializeIndent(s, "", "  ") {
+    Ok(b) => return strings.fromBytes(b) + "\n",
+    Err(e) => {
+      fmt.println("corpus-status: JSON serialise failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+func writeArtifacts(s: Status) {
+  writeOrDie(jsonPath(), statusJson(s))
+  writeOrDie(mdPath(), renderMarkdown(s))
+}
+
+func writeOrDie(path: string, content: string) {
+  match writeFile(path, toBytes(content), 420) {
+    Ok(_) => fmt.print(""),
+    Err(e) => {
+      fmt.println("corpus-status: write", path, "failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+// --- --check: floor enforcement + snapshot freshness ---
+//
+// --check re-derives all three metrics, run_ok included: the run cache makes
+// the run pass fast (unchanged examples hit) and deterministic (cached
+// outcomes are recorded, not re-measured), so re-running it no longer flakes —
+// a cache miss means the emitted Go genuinely changed and the example must
+// re-run anyway (that is how a behavioural regression is caught). cur already
+// carries the freshly measured run_ok (collect(true, …)).
+func cmdCheck(cur: Status): int {
+  let floors = readFloors()
+  let ab = cur.totals.build_ok
+  let ad = cur.totals.diag_ok
+  let ar = cur.totals.run_ok
+  if ab < floors.build_ok_min {
+    fmt.println(fmt.sprintf("corpus-status: REGRESSION: build_ok %d < floor %d — a previously-building example no longer builds", ab, floors.build_ok_min))
+    return 1
+  }
+  if ad < floors.diag_ok_min {
+    fmt.println(fmt.sprintf("corpus-status: REGRESSION: diag_ok %d < floor %d — fewer negative cases reproduce their diagnostic. Fix the case(s), or, if a diagnostic legitimately changed, lower diag_ok_min in metric-floors.toml with a justification.", ad, floors.diag_ok_min))
+    return 1
+  }
+  if ar < floors.run_ok_min {
+    fmt.println(fmt.sprintf("corpus-status: REGRESSION: run_ok %d < floor %d — a run-pass example no longer runs as specified (wrong output, crash, or hang)", ar, floors.run_ok_min))
+    return 1
+  }
+  let committed = readFileOrEmpty(jsonPath())
+  if committed == "" {
+    fmt.println("corpus-status:", jsonPath(), "missing — run corpus-status")
+    return 1
+  }
+  if strings.trimSpace(statusJson(cur)) != strings.trimSpace(committed) {
+    fmt.println(fmt.sprintf("corpus-status: snapshot stale (build_ok=%d, diag_ok=%d, run_ok=%d) — run corpus-status and commit the result", ab, ad, ar))
+    return 1
+  }
+  if readFileOrEmpty(mdPath()) != renderMarkdown(cur) {
+    fmt.println("corpus-status:", mdPath(), "stale — run corpus-status and commit")
+    return 1
+  }
+  fmt.println(fmt.sprintf("corpus-status: up to date (build_ok %d/%d, diag_ok %d/%d, run_ok %d/%d)", ab, cur.totals.total, ad, cur.totals.diag_total, ar, cur.totals.run_total))
+  return 0
+}
+
+// --- --history: the trend (JSONL) reconstructed from git ---
+
+type HistTotals = {
+  total: int
+  build_ok: int
+  diag_ok: int
+  diag_total: int
+  emit_fail: int
+  sema_fail: int
+  parse_fail: int
+  run_ok: int
+  run_total: int
+}
+
+type HistStatus = {
+  schema_version: int
+  totals: HistTotals
+}
+
+// jsonStrLit renders a JSON string literal the way Python's json.dumps does
+// with ensure_ascii=False: escape `\` and `"` (and the control chars that
+// occur in this data — none, git %s is single-line), but leave `<`/`>`/`&`
+// raw. Go's json.Marshal HTML-escapes those, which would diverge from the
+// Python tool on subjects like `fmt.scan<T>` — so we build the line by hand.
+func jsonStrLit(s: string): string {
+  let a = strings.replace(s, "\\", "\\\\", -1)
+  let b = strings.replace(a, "\"", "\\\"", -1)
+  return "\"" + b + "\""
+}
+
+// historyLine renders one JSONL trend row. run_ok/run_total are 0 for
+// pre-run_ok (schema v2) blobs, which simply lacked the metric.
+func historyLine(date: string, commit: string, subject: string, t: HistTotals): string {
+  return ("{"
+    + "\"date\": " + jsonStrLit(date)
+    + ", \"commit\": " + jsonStrLit(commit)
+    + ", \"subject\": " + jsonStrLit(subject)
+    + ", \"total\": " + strconv.itoa(t.total)
+    + ", \"build_ok\": " + strconv.itoa(t.build_ok)
+    + ", \"diag_ok\": " + strconv.itoa(t.diag_ok)
+    + ", \"diag_total\": " + strconv.itoa(t.diag_total)
+    + ", \"emit_fail\": " + strconv.itoa(t.emit_fail)
+    + ", \"sema_fail\": " + strconv.itoa(t.sema_fail)
+    + ", \"parse_fail\": " + strconv.itoa(t.parse_fail)
+    + ", \"run_ok\": " + strconv.itoa(t.run_ok)
+    + ", \"run_total\": " + strconv.itoa(t.run_total)
+    + "}")
+}
+
+func cmdHistory() {
+  let log = runOk("git", ["log", "--reverse", "--format=%H%x09%cI%x09%s", "--", jsonPath()])
+  for ln in strings.split(log, "\n") {
+    let line = strings.trimSpace(ln)
+    if line == "" { continue }
+    let parts = splitN(line, "\t", 3)
+    if parts.len() < 3 { continue }
+    let sha = parts[0]
+    let blob = run("git", ["show", sha + ":" + jsonPath()])
+    if blob.code() != 0 { continue }
+    var hs = HistStatus{
+      schema_version: 0,
+      totals: HistTotals{ total: 0, build_ok: 0, diag_ok: 0, diag_total: 0, emit_fail: 0, sema_fail: 0, parse_fail: 0, run_ok: 0, run_total: 0 },
+    }
+    var parsed = false
+    match json.parse<HistStatus>(toBytes(blob.out())) {
+      Ok(s) => {
+        hs = s
+        parsed = true
+      },
+      Err(_) => parsed = false,
+    }
+    // Accept the run_ok-era schema (v3) and its predecessor (v2, run fields
+    // absent → 0); skip anything else rather than mis-reading it.
+    if !parsed || (hs.schema_version != 2 && hs.schema_version != 3) { continue }
+    fmt.println(historyLine(parts[1], sha[:12], parts[2], hs.totals))
+  }
+}
+
+func main() {
+  // Run from the repo root so relative paths + git resolve regardless of cwd.
+  let root = runOk("git", ["rev-parse", "--show-toplevel"])
+  match chdir(root) {
+    Ok(_) => fmt.print(""),
+    Err(e) => {
+      fmt.println("corpus-status: chdir failed:", e)
+      os.exit(1)
+    },
+  }
+  let args = os.args
+  var mode = "write"
+  var noRun = false
+  var i = 1
+  while i < args.len() {
+    let a = args[i]
+    if a == "--check" {
+      mode = "check"
+    } else if a == "--history" {
+      mode = "history"
+    } else if a == "--no-run" {
+      noRun = true
+    } else {
+      fmt.println("usage: corpus-status [--check|--history] [--no-run]")
+      os.exit(2)
+    }
+    i = i + 1
+  }
+  if noRun && mode != "write" {
+    fmt.println("corpus-status: --no-run cannot be combined with --check/--history")
+    os.exit(2)
+  }
+  if mode == "history" {
+    cmdHistory()
+    os.exit(0)
+  }
+  // --check re-derives run_ok too (cache-accelerated, deterministic) and
+  // enforces all three floors; it must not rewrite the committed cache, so
+  // persistCache is false.
+  if mode == "check" {
+    os.exit(cmdCheck(collect(true, false)))
+  }
+  // --no-run is the fast local pass: build_ok + diag_ok only, never running
+  // the examples and never touching the committed artifacts (which carry the
+  // full run_ok measurement).
+  if noRun {
+    let s = collect(false, false)
+    let t = s.totals
+    fmt.println(fmt.sprintf("corpus-status: --no-run (run_ok skipped): build_ok %d/%d, diag_ok %d/%d", t.build_ok, t.total, t.diag_ok, t.diag_total))
+    os.exit(0)
+  }
+  let status = collect(true, true)
+  writeArtifacts(status)
+  let t = status.totals
+  fmt.println(fmt.sprintf("corpus-status: wrote examples/auto-status.json + examples/STATUS.md (build_ok %d/%d, run_ok %d/%d)", t.build_ok, t.total, t.run_ok, t.run_total))
+}

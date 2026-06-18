@@ -58,38 +58,38 @@ func combine(a int, b int) int {
 	return a + b
 }
 func compute(n int) Result[int, string] {
-	__tide_try_1 := half(n)
-	if __tide_try_1.Tag == 1 {
-		return Result[int, string]{Tag: 1, E: __tide_try_1.E}
+	__aril_try_1 := half(n)
+	if __aril_try_1.Tag == 1 {
+		return Result[int, string]{Tag: 1, E: __aril_try_1.E}
 	}
-	__tide_try_2 := half(n + 2)
-	if __tide_try_2.Tag == 1 {
-		return Result[int, string]{Tag: 1, E: __tide_try_2.E}
+	__aril_try_2 := half(n + 2)
+	if __aril_try_2.Tag == 1 {
+		return Result[int, string]{Tag: 1, E: __aril_try_2.E}
 	}
-	var s = combine(__tide_try_1.V, __tide_try_2.V)
-	__tide_try_3 := half(n)
-	if __tide_try_3.Tag == 1 {
-		return Result[int, string]{Tag: 1, E: __tide_try_3.E}
+	var s = combine(__aril_try_1.V, __aril_try_2.V)
+	__aril_try_3 := half(n)
+	if __aril_try_3.Tag == 1 {
+		return Result[int, string]{Tag: 1, E: __aril_try_3.E}
 	}
-	return ResultOk[int, string](s + __tide_try_3.V)
+	return ResultOk[int, string](s + __aril_try_3.V)
 }
 func main() {
-	__tide_match_1 := compute(20)
-	switch __tide_match_1.Tag {
+	__aril_match_1 := compute(20)
+	switch __aril_match_1.Tag {
 	case 0:
-		v := __tide_match_1.V
+		v := __aril_match_1.V
 		fmt.Println("ok", v)
 	case 1:
-		e := __tide_match_1.E
+		e := __aril_match_1.E
 		fmt.Println("err", e)
 	}
-	__tide_match_2 := compute(7)
-	switch __tide_match_2.Tag {
+	__aril_match_2 := compute(7)
+	switch __aril_match_2.Tag {
 	case 0:
-		v := __tide_match_2.V
+		v := __aril_match_2.V
 		fmt.Println("ok", v)
 	case 1:
-		e := __tide_match_2.E
+		e := __aril_match_2.E
 		fmt.Println("err", e)
 	}
 }

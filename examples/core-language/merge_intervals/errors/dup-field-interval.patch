@@ -1,5 +1,5 @@
---- merge_intervals.td
-+++ merge_intervals.td
+--- merge_intervals.aril
++++ merge_intervals.aril
 @@ -10,7 +10,7 @@
  
  type Interval = {

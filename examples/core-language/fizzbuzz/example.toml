@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "fizzbuzz.td"
+entry    = "fizzbuzz.aril"
 
 [[error]]
 patch   = "errors/missing-in.patch"   # drop the `in` keyword from the for-loop header

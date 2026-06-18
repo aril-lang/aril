@@ -10,10 +10,10 @@
 
 ## Summary
 
-The Tide language and compiler enter pre-alpha at version
+The Aril language and compiler enter pre-alpha at version
 **v0.1**. The v0.1 surface is exactly the contents of
 `lang-spec/` at the git tag
-[`v0.1-baseline`](https://github.com/heni/tide-lang/releases/tag/v0.1-baseline)
+[`v0.1-baseline`](https://github.com/aril-lang/aril/releases/tag/v0.1-baseline)
 (commit `fbc530e`). Every later RFC extends or amends this
 baseline.
 
@@ -43,13 +43,13 @@ tag `v0.1-baseline`:
 | `name-resolution.md` | Scopes, implicit receiver, shadow rules |
 | `type-system.md` | Sequent-style inference rules + exhaustiveness |
 | `builtins.md` | Predeclared identifier catalog with full signatures |
-| `desugaring.md` | Tide AST → Tide IR rewrite stages |
-| `lowering-go.md` | Tide IR → Go encoding |
+| `desugaring.md` | Aril AST → Aril IR rewrite stages |
+| `lowering-go.md` | Aril IR → Go encoding |
 | `diagnostics.md` | Numbered error / warning catalog |
 | `test-contract.md` | Canonical fixture serialization |
 | `acceptance.yml` | Per-example feature manifest |
 
-The corpus at `examples/` (51 `.td` files at the baseline tag)
+The corpus at `examples/` (51 `.aril` files at the baseline tag)
 demonstrates v0.1 in practice; every feature listed in
 `acceptance.yml` is exercised by at least one example.
 
@@ -58,7 +58,7 @@ demonstrates v0.1 in practice; every feature listed in
 The following are explicitly **not** part of v0.1; each will be
 its own RFC when work begins:
 
-- A working compiler binary. `cmd/tide` is currently a stub;
+- A working compiler binary. `cmd/aril` is currently a stub;
   the lexer / parser / sema / desugar / codegen pipeline is the
   next milestone.
 - Atomic-fixture coverage in `tests/{lexer,grammar,sema,codegen}/`.
@@ -88,7 +88,7 @@ None — this RFC is purely declarative. No `lang-spec/` files
 change as part of its acceptance.
 
 The git side has already happened: the
-[`v0.1-baseline`](https://github.com/heni/tide-lang/releases/tag/v0.1-baseline)
+[`v0.1-baseline`](https://github.com/aril-lang/aril/releases/tag/v0.1-baseline)
 tag points at commit `fbc530e` on `main`.
 
 ## Transition / compatibility

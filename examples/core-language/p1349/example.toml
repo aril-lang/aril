@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "p1349.td"
+entry    = "p1349.aril"
 
 [[error]]
 patch   = "errors/missing-comma.patch"   # missing comma between arguments

@@ -1,6 +1,6 @@
 # Design decisions
 
-The architectural commitments behind Tide, in one place. Each decision has a
+The architectural commitments behind Aril, in one place. Each decision has a
 **claim** (what the project does), **why** it does that, and the
 **trade-offs** that follow. The numbering (D1, D2, ...) is a stable label
 used across the docs and source comments — when something says "(D14)" it
@@ -18,12 +18,12 @@ points here.
 **One line.** Familiar TypeScript-style syntax, free of JavaScript's legacy,
 on the Go runtime.
 
-**Audience: TypeScript developers.** That is who Tide is for, and it shapes
+**Audience: TypeScript developers.** That is who Aril is for, and it shapes
 everything. The familiar surface is genuine value for this audience, not a
 cosmetic detail — it removes the largest cost of adopting a new language
 (relearning everything from scratch).
 
-What Tide gives a TypeScript developer:
+What Aril gives a TypeScript developer:
 
 - **A syntax you already know** — productive from day one.
 - **No JavaScript legacy** — dropped, deliberately: `prototype`, `this`,
@@ -36,12 +36,12 @@ What Tide gives a TypeScript developer:
 - **The Go runtime** — goroutine scheduler, GC, single-binary deployment,
   fast startup, the standard library.
 - **Errors without `if err != nil`** — `let x = try foo()` over Go's error
-  model. People love the Go runtime and tolerate Go's errors; Tide keeps
+  model. People love the Go runtime and tolerate Go's errors; Aril keeps
   the first and removes the second.
 
-**Honest framing.** Tide is not a TypeScript-to-Go transpiler. That phrasing
+**Honest framing.** Aril is not a TypeScript-to-Go transpiler. That phrasing
 would make people expect npm, JavaScript semantics, and a browser ecosystem
-— none of which Tide has, deliberately.
+— none of which Aril has, deliberately.
 
 **Not present:** npm packages, JavaScript interop, `Promise`, decorators,
 dynamic objects, browser targets, systems-level memory control.
@@ -49,7 +49,7 @@ dynamic objects, browser targets, systems-level memory control.
 ### The honest cost — npm
 
 Dropping JavaScript *semantics* is free. Dropping *npm* is not — it removes
-the largest package ecosystem in the world, and that cost is real. Tide's
+the largest package ecosystem in the world, and that cost is real. Aril's
 answer is not "recreate npm"; it is to bind the finite Go standard library
 (see D3) and to host its own packages with a decentralized registry
 (see D5). Whether that is enough for a given use case is a fair question to
@@ -70,20 +70,20 @@ RFC-0000 §"Referencing decisions and stable labels").
 | D2 | TypeScript-flavored syntax, ML-family type system, no JavaScript semantics |
 | D3 | Bind, do not port, the Go standard library |
 | D4 | Go packages are reachable only through an explicit binding layer |
-| D5 | Tide has its own decentralized package ecosystem |
+| D5 | Aril has its own decentralized package ecosystem |
 | D6 | Bindings are generated from `go/packages`, not hand-written |
 | D7 | No async/await function coloring; concurrency is uncolored |
 | D8 | Source-level debugging via `//line` directives |
 | D9 | The compiler is implemented in Go |
-| D10 | Errors are reported in Tide source coordinates |
+| D10 | Errors are reported in Aril source coordinates |
 | D11 | Surface-syntax discipline |
 | D12 | v1 scope is defined by an example acceptance suite |
 | D13 | Validate the spec on paper before building the compiler |
 | D14 | Structural records, nominal behavioral types |
-| D15 | Tide targets a defined, stable subset of Go as its IR contract |
-| D16 | Tide is not a transpiler at the UX level |
+| D15 | Aril targets a defined, stable subset of Go as its IR contract |
+| D16 | Aril is not a transpiler at the UX level |
 | D17 | Formal docs are authoritative; coverage is a hard rule |
-| D18 | Tide has a runtime, and it is part of the language contract |
+| D18 | Aril has a runtime, and it is part of the language contract |
 | D19 | Third-party Go dependencies are reserved for UX-only surfaces |
 | D20 | Module import graph is acyclic |
 
@@ -99,7 +99,7 @@ Go would either crush the type system into something Go-shaped, or pay
 heavy runtime cost. Treating Go as IR frees the type system to be what it
 needs to be.
 
-**Trade-off.** Tide commits to first-class source-level debugging (see D8)
+**Trade-off.** Aril commits to first-class source-level debugging (see D8)
 so the user never has to read generated Go. This is non-negotiable and lands
 in Phase 1, not later as polish.
 
@@ -114,12 +114,12 @@ entirely.
 modern type system catches a class of errors TypeScript can't, and dropping
 JavaScript semantics is a feature, not a regression.
 
-**Trade-off.** Tide must not be described as a TypeScript transpiler. That
+**Trade-off.** Aril must not be described as a TypeScript transpiler. That
 phrasing imports the wrong expectations (npm, JS semantics, browser).
 
 ### D3 — Bind, do not port, the Go standard library
 
-**Claim.** For Go stdlib functionality, Tide generates a thin typed
+**Claim.** For Go stdlib functionality, Aril generates a thin typed
 *binding* over the real Go package. It never *ports* (reimplements).
 
 **Why.** Because Go is the IR (D1), a call into a Go package costs nothing
@@ -140,12 +140,12 @@ only through generated bindings.
 `interface{}`, `context` — at one explicit, generated boundary, instead of
 letting it bleed through every file.
 
-**Trade-off.** Tide consciously declines to use the Go ecosystem as a free
+**Trade-off.** Aril consciously declines to use the Go ecosystem as a free
 bootstrap. That sharpens the cold-start problem.
 
-### D5 — Tide has its own decentralized package ecosystem
+### D5 — Aril has its own decentralized package ecosystem
 
-**Claim.** Tide packages distribute with a go-mod-style model: import path
+**Claim.** Aril packages distribute with a go-mod-style model: import path
 as URL, no central registry, MVS-style version resolution, vendoring.
 
 **Why.** Go proved this model. It's cheap to copy and needs no central
@@ -183,7 +183,7 @@ model is more demanding to design but a better answer.
 
 **Claim.** Codegen emits `//line file:line` for every construct, so Go
 panics, stack traces, `runtime.Caller`, and (via DWARF) `delve` and `pprof`
-all report `.td` locations.
+all report `.aril` locations.
 
 **Why.** D1 makes Go invisible. Without source maps, every panic and
 profile would point at unreadable generated code — destroying the user
@@ -193,7 +193,7 @@ experience.
 
 ### D9 — The compiler is implemented in Go
 
-**Claim.** The Tide compiler is written in Go.
+**Claim.** The Aril compiler is written in Go.
 
 **Why.** Go is already a dependency (it is the IR and the runtime), so this
 avoids a second toolchain. Critically, the binding generator (D6) must
@@ -204,9 +204,9 @@ introspect Go packages — in Go, `go/packages` / `go/types` / `go/ast` /
 for a project whose central claim is sum types. Accepted; a self-hosted
 compiler is a long-term goal.
 
-### D10 — Errors are reported in Tide source coordinates
+### D10 — Errors are reported in Aril source coordinates
 
-**Claim.** Type and binding errors surface in `.td` coordinates and Tide
+**Claim.** Type and binding errors surface in `.aril` coordinates and Aril
 terminology. Raw `go/types` diagnostics that point at generated Go are a
 **bug**, caught by a negative test.
 
@@ -215,7 +215,7 @@ terminology. Raw `go/types` diagnostics that point at generated Go are a
 
 ### D11 — Surface-syntax discipline
 
-**Claim.** The Tide surface is **TypeScript-flavoured, ML-influenced**, with
+**Claim.** The Aril surface is **TypeScript-flavoured, ML-influenced**, with
 a single, settled spelling for each construct. The acceptance-suite paper
 validation forced concrete answers across roughly thirty surface-syntax
 questions; the resolutions live in `docs/language-spec.md`.
@@ -247,7 +247,7 @@ abstract.
 ### D13 — Validate the spec on paper before building the compiler
 
 **Claim.** Before any compiler code is written, every example in the
-acceptance suite (D12) is hand-implemented as a complete `.td` program
+acceptance suite (D12) is hand-implemented as a complete `.aril` program
 against `docs/language-spec.md`. The spec passes only when each example
 can be written *one obvious, unambiguous way*.
 
@@ -265,7 +265,7 @@ naming convention is also noted on D14).
 
 **Claim.** Plain data shapes (`type X = {...}` records) use **structural**
 typing — two records with the same fields are interchangeable. Types that
-carry behavior — `class`es and Tide-defined `interface`s — are **nominal**
+carry behavior — `class`es and Aril-defined `interface`s — are **nominal**
 with **explicit, declared** conformance: `class MyReader implements
 io.Reader { ... }`. The checker verifies the declared method set; there is
 no implicit or accidental satisfaction.
@@ -280,16 +280,16 @@ compatibility check.
 
 **Trade-off.** An explicit `implements` line per conformance is mild
 ceremony, accepted as the price of no accidental compatibility. This makes
-Tide less TypeScript-like and more ML-like (cf. Rust traits, Swift
+Aril less TypeScript-like and more ML-like (cf. Rust traits, Swift
 protocols).
 
-**Note.** This discipline governs Tide-authored types. Bound Go types
+**Note.** This discipline governs Aril-authored types. Bound Go types
 flowing into Go interfaces are satisfied structurally on the Go side at
-codegen — Tide adds no checking there.
+codegen — Aril adds no checking there.
 
-### D15 — Tide targets a defined, stable subset of Go as its IR contract
+### D15 — Aril targets a defined, stable subset of Go as its IR contract
 
-**Claim.** Tide does not assume "the current Go, forever." It commits to a
+**Claim.** Aril does not assume "the current Go, forever." It commits to a
 defined subset of the Go language and a supported Go version range, treated
 as a stable IR contract.
 
@@ -301,21 +301,21 @@ as a stable IR contract.
   compiler internals.
 
 **Why.** Without an explicit contract, codegen and bindgen drift into
-dependence on incidental or unstable Go semantics, and Tide rots as Go
+dependence on incidental or unstable Go semantics, and Aril rots as Go
 evolves.
 
 **Status.** Pinning the exact subset is due before codegen settles.
 
-### D16 — Tide is not a transpiler at the UX level
+### D16 — Aril is not a transpiler at the UX level
 
-**Claim.** The user works entirely in Tide: `.td` source, Tide diagnostics,
-Tide tooling, a Tide debugger view. Go is purely backend compiler
+**Claim.** The user works entirely in Aril: `.aril` source, Aril diagnostics,
+Aril tooling, a Aril debugger view. Go is purely backend compiler
 infrastructure the user never sees.
 
-**Why.** A transpiler UX would constantly pull Tide back toward being a
+**Why.** A transpiler UX would constantly pull Aril back toward being a
 thin skin over Go, undermining its identity as a language in its own right.
 This is the product-identity counterpart to D1 (Go is an IR), D8 (`//line`
-source maps), and D10 (errors in Tide coordinates) — naming it explicitly
+source maps), and D10 (errors in Aril coordinates) — naming it explicitly
 guards against the project sliding into "just nicer Go syntax."
 
 ### D17 — Formal docs are authoritative; coverage is a hard rule
@@ -338,17 +338,17 @@ if codegen drifts from it.
 least one fixture. Accepted deliberately: the alternative is documentation
 rot and an untested contract.
 
-### D18 — Tide has a runtime, and it is part of the language contract
+### D18 — Aril has a runtime, and it is part of the language contract
 
-**Claim.** Tide ships a small runtime package (`tidert/`) whose surface is
+**Claim.** Aril ships a small runtime package (`arilrt/`) whose surface is
 part of the language contract, not a private codegen implementation
 detail. Three things live there:
 
 1. Method bodies for the predeclared generic containers (`Map`, `Set`,
-   `Stack`). These have always lived in `tidert/`; this decision just
+   `Stack`). These have always lived in `arilrt/`; this decision just
    names what was implicit.
 2. Per-class / per-sum **type descriptors** — small records carrying
-   Tide-side names (class name, field names, variant names, generic
+   Aril-side names (class name, field names, variant names, generic
    arguments), emitted by codegen and held in a runtime registry.
 3. The reflection API (`Type`, `Kind`, `FieldInfo`, the `Dynamic`
    wrapper, the functions in the `reflect` module) that reads
@@ -357,14 +357,14 @@ detail. Three things live there:
 **Contract invariants (CT1–CT3).** These govern how the runtime
 surface evolves over time.
 
-1. **CT1. `tidert/` has a private and a public layer.** The container
+1. **CT1. `arilrt/` has a private and a public layer.** The container
    helpers (`Map.new`, `Set.new`, `Stack.pop`, ...) stay private —
    codegen is free to refactor them without it being a contract
    change. The reflection-facing surface — type descriptors, the
    registry, the `reflect` module — is public; every observation
    user code can make through it is a commitment.
-2. **CT2. Generated code and `tidert` are version-locked.** A binary
-   produced by compiler version *N* must be linked against `tidert`
+2. **CT2. Generated code and `arilrt` are version-locked.** A binary
+   produced by compiler version *N* must be linked against `arilrt`
    built at version *N*. Mismatch is detected eagerly (build-time
    error or forced rebuild) and never produces a runnable binary.
 3. **CT3. Reflection ABI is append-only within a compatibility
@@ -377,7 +377,7 @@ surface evolves over time.
 interacts with the rest of the language at execution time. The
 guiding principle:
 
-> Tide runtime is **opt-in** for dynamic / reflection features and
+> Aril runtime is **opt-in** for dynamic / reflection features and
 > **zero-cost or near-zero-cost passive** for statically typed code.
 
 1. **P1. Reflection metadata is passive.** Type descriptors may be
@@ -392,40 +392,40 @@ guiding principle:
    anywhere — `reflect.unbox<T>` is the only path back to `T`.
    Generic lowering does not route values through `Dynamic` as a
    universal carrier.
-3. **P3. `tidert` helpers are monomorphic Go helpers or use Go
-   generics directly.** They must not force Tide values through a
+3. **P3. `arilrt` helpers are monomorphic Go helpers or use Go
+   generics directly.** They must not force Aril values through a
    universal `Value`-style representation at runtime. The path from
-   Tide source to running code is "Tide → near-direct Go → Go
-   optimiser / Go runtime", not "Tide → tidert dispatch / boxing
+   Aril source to running code is "Aril → near-direct Go → Go
+   optimiser / Go runtime", not "Aril → arilrt dispatch / boxing
    → Go".
 
-**Layer split.** `tidert/` is organised into two layers:
+**Layer split.** `arilrt/` is organised into two layers:
 
-- **`tidert/core`** — containers, channel construction, minimal
+- **`arilrt/core`** — containers, channel construction, minimal
   helpers. Inlinable. No reflection dependency. Linked into every
-  Tide binary that uses these features.
-- **`tidert/reflect`** — descriptors, registry, `Dynamic` box,
+  Aril binary that uses these features.
+- **`arilrt/reflect`** — descriptors, registry, `Dynamic` box,
   pretty-print helpers. Linked **only** when the program
   transitively imports `reflect`. Programs that don't use reflection
   must not ship this layer in their binary.
 
 **Anti-pattern — universal `Value` representation (forbidden).** The
 shape `type Value struct { Type *TypeDesc; Data any }` is **not** a
-valid lowering target for ordinary Tide values. If every Tide value
+valid lowering target for ordinary Aril values. If every Aril value
 lowered through such a type, Go's optimiser would lose visibility
 through the entire program. `Value`-shaped representations are
 admissible only inside the `Dynamic` boundary — i.e., as the
-implementation of `tidert.Dynamic`, never as the lowering of `int`,
+implementation of `arilrt.Dynamic`, never as the lowering of `int`,
 `string`, class instances, sum-type values, or any other
 statically-typed construct.
 
 **Concrete reviewer signals.** A PR breaks P1–P3 if any of the
-following appear outside `tidert/reflect`:
+following appear outside `arilrt/reflect`:
 
 - A new Go struct of the shape `{ *TypeDesc, any }` (or any
   morally equivalent "type descriptor + payload" pair) reachable
   from non-`reflect.*` code paths.
-- A descriptor lookup (`registry.Get`, `tidert.DescOf`, etc.) in
+- A descriptor lookup (`registry.Get`, `arilrt.DescOf`, etc.) in
   emitted code for ordinary field access, method dispatch, `match`
   arms, or container operations.
 - A helper signature with `any` / `interface{}` parameter or
@@ -442,14 +442,14 @@ shapes alongside the existing review checklist.
 
 **Why.** Without naming the line, every future runtime-shaped feature
 (serialisation, debug printers, hot reload, deep clone) would relitigate
-"does Tide have a runtime?" instead of "what does the runtime do for
+"does Aril have a runtime?" instead of "what does the runtime do for
 this feature?". The threshold was crossed implicitly when `Map`/`Set`/
 `Stack` containers landed; reflection makes it observable, so naming it
 is overdue.
 
 **What it does not change.** D1 still holds — generated Go is not for
 human reading. The runtime exists in Go because the IR is Go; it
-remains invisible to the Tide user.
+remains invisible to the Aril user.
 
 ### D19 — Third-party Go dependencies are reserved for UX-only surfaces
 
@@ -462,7 +462,7 @@ where the alternative is rebuilding a heavy non-language wheel.
 The first dep crossed in is `c-bata/go-prompt` (plus its transitive
 `mattn/go-tty`, `mattn/go-isatty`, `mattn/go-runewidth`,
 `mattn/go-colorable`, `pkg/term`, `golang.org/x/sys`) for the
-`tide repl` interactive line editor. Reimplementing arrow-key
+`aril repl` interactive line editor. Reimplementing arrow-key
 history, raw-mode terminal handling, and cursor positioning inside
 this repo is out of proportion with the value delivered, hence the
 exception.
@@ -471,7 +471,7 @@ exception.
 to supply-chain drift — anyone reading the spec can read the
 implementation without auditing thousands of lines of third-party
 Go. UX shells live on a separate budget because terminal handling
-is not a Tide-design question; it is a "make the prompt usable"
+is not a Aril-design question; it is a "make the prompt usable"
 question.
 
 **Rules of thumb when adding a new dep.**
@@ -481,14 +481,14 @@ question.
 - UX-shell PRs may introduce deps if the alternative is non-trivial
   re-implementation. Prefer libraries with stable APIs and a small
   transitive footprint.
-- Generated user code (Tide → Go output) may depend on a third-party
+- Generated user code (Aril → Go output) may depend on a third-party
   Go module **only** through an explicit, version-pinned, hermetic
   binding declared by the foreign-binding interface (see RFC-0005) —
   a package named in the binding manifest, resolved via a
   vendored `replace` so the build never touches the network.
   *Accidental* and *transitive* third-party deps in generated code
-  remain forbidden. Absent such a binding, the runtime in `tidert/`
-  and the stdlib bindings are the only Go-side surface a Tide program
+  remain forbidden. Absent such a binding, the runtime in `arilrt/`
+  and the stdlib bindings are the only Go-side surface a Aril program
   reaches.
 
 **What it does not change.** D6 (bind, don't port the Go stdlib) and
@@ -500,7 +500,7 @@ FFI — never an arbitrary or transitive dependency.
 
 ### D20 — Module import graph is acyclic
 
-**Claim.** Tide modules form a strictly acyclic dependency graph.
+**Claim.** Aril modules form a strictly acyclic dependency graph.
 `module A imports module B` requires `B` to have *no* (transitive)
 dependency on `A`. The compiler builds a module import graph, runs a
 topological order over it, and rejects any cycle with a build-time
@@ -520,8 +520,8 @@ already know.
    fixed-point iteration (slow, hard to make deterministic) or
    inference-across-modules (a much bigger semantic commitment than
    we want in v1).
-2. **Mirrors the Go backend.** Tide lowers to Go, and Go cycles
-   *are* a build-time error. If Tide allowed them, codegen would
+2. **Mirrors the Go backend.** Aril lowers to Go, and Go cycles
+   *are* a build-time error. If Aril allowed them, codegen would
    have to invent its own cycle-breaking lowering — extra
    complexity for a feature that maps poorly onto the target.
 3. **Cyclic modules are an architectural smell.** Even in

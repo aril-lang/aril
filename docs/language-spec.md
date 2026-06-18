@@ -6,7 +6,7 @@
 > in [`../examples/README.md`](../examples/README.md) is the working ground
 > truth — anything the suite uses must be specified here.
 >
-> **Authority.** This document is the **prose** view of Tide. The
+> **Authority.** This document is the **prose** view of Aril. The
 > companion formal docs in [`../lang-spec/`](../lang-spec/) are
 > machine-precise; on disagreement they win, and the prose is a
 > mirror. Updates require a paired edit. See
@@ -23,7 +23,7 @@
   a statement, so multi-line literals and call expressions work
   unsurprisingly. Trailing commas are permitted (and recommended) in
   multi-line literals.
-- Source files use the `.td` extension.
+- Source files use the `.aril` extension.
 - String literals: `"..."`. Escapes: `\n`, `\t`, `\r`, `\\`, `\"`,
   `\'`, `\0`, `\xNN`, `\uNNNN`. No raw CR or LF inside a literal —
   multi-line strings are not in v1.
@@ -39,22 +39,22 @@
 
 ## Imports
 
-```td
+```aril
 import fmt
 import encoding/json
 ```
 
-An import brings a Go (bound) or Tide package into scope under its package
+An import brings a Go (bound) or Aril package into scope under its package
 name. Members are accessed package-qualified: `fmt.println`, `json.parse`.
 All imports must appear at the top of the file, before any declarations.
 
-A **package** is a directory of `.td` files sharing one top-level scope;
+A **package** is a directory of `.aril` files sharing one top-level scope;
 a single file is a one-file package. A project spanning more than one
-package adds a `tide.toml` manifest naming the project root, after which
+package adds a `aril.toml` manifest naming the project root, after which
 `import myproj/utils` resolves to a sibling directory and its names bind
 under the last path segment (`utils.…`). Without a manifest a program is
 a single package resolved against the stdlib bindings — no config needed.
-A user-package import graph must be acyclic. See `tide.toml` in the
+A user-package import graph must be acyclic. See `aril.toml` in the
 formal spec for the resolution rules.
 
 ## Types
@@ -68,13 +68,13 @@ with no declared return type return `unit`; codegen erases it.
 `Any` is an escape type used **only** at the binding boundary for Go's
 `interface{}`/`any` parameters (e.g. variadic formatters). Concrete types
 implicitly widen to `Any` at call sites that expect it. Going back to a
-concrete type requires a typed `match` (form TBD). User-authored Tide code
+concrete type requires a typed `match` (form TBD). User-authored Aril code
 should not introduce `Any`-typed parameters in its own functions.
 
 Struct shapes use `type` and are **records** (value types, structural —
 see Records below):
 
-```td
+```aril
 type User = {
   id: string
   name: string
@@ -90,7 +90,7 @@ Tuples must have arity ≥ 2; `(a)` is just a parenthesised expression.
 Equality is structural.
 
 Nominal newtypes — distinct types over an underlying type, with their own
-method set. Required because Tide must faithfully represent types like
+method set. Required because Aril must faithfully represent types like
 `time.Duration` (a Go `type Duration int64` with methods). Syntax TBD;
 working placeholder `newtype UserId = string`.
 
@@ -103,7 +103,7 @@ There is **no `any`**. Untyped dynamic values do not exist.
 **Conversion between primitive types** is explicit and uses the
 function-call form `Type(expr)`:
 
-```td
+```aril
 let f = float64(n)        // int → float64
 let i = int(f)            // float64 → int (truncates, matches Go)
 let b = byte(r)           // rune → byte (low 8 bits)
@@ -125,7 +125,7 @@ compile errors. There is no implicit numeric widening.
 Type annotations are optional when the type can be inferred from the
 right-hand side or from a target context:
 
-```td
+```aril
 let n = 42                  // inferred int
 let xs: []int = []          // empty literal needs context
 var cur: Option<Node> = head
@@ -134,7 +134,7 @@ var cur: Option<Node> = head
 **Discard pattern.** `_` is a write-only binding that evaluates its
 right-hand side and ignores the value:
 
-```td
+```aril
 let _ = sideEffect()
 ```
 
@@ -157,7 +157,7 @@ shadow each other.
 - `s.len(): int`.
 - `s.push(v): []T` — returns a new slice header (may grow underlying
   storage). Idiomatic re-assignment: `s = s.push(v)` when `s` is `var`.
-- Indexing: `s[i]` — out-of-bounds panics at the `.td` site.
+- Indexing: `s[i]` — out-of-bounds panics at the `.aril` site.
 - Safe access: `s.get(i): Option<T>`.
 - Slicing: `s[a:b]: []T` — half-open view into the same backing array.
   `s[a:]` and `s[:b]` are shorthand for `s[a:s.len()]` and `s[0:b]`.
@@ -259,7 +259,7 @@ otherwise duplicate the same data structure.
 A `type` whose right-hand side is a union of variants. Variants are
 nullary or carry **positional** named-typed fields:
 
-```td
+```aril
 type Tree<T> =
   | Leaf
   | Node(value: T, left: Tree<T>, right: Tree<T>)
@@ -287,7 +287,7 @@ payloads.
 unify to one type. An arm body may use a block `{ ... <trailing
 expression> }`; the trailing expression is the arm's value.
 
-```td
+```aril
 let v = match getUser(id) {
   Ok(user) => user.name,
   Err(e)   => "<unknown: " + e.error() + ">",
@@ -351,7 +351,7 @@ bools by `false < true`).
 
 ## Functions
 
-```td
+```aril
 func add(a: int, b: int): int {
   return a + b
 }
@@ -383,7 +383,7 @@ Top-level functions use the `func` keyword. Methods inside a `class` or an
   string, arg ...string)` → `command(name: string, arg: ...string)`). The
   `...Any` form (a Go variadic formatter such as `fmt.Println(a
   ...any)`) is the same feature with `T = Any` — but interface-element
-  variadics are not yet generated by `tide import` (the binding generator
+  variadics are not yet generated by `aril import` (the binding generator
   marks them `UNBINDABLE` until an `Any`-translation path lands); only
   concrete-element variadics bind today.
 - Parameters may use the discard pattern `_` (e.g. `func cb(_: int,
@@ -420,7 +420,7 @@ bites.
   evaluates to `U` on `Some`; `None` returns `None` from the function.
 
 For inspection rather than propagation, use `match`. Mapping Go's
-`errors.Is`/`errors.As`/`%w` wrapping onto Tide error values is a later
+`errors.Is`/`errors.As`/`%w` wrapping onto Aril error values is a later
 design item.
 
 **Diverging built-ins.** Two built-ins never return — they unify with
@@ -429,7 +429,7 @@ or any other typed position:
 
 - `panic(msg: string)` — abort the program with an unrecoverable
   error. The Go runtime's panic stack walks via the D8 source map,
-  so the trace points at the originating `.td` site. Use for
+  so the trace points at the originating `.aril` site. Use for
   invariant violations and "obviously unreachable" arms.
 - `os.exit(code: int)` — terminate the process with the given code.
 
@@ -439,7 +439,7 @@ context they appear in.
 
 ## Control flow
 
-```td
+```aril
 if x > 0 { ... } else if x < 0 { ... } else { ... }
 
 for v in items     { ... }   // value iteration
@@ -485,7 +485,7 @@ interchangeable. They are copied on assignment, like Go structs.
 **Construction.** Named fields, all required unless the field type is
 `Option<T>`:
 
-```td
+```aril
 let u = User{ id: "x", name: "y" }
 ```
 
@@ -495,7 +495,7 @@ the case people get wrong). Anonymous record literals — `{ x: 1, y: 2 }`
 
 **Generic records** are declared the same way as generic classes:
 
-```td
+```aril
 type Envelope<P> = {
   t: string
   q: Option<string>
@@ -518,7 +518,7 @@ Classes are **reference types** (D14): assignment copies the
 reference; mutating a `var` field through any reference is visible
 through every reference to the same instance.
 
-```td
+```aril
 class Counter {
   var n: int
 
@@ -540,7 +540,7 @@ class Counter {
 
 **Methods** — declared without `func`:
 
-```td
+```aril
 class MyReader implements io.Reader {
   read(p: []byte): Result<int, error> { ... }
 }
@@ -557,14 +557,14 @@ shadows a field, or when the instance is used as a value
 called on, and nothing more. **No dynamic binding, no `.bind()` /
 `.call()` / `.apply()`, no prototype-chain method resolution.** What
 the cut list (D2) drops is JS's *semantic* load on `this`, not the
-keyword. Tide is a bridge between the TS and Go worlds, both of
+keyword. Aril is a bridge between the TS and Go worlds, both of
 which use `this` as the natural receiver name — removing the
 keyword would be its own inconsistency. The pointer-vs-value-
 receiver distinction is a codegen concern, not a surface concern.
 
 **Shadowing — diagnostics.** The implicit-receiver rule keeps
 method bodies clean but creates a silent-bug class around the
-field / parameter / local name overlap. Tide treats this strictly,
+field / parameter / local name overlap. Aril treats this strictly,
 but only on the **write** side — that is where the silent-bug class
 actually bites. The rule applies to **instance methods** only;
 `static` methods have no receiver in scope, so the diagnostic does
@@ -581,7 +581,7 @@ name.
   Reusing the `Counter` shape from above (with `var n: int`) to
   show the three options at the call site:
 
-  ```td
+  ```aril
   // ERROR: writing to a bare `n` while param `n` shadows the field.
   set(n: int) { n = 0 }
   // OK: rename the parameter so the bare write targets the field.
@@ -617,7 +617,7 @@ enough.
 **Static methods** — declared with `static`, called as `ClassName.name(...)`
 or `ClassName<T>.name(...)`:
 
-```td
+```aril
 class LRU<K, V> {
   static new(capacity: int): LRU<K, V> { ... }
 }
@@ -630,7 +630,7 @@ in scope throughout the class body.
 
 **Interface conformance** — explicit, declared, checked:
 
-```td
+```aril
 interface Reader {
   read(p: []byte): Result<int, error>
 }
@@ -643,20 +643,20 @@ class MyReader implements Reader {
 Interface method declarations omit `func`, like methods in a class.
 
 There is no implicit or accidental satisfaction (D14). `implements`
-works for both Tide-defined interfaces and bound Go interfaces, so a
-Tide class can explicitly implement e.g. `io.Reader` or `http.Handler`.
+works for both Aril-defined interfaces and bound Go interfaces, so a
+Aril class can explicitly implement e.g. `io.Reader` or `http.Handler`.
 The checker enforces the conformance *relation* (a class declared to
 implement an interface is usable where that interface is expected);
 verifying that the class actually declares every interface method is a
 v1 gap — a non-satisfying class is currently caught by the Go build,
-not yet by a Tide-coordinate diagnostic. Method-set semantics follow
+not yet by a Aril-coordinate diagnostic. Method-set semantics follow
 Go's (value- vs pointer-receiver).
 
 **Interface composition** — an interface may aggregate other interfaces
 with `extends`. The composed interface requires the union of the method
 sets:
 
-```td
+```aril
 interface ReadCloser extends Reader, Closer { }
 
 // Equivalent to writing read() and close() out explicitly. Extra
@@ -672,7 +672,7 @@ conformance, not to inherit. There is no class inheritance in v1.
 **Anonymous interface as a type** — an interface shape can be used
 inline as a type expression, the same way records can:
 
-```td
+```aril
 type Signal = interface {
   signal(): unit
   string(): string
@@ -686,7 +686,7 @@ generic code, use a named `interface` declaration plus `extends`.
 
 For the bound-Go side, method names are uniformly rewritten:
 `ServeHTTP` (Go, exported) is exposed in the binding as `serveHTTP`,
-and the Tide class declares `serveHTTP`. Codegen translates back to
+and the Aril class declares `serveHTTP`. Codegen translates back to
 `ServeHTTP` for the synthesized Go method. This is a binding-layer
 convention, not a language rule.
 
@@ -715,7 +715,7 @@ takes a `SendChan<os.Signal>`; `context.Context.done()` returns a
 `RecvChan<unit>`). They also let user code declare intent at the
 producer/consumer boundary.
 
-```td
+```aril
 let ch = makeChannel<int>()           // Channel<int>, unbuffered
 let bc = makeChannel<Event>(16)       // Channel<Event>, capacity 16
 
@@ -751,7 +751,7 @@ Spawns may only appear inside a structured-concurrency `scope` (below)
 
 ### `select`
 
-```td
+```aril
 select {
   case s = <-sigs        => { ... },    // receive into a binding
   case <-ctx.done()      => { ... },    // receive, drop the value
@@ -766,7 +766,7 @@ both inside and outside `select`.
 
 ### Structured concurrency
 
-```td
+```aril
 let pages = try scope<[]Page, error> {
   let results = makeChannel<Page>(urls.len())
   for u in urls {

@@ -1,6 +1,6 @@
-# Tide RFCs
+# Aril RFCs
 
-Forward-looking governance for changes to the Tide language and
+Forward-looking governance for changes to the Aril language and
 compiler. RFCs (Request For Comments) are how non-trivial
 changes to the v1 surface, the compiler pipeline, or the
 language tooling enter the project.
@@ -14,7 +14,7 @@ This directory holds:
   baseline.
 - **`0002-multi-file-programs.md`** — package model
   (Go-style: package = directory) plus an optional
-  `tide.toml` manifest for projects spanning multiple
+  `aril.toml` manifest for projects spanning multiple
   packages.
 - **`NNNN-<kebab-name>.md`** — individual proposals.
 
@@ -24,8 +24,8 @@ This directory holds:
 |---|---|---|
 | 0000 | accepted | RFC process |
 | 0001 | accepted | v0.1 baseline |
-| 0002 | accepted | Multi-file Tide programs |
-| 0003 | accepted | `tide repl` and reflection API |
+| 0002 | accepted | Multi-file Aril programs |
+| 0003 | accepted | `aril repl` and reflection API |
 | 0004 | accepted | Example corpus charter |
 | 0005 | accepted | Go FFI: the foreign-binding interface |
 

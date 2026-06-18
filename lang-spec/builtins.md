@@ -2,7 +2,7 @@
 
 The contents of the *predeclared* scope (per
 `name-resolution.md` §Scopes #5). Everything here is in scope at
-the start of every Tide compilation, before any user `import` or
+the start of every Aril compilation, before any user `import` or
 top-level declaration. Names in this scope can be shadowed by
 user code but doing so is bad style.
 
@@ -90,7 +90,7 @@ interface error {
 
 A nominal interface with a single method `error(): string`. Any
 class declaring `implements error` and an `error(): string`
-method satisfies it. Bound Go-side `error` values land in Tide as
+method satisfies it. Bound Go-side `error` values land in Aril as
 this interface.
 
 ### `Scope`
@@ -218,7 +218,7 @@ first written.
 Iteration: `for (k, v) in m { ... }` (`IterElem(Map<K, V>) =
 (K, V)`). Order is **insertion order**: the order in which
 `m.set(k, ...)` was first called for each `k`. This is stronger
-than Go's randomised iteration order — Tide preserves order for
+than Go's randomised iteration order — Aril preserves order for
 predictable golden tests (see the Lowering pointers section
 below for the implementation strategy).
 
@@ -263,8 +263,8 @@ LIFO. Brace literal `Stack<T>{ e1, e2, ..., en }` (`T-Stack-Lit`)
 pushes in left-to-right order, so `e_n` is on top after construction.
 
 `pop()` returns `Result<T, error>` because corpus usage (e.g.
-`examples/modeling-errors/rpn_calculator/rpn_calculator.td`,
-`examples/core-language/valid_parentheses/valid_parentheses.td`) consumes it with
+`examples/modeling-errors/rpn_calculator/rpn_calculator.aril`,
+`examples/core-language/valid_parentheses/valid_parentheses.aril`) consumes it with
 `try` inside `Result`-returning functions and with `match Ok/Err`
 arms. The asymmetric `peek(): Option<T>` choice reflects intent:
 `peek` is "look without committing", `pop` is "consume; propagate
@@ -306,7 +306,7 @@ The reverse is not allowed.
 
 `recv()` blocks; `tryRecv()` does not. `recv()` on a closed
 channel returns the zero value for `T` (Go semantics) — but
-Tide's recommended idiom is `for v in ch { ... }` which exits on
+Aril's recommended idiom is `for v in ch { ... }` which exits on
 close. `close()` is exposed on `Channel<T>` and `SendChan<T>`
 but NOT on `RecvChan<T>` — only the owner / producer side may
 close. Closing a closed channel panics at runtime.
@@ -319,7 +319,7 @@ terminates cleanly when the channel closes (`IterElem(RecvChan<T>)
 
 Runtime-supplied module. Unlike `fmt`, `strings`, `os` (which
 are Go-stdlib bindings per D6), `reflect` is implemented in
-`tidert/reflect` and ships with the Tide runtime — not a binding
+`arilrt/reflect` and ships with the Aril runtime — not a binding
 to any Go package. The surface is governed by **D18**
 (`docs/design-decisions.md`): contract invariants CT1–CT3
 (private/public layer split, version-locking, append-only ABI)
@@ -340,7 +340,7 @@ and **Constraints** subsections below rather than as a single
 ### Types
 
 ```
-type Type             // opaque descriptor; equal iff describes the same Tide type
+type Type             // opaque descriptor; equal iff describes the same Aril type
 
 type Kind =
   | Primitive
@@ -352,7 +352,7 @@ type Kind =
 
 type FieldInfo = {
   name: string,
-  desc: Type,           // field name `desc`, not `type` — `type` is a Tide keyword
+  desc: Type,           // field name `desc`, not `type` — `type` is a Aril keyword
 }
 
 type MethodInfo = {
@@ -367,9 +367,9 @@ type VariantInfo = {
 ```
 
 `Type` is opaque — its internal representation is part of
-`tidert/reflect` (private under CT1) and not observable to
+`arilrt/reflect` (private under CT1) and not observable to
 user code beyond the functions below. Two `Type` values are
-**equal** iff they describe the same Tide type; this is the
+**equal** iff they describe the same Aril type; this is the
 only externally observable invariant on `Type` identity.
 
 ### Functions
@@ -378,7 +378,7 @@ Total queries — always succeed:
 
 ```
 typeOf(v: Dynamic): Type
-typeName(t: Type): string         // Tide-side spelling, e.g. "Counter", "int", "Option<int>"
+typeName(t: Type): string         // Aril-side spelling, e.g. "Counter", "int", "Option<int>"
 kind(t: Type): Kind
 ```
 
@@ -596,7 +596,7 @@ Each built-in maps onto a Go construct at codegen time. The full
 table is forthcoming in `lowering-go.md` (Formalization-I);
 sketch below for reviewers' orientation:
 
-| Tide built-in | Go lowering |
+| Aril built-in | Go lowering |
 |---|---|
 | `int`, `string`, ... | identical Go primitives |
 | `[]T` | `[]T`; `xs.push(e)` lowers to `append(xs, e)`; `xs.len()` to `len(xs)`; `xs.copy()` to a fresh-backing clone (see `lowering-go.md` §Slice methods) |
@@ -609,8 +609,8 @@ sketch below for reviewers' orientation:
 | `SendChan<T>` | `chan<- T` |
 | `RecvChan<T>` | `<-chan T` |
 | `error` | Go `error` interface |
-| `Dynamic` | `tidert.Dynamic` struct (payload + descriptor pointer); never `interface{}` alone — see D18-P3 |
-| `reflect.*` functions | calls into `tidert/reflect`; descriptors built at codegen time and registered in the runtime registry *(impl: Block R)* |
+| `Dynamic` | `arilrt.Dynamic` struct (payload + descriptor pointer); never `interface{}` alone — see D18-P3 |
+| `reflect.*` functions | calls into `arilrt/reflect`; descriptors built at codegen time and registered in the runtime registry *(impl: Block R)* |
 | `scope { ... }` | `errgroup.Group` + cancellable `context.Context` |
 | `spawn` | `g.Go(func() error { ... })` |
 | `makeChannel<T>(n)` | `make(chan T, n)` |

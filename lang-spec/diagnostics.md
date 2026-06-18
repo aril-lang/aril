@@ -1,6 +1,6 @@
 # Diagnostics — error and warning catalog
 
-The closed catalog of every diagnostic the v1 Tide compiler can
+The closed catalog of every diagnostic the v1 Aril compiler can
 emit. Each entry has: a stable code, a one-line description, the
 authoritative rule (from `type-system.md`, `name-resolution.md`,
 `grammar.ebnf`, `desugaring.md`, or `lowering-go.md`), the
@@ -55,7 +55,7 @@ severity column.
 | E0104 | E | Ambiguous variant name | `name-resolution.md` §Variant constructors | Use the qualified form `Type.Variant`. |
 | E0105 | E | Duplicate field name | `type-system.md` §WF-Body-Record | Rename one of the colliding fields. |
 | E0106 | E | Duplicate variant name | `type-system.md` §WF-Body-Sum | Rename one of the colliding variants. |
-| E0107 | E | Reserved identifier prefix | `grammar.ebnf` Ident (`_tide_` prefix rejected) / `lowering-go.md` §Identifier encoding | Rename the identifier — `_tide_…` is reserved for codegen. |
+| E0107 | E | Reserved identifier prefix | `grammar.ebnf` Ident (`_aril_` prefix rejected) / `lowering-go.md` §Identifier encoding | Rename the identifier — `_aril_…` is reserved for codegen. |
 | E0108 | E | Type used as value | `name-resolution.md` §Generic type-argument resolution | Use the type in a type position, or call `.new(...)` on a class, or use a brace literal. |
 | E0109 | E | Malformed numeric literal | `grammar.ebnf` IntLit / FloatLit | A digit is missing or invalid for the radix (e.g. `0o9`, `0x`, bare `1e`). |
 | E0110 | E | Malformed escape sequence | `grammar.ebnf` EscapeChar | Use one of the v1 escapes: `\n \t \r \\ \" \' \0 \xNN \uNNNN`. |
@@ -123,7 +123,7 @@ severity column.
 
 | Code | Sev | Message | Authoritative rule | Fix |
 |---|---|---|---|---|
-| E0701 | I | internal: non-exhaustive match reached desugaring | `desugaring.md` §Stage 5 | Compiler bug; file an issue with the offending `.td` file. |
+| E0701 | I | internal: non-exhaustive match reached desugaring | `desugaring.md` §Stage 5 | Compiler bug; file an issue with the offending `.aril` file. |
 
 ### E08xx — Codegen / lowering (internal)
 
@@ -135,7 +135,7 @@ severity column.
 
 ### E09xx — REPL input
 
-Codes raised by `tide repl` (RFC-0003) when an input is not
+Codes raised by `aril repl` (RFC-0003) when an input is not
 admissible at the prompt. Coordinates use the synthetic file
 `repl` followed by line:col within the input buffer.
 
@@ -144,7 +144,7 @@ admissible at the prompt. Coordinates use the synthetic file
 | E0901 | E | Top-level control-flow not supported at the REPL prompt | RFC-0003 §What the REPL accepts | Wrap `if` / `for` / `while` / `match` in a function and call it. The function body still admits these constructs. |
 | E0902 | E | `main` is owned by the REPL | RFC-0003 §What the REPL accepts | Drop the `func main() { ... }` wrapper — paste the body directly at the prompt. The REPL synthesises `main` itself. |
 | E0903 | E | Unknown meta-command | RFC-0003 §Meta-commands | The set is `:help :quit :reset :imports :show :write[!] :type :inspect :load`. Type `:help` for the full list. |
-| E0904 | E | **reserved** (`:write` target file already exists — `:write` not yet implemented) | RFC-0003 §Meta-commands | Use `:write! <file.td>` to overwrite, or pick a different name. |
+| E0904 | E | **reserved** (`:write` target file already exists — `:write` not yet implemented) | RFC-0003 §Meta-commands | Use `:write! <file.aril>` to overwrite, or pick a different name. |
 | E0905 | E | **reserved** (Last-value binding is unbound — `_` / `_error` not yet implemented) | RFC-0003 §Auto-printing (`_` / `_error`) + §Open questions #2 (unbound-on-fresh-session) | Evaluate an expression first — `_` is bound to the last result; `_error` to the last runtime error. A fresh session has neither. |
 
 ### E10xx — Foreign bindings (Go FFI)
@@ -170,7 +170,7 @@ with optional secondary lines indented two spaces (snippet of
 source, caret, fix hint). Example:
 
 ```
-src/parser.td:42:14: error[E0201]: Type mismatch
+src/parser.aril:42:14: error[E0201]: Type mismatch
   expected `int`, found `string`
   consider parsing with `strconv.atoi(...)` and `try`
 ```

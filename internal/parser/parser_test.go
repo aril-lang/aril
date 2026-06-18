@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
 )
 
 func parseString(t *testing.T, src string) *ast.File {
@@ -25,7 +25,7 @@ func TestHello(t *testing.T) {
 	src := `import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 `
 	f := parseString(t, src)
@@ -88,7 +88,7 @@ func main() {
 }
 
 func TestParseFile_FilePrefix(t *testing.T) {
-	toks, _ := lexer.LexFile("##", "foo.td") // lex error first
+	toks, _ := lexer.LexFile("##", "foo.aril") // lex error first
 	if toks == nil {
 		// expected: lex returns tokens-so-far + error; here it
 		// errors before producing any token, but tokens may be
@@ -97,11 +97,11 @@ func TestParseFile_FilePrefix(t *testing.T) {
 		// failed, that's fine.
 		return
 	}
-	_, perr := ParseFile(toks, "foo.td")
+	_, perr := ParseFile(toks, "foo.aril")
 	if perr == nil {
 		return
 	}
-	if !strings.HasPrefix(perr.Error(), "foo.td:") {
+	if !strings.HasPrefix(perr.Error(), "foo.aril:") {
 		t.Errorf("parser diag missing file prefix: %s", perr.Error())
 	}
 }
@@ -406,7 +406,7 @@ func TestCanonicalSerialisationStable(t *testing.T) {
 	src := `import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 `
 	f := parseString(t, src)

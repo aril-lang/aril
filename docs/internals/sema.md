@@ -17,7 +17,7 @@ order, and how errors flow back to the user.
 
 ## 1. Mission
 
-Sema validates a `.td` program is well-formed and produces a
+Sema validates a `.aril` program is well-formed and produces a
 **resolved, type-checked AST** for codegen to lower
 mechanically. Two firm boundaries:
 
@@ -33,7 +33,7 @@ mechanically. Two firm boundaries:
   typing rules.
 - Sema does **not** lower types into Go form — codegen handles
   the Go-side encoding (`lang-spec/lowering-go.md`). Sema's type
-  representation is Tide-side: `int`, `Map<rune, int>`,
+  representation is Aril-side: `int`, `Map<rune, int>`,
   `Status`, `Option<T>`.
 
 What sema owns (see §4 for how this fits the barrier model):
@@ -46,7 +46,7 @@ What sema owns (see §4 for how this fits the barrier model):
    "`TypeSymbol#17`". `E0103` / `E0104` / `E0108`.
 2. **Type construction.** Every `NamedType` in source
    (`User`, `Option<User>`, `Map<string, int>`) is built into a
-   canonical Tide-side `Type` value the rest of sema can
+   canonical Aril-side `Type` value the rest of sema can
    compare, substitute through generics, and pattern-match on.
 3. **Type inference and checking.** Fills in types the source
    omits — `let x = foo()`, variant constructors
@@ -56,7 +56,7 @@ What sema owns (see §4 for how this fits the barrier model):
 4. **Trait / interface satisfaction.** Validates that a class
    that declares `implements I` actually provides the method
    set `I` requires, and (where it surfaces through a binding)
-   that a Tide value satisfies the relevant Go-side interface.
+   that a Aril value satisfies the relevant Go-side interface.
    v1 has nominal `implements` only; the structural-vs-Go-
    nominal bridge is anticipated work, not v1 surface.
 5. **Exhaustiveness.** `match` arm patterns cover every value
@@ -87,7 +87,7 @@ concern.
 
 What sema explicitly does **not** own:
 
-- Borrow / lifetime analysis (Tide has no borrow checker).
+- Borrow / lifetime analysis (Aril has no borrow checker).
 - Constant folding (codegen's responsibility if at all).
 - Effect tracking, purity (no spec for it yet).
 
@@ -114,7 +114,7 @@ builtins ──┘
   desugaring stages, if any, must declare themselves
   pre-sema-pre-info or rebuild `Info` afterwards.
 - `Diag` slice is ordered by source position so the user sees
-  errors top-to-bottom on `tide build`. **Accumulate, not
+  errors top-to-bottom on `aril build`. **Accumulate, not
   fail-fast**: a malformed function should still let later
   functions get checked.
 
@@ -156,7 +156,7 @@ internal/sema/
 │
 │  Cross-cutting
 ├── dynamic.go          — Dynamic-doesn't-leak invariant; consumed by body.go
-├── diag.go             — Diag construction with .td coordinates + source-span sort
+├── diag.go             — Diag construction with .aril coordinates + source-span sort
 └── info.go             — the AST-keyed side-table
 ```
 
@@ -218,19 +218,19 @@ Barrier D — whole-program validation
 A module's **exported interface** is whatever its dependents
 can legally reach: pub-marked types, functions, classes,
 methods, sum variants, constants. The interface is a
-deterministic in-memory value (a future `.tidei` file would be
+deterministic in-memory value (a future `.arili` file would be
 its on-disk projection); it does *not* expose function bodies
 or private declarations. Cross-module reads go through this
 interface; cross-module writes are impossible.
 
-**Tide modules vs Go-stdlib bindings.** The import graph is
-over Tide modules only. `import fmt`, `import strings`,
-`import strconv`, … in `.td` source are *not* Tide-module
+**Aril modules vs Go-stdlib bindings.** The import graph is
+over Aril modules only. `import fmt`, `import strings`,
+`import strconv`, … in `.aril` source are *not* Aril-module
 imports — they're Go-stdlib bindings whose surface is built
 by `internal/bindgen` from `go/packages`. D20's acyclic rule
-applies to Tide-module edges only; binding leaves sit outside
+applies to Aril-module edges only; binding leaves sit outside
 the graph. Sema treats a binding as an immutable
-already-resolved interface — same shape as a Tide module's
+already-resolved interface — same shape as a Aril module's
 exported interface, sourced through the bindgen pipeline
 instead of from another module's Barrier B output.
 
@@ -243,8 +243,8 @@ guarantees each module is fully checked before its dependents
 run Barrier B, the producing module's interface is always
 available when a dependent constructs the generic.
 
-**v1 reality.** Tide v1 ships with a single user module — the
-`.td` file passed to `tide build`. The module-level layer is a
+**v1 reality.** Aril v1 ships with a single user module — the
+`.aril` file passed to `aril build`. The module-level layer is a
 no-op in degenerate form (one node, trivial topo order, no
 cycle possible). The layer is in the architecture from day one
 so adding multi-file support later is a multi-module loop
@@ -414,7 +414,7 @@ work folds into the barrier whose invariants it depends on.
 Internal `Type` is a closed sum (Go-side `type Type interface{}`
 with a fixed set of concrete cases — `Prim`, `Named`, `Slice`,
 `Map`, `Set`, `Stack`, `Func`, `Tuple`, `Generic`, `Dynamic`,
-`Any`, `Unit`, `Never`). Stays Tide-shaped: a `Status` sum type
+`Any`, `Unit`, `Never`). Stays Aril-shaped: a `Status` sum type
 is `Named{Name: "Status", Decl: …}`, not the Go `Status struct`
 shape codegen emits.
 
@@ -460,9 +460,9 @@ provides the cross-check.
 
 Every `Diag` carries a `Code` (E0xxx per `diagnostics.md`), a
 `Span` from the offending AST node, and a human-readable
-message in Tide terminology (D10) — class fields by their
+message in Aril terminology (D10) — class fields by their
 declared names, sum variants by their declared names,
-primitives with the Tide spelling. Raw Go-side names never
+primitives with the Aril spelling. Raw Go-side names never
 leak.
 
 The CLI prints `repo-relative-path:line:col: error[E0xxx]:
@@ -529,12 +529,12 @@ the RFC; this file gets the paired implementation update.
 
 ## 7. Integration with the pipeline
 
-`cmd/tide` calls sema between parse and codegen. On any error
-the program does not reach codegen — `tide build` / `tide run`
+`cmd/aril` calls sema between parse and codegen. On any error
+the program does not reach codegen — `aril build` / `aril run`
 exit 1 with the diagnostics on stderr.
 
 Hooks for the REPL:
-- `tide repl` runs sema per turn before codegen. A sema error
+- `aril repl` runs sema per turn before codegen. A sema error
   rolls back the session input just like a parse error does
   today; the existing `rejected` set in `replSession` catches
   retypes.

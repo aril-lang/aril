@@ -1,5 +1,5 @@
---- concurrency.td
-+++ concurrency.td
+--- concurrency.aril
++++ concurrency.aril
 @@ -46,7 +46,7 @@
    //
    // Fan-out: N workers each send 1 into `ch`; the body collects N and

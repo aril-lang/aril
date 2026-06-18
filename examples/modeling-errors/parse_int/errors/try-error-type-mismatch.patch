@@ -1,5 +1,5 @@
---- parse_int.td
-+++ parse_int.td
+--- parse_int.aril
++++ parse_int.aril
 @@ -2,7 +2,7 @@
  import fmt
  import strconv

@@ -89,7 +89,7 @@ var (
 	KindUnit      = Kind{Tag: 5}
 )
 
-var tideDescRegistry = map[string]*TypeDescriptor{}
+var arilDescRegistry = map[string]*TypeDescriptor{}
 
 // Primitive descriptors — registered eagerly so reflect.box on
 // any primitive value finds a descriptor. Notes:
@@ -102,111 +102,111 @@ var tideDescRegistry = map[string]*TypeDescriptor{}
 //     "let r: rune = ...", reflect.typeName can return "rune" via
 //     compile-time-resolved descriptor.
 var (
-	tideDesc_int     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
-	tideDesc_int64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
-	tideDesc_int32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
-	tideDesc_string  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
-	tideDesc_bool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
-	tideDesc_float64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
-	tideDesc_byte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
+	arilDesc_int     = &TypeDescriptor{Name: "int", Kind: KindPrimitive}
+	arilDesc_int64   = &TypeDescriptor{Name: "int64", Kind: KindPrimitive}
+	arilDesc_int32   = &TypeDescriptor{Name: "int32", Kind: KindPrimitive}
+	arilDesc_string  = &TypeDescriptor{Name: "string", Kind: KindPrimitive}
+	arilDesc_bool    = &TypeDescriptor{Name: "bool", Kind: KindPrimitive}
+	arilDesc_float64 = &TypeDescriptor{Name: "float64", Kind: KindPrimitive}
+	arilDesc_byte    = &TypeDescriptor{Name: "byte", Kind: KindPrimitive}
 )
 
 func init() {
-	tideDescRegistry["int"] = tideDesc_int
-	tideDescRegistry["int64"] = tideDesc_int64
-	tideDescRegistry["int32"] = tideDesc_int32
-	tideDescRegistry["string"] = tideDesc_string
-	tideDescRegistry["bool"] = tideDesc_bool
-	tideDescRegistry["float64"] = tideDesc_float64
-	tideDescRegistry["uint8"] = tideDesc_byte
+	arilDescRegistry["int"] = arilDesc_int
+	arilDescRegistry["int64"] = arilDesc_int64
+	arilDescRegistry["int32"] = arilDesc_int32
+	arilDescRegistry["string"] = arilDesc_string
+	arilDescRegistry["bool"] = arilDesc_bool
+	arilDescRegistry["float64"] = arilDesc_float64
+	arilDescRegistry["uint8"] = arilDesc_byte
 }
 
-func tideBox[T any](v T) Dynamic {
-	return Dynamic{Payload: v, Desc: tideDescForKey(reflect.TypeOf(v).String())}
+func arilBox[T any](v T) Dynamic {
+	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
 }
 
-// tideDescForKey looks up (and caches) a descriptor for the
+// arilDescForKey looks up (and caches) a descriptor for the
 // Go-runtime type-name key. The cache preserves CT1 (descriptor
 // uniqueness): two reflect.box calls on the same Go-runtime
 // type return Dynamic values whose Desc pointers compare equal.
 // Concurrent first-time-seen unknown types may briefly race on
 // the registry write — a later Block-R PR adds synchronisation.
-func tideDescForKey(key string) *TypeDescriptor {
-	if d, ok := tideDescRegistry[key]; ok {
+func arilDescForKey(key string) *TypeDescriptor {
+	if d, ok := arilDescRegistry[key]; ok {
 		return d
 	}
 	d := &TypeDescriptor{Name: key, Kind: KindPrimitive}
-	tideDescRegistry[key] = d
+	arilDescRegistry[key] = d
 	return d
 }
 
-func tideTypeOf(d Dynamic) *TypeDescriptor  { return d.Desc }
-func tideTypeName(t *TypeDescriptor) string { return t.Name }
-func tideKind(t *TypeDescriptor) Kind       { return t.Kind }
+func arilTypeOf(d Dynamic) *TypeDescriptor  { return d.Desc }
+func arilTypeName(t *TypeDescriptor) string { return t.Name }
+func arilKind(t *TypeDescriptor) Kind       { return t.Kind }
 
-func tideUnbox[T any](d Dynamic) Result[T, error] {
+func arilUnbox[T any](d Dynamic) Result[T, error] {
 	v, ok := d.Payload.(T)
 	if !ok {
 		var zero T
-		return Result[T, error]{Tag: 1, E: tideUnboxError(d.Desc.Name), V: zero}
+		return Result[T, error]{Tag: 1, E: arilUnboxError(d.Desc.Name), V: zero}
 	}
 	return Result[T, error]{Tag: 0, V: v}
 }
 
-type tideUnboxErr struct{ typeName string }
+type arilUnboxErr struct{ typeName string }
 
-func (e tideUnboxErr) Error() string {
+func (e arilUnboxErr) Error() string {
 	return "reflect.unbox: payload is not the requested type (have " + e.typeName + ")"
 }
 
-func tideUnboxError(typeName string) error { return tideUnboxErr{typeName: typeName} }
+func arilUnboxError(typeName string) error { return arilUnboxErr{typeName: typeName} }
 
 // Per-class field accessor functions are registered into this
 // map at init time (one per non-generic class declared in the
-// program). The accessor reads a named field off the Tide-side
+// program). The accessor reads a named field off the Aril-side
 // pointer-to-struct and returns it boxed as Dynamic.
-type tideFieldAccessor = func(v any, name string) (Dynamic, bool)
+type arilFieldAccessor = func(v any, name string) (Dynamic, bool)
 
-var tideFieldAccessors = map[string]tideFieldAccessor{}
+var arilFieldAccessors = map[string]arilFieldAccessor{}
 
-func tideFields(t *TypeDescriptor) []FieldInfo { return t.fields }
+func arilFields(t *TypeDescriptor) []FieldInfo { return t.fields }
 
-func tideFieldValue(d Dynamic, name string) Result[Dynamic, error] {
+func arilFieldValue(d Dynamic, name string) Result[Dynamic, error] {
 	if d.Desc == nil {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("Dynamic has no descriptor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("Dynamic has no descriptor"), V: zero}
 	}
-	fn, ok := tideFieldAccessors[d.Desc.Name]
+	fn, ok := arilFieldAccessors[d.Desc.Name]
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field accessor"), V: zero}
 	}
 	v, ok := fn(d.Payload, name)
 	if !ok {
 		var zero Dynamic
-		return Result[Dynamic, error]{Tag: 1, E: tideFieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
+		return Result[Dynamic, error]{Tag: 1, E: arilFieldErr("type " + d.Desc.Name + " has no field " + name), V: zero}
 	}
 	return Result[Dynamic, error]{Tag: 0, V: v}
 }
 
-type tideFieldErrT struct{ msg string }
+type arilFieldErrT struct{ msg string }
 
-func (e tideFieldErrT) Error() string { return e.msg }
+func (e arilFieldErrT) Error() string { return e.msg }
 
-func tideFieldErr(msg string) error { return tideFieldErrT{msg: msg} }
+func arilFieldErr(msg string) error { return arilFieldErrT{msg: msg} }
 
-// tideBoxAny boxes an arbitrary value (with type known only at
+// arilBoxAny boxes an arbitrary value (with type known only at
 // runtime via Go's reflect). Used by per-class field accessors
-// when reading a field's value. Routes through tideDescForKey so
+// when reading a field's value. Routes through arilDescForKey so
 // descriptor identity follows CT1.
-func tideBoxAny(v any) Dynamic {
+func arilBoxAny(v any) Dynamic {
 	if v == nil {
-		return Dynamic{Payload: nil, Desc: tideDescForKey("<nil>")}
+		return Dynamic{Payload: nil, Desc: arilDescForKey("<nil>")}
 	}
-	return Dynamic{Payload: v, Desc: tideDescForKey(reflect.TypeOf(v).String())}
+	return Dynamic{Payload: v, Desc: arilDescForKey(reflect.TypeOf(v).String())}
 }
 
-// tideShow renders a Dynamic value as a human-readable string.
+// arilShow renders a Dynamic value as a human-readable string.
 // It is the runtime building block for the REPL auto-printer
 // and `:inspect` (RFC-0003). Kinds beyond Primitive /
 // Class fall back to a "<TypeName>" placeholder for now; PR-R4
@@ -214,11 +214,11 @@ func tideBoxAny(v any) Dynamic {
 // metadata lands. Panic-free per D18 CT2 — class graphs with
 // cycles render the back-edge as "<cycle>" instead of blowing
 // the stack.
-func tideShow(d Dynamic) string {
-	return tideShowWalk(d, map[any]bool{})
+func arilShow(d Dynamic) string {
+	return arilShowWalk(d, map[any]bool{})
 }
 
-func tideShowWalk(d Dynamic, seen map[any]bool) string {
+func arilShowWalk(d Dynamic, seen map[any]bool) string {
 	if d.Desc == nil {
 		return "<nil>"
 	}
@@ -238,22 +238,22 @@ func tideShowWalk(d Dynamic, seen map[any]bool) string {
 			if i > 0 {
 				out += ", "
 			}
-			fv := tideFieldValue(d, fi.Name)
+			fv := arilFieldValue(d, fi.Name)
 			if fv.Tag != 0 {
 				out += fi.Name + ": <unreadable>"
 				continue
 			}
-			out += fi.Name + ": " + tideShowWalk(fv.V, seen)
+			out += fi.Name + ": " + arilShowWalk(fv.V, seen)
 		}
 		return out + "}"
 	case KindPrimitive:
-		return tideShowPrimitive(d)
+		return arilShowPrimitive(d)
 	default:
 		return "<" + d.Desc.Name + ">"
 	}
 }
 
-func tideShowPrimitive(d Dynamic) string {
+func arilShowPrimitive(d Dynamic) string {
 	switch v := d.Payload.(type) {
 	case nil:
 		return "<nil>"
@@ -293,28 +293,28 @@ func tideShowPrimitive(d Dynamic) string {
 	}
 }
 
-var tideDesc_Point = &TypeDescriptor{Name: "Point", Kind: KindClass}
+var arilDesc_Point = &TypeDescriptor{Name: "Point", Kind: KindClass}
 
-func tideFieldOf_Point(v any, name string) (Dynamic, bool) {
+func arilFieldOf_Point(v any, name string) (Dynamic, bool) {
 	c, _ := v.(*Point)
 	if c == nil {
 		return Dynamic{}, false
 	}
 	switch name {
 	case "x":
-		return Dynamic{Payload: c.X, Desc: tideDesc_int}, true
+		return Dynamic{Payload: c.X, Desc: arilDesc_int}, true
 	case "y":
-		return Dynamic{Payload: c.Y, Desc: tideDesc_int}, true
+		return Dynamic{Payload: c.Y, Desc: arilDesc_int}, true
 	}
 	return Dynamic{}, false
 }
 func init() {
-	tideDescRegistry["*main.Point"] = tideDesc_Point
-	tideDesc_Point.fields = []FieldInfo{
-		{Name: "x", Desc: tideDesc_int},
-		{Name: "y", Desc: tideDesc_int},
+	arilDescRegistry["*main.Point"] = arilDesc_Point
+	arilDesc_Point.fields = []FieldInfo{
+		{Name: "x", Desc: arilDesc_int},
+		{Name: "y", Desc: arilDesc_int},
 	}
-	tideFieldAccessors["Point"] = tideFieldOf_Point
+	arilFieldAccessors["Point"] = arilFieldOf_Point
 }
 
 type Point struct {
@@ -324,25 +324,25 @@ type Point struct {
 
 func main() {
 	var p = &Point{3, 4}
-	var d = tideBox(p)
-	for _, fi := range tideFields(tideTypeOf(d)) {
-		fmt.Println(fi.Name, tideTypeName(fi.Desc))
+	var d = arilBox(p)
+	for _, fi := range arilFields(arilTypeOf(d)) {
+		fmt.Println(fi.Name, arilTypeName(fi.Desc))
 	}
-	__tide_match_1 := tideFieldValue(d, "x")
-	switch __tide_match_1.Tag {
+	__aril_match_1 := arilFieldValue(d, "x")
+	switch __aril_match_1.Tag {
 	case 0:
-		v := __tide_match_1.V
-		fmt.Println("x=", tideTypeName(tideTypeOf(v)))
+		v := __aril_match_1.V
+		fmt.Println("x=", arilTypeName(arilTypeOf(v)))
 	case 1:
-		e := __tide_match_1.E
+		e := __aril_match_1.E
 		fmt.Println("err", e)
 	}
-	__tide_match_2 := tideFieldValue(d, "missing")
-	switch __tide_match_2.Tag {
+	__aril_match_2 := arilFieldValue(d, "missing")
+	switch __aril_match_2.Tag {
 	case 0:
 		fmt.Println("got")
 	case 1:
-		e := __tide_match_2.E
+		e := __aril_match_2.E
 		fmt.Println("missing err:", e)
 	}
 }

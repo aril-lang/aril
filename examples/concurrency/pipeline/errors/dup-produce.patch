@@ -1,5 +1,5 @@
---- pipeline.td
-+++ pipeline.td
+--- pipeline.aril
++++ pipeline.aril
 @@ -35,6 +35,8 @@
    out.close()
  }

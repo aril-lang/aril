@@ -1,8 +1,8 @@
---- hello.td
-+++ hello.td
+--- hello.aril
++++ hello.aril
 @@ -6,4 +6,5 @@
  
  func main() {
-   fmt.println("Tide is rising.")
+   fmt.println("Aril is rising.")
 +  `
  }

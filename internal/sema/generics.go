@@ -3,7 +3,7 @@ package sema
 import (
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // Generic instantiation at a call site (type-system.md T-Call-Generic

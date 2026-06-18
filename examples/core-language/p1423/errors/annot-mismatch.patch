@@ -1,5 +1,5 @@
---- p1423.td
-+++ p1423.td
+--- p1423.aril
++++ p1423.aril
 @@ -40,7 +40,7 @@
  // Find first occurrence of `a` in `b`, or -1.
  func fastFind(a: []byte, b: []byte): int {

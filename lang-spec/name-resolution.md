@@ -1,6 +1,6 @@
 # Name resolution
 
-How identifiers in a Tide program resolve to declarations. The
+How identifiers in a Aril program resolve to declarations. The
 formal contract for the resolver pass; sema reads this to know
 what every `Ident` AST node means before type checking.
 
@@ -25,8 +25,8 @@ them inside-out — the closest match wins.
    bound here; `ScopeRef` (`scope`) is *not* a class-scope name
    — it's a control-flow construct (see §Special names).
 4. **Package scope.** Top-level `TopLevelLet` constants, `FuncDecl`,
-   `TypeDecl`, `ClassDecl`, `InterfaceDecl` of **every `.td` file in
-   the package** (a package is a directory of `.td` files — RFC-0002
+   `TypeDecl`, `ClassDecl`, `InterfaceDecl` of **every `.aril` file in
+   the package** (a package is a directory of `.aril` files — RFC-0002
    §"Package = directory"), plus the imported package aliases from
    `Import` declarations. A single-file program is the degenerate
    one-file package. All top-level names share this one flat scope, so
@@ -130,7 +130,7 @@ enclosing class, then a **write** to bare `n` is a compile
 error. The compiler will not guess whether the developer meant
 the field or the local.
 
-```td
+```aril
 class Counter {
   var n: int
   set(n: int) { n = 0 }   // ERROR E0502: writing to a bare `n` while param `n` shadows the field
@@ -238,7 +238,7 @@ though the top-level declarations they sit beside are package-wide
 
 ## Cross-package imports
 
-A project that spans more than one package adds a `tide.toml` manifest
+A project that spans more than one package adds a `aril.toml` manifest
 (`manifest.md`) and imports its own packages by path: `import
 myproj/utils`. Resolution (manifest-relative directory lookup, the
 stdlib fallback, the failure codes **E0116** / **E0117**) is specified in

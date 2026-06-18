@@ -3,8 +3,8 @@ package parser
 import (
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
 )
 
 // Parser coverage for variadic parameters (`name: ...T`) and call-site

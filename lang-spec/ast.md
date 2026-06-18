@@ -1,6 +1,6 @@
 # AST schema
 
-Canonical shape of every node in the Tide abstract syntax tree.
+Canonical shape of every node in the Aril abstract syntax tree.
 One entry per node kind, with fields (typed), required vs optional,
 and invariants. Source span is mandatory on every node.
 
@@ -11,8 +11,8 @@ divergence between grammar productions and AST kinds here is a
 bug in one of the two files.
 
 This file is the **data-model contract** between the parser and
-everything downstream (sema, codegen). Re-implementations (Tide-in-
-Tide self-host) must produce nodes with the same fields and field
+everything downstream (sema, codegen). Re-implementations (Aril-in-
+Aril self-host) must produce nodes with the same fields and field
 names, so that AST-serialisation fixtures (`tests/grammar/*.txt`
 TOKENS+AST sections per `test-contract.md`) remain stable.
 
@@ -215,7 +215,7 @@ An opaque foreign handle (`extern type T @go("pkg")`).
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `span` | `Span` | yes | |
-| `name` | `string` | yes | the Tide handle name |
+| `name` | `string` | yes | the Aril handle name |
 | `go` | `Option<GoRef>` | optional | absent ⇒ symbol defaults to `name` |
 
 ### `ExternFuncDecl`

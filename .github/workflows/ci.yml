@@ -47,13 +47,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # The corpus-status tool is itself written in Tide, so tide compiles it
+      # The corpus-status tool is itself written in Aril, so aril compiles it
       # first; it then shells out to `go build` (and git/patch) to measure the
       # corpus.
-      - name: build tide
-        run: go build -o tide ./cmd/tide
+      - name: build aril
+        run: go build -o aril ./cmd/aril
       - name: build corpus-status tool
-        run: ./tide build -o corpus-status tools/corpus-status
+        run: ./aril build -o corpus-status tools/corpus-status
       # Fails if the committed snapshot is stale or build_ok regressed.
       # Generation stays a local author step; CI is the independent check.
       - name: corpus-status ratchet

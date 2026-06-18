@@ -3,7 +3,7 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // tail.go — implicit tail-expression return. A function/method/closure

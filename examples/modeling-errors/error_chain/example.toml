@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "error_chain.td"
+entry    = "error_chain.aril"
 
 [[error]]
 patch   = "errors/typo-trimmed.patch"   # typo: trimed instead of trimmed

@@ -1,32 +1,32 @@
-# Tide
+# Aril
 
-**Familiar TypeScript-style syntax, free of JavaScript's legacy, on the Go
-runtime.**
+<p align="center"><img src="docs/assets/aril-logo.png" alt="Aril" width="160"></p>
+
+**A reliable, intuitive language with TypeScript-style syntax, compiled to Go.**
 
 ## The idea
 
-Tide is a modern, statically typed language for TypeScript developers. It keeps
-the syntax they already know — productive from day one — then drops the
-JavaScript legacy (`prototype`, `this`, coercions, `any`, decorators,
-`Promise`, npm) and puts the language on the Go runtime: goroutine scheduler,
-garbage collector, single-binary deployment, fast startup, the standard
-library.
+Aril is a reliable, modern programming language with TypeScript-like ergonomics
+and Go-class deployment characteristics. It pairs that familiar syntax with
+algebraic data types, exhaustive pattern matching, and explicit
+`Result`/`Option`-based error handling — so whole classes of bugs surface at
+compile time, not in production.
 
-Two things make it more than a reskin. The type system is genuinely more
-capable — sum types, exhaustive matching, `Option`/`Result`, no `any` (an
-ML-family type system underneath). And error handling drops `if err != nil`:
-`let x = try foo()` over Go's error model. People love the Go runtime and
-tolerate Go's errors — Tide keeps the first and removes the second.
+Under the hood, Aril compiles to Go and inherits its strengths: static
+binaries, goroutine concurrency, fast startup, and the standard library. The Go
+core is the engine, not a leaky surface — Aril keeps the runtime developers love
+and drops the friction (`if err != nil`, `nil` footguns) behind `Result` /
+`Option` and a single `try` keyword.
 
-Tide is **not** a TypeScript-to-Go transpiler: no npm, no JavaScript semantics,
-no browser ecosystem — and that is deliberate.
+Aril is a language in its own right, not a TypeScript-to-Go transpiler: no
+JavaScript semantics, no npm, no browser target — and that is deliberate.
 
-> Status: **pre-alpha**. This repository is a scaffold; nothing compiles Tide
-> source yet.
+> Status: **pre-alpha** — the compiler builds a growing corpus of examples
+> end-to-end, but the language and tooling are still moving fast.
 
 ## A taste
 
-```td
+```aril
 import http
 import io
 import json
@@ -46,20 +46,20 @@ func getUser(id: string): Result<User, error> {
 
 ## Building the compiler
 
-The Tide compiler is itself written in Go.
+The Aril compiler is itself written in Go.
 
 ```sh
-go build ./cmd/tide
-./tide version
+go build ./cmd/aril
+./aril version
 ```
 
-Source files use the `.td` extension.
+Source files use the `.aril` extension.
 
 ## Read more
 
 | To understand... | Read |
 |---|---|
-| The architectural commitments and why Tide is the way it is | [`docs/design-decisions.md`](docs/design-decisions.md) |
+| The architectural commitments and why Aril is the way it is | [`docs/design-decisions.md`](docs/design-decisions.md) |
 | How the compiler is built — pipeline, bindings, concurrency, testing | [`docs/architecture.md`](docs/architecture.md) |
 | The language surface (working draft) | [`docs/language-spec.md`](docs/language-spec.md) |
 | Target spelling of every stdlib call used by the suite | [`docs/binding-surface.md`](docs/binding-surface.md) |

@@ -1,5 +1,5 @@
---- pipeline.td
-+++ pipeline.td
+--- pipeline.aril
++++ pipeline.aril
 @@ -27,7 +27,7 @@
  
  // Stage 3: read from `inCh`, accumulate a sum, push it to `out`, close.

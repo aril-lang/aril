@@ -1,5 +1,5 @@
---- defer_demo.td
-+++ defer_demo.td
+--- defer_demo.aril
++++ defer_demo.aril
 @@ -13,7 +13,7 @@
  
  func main() {

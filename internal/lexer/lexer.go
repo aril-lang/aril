@@ -251,7 +251,7 @@ func (l *lexer) next() *Diag {
 			l.advance(sz)
 		}
 		lex := l.src[startOffset:l.offset]
-		if strings.HasPrefix(lex, "_tide_") {
+		if strings.HasPrefix(lex, "_aril_") {
 			return l.diag("E0107", "Reserved identifier prefix", startLine, startCol)
 		}
 		if keywordSet[lex] {

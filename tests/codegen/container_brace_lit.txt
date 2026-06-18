@@ -152,7 +152,7 @@ func (s *Stack[T]) pop() Result[T, error] {
 	n := len(s.xs)
 	if n == 0 {
 		var zero T
-		return Result[T, error]{Tag: 1, E: tideEmptyStack, V: zero}
+		return Result[T, error]{Tag: 1, E: arilEmptyStack, V: zero}
 	}
 	v := s.xs[n-1]
 	s.xs = s.xs[:n-1]
@@ -166,11 +166,11 @@ func (s *Stack[T]) peek() Option[T] {
 	return Option[T]{Tag: 1, V: s.xs[n-1]}
 }
 
-var tideEmptyStack = tideEmptyStackError{}
+var arilEmptyStack = arilEmptyStackError{}
 
-type tideEmptyStackError struct{}
+type arilEmptyStackError struct{}
 
-func (tideEmptyStackError) Error() string { return "empty stack" }
+func (arilEmptyStackError) Error() string { return "empty stack" }
 func main() {
 	var s = setFrom([]int{1, 2, 3})
 	var e = setNew[int]()

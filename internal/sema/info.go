@@ -1,6 +1,6 @@
 package sema
 
-import "github.com/heni/tide-lang/internal/ast"
+import "github.com/aril-lang/aril/internal/ast"
 
 // Info is the AST-keyed side table. See docs/internals/sema.md §2.
 type Info struct {

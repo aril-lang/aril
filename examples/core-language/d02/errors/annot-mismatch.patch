@@ -1,5 +1,5 @@
---- d02.td
-+++ d02.td
+--- d02.aril
++++ d02.aril
 @@ -47,7 +47,7 @@
  
  func checkHard(s: string): bool {

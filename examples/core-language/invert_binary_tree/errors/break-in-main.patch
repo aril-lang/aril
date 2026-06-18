@@ -1,5 +1,5 @@
---- invert_binary_tree.td
-+++ invert_binary_tree.td
+--- invert_binary_tree.aril
++++ invert_binary_tree.aril
 @@ -33,6 +33,6 @@
      Node(2, Node(1, Leaf, Leaf), Node(3, Leaf, Leaf)),
      Node(7, Node(6, Leaf, Leaf), Node(9, Leaf, Leaf)))

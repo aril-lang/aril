@@ -6,4 +6,4 @@ forces   = []
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "sum_numbers.td"
+entry    = "sum_numbers.aril"

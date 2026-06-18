@@ -48,19 +48,19 @@ func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
 
-type tideGroup struct {
+type arilGroup struct {
 	wg     sync.WaitGroup
 	once   sync.Once
 	err    error
 	cancel context.CancelFunc
 }
 
-func tideNewGroup(parent context.Context) (*tideGroup, context.Context) {
+func arilNewGroup(parent context.Context) (*arilGroup, context.Context) {
 	ctx, cancel := context.WithCancel(parent)
-	return &tideGroup{cancel: cancel}, ctx
+	return &arilGroup{cancel: cancel}, ctx
 }
 
-func (g *tideGroup) Go(f func() error) {
+func (g *arilGroup) Go(f func() error) {
 	g.wg.Add(1)
 	go func() {
 		defer g.wg.Done()
@@ -73,7 +73,7 @@ func (g *tideGroup) Go(f func() error) {
 	}()
 }
 
-func (g *tideGroup) Wait() error {
+func (g *arilGroup) Wait() error {
 	g.wg.Wait()
 	g.cancel()
 	return g.err
@@ -81,40 +81,40 @@ func (g *tideGroup) Wait() error {
 func main() {
 	var ch = make(chan int, 1)
 	var r = func() Result[int, error] {
-		_tideEg0, _ := tideNewGroup(context.Background())
-		_tideEg0.Go(func() error {
+		_arilEg0, _ := arilNewGroup(context.Background())
+		_arilEg0.Go(func() error {
 			var inner = func() Result[int, error] {
-				_tideEg1, _ := tideNewGroup(context.Background())
-				_tideEg1.Go(func() error {
+				_arilEg1, _ := arilNewGroup(context.Background())
+				_arilEg1.Go(func() error {
 					return nil
 				})
-				if _err := _tideEg1.Wait(); _err != nil {
+				if _err := _arilEg1.Wait(); _err != nil {
 					return ResultErr[int, error](_err)
 				}
 				return ResultOk[int, error](15)
 			}()
-			__tide_match_1 := inner
-			switch __tide_match_1.Tag {
+			__aril_match_1 := inner
+			switch __aril_match_1.Tag {
 			case 0:
-				v := __tide_match_1.V
+				v := __aril_match_1.V
 				ch <- v + 1
 			case 1:
 				ch <- 0
 			}
 			return nil
 		})
-		if _err := _tideEg0.Wait(); _err != nil {
+		if _err := _arilEg0.Wait(); _err != nil {
 			return ResultErr[int, error](_err)
 		}
 		return ResultOk[int, error](<-ch)
 	}()
-	__tide_match_2 := r
-	switch __tide_match_2.Tag {
+	__aril_match_2 := r
+	switch __aril_match_2.Tag {
 	case 0:
-		n := __tide_match_2.V
+		n := __aril_match_2.V
 		fmt.Println("got:", n)
 	case 1:
-		e := __tide_match_2.E
+		e := __aril_match_2.E
 		fmt.Println("err:", e)
 	}
 }

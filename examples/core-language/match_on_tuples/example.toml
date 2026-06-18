@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "match_on_tuples.td"
+entry    = "match_on_tuples.aril"
 
 [[error]]
 patch   = "errors/stray-break.patch"   # a stray break with no enclosing loop

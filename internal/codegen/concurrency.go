@@ -3,7 +3,7 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // emitScopeExpr lowers a `scope<T, E>(parent?) { body }` expression
@@ -23,7 +23,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	}
 
 	depth := len(g.groupVars)
-	gv := fmt.Sprintf("_tideEg%d", depth)
+	gv := fmt.Sprintf("_arilEg%d", depth)
 	g.groupVars = append(g.groupVars, gv)
 	defer func() { g.groupVars = g.groupVars[:depth] }()
 
@@ -47,7 +47,7 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	// used by every spawn and by Wait below.
 	g.writeIndent()
 	g.b.WriteString(gv)
-	g.b.WriteString(", _ := tideNewGroup(")
+	g.b.WriteString(", _ := arilNewGroup(")
 	if s.Parent != nil {
 		if err := g.emitExpr(s.Parent); err != nil {
 			return err
@@ -175,7 +175,7 @@ func (g *gen) emitScopeTType(t ast.TypeExpr) error {
 // emitSpawnReturn (driven by g.inSpawnBody); a body that falls
 // through with no return gets a `return nil`.
 func (g *gen) emitSpawnStmt(s *ast.SpawnExpr) error {
-	gv := "_tideEg0"
+	gv := "_arilEg0"
 	if n := len(g.groupVars); n > 0 {
 		gv = g.groupVars[n-1]
 	}

@@ -5,7 +5,7 @@ TopLevelLet — module-level constants (inferred + annotated) lower to package-l
 import fmt
 
 let version = 5
-let greeting: string = "tide"
+let greeting: string = "aril"
 
 func banner(): string {
   return greeting + " v" + intStr(version)
@@ -25,7 +25,7 @@ package main
 import "fmt"
 
 var version = 5
-var greeting string = "tide"
+var greeting string = "aril"
 
 func banner() string {
 	return greeting + " v" + intStr(version)
@@ -38,4 +38,4 @@ func main() {
 }
 
 --- STDOUT ---
-tide v5
+aril v5

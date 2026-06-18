@@ -46,7 +46,7 @@ func TestKeywordReclassification(t *testing.T) {
 	if !strings.Contains(got, "Ident<intx>  1:1") {
 		t.Errorf("intx should be Ident; got:\n%s", got)
 	}
-	// `int` is NOT a keyword in Tide (it's a predeclared identifier
+	// `int` is NOT a keyword in Aril (it's a predeclared identifier
 	// per keywords.md — not in the reserved-keyword set), so the
 	// resolver tier handles it. The lexer emits Ident.
 	if !strings.Contains(got, "Ident<int>  1:6") {
@@ -55,9 +55,9 @@ func TestKeywordReclassification(t *testing.T) {
 }
 
 func TestReservedPrefixRejected(t *testing.T) {
-	_, err := Lex("let _tide_99 = 7")
+	_, err := Lex("let _aril_99 = 7")
 	if err == nil {
-		t.Fatalf("expected E0107 on `_tide_99`; got no error")
+		t.Fatalf("expected E0107 on `_aril_99`; got no error")
 	}
 	if err.Code != "E0107" {
 		t.Errorf("want E0107; got %q", err.Code)
@@ -177,11 +177,11 @@ func TestExponentNoDigits(t *testing.T) {
 }
 
 func TestLexFilePrefix(t *testing.T) {
-	_, err := LexFile("#", "foo.td")
+	_, err := LexFile("#", "foo.aril")
 	if err == nil {
 		t.Fatalf("expected error on `#`")
 	}
-	want := "foo.td:1:1: error[E0101]: Unexpected character"
+	want := "foo.aril:1:1: error[E0101]: Unexpected character"
 	if err.Error() != want {
 		t.Errorf("got %q\nwant %q", err.Error(), want)
 	}

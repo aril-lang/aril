@@ -1,5 +1,5 @@
---- pipeline.td
-+++ pipeline.td
+--- pipeline.aril
++++ pipeline.aril
 @@ -44,6 +44,7 @@
    // out through `result`. The scope joins when every stage's spawn
    // returns (which happens once each stage's input is closed and

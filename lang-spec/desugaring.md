@@ -1,13 +1,13 @@
-# Desugaring — Tide AST → Tide IR
+# Desugaring — Aril AST → Aril IR
 
 The contract for the **desugaring** pass that runs after sema
-and before codegen. Takes a fully-typed Tide AST (every node
+and before codegen. Takes a fully-typed Aril AST (every node
 carries its `Type`, every `Ident` carries its resolved
-`Binding`) and produces a **Tide IR** — a strict subset of the
+`Binding`) and produces a **Aril IR** — a strict subset of the
 AST with high-level constructs rewritten into simpler shapes.
 
-The IR is **not** Go yet. It is still Tide-shaped — same
-identifier names, same `.td` source coordinates (`Span`),
+The IR is **not** Go yet. It is still Aril-shaped — same
+identifier names, same `.aril` source coordinates (`Span`),
 same primitive types. Codegen (`lowering-go.md`, forthcoming
 Formalization-I) takes IR → Go. Desugaring exists to keep
 codegen small and uniform: codegen does **not** see `try`,
@@ -51,11 +51,11 @@ This is the contract sema and codegen rely on for diagnostics
 
 **Fresh-name generation.** Stages 4 and 6 introduce fresh
 locals (`fresh_v`, `fresh_e`, `fresh_g`, `fresh_ctx`). All
-freshly generated names use the reserved prefix `$tide_`
+freshly generated names use the reserved prefix `$aril_`
 followed by a per-pass monotonic counter; the lexer rejects
 `$` in user source (`grammar.ebnf` LexicalIdent), so collisions
-are impossible by construction. Codegen rewrites `$tide_NN` to
-a Go-legal identifier `_tide_NN`.
+are impossible by construction. Codegen rewrites `$aril_NN` to
+a Go-legal identifier `_aril_NN`.
 
 ## Pass ordering
 
@@ -126,7 +126,7 @@ reach desugaring and resolves to the closest binding (the local).
 
 ## Stage 2 — (no-op; parser-level normalisation)
 
-Tide has no `ShortClosure` AST node — the parser already
+Aril has no `ShortClosure` AST node — the parser already
 normalises the short form `(x, y) => x + y` into
 `ClosureLit { params, body: Block { stmts: [], trailing:
 Some(x + y) } }` per `ast.md:289-292`. Desugaring therefore
@@ -308,7 +308,7 @@ exhaustiveness check has held) is lowered by `lowering-go.md`.
 explicit IR nodes carrying the errgroup binding and context
 threading. The names below mirror the lowering target
 (`lowering-go.md`, forthcoming) but the IR is still
-Tide-shaped.
+Aril-shaped.
 
 ```
 [[ ScopeExpr { ty: T, err: E, parent: p?, body: B } ]]
@@ -363,20 +363,20 @@ expression context is preserved).
 
 ```
 [[ BraceLit { kind: Map<K, V>, entries: [(k_1, v_1), ..., (k_n, v_n)] } ]]
-  fresh local: $tide_m                                  (n >= 0)
+  fresh local: $aril_m                                  (n >= 0)
                                                       ⟿
   Block {
     stmts: [
-      LetStmt { name: $tide_m,
+      LetStmt { name: $aril_m,
                 init: Call { callee: Field { receiver: Map, name: new },
                              type_args: [K, V], args: [] } },
-      ExprStmt { expr: Call { callee: Field { receiver: $tide_m, name: set },
+      ExprStmt { expr: Call { callee: Field { receiver: $aril_m, name: set },
                               args: [k_1, v_1] } },
       ...
-      ExprStmt { expr: Call { callee: Field { receiver: $tide_m, name: set },
+      ExprStmt { expr: Call { callee: Field { receiver: $aril_m, name: set },
                               args: [k_n, v_n] } },
     ],
-    trailing: Some(Var $tide_m),
+    trailing: Some(Var $aril_m),
   }
 
 [[ BraceLit { kind: Set<T>, entries: [e_1, ..., e_n] } ]]

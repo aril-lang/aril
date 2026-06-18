@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "invert_binary_tree.td"
+entry    = "invert_binary_tree.aril"
 
 [[error]]
 patch   = "errors/drop-leaf-arm.patch"   # drop the Leaf arm from invert's match

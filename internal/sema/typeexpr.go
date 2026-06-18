@@ -1,6 +1,6 @@
 package sema
 
-import "github.com/heni/tide-lang/internal/ast"
+import "github.com/aril-lang/aril/internal/ast"
 
 // typeFromExpr lowers a (resolved) AST type annotation to the
 // canonical sema Type. It leans on Info.Symbol, which resolve.go
@@ -208,7 +208,7 @@ func (c *checker) paramTypes(params []*ast.Param) ([]Type, bool) {
 }
 
 // externFuncSigType builds the Func type of an extern function from
-// its annotations — the curated `.td` writes the lifted return type
+// its annotations — the curated `.aril` writes the lifted return type
 // (e.g. `Result<T, error>`) directly, so no boundary-lift logic is
 // needed here; that lift is a codegen concern (lowering-go.md §ForeignCall).
 func (c *checker) externFuncSigType(fn *ast.ExternFuncDecl) *Func {

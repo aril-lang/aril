@@ -1,8 +1,8 @@
-# Project manifest — `tide.toml`
+# Project manifest — `aril.toml`
 
-The optional project file that defines a multi-package Tide project's
+The optional project file that defines a multi-package Aril project's
 root and name (RFC-0002). A single-file program or a single directory of
-`.td` files needs **no manifest** — it is one package, resolved against
+`.aril` files needs **no manifest** — it is one package, resolved against
 the stdlib binding registry only. A manifest is required only to span
 **more than one user package**.
 
@@ -11,7 +11,7 @@ mirror is `../docs/language-spec.md`. On disagreement this file wins (D17).
 
 ## Schema
 
-`tide.toml` is the **only** v0.x configuration surface — no build flags,
+`aril.toml` is the **only** v0.x configuration surface — no build flags,
 no external-dependency version pinning (pre-alpha ships no package
 manager). It has exactly three tables:
 
@@ -40,9 +40,9 @@ name`, a malformed value) is a manifest error reported at compiler start.
 
 ## Resolution
 
-A package is a directory of `.td` files (`name-resolution.md` §Scopes —
+A package is a directory of `.aril` files (`name-resolution.md` §Scopes —
 package scope). When the build target's source tree contains a
-`tide.toml` (found by walking up from the entry file/directory to the
+`aril.toml` (found by walking up from the entry file/directory to the
 filesystem root), each `import P` resolves as:
 
 1. **Local user package.** If `P` equals the manifest `name` or begins
@@ -50,7 +50,7 @@ filesystem root), each `import P` resolves as:
    directory **relative to the manifest's directory**. Bare `import
    myproj` resolves to the manifest root directory itself. A missing
    directory is **E0117 Unknown import path** (it does *not* fall through
-   to stdlib). The package's `.td` files join the build; its top-level
+   to stdlib). The package's `.aril` files join the build; its top-level
    names bind under the import's last segment (`import myproj/utils` →
    `utils.…`; the qualified-reference surface and cross-package
    visibility are specified in `name-resolution.md` §Cross-package
@@ -62,7 +62,7 @@ filesystem root), each `import P` resolves as:
 3. **Failure.** Neither local nor a known binding namespace → **E0117
    Unknown import path**.
 
-Without a `tide.toml`, step 1 is skipped entirely: the program is a
+Without a `aril.toml`, step 1 is skipped entirely: the program is a
 single package resolved against the stdlib registry — the zero-config
 path for scripts and quick experiments.
 

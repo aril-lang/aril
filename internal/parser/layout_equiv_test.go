@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
 )
 
 // spanRE strips the `@line:col-line:col` coordinate suffixes from a
@@ -18,11 +18,11 @@ var spanRE = regexp.MustCompile(` @\d+:\d+-\d+:\d+`)
 // AST. ok is false (with a diagnostic string) if lexing or parsing
 // failed.
 func parseShape(src string) (shape string, diag string, ok bool) {
-	toks, lerr := lexer.LexFile(src, "src.td")
+	toks, lerr := lexer.LexFile(src, "src.aril")
 	if lerr != nil {
 		return "", lerr.Error(), false
 	}
-	f, perr := ParseFile(toks, "src.td")
+	f, perr := ParseFile(toks, "src.aril")
 	if perr != nil {
 		return "", perr.Error(), false
 	}

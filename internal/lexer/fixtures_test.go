@@ -37,7 +37,7 @@ func TestFixtures(t *testing.T) {
 				t.Fatalf("%s: missing INPUT section", name)
 			}
 
-			tokens, diag := LexFile(input, "src.td")
+			tokens, diag := LexFile(input, "src.aril")
 
 			if want, ok := sections["TOKENS"]; ok {
 				got := serializeTokens(tokens)

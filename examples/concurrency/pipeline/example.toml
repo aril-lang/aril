@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "pipeline.td"
+entry    = "pipeline.aril"
 
 [[error]]
 patch   = "errors/scope-string-error.patch"   # scope error parameter must be error in v1

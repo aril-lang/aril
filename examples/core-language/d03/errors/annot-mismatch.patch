@@ -1,5 +1,5 @@
---- d03.td
-+++ d03.td
+--- d03.aril
++++ d03.aril
 @@ -28,7 +28,7 @@
      let s = strings.trimSpace(ln)
      if s.len() == 0 { continue }

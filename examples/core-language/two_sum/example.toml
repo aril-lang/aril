@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "two_sum.td"
+entry    = "two_sum.aril"
 
 [[error]]
 patch   = "errors/typo-want.patch"   # typo: wnat is not in scope

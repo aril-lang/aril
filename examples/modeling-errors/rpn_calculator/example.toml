@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "rpn_calculator.td"
+entry    = "rpn_calculator.aril"
 args            = ["3 4 + 2 *"]
 expected_output = "expected-output.txt"
 

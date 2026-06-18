@@ -1,5 +1,5 @@
---- d09.td
-+++ d09.td
+--- d09.aril
++++ d09.aril
 @@ -81,7 +81,7 @@
  
  func solveSimple(corners: []Corner): int {

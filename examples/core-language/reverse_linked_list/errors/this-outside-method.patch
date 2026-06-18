@@ -1,5 +1,5 @@
---- reverse_linked_list.td
-+++ reverse_linked_list.td
+--- reverse_linked_list.aril
++++ reverse_linked_list.aril
 @@ -14,7 +14,7 @@
  
  func reverse(head: Option<Node>): Option<Node> {

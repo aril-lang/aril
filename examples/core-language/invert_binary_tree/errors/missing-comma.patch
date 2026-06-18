@@ -1,5 +1,5 @@
---- invert_binary_tree.td
-+++ invert_binary_tree.td
+--- invert_binary_tree.aril
++++ invert_binary_tree.aril
 @@ -6,7 +6,7 @@
  
  type Tree<T> =

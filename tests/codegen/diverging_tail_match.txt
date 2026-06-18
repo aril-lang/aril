@@ -41,12 +41,12 @@ func OutcomeGood(n int) Outcome {
 	return Outcome{Tag: 1, GoodN: n}
 }
 func pick(o Outcome) int {
-	__tide_match_1 := o
-	switch __tide_match_1.Tag {
+	__aril_match_1 := o
+	switch __aril_match_1.Tag {
 	case 0:
 		os.Exit(3)
 	case 1:
-		n := __tide_match_1.GoodN
+		n := __aril_match_1.GoodN
 		return n * 2
 	}
 	panic("unreachable: non-exhaustive match")

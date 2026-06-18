@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
 )
 
 // Diag is a parser-level diagnostic with the same shape as

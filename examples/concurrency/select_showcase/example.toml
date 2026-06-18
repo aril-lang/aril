@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "select_showcase.td"
+entry    = "select_showcase.aril"
 
 [[error]]
 patch   = "errors/annot-mismatch.patch"   # n annotated string but assigned an int

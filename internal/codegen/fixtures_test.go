@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
 )
 
 // TestFixtures walks every *.txt manifest in ../../tests/codegen/,
@@ -79,7 +79,7 @@ func TestFixtures(t *testing.T) {
 				t.Fatalf("write: %v", err)
 			}
 			if err := os.WriteFile(filepath.Join(dir, "go.mod"),
-				[]byte("module tide-fixture-exec\n\ngo 1.22\n"), 0o644); err != nil {
+				[]byte("module aril-fixture-exec\n\ngo 1.22\n"), 0o644); err != nil {
 				t.Fatalf("write go.mod: %v", err)
 			}
 			cmd := exec.Command("go", "run", "./...")

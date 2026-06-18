@@ -1,5 +1,5 @@
---- fizzbuzz.td
-+++ fizzbuzz.td
+--- fizzbuzz.aril
++++ fizzbuzz.aril
 @@ -3,6 +3,7 @@
  import fmt
  

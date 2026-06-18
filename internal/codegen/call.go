@@ -8,8 +8,8 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 func (g *gen) emitCall(c *ast.Call) error {
@@ -18,7 +18,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// don't inherit it — only this call's own callee may consume it.
 	expect := g.expectType
 	g.expectType = nil
-	// reflect.* dispatch — lower to inline tidert helpers per
+	// reflect.* dispatch — lower to inline arilrt helpers per
 	// `lang-spec/builtins.md` §reflect. Codegen owns reflect's
 	// surface (it's runtime-supplied, not a Go-stdlib binding).
 	if f, ok := c.Callee.(*ast.Field); ok {
@@ -45,11 +45,11 @@ func (g *gen) emitCall(c *ast.Call) error {
 		g.b.WriteByte(')')
 		return nil
 	}
-	// fmt.scan<T>() — stdin binding. Lowers to the tideScan helper,
+	// fmt.scan<T>() — stdin binding. Lowers to the arilScan helper,
 	// which wraps Go's pointer-mutation `fmt.Scan(&v)` into the
 	// Result<T, error> return form (binding-surface.md §fmt).
 	if isFmtScan(c.Callee) {
-		g.b.WriteString("tideScan")
+		g.b.WriteString("arilScan")
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err
 		}
@@ -58,16 +58,16 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// fmt.scan2<A,B>() / fmt.scan3<A,B,C>() — multi-value stdin bindings
 	// returning Result<(A,B[,C]), error> (binding-surface.md §fmt). Lower
-	// to the tideScan2 / tideScan3 helpers (one fmt.Scan of N pointers,
+	// to the arilScan2 / arilScan3 helpers (one fmt.Scan of N pointers,
 	// folded into a tuple Ok). The tuple Ok payload destructures through
 	// the existing tuple-in-variant-payload match path.
 	if n := fmtScanMultiArity(c.Callee); n > 0 && len(c.TypeArgs) == n {
 		if n == 2 {
 			g.usesScan2 = true
-			g.b.WriteString("tideScan2")
+			g.b.WriteString("arilScan2")
 		} else {
 			g.usesScan3 = true
-			g.b.WriteString("tideScan3")
+			g.b.WriteString("arilScan3")
 		}
 		g.usesResult = true
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
@@ -98,7 +98,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Result-wrapping stdlib binding — `pkg.method(args)` whose Go
 	// referent returns `(T, error)`, lowered to
-	// `tideResultOf(pkg.GoName(args))` (bindings.go). Go spreads the
+	// `arilResultOf(pkg.GoName(args))` (bindings.go). Go spreads the
 	// referent's two-value return across the helper's two params and
 	// infers T, folding it into the predeclared Result<T, error>.
 	if f, ok := c.Callee.(*ast.Field); ok {
@@ -106,7 +106,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 			if goName, ok := stdlibResultWrapOf(recv.Name, f.Name); ok {
 				g.usesResultOf = true
 				g.usesResult = true
-				g.b.WriteString("tideResultOf(")
+				g.b.WriteString("arilResultOf(")
 				g.b.WriteString(recv.Name)
 				g.b.WriteByte('.')
 				g.b.WriteString(goName)
@@ -137,7 +137,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// sort.sorted(s, less) — comparator sort that returns a NEW slice
-	// (binding-surface.md §sort). Lowers to the inline tideSorted helper
+	// (binding-surface.md §sort). Lowers to the inline arilSorted helper
 	// (copy + sort.SliceStable), preserving the input's immutability.
 	// The comparator's omitted param types are stamped from sema's
 	// inferred Func (emitClosure reads g.info.Type) — T-Closure. Gated on
@@ -147,7 +147,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 2 && f.Name == "sorted" {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
 			g.usesSortSorted = true
-			g.b.WriteString("tideSorted")
+			g.b.WriteString("arilSorted")
 			return g.emitArgList(c.Args)
 		}
 	}
@@ -168,9 +168,9 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// makeSlice<T>(n, v) — predeclared generic builtin lowering
-	// to the inline tideMakeSlice helper.
+	// to the inline arilMakeSlice helper.
 	if id, ok := c.Callee.(*ast.Ident); ok && id.Name == "makeSlice" {
-		g.b.WriteString("tideMakeSlice")
+		g.b.WriteString("arilMakeSlice")
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// Channel instance methods (lowering-go.md §Channel lowering):
 	//   ch.send(v)  → ch <- v
 	//   ch.recv()   → <-ch
-	//   ch.tryRecv()→ tideTryRecv(ch)   (non-blocking select helper)
+	//   ch.tryRecv()→ arilTryRecv(ch)   (non-blocking select helper)
 	//   ch.close()  → close(ch)
 	if f, ok := c.Callee.(*ast.Field); ok && g.isChannelReceiver(f.Receiver) {
 		switch f.Name {
@@ -232,7 +232,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 		case "tryRecv":
 			g.usesTryRecv = true
 			g.usesOption = true
-			g.b.WriteString("tideTryRecv(")
+			g.b.WriteString("arilTryRecv(")
 			if err := g.emitExpr(f.Receiver); err != nil {
 				return err
 			}
@@ -249,7 +249,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Foreign-binding call (ffi.md §ForeignCall): an extern function
 	// `f(args)` → `pkg.Sym(args)`; an extern method `recv.m(args)` on
-	// an opaque handle → `recv.GoName(args)`. Both wrap in tideResultOf
+	// an opaque handle → `recv.GoName(args)`. Both wrap in arilResultOf
 	// when their curated return is `Result<…>`.
 	if id, ok := c.Callee.(*ast.Ident); ok {
 		if efd, isExtern := g.externFunc[id.Name]; isExtern {

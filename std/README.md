@@ -1,6 +1,6 @@
 # std/ — generated standard-library bindings
 
-Tide bindings for Go standard-library packages, produced by `internal/bindgen`
+Aril bindings for Go standard-library packages, produced by `internal/bindgen`
 (see `docs/architecture.md` section 3).
 
 These files are **generated**. Raw binding signatures are derived mechanically

@@ -1,4 +1,4 @@
-# `lang-spec/` — Tide formal specification
+# `lang-spec/` — Aril formal specification
 
 Machine-precise contracts a compiler implementer (or self-host
 re-implementation) reads. Prose explanation of *why* and *how it
@@ -17,10 +17,10 @@ On disagreement these files win, per D17.
 | `name-resolution.md` | Scoping, implicit receiver, shadow rules | ✓ |
 | `type-system.md` | Inference rules in sequent notation | ✓ |
 | `builtins.md` | Predeclared identifiers with full signatures | ✓ |
-| `desugaring.md` | Tide AST → simpler IR (match arms, scope+spawn, try) | ✓ |
+| `desugaring.md` | Aril AST → simpler IR (match arms, scope+spawn, try) | ✓ |
 | `lowering-go.md` | IR → Go encoding, runtime helpers, `//line` placement | ✓ |
 | `diagnostics.md` | Numbered error-code catalog (`E0103 Unknown name`, …) | ✓ |
-| `manifest.md` | `tide.toml` project-manifest schema + package-resolution algorithm (RFC-0002) | ✓ |
+| `manifest.md` | `aril.toml` project-manifest schema + package-resolution algorithm (RFC-0002) | ✓ |
 | `acceptance.yml` | Per-example feature manifest (label → covered constructs) | ✓ |
 
 ## Authority and coverage

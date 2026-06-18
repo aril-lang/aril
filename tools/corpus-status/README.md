@@ -1,6 +1,6 @@
-# corpus-status — the conformance scoreboard, in Tide
+# corpus-status — the conformance scoreboard, in Aril
 
-The corpus build/diagnostic scoreboard, written in Tide. Self-host/dogfood
+The corpus build/diagnostic scoreboard, written in Aril. Self-host/dogfood
 milestone: the tool that measures the corpus is itself written in the
 language, built and run by the compiler. (It began as a port of an interim
 Python script, now retired.)
@@ -11,7 +11,7 @@ tool never scores itself.
 ## Build & run
 
 ```
-tide build -o /tmp/corpus-status tools/corpus-status
+aril build -o /tmp/corpus-status tools/corpus-status
 cd <repo-root> && /tmp/corpus-status
 ```
 
@@ -48,19 +48,19 @@ caught), while unchanged Go is skipped. The cache is committed and portable
 changes codegen** for run-pass examples — that is the cost of a CI-shared,
 correctness-preserving cache.
 
-This tool is the authoritative gate: CI builds it with `tide` and runs
+This tool is the authoritative gate: CI builds it with `aril` and runs
 `--check` on every PR and push to `main`.
 
 ## Layout
 
-- `bindings.td` — curated FFI (`extern`) surface: the vendored `corpusexec`
+- `bindings.aril` — curated FFI (`extern`) surface: the vendored `corpusexec`
   subprocess adapter (`std/vendor/corpusexec`), plus `os`/`path/filepath`/
   `regexp`/`strings` bindings the built-in tables don't cover.
-- `main.td` — the logic and entry point.
+- `main.aril` — the logic and entry point.
 
 ### Why a vendored subprocess adapter
 
-Tide's `(T, error) → Result<T, error>` boundary lift discards the value when
+Aril's `(T, error) → Result<T, error>` boundary lift discards the value when
 the error is non-nil, but a subprocess's combined output is meaningful
 precisely when the process *fails* (a build diagnostic). The thin vendored
 Go module `std/vendor/corpusexec` reshapes the boundary into an opaque handle

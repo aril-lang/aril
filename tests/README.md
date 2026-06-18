@@ -3,7 +3,7 @@
 Test layers are defined in `docs/architecture.md` section 6:
 
 - L0  signature bugs eliminated by construction (generated bindings)
-- L1  round-trip compilation (Tide -> Go -> `go build`)
+- L1  round-trip compilation (Aril -> Go -> `go build`)
 - L2  structural diff of bindings against `go/types`
 - L3  behavioral / differential testing on fuzzed inputs
 - L4  Go `Example*` functions as oracles

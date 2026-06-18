@@ -1,5 +1,5 @@
---- d05.td
-+++ d05.td
+--- d05.aril
++++ d05.aril
 @@ -77,7 +77,7 @@
  
        fmt.println("Fresh DB size:", raw.len(), "=>", freshDB.len())

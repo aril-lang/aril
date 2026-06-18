@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "defer_demo.td"
+entry    = "defer_demo.aril"
 
 [[error]]
 patch   = "errors/defer-noncall.patch"   # defer argument is not a call

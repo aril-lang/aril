@@ -1,5 +1,5 @@
---- reverse_linked_list.td
-+++ reverse_linked_list.td
+--- reverse_linked_list.aril
++++ reverse_linked_list.aril
 @@ -21,7 +21,7 @@
        Some(n) => {
          let nxt = n.next

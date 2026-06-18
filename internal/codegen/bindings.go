@@ -1,7 +1,7 @@
 package codegen
 
 // bindings.go — the stdlib binding registry. A declarative table of
-// the Go-stdlib calls and values the corpus uses, with the Tide-side
+// the Go-stdlib calls and values the corpus uses, with the Aril-side
 // `pkg.method` spelling on the left and the lowering on the right.
 // Source of truth for the *intended* surface is
 // `docs/binding-surface.md`; this file is the codegen realisation of
@@ -15,7 +15,7 @@ package codegen
 //                 Go referent is value-returning (no error), so the
 //                 call/field lowers straight through with only an
 //                 identifier swap. Handled by mapFieldName.
-//   - resultWrap: `pkg.method(args)` → `tideResultOf(pkg.GoName(args))`.
+//   - resultWrap: `pkg.method(args)` → `arilResultOf(pkg.GoName(args))`.
 //                 The Go referent returns `(T, error)`; the helper
 //                 folds that into the predeclared `Result<T, error>`.
 //                 Handled by emitCall.
@@ -83,7 +83,7 @@ var stdlibRename = map[[2]string]string{
 
 // stdlibResultWrap maps a stdlib binding whose Go referent returns
 // `(T, error)` to its Go identifier. The call lowers to
-// `tideResultOf(pkg.GoName(args))`, folding the two-value Go return
+// `arilResultOf(pkg.GoName(args))`, folding the two-value Go return
 // into the predeclared `Result<T, error>` (binding-surface.md — the
 // `(T, error)` → Result wrapper convention). Go infers T from the
 // referent's first return, so one generic helper serves every row.
@@ -97,7 +97,7 @@ var stdlibResultWrap = map[[2]string]string{
 // timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to
 // its Go `time.<Unit>` constant. The call lowers to
 // `time.Duration(n) * time.<Unit>` (binding-surface.md §time —
-// Tide hides Go's `time.Second * N` idiom behind factory funcs).
+// Aril hides Go's `time.Second * N` idiom behind factory funcs).
 // ("", false) when name is not a Duration constructor.
 func timeDurationUnit(name string) (string, bool) {
 	switch name {

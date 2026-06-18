@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "valid_parentheses.td"
+entry    = "valid_parentheses.aril"
 
 [[error]]
 patch   = "errors/bad-rune.patch"   # two-character rune literal

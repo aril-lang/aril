@@ -45,7 +45,7 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
-func tideResultOf[T any](v T, err error) Result[T, error] {
+func arilResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -54,20 +54,20 @@ func tideResultOf[T any](v T, err error) Result[T, error] {
 func sum(csv string) Result[int, error] {
 	var total = 0
 	for _, p := range strings.Split(csv, ",") {
-		__tide_try_1 := tideResultOf(strconv.Atoi(strings.TrimSpace(p)))
-		if __tide_try_1.Tag == 1 {
-			return Result[int, error]{Tag: 1, E: __tide_try_1.E}
+		__aril_try_1 := arilResultOf(strconv.Atoi(strings.TrimSpace(p)))
+		if __aril_try_1.Tag == 1 {
+			return Result[int, error]{Tag: 1, E: __aril_try_1.E}
 		}
-		var n = __tide_try_1.V
+		var n = __aril_try_1.V
 		total = total + n
 	}
 	return ResultOk[int, error](total)
 }
 func main() {
-	__tide_match_1 := sum("1, 22, 333")
-	switch __tide_match_1.Tag {
+	__aril_match_1 := sum("1, 22, 333")
+	switch __aril_match_1.Tag {
 	case 0:
-		t := __tide_match_1.V
+		t := __aril_match_1.V
 		fmt.Println("total", t, "as-string", strconv.Itoa(t))
 	case 1:
 		fmt.Println("bad input")

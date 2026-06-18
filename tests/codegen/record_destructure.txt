@@ -61,15 +61,15 @@ func StepStop(info Info, why string) Step {
 }
 func describe(s Step) int {
 	return func() int {
-		__tide_match_1 := s
-		switch __tide_match_1.Tag {
+		__aril_match_1 := s
+		switch __aril_match_1.Tag {
 		case 0:
-			x := __tide_match_1.MoveInfo.At._0
-			y := __tide_match_1.MoveInfo.At._1
+			x := __aril_match_1.MoveInfo.At._0
+			y := __aril_match_1.MoveInfo.At._1
 			return x + y
 		case 1:
-			x := __tide_match_1.StopInfo.At._0
-			y := __tide_match_1.StopInfo.At._1
+			x := __aril_match_1.StopInfo.At._0
+			y := __aril_match_1.StopInfo.At._1
 			return x - y
 		}
 		var __zero int

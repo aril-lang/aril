@@ -1,26 +1,26 @@
 # Foreign-binding interface (Go FFI)
 
-The contract for binding Go libraries into Tide. This file is the
+The contract for binding Go libraries into Aril. This file is the
 formal mirror of the accepted design in `../docs/rfcs/0005-go-ffi.md`;
 on disagreement the formal files (`grammar.ebnf`, `ast.md`,
 `type-system.md`, `lowering-go.md`) win, and this file is updated to
 match.
 
-Tide binds Go through a **generate-then-curate** split: a generator
-(`tide import`) reads a Go package's type information and emits
-**declaration files** — Tide source whose items are marked foreign;
+Aril binds Go through a **generate-then-curate** split: a generator
+(`aril import`) reads a Go package's type information and emits
+**declaration files** — Aril source whose items are marked foreign;
 a human curates them and writes idiomatic **adapters** on top. The raw
 binding layer stays close to the Go shapes; the adapter layer is
-ordinary Tide. This file specifies the *raw* layer's surface and
+ordinary Aril. This file specifies the *raw* layer's surface and
 semantics.
 
 ## Declaration surface
 
-A binding module is ordinary Tide source whose foreign items are
+A binding module is ordinary Aril source whose foreign items are
 introduced by the `extern` keyword. Three declaration forms, plus a
 per-item `@go("...")` attribute that names the Go referent.
 
-```td
+```aril
 extern type Cmd @go("os/exec")
 
 extern func command(name: string, args: []string): Cmd @go("os/exec.Command")
@@ -34,9 +34,9 @@ extern impl Cmd {
 
 ### `extern type` — opaque foreign handle
 
-`extern type T @go("pkg")` declares an **opaque foreign handle**: Tide
+`extern type T @go("pkg")` declares an **opaque foreign handle**: Aril
 knows the name `T`, never the layout. A handle cannot be constructed by
-a Tide literal (only returned from an extern function/method) and cannot
+a Aril literal (only returned from an extern function/method) and cannot
 be pattern-destructured. It is a **reference type** admitted into
 `refEq` (the relaxed `T-RefEq`). It models `*exec.Cmd`,
 `*regexp.Regexp`, `os.File`, `*sql.Rows` — Go library types used
@@ -48,7 +48,7 @@ nilability, so the generator cannot prove non-nil. Guarding nil and
 lifting `*T → Option<T>` is an **adapter** responsibility — the raw
 layer never auto-lifts a handle to `Option`.
 
-A handle is **opaque** (T-Extern): it cannot be built from a Tide
+A handle is **opaque** (T-Extern): it cannot be built from a Aril
 literal or constructor call (**E1001**), cannot be tuple/record-
 destructured (**E1002**), and is excluded from structural `==`/`!=`
 (routed to `refEq`). It **is** admitted into `refEq` as a
@@ -83,13 +83,13 @@ alone. The string is interpreted by **position**:
 - On an `extern impl` member: the **bare Go method/field name** (the
   package comes from the receiver handle).
 - **Omitted** (`@go` absent, or path with no `.Symbol`): the Go symbol
-  defaults to the case-converted Tide name — Tide `command` ↔ Go
-  `Command`, Tide `Cmd` ↔ Go `Cmd` (the standard convention).
+  defaults to the case-converted Aril name — Aril `command` ↔ Go
+  `Command`, Aril `Cmd` ↔ Go `Cmd` (the standard convention).
 
 The per-item `@go` **supplants** the RFC sketch's `EXT` body marker and
 trailing `= "GoName"` rename: a single attribute carries the binding
 target, so an extern item never has a body. `EXT` is therefore not a
-Tide token. (This resolves the declaration-spelling open question.)
+Aril token. (This resolves the declaration-spelling open question.)
 
 Grammar: `grammar.ebnf` §"Foreign-binding". AST: `ast.md` §"Foreign
 bindings". Lexical surface: `keywords.md` (`extern` hard keyword;
@@ -102,7 +102,7 @@ supplies zero or more arguments of element type `T`, and inside the body
 `name` has type `[]T`. Only the **final** parameter of a function,
 method, or `extern func`/`extern impl` method may be variadic; a `...T`
 followed by another parameter is **E0115**. This is an ordinary language
-feature — it benefits plain Tide functions — but it is the binding-layer
+feature — it benefits plain Aril functions — but it is the binding-layer
 unblocker that lets Go variadics (`exec.Command(name string, arg
 ...string)`) bind faithfully rather than bail.
 
@@ -133,7 +133,7 @@ Grammar: `grammar.ebnf` §Param / §Arg. AST: `ast.md` §Param
 
 ## Verify the declaration, do not trust it
 
-Because Tide emits Go and then compiles it, the **Go type checker
+Because Aril emits Go and then compiles it, the **Go type checker
 re-verifies every binding** against the real package:
 
 - At **generation** time, signatures come from `go/types` — wrong
@@ -141,32 +141,32 @@ re-verifies every binding** against the real package:
 - At **build** time, the emitted call (`pkg.GoName(args)`) is
   type-checked by Go; a binding that has drifted from its package fails
   the build. The *contract* is that such a failure is surfaced in
-  **`.td` coordinates and Tide terminology**, never as a raw `go/types`
+  **`.aril` coordinates and Aril terminology**, never as a raw `go/types`
   diagnostic. The current lowering achieves the build-time *rejection*
-  (a drifted binding cannot miscompile); the `.td`-coordinate
+  (a drifted binding cannot miscompile); the `.aril`-coordinate
   binding-drift **diagnostic** that translates the Go error back to
-  Tide source is a later slice (until then the Go error leaks).
+  Aril source is a later slice (until then the Go error leaks).
 
 This is the property the `external`-keyword lineage (OCaml, ReScript,
 Gleam, PureScript) lacks — there a wrong declaration miscompiles
-silently. In Tide it is a build-time error.
+silently. In Aril it is a build-time error.
 
 ## Typing the surface
 
 An extern function/method/field is typed by its declared (curated)
 signature, exactly like an ordinary call/field access — the rules are
 **T-Extern** (`type-system.md` §"Foreign handles"). Because the curated
-`.td` writes any boundary-lifted return type (`Result<·, error>`,
+`.aril` writes any boundary-lifted return type (`Result<·, error>`,
 `Option<·>`) **directly**, there is no separate lift judgement at the
 type level: `extern func atoi(s: string): Result<int, error>` simply
 *is* a function returning `Result<int, error>` to the type checker. The
 lift from Go's `(int, error)` into that `Result` is a **lowering** rule
 (`lowering-go.md` §ForeignCall), applied at codegen. A referent that
 returns a **bare `error`** (no value) curates as `Result<unit, error>`
-and lowers through the `tideResultUnit` wrapper — the value-free
+and lowers through the `arilResultUnit` wrapper — the value-free
 degenerate case of the same error lift.
 
-The mechanical Go→Tide type map the **generator** uses, and the
+The mechanical Go→Aril type map the **generator** uses, and the
 automatic boundary lifts it applies when emitting the curated file —
 `(T, error) → Result<T, error>` (with bare `error → Result<unit,
 error>` as its value-free case) and comma-ok `(T, bool) → Option<T>` —
@@ -175,10 +175,10 @@ invariant: the only automatic `Option`/`Result`-producing lifts are
 the error lift and the comma-ok lift; a nil-able `*T` is an **adapter**
 lift, never automatic.
 
-## The generator — `tide import`
+## The generator — `aril import`
 
-`tide import <go/import/path>` introspects a Go package's type
-information and prints a deterministic (name-sorted) `.td` binding file
+`aril import <go/import/path>` introspects a Go package's type
+information and prints a deterministic (name-sorted) `.aril` binding file
 of `extern` items — a *starting point a human owns*, not an always-on
 translation. The output is reviewed source; the Go type checker catches
 any residual error at build (verify-don't-trust).
@@ -194,7 +194,7 @@ Each symbol is rendered with its translated signature and the boundary
 lifts; the generator marks what the curator must review inline:
 `// UNBINDABLE <name>: <reason>` for a symbol it cannot translate, and a
 `// GUESS` note on a `(T, bool) → Option<T>` lift (which it cannot prove
-is comma-ok rather than a meaningful bool). Names colliding with a Tide
+is comma-ok rather than a meaningful bool). Names colliding with a Aril
 keyword are escaped (`Match → match_`), the `@go` attribute pinning the
 real Go symbol.
 
@@ -206,9 +206,9 @@ compilable module — there is nothing to bind.)
 
 This epoch's generator binds a **named type whose underlying is an
 interface** (e.g. `os.Signal`) as an opaque handle, and **bails** on a
-`func`-typed parameter or result (Tide closures-as-FFI-callbacks are a
+`func`-typed parameter or result (Aril closures-as-FFI-callbacks are a
 later slice). Both diverge from the RFC's eventual table (interfaces →
-Tide `interface`, `func(A) R → (A) => R`); the curator bridges the gap
+Aril `interface`, `func(A) R → (A) => R`); the curator bridges the gap
 by hand until those lifts land.
 
 ## Bindable subset and bail-out
@@ -220,7 +220,7 @@ types, cross-package named types) is **not** emitted as a
 binding: the generator currently renders it as a `// UNBINDABLE` comment
 naming the real reason, so one untranslatable symbol does not sterilise
 the rest of the package. The RFC's stronger **poison declaration** (a
-binding that compiles but raises a `.td`-coordinate diagnostic on *use*)
+binding that compiles but raises a `.aril`-coordinate diagnostic on *use*)
 is a follow-up; the comment form already prevents silent mistranslation.
 
 ## Dependency model
@@ -238,15 +238,15 @@ carrying a `require` for the module plus a `replace` to the **absolute
 path of the vendored copy**, so the build never touches the network —
 the hermeticity guardrail. A program that uses no third-party binding
 gets the plain require-free module. The toolchain locates the manifest
-via `$TIDE_ROOT`, else the nearest ancestor of the cwd holding
+via `$ARIL_ROOT`, else the nearest ancestor of the cwd holding
 `std/bindings.json`.
 
 The proving case is `examples/ffi/config_reader` binding the vendored
-`example.com/tidekv` module; a real third-party library
+`example.com/arilkv` module; a real third-party library
 (`github.com/BurntSushi/toml`) plugs into the same mechanism once
 vendored — its `toml.parse<T>` would mirror `json.parse<T>`, differing
 only in the underlying package and the manifest `require`. Generating
 bindings for a *non-stdlib* package (module-aware loading, which
 `go/importer` source mode does not do) is a separate follow-up — the
-plumbing here is independent of how the binding `.td` is authored
+plumbing here is independent of how the binding `.aril` is authored
 (hand-curated, as the proving case is).

@@ -6,18 +6,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
-// Emit lowers the given Tide AST to a Go source string. The
+// Emit lowers the given Aril AST to a Go source string. The
 // returned text is gofmt-stable (round-trips through gofmt -s).
 // file is the source path embedded into //line directives;
 // pass "" to suppress them.
 func Emit(f *ast.File, file string) (string, error) {
 	// Codegen reads variable / receiver types from the sema
 	// side-table. When called standalone (tests, tooling) it
-	// computes Info here; cmd/tide passes the Info it already
+	// computes Info here; cmd/aril passes the Info it already
 	// produced via EmitWithInfo. Diagnostics are the caller's
 	// concern — codegen only needs the type side-table.
 	info, _ := sema.Check(f, file)
@@ -29,12 +29,12 @@ func EmitWithInfo(f *ast.File, file string, info *sema.Info) (string, error) {
 	return EmitFilesWithInfo([]*ast.File{f}, []string{file}, info)
 }
 
-// EmitFilesWithInfo lowers a whole package — every `.td` file in a
+// EmitFilesWithInfo lowers a whole package — every `.aril` file in a
 // directory shares one Go `package main` (RFC-0002 §"Package =
 // directory"). The files are merged into one compile unit: the union of
 // their imports plus the concatenation of their declarations. Each decl
 // remembers its own source path so the //line directives attribute it
-// to the right `.td` file. `paths[i]` is the //line path for files[i]
+// to the right `.aril` file. `paths[i]` is the //line path for files[i]
 // ("" suppresses directives for that file).
 func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (string, error) {
 	merged := &ast.File{}
@@ -102,7 +102,7 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 		generic: true,
 		statics: map[string]bool{"new": true},
 	}
-	// `import reflect` is a Tide-internal module — signals that
+	// `import reflect` is a Aril-internal module — signals that
 	// codegen should emit the reflection layer (Dynamic struct,
 	// TypeDescriptor, registry, helper funcs). It is NOT a
 	// Go-stdlib binding (D6 / D18); the Go-side `import "reflect"`
@@ -139,7 +139,7 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 		// block.
 		// Collect set of declared class names first so field-type
 		// resolution can reference them (descRef for a field of
-		// class-type X is `tideDesc_X`).
+		// class-type X is `arilDesc_X`).
 		classNames := map[string]bool{}
 		for _, d := range f.Decls {
 			if cd, ok := d.(*ast.ClassDecl); ok && len(cd.TypeParams) == 0 {
@@ -155,12 +155,12 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 				var fields []fieldDescInfo
 				for _, cf := range v.Fields {
 					fields = append(fields, fieldDescInfo{
-						tideName: cf.Name,
+						arilName: cf.Name,
 						descRef:  descRefForType(cf.DeclType, classNames),
 					})
 				}
 				g.descriptors = append(g.descriptors, descInfo{
-					tideName: v.Name,
+					arilName: v.Name,
 					goType:   "*main." + v.Name,
 					kind:     "KindClass",
 					fields:   fields,
@@ -168,7 +168,7 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 			case *ast.TypeDecl:
 				if _, ok := v.Body.(*ast.SumTypeBody); ok {
 					g.descriptors = append(g.descriptors, descInfo{
-						tideName: v.Name,
+						arilName: v.Name,
 						goType:   "main." + v.Name,
 						kind:     "KindSum",
 					})
@@ -220,7 +220,7 @@ func EmitFilesWithInfo(files []*ast.File, paths []string, info *sema.Info) (stri
 	// `import reflect` is present, the names Primitive / Class /
 	// Sum / Slice / Function / Unit are reserved at the variant
 	// namespace; user sums sharing any of them yield E0104-style
-	// ambiguity (sema PR moves this to a proper `.td`-coordinate
+	// ambiguity (sema PR moves this to a proper `.aril`-coordinate
 	// diagnostic).
 	if g.usesReflect {
 		kindVariants := []string{"Primitive", "Class", "Sum", "Slice", "Function", "Unit"}
@@ -311,7 +311,7 @@ type gen struct {
 	// (`Counter(...)` → `&Counter{...}`) and static-method
 	// calls (`Counter.make(...)` → `counterMake(...)`).
 	class map[string]classInfo
-	// fieldTypes maps a record/class name to its fields' declared Tide
+	// fieldTypes maps a record/class name to its fields' declared Aril
 	// TypeExprs. emitBraceLit sets expectType from it so a constructor
 	// field value whose type Go can't infer — a bare `None` / `Ok` in
 	// `Envelope{ q: None, … }` — gets its type args stamped from the
@@ -337,24 +337,24 @@ type gen struct {
 	usesScan      bool
 	// usesScan2 / usesScan3 — the multi-value stdin bindings
 	// `fmt.scan2<A,B>()` / `fmt.scan3<A,B,C>()`, lowered to the
-	// tideScan2 / tideScan3 helpers (Result<(A,B[,C]), error>).
+	// arilScan2 / arilScan3 helpers (Result<(A,B[,C]), error>).
 	usesScan2    bool
 	usesScan3    bool
 	usesResultOf bool
 	// usesResultUnit — an extern referent returning a bare Go `error`
-	// (Tide `Result<unit, error>`) is lifted via the tideResultUnit
+	// (Aril `Result<unit, error>`) is lifted via the arilResultUnit
 	// helper (lowering-go.md §ForeignCall).
 	usesResultUnit bool
 	// usesJSON — any json.* binding is used, so Go's encoding/json is
 	// imported and (with usesOption) the Option ⇄ null/value JSON
 	// methods are emitted. usesJSONParse additionally forces the
-	// tideJSONParse helper (json.parse<T>).
+	// arilJSONParse helper (json.parse<T>).
 	usesJSON      bool
 	usesJSONParse bool
 	usesTryRecv   bool
 	usesScope     bool
 	// usesSortSorted — `sort.sorted(s, less)` is used, so its inline
-	// tideSorted helper (copy + sort.SliceStable) and Go's "sort"
+	// arilSorted helper (copy + sort.SliceStable) and Go's "sort"
 	// import are needed.
 	usesSortSorted bool
 	// usesErrorCtor — the `error(msg)` free constructor (builtins.md)
@@ -369,34 +369,34 @@ type gen struct {
 	inSpawnBody bool
 	// usedGoPkgs — Go stdlib packages actually referenced in the
 	// emitted output (a `pkg.Sym`). Populated by the pre-walk; the
-	// import block is this set ∩ the .td imports, so a binding that
+	// import block is this set ∩ the .aril imports, so a binding that
 	// lowers to a Go conversion (strings.fromBytes → string(...))
 	// does not drag in an unused import.
 	usedGoPkgs map[string]bool
 	// Foreign bindings (ffi.md), pre-scanned from the file's extern
 	// decls before the import pre-walk. externFunc/externType key on
-	// the Tide name; externMethods/externFields key handle→member.
+	// the Aril name; externMethods/externFields key handle→member.
 	// externPkgs collects the Go import paths the emitted bindings
 	// reference, added to the import block by writeHeader (these come
-	// from `@go`, not the .td imports).
+	// from `@go`, not the .aril imports).
 	externFunc    map[string]*ast.ExternFuncDecl
 	externType    map[string]*ast.ExternTypeDecl
 	externMethods map[string]map[string]*ast.ExternMethod
 	externFields  map[string]map[string]*ast.ExternField
 	externPkgs    map[string]bool
 	// descriptors collected during emit — for each user-declared
-	// type that has a Tide-side descriptor, we emit a
-	// `tideDesc_<Name>` package-level var plus an init()
+	// type that has a Aril-side descriptor, we emit a
+	// `arilDesc_<Name>` package-level var plus an init()
 	// registration into the descriptor map keyed by the Go-side
 	// type name. Consumed by reflect.box runtime lookup.
 	descriptors []descInfo
-	// curFuncReturn — the Tide return TypeExpr of the function /
+	// curFuncReturn — the Aril return TypeExpr of the function /
 	// method currently being emitted. Consumed by TryExpr
 	// lowering to know whether the early-return target is
 	// `Option<U>` or `Result<U, E>` and to extract U / E for
 	// the wrapped return value.
 	curFuncReturn ast.TypeExpr
-	// expectType — the Tide TypeExpr the next emitted expression is
+	// expectType — the Aril TypeExpr the next emitted expression is
 	// expected to produce, set at return / typed-binding positions and
 	// consumed (then cleared) by emitCall to supply explicit type args
 	// to predeclared Result/Option constructors whose un-constrained
@@ -449,33 +449,33 @@ type classInfo struct {
 // `reflect.fields(t)` and `reflect.fieldValue(v, name)`. Empty
 // for non-class descriptors.
 type descInfo struct {
-	tideName string
+	arilName string
 	goType   string
 	kind     string // "KindClass" / "KindSum" / etc.
 	fields   []fieldDescInfo
 }
 
 // fieldDescInfo is one entry in a class descriptor's field
-// list. `tideName` is the Tide-source spelling (also the
+// list. `arilName` is the Aril-source spelling (also the
 // Go-side struct field name — emitted lowercase per the
 // class-field lowering convention); `descRef` is the Go-side
 // var name pointing at the field's type descriptor (e.g.,
-// "tideDesc_int" for int, "tideDesc_Counter" for a class
+// "arilDesc_int" for int, "arilDesc_Counter" for a class
 // instance). When the field's static type has no resolvable
 // descriptor (slices, generics, ...) descRef is the empty
 // string and reflect.fields synthesises a placeholder.
 type fieldDescInfo struct {
-	tideName string
+	arilName string
 	descRef  string
 }
 
 func (g *gen) writeHeader(f *ast.File) {
 	g.b.WriteString("package main\n\n")
-	// PR-C bindings shortcut: every Tide import resolves to the
+	// PR-C bindings shortcut: every Aril import resolves to the
 	// matching Go stdlib package by the same name. fmt → "fmt".
 	// strconv → "strconv". etc. Sorted for determinism.
 	//
-	// `reflect` is Tide-internal (D6 / D18 — runtime-supplied,
+	// `reflect` is Aril-internal (D6 / D18 — runtime-supplied,
 	// not a Go-stdlib binding); it does NOT translate to a Go
 	// import for the user, but if usesReflect is set we add Go's
 	// `import "reflect"` for the descriptor registry's internal
@@ -491,7 +491,7 @@ func (g *gen) writeHeader(f *ast.File) {
 	}
 	for _, im := range f.Imports {
 		if im.Path == "reflect" {
-			continue // Tide-internal
+			continue // Aril-internal
 		}
 		// Drop a stdlib import the generated Go never references —
 		// e.g. a program whose only `strings` use is the
@@ -500,7 +500,7 @@ func (g *gen) writeHeader(f *ast.File) {
 		if isStdlibNamespaceName(im.Path) && !g.usedGoPkgs[im.Path] {
 			continue
 		}
-		// Tide import name → Go import path (json → encoding/json); all
+		// Aril import name → Go import path (json → encoding/json); all
 		// other stdlib bindings share the name.
 		add(goImportPath(im.Path))
 	}
@@ -522,12 +522,12 @@ func (g *gen) writeHeader(f *ast.File) {
 		add("errors")
 	}
 	if g.usesSortSorted {
-		// sort.sorted lowers onto the tideSorted helper (sort.SliceStable).
+		// sort.sorted lowers onto the arilSorted helper (sort.SliceStable).
 		add("sort")
 	}
 	// Foreign-binding packages (ffi.md) — the Go import paths named by
 	// `@go` attributes of the extern funcs/handles actually used. These
-	// come from `@go`, not the .td imports, so they are added directly.
+	// come from `@go`, not the .aril imports, so they are added directly.
 	for p := range g.externPkgs {
 		add(p)
 	}
@@ -583,10 +583,10 @@ func (g *gen) writePredeclaredSums() {
 	// Struct shape exactly per `lang-spec/lowering-go.md`
 	// §Container types — runtime representation: `Option[T]`
 	// fields `Tag` + `V`; `Result[T, E]` fields `Tag` + `V` + `E`.
-	// The spec puts these in `tidert/runtime.go` and refers to
-	// them as `tidert.Option[T]` / `tidert.Result[T, E]`; PR-F5b
+	// The spec puts these in `arilrt/runtime.go` and refers to
+	// them as `arilrt.Option[T]` / `arilrt.Result[T, E]`; PR-F5b
 	// emits them inline in `main` as a v1 transitional state.
-	// Block R relocates them to `tidert/` without changing the
+	// Block R relocates them to `arilrt/` without changing the
 	// struct shape.
 	if g.usesOption {
 		g.b.WriteString("type Option[T any] struct {\n\tTag uint8\n\tV   T\n}\n")
@@ -612,11 +612,11 @@ func (g *gen) writePredeclaredMakeSlice() {
 	if !g.usesMakeSlice {
 		return
 	}
-	g.b.WriteString(`func tideMakeSlice[T any](n int) []T { return make([]T, n) }
+	g.b.WriteString(`func arilMakeSlice[T any](n int) []T { return make([]T, n) }
 `)
 }
 
-// writePredeclaredScan emits the tideScan helper backing the
+// writePredeclaredScan emits the arilScan helper backing the
 // `fmt.scan<T>()` binding (binding-surface.md §fmt). It wraps Go's
 // pointer-mutation `fmt.Scan(&v)` into Result<T, error>: a read error
 // becomes Err, a successful parse becomes Ok(v). Requires the
@@ -625,7 +625,7 @@ func (g *gen) writePredeclaredScan() {
 	if !g.usesScan {
 		return
 	}
-	g.b.WriteString(`func tideScan[T any]() Result[T, error] {
+	g.b.WriteString(`func arilScan[T any]() Result[T, error] {
 	var v T
 	if _, err := fmt.Scan(&v); err != nil {
 		return ResultErr[T, error](err)
@@ -647,7 +647,7 @@ func (g *gen) writePredeclaredScan2() {
 	if !g.usesScan2 {
 		return
 	}
-	g.b.WriteString(`func tideScan2[A any, B any]() Result[struct { _0 A; _1 B }, error] {
+	g.b.WriteString(`func arilScan2[A any, B any]() Result[struct { _0 A; _1 B }, error] {
 	var a A
 	var b B
 	if _, err := fmt.Scan(&a, &b); err != nil {
@@ -662,7 +662,7 @@ func (g *gen) writePredeclaredScan3() {
 	if !g.usesScan3 {
 		return
 	}
-	g.b.WriteString(`func tideScan3[A any, B any, C any]() Result[struct { _0 A; _1 B; _2 C }, error] {
+	g.b.WriteString(`func arilScan3[A any, B any, C any]() Result[struct { _0 A; _1 B; _2 C }, error] {
 	var a A
 	var b B
 	var c C
@@ -674,7 +674,7 @@ func (g *gen) writePredeclaredScan3() {
 `)
 }
 
-// writePredeclaredResultOf emits the tideResultOf helper backing the
+// writePredeclaredResultOf emits the arilResultOf helper backing the
 // `(T, error)` → Result<T, error> stdlib bindings (bindings.go —
 // `strconv.atoi`, `os.readFile`, …). A non-nil error becomes Err, a
 // successful value becomes Ok. Requires the predeclared Result sum
@@ -683,7 +683,7 @@ func (g *gen) writePredeclaredResultOf() {
 	if !g.usesResultOf {
 		return
 	}
-	g.b.WriteString(`func tideResultOf[T any](v T, err error) Result[T, error] {
+	g.b.WriteString(`func arilResultOf[T any](v T, err error) Result[T, error] {
 	if err != nil {
 		return ResultErr[T, error](err)
 	}
@@ -692,7 +692,7 @@ func (g *gen) writePredeclaredResultOf() {
 `)
 }
 
-// writePredeclaredResultUnit emits the tideResultUnit helper backing
+// writePredeclaredResultUnit emits the arilResultUnit helper backing
 // the bare-`error` → Result<unit, error> boundary lift for extern
 // referents that return only an `error` (`os.Chdir`, `os.WriteFile`,
 // …). `unit` lowers to Go's zero-byte struct{} (lowering-go.md
@@ -702,7 +702,7 @@ func (g *gen) writePredeclaredResultUnit() {
 	if !g.usesResultUnit {
 		return
 	}
-	g.b.WriteString(`func tideResultUnit(err error) Result[struct{}, error] {
+	g.b.WriteString(`func arilResultUnit(err error) Result[struct{}, error] {
 	if err != nil {
 		return ResultErr[struct{}, error](err)
 	}
@@ -711,15 +711,15 @@ func (g *gen) writePredeclaredResultUnit() {
 `)
 }
 
-// writePredeclaredSortSorted emits the tideSorted helper backing
+// writePredeclaredSortSorted emits the arilSorted helper backing
 // `sort.sorted(s, less)` (binding-surface.md §sort): a comparator sort
-// that returns a NEW slice (Tide preserves the input's immutability),
+// that returns a NEW slice (Aril preserves the input's immutability),
 // built on Go's sort.SliceStable for a stable order. Conditional on use.
 func (g *gen) writePredeclaredSortSorted() {
 	if !g.usesSortSorted {
 		return
 	}
-	g.b.WriteString(`func tideSorted[T any](s []T, less func(T, T) bool) []T {
+	g.b.WriteString(`func arilSorted[T any](s []T, less func(T, T) bool) []T {
 	out := make([]T, len(s))
 	copy(out, s)
 	sort.SliceStable(out, func(i, j int) bool { return less(out[i], out[j]) })
@@ -736,7 +736,7 @@ func (g *gen) writePredeclaredTryRecv() {
 	if !g.usesTryRecv {
 		return
 	}
-	g.b.WriteString(`func tideTryRecv[T any](ch <-chan T) Option[T] {
+	g.b.WriteString(`func arilTryRecv[T any](ch <-chan T) Option[T] {
 	select {
 	case v := <-ch:
 		return OptionSome[T](v)
@@ -758,19 +758,19 @@ func (g *gen) writePredeclaredGroup() {
 	if !g.usesScope {
 		return
 	}
-	g.b.WriteString(`type tideGroup struct {
+	g.b.WriteString(`type arilGroup struct {
 	wg     sync.WaitGroup
 	once   sync.Once
 	err    error
 	cancel context.CancelFunc
 }
 
-func tideNewGroup(parent context.Context) (*tideGroup, context.Context) {
+func arilNewGroup(parent context.Context) (*arilGroup, context.Context) {
 	ctx, cancel := context.WithCancel(parent)
-	return &tideGroup{cancel: cancel}, ctx
+	return &arilGroup{cancel: cancel}, ctx
 }
 
-func (g *tideGroup) Go(f func() error) {
+func (g *arilGroup) Go(f func() error) {
 	g.wg.Add(1)
 	go func() {
 		defer g.wg.Done()
@@ -783,7 +783,7 @@ func (g *tideGroup) Go(f func() error) {
 	}()
 }
 
-func (g *tideGroup) Wait() error {
+func (g *arilGroup) Wait() error {
 	g.wg.Wait()
 	g.cancel()
 	return g.err
@@ -797,7 +797,7 @@ func (g *tideGroup) Wait() error {
 // `lang-spec/lowering-go.md` §Container types. Conditional —
 // programs that don't reference a container emit no Go-side
 // noise for it. Like writePredeclaredSums, the spec authoritative
-// location is `tidert/runtime.go`; PR-F6 emits them inline in
+// location is `arilrt/runtime.go`; PR-F6 emits them inline in
 // `main` as a v1 transitional state. Block R relocates without
 // changing the struct shape.
 func (g *gen) writePredeclaredContainers() {
@@ -907,7 +907,7 @@ func (s *Stack[T]) pop() Result[T, error] {
 	n := len(s.xs)
 	if n == 0 {
 		var zero T
-		return Result[T, error]{Tag: 1, E: tideEmptyStack, V: zero}
+		return Result[T, error]{Tag: 1, E: arilEmptyStack, V: zero}
 	}
 	v := s.xs[n-1]
 	s.xs = s.xs[:n-1]
@@ -921,11 +921,11 @@ func (s *Stack[T]) peek() Option[T] {
 	return Option[T]{Tag: 1, V: s.xs[n-1]}
 }
 
-var tideEmptyStack = tideEmptyStackError{}
+var arilEmptyStack = arilEmptyStackError{}
 
-type tideEmptyStackError struct{}
+type arilEmptyStackError struct{}
 
-func (tideEmptyStackError) Error() string { return "empty stack" }
+func (arilEmptyStackError) Error() string { return "empty stack" }
 `)
 	}
 }
@@ -1158,13 +1158,13 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				walk(arm.Body)
 			}
 		case *ast.Call:
-			// `fmt.scan<T>()` lowers to the tideScan helper, which
+			// `fmt.scan<T>()` lowers to the arilScan helper, which
 			// returns Result<T, error> — pull both into the binary.
 			if isFmtScan(v.Callee) {
 				g.usesScan = true
 				g.usesResult = true
 			}
-			// `fmt.scan2`/`fmt.scan3` lower to the tideScan2/tideScan3
+			// `fmt.scan2`/`fmt.scan3` lower to the arilScan2/arilScan3
 			// helpers, which return Result<(…), error> — pull both in.
 			if n := fmtScanMultiArity(v.Callee); n == 2 {
 				g.usesScan2 = true
@@ -1174,7 +1174,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				g.usesResult = true
 			}
 			// A `(T, error)` stdlib binding (`strconv.atoi`,
-			// `os.readFile`, …) lowers via the tideResultOf helper,
+			// `os.readFile`, …) lowers via the arilResultOf helper,
 			// which returns Result<T, error> — pull both in.
 			if f, ok := v.Callee.(*ast.Field); ok {
 				if recv, ok := f.Receiver.(*ast.Ident); ok {
@@ -1184,7 +1184,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 					}
 				}
 			}
-			// `ch.tryRecv()` lowers to the tideTryRecv helper, which
+			// `ch.tryRecv()` lowers to the arilTryRecv helper, which
 			// returns Option<T> — pull both into the binary. Keyed on
 			// the method name (the receiver's channel kind is a sema
 			// fact); a same-named user method would over-pull the
@@ -1193,7 +1193,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if g.isErrorCtorCall(v) {
 				g.usesErrorCtor = true
 			}
-			// `sort.sorted(s, less)` lowers to the inline tideSorted
+			// `sort.sorted(s, less)` lowers to the inline arilSorted
 			// helper, which needs Go's "sort". Gated on the sema symbol
 			// (as the emitCall intercept is) so a user `sort` value
 			// doesn't drag in the import + helper.
@@ -1204,8 +1204,8 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			}
 			// json.* bindings (binding-surface.md §encoding/json). Gated
 			// on the sema symbol like sort.sorted. parse<T> needs the
-			// tideJSONParse helper; serialize/serializeIndent reuse
-			// tideResultOf. Either marks usesJSON so the Option JSON
+			// arilJSONParse helper; serialize/serializeIndent reuse
+			// arilResultOf. Either marks usesJSON so the Option JSON
 			// methods + encoding/json import are pulled in.
 			if f, ok := v.Callee.(*ast.Field); ok {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "json" && g.isBuiltinModule(recv) {
@@ -1227,7 +1227,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			}
 			// Foreign bindings (ffi.md): an extern func call pulls its
 			// `@go` package into the import block, and a `Result<…>`
-			// return (func or handle method) pulls the tideResultOf helper.
+			// return (func or handle method) pulls the arilResultOf helper.
 			if id, ok := v.Callee.(*ast.Ident); ok {
 				if efd, isExtern := g.externFunc[id.Name]; isExtern {
 					if pkg, _ := goRefPkgSym(efd.Go, efd.Name); pkg != "" {
@@ -1346,7 +1346,7 @@ func (g *gen) emitTypeDecl(td *ast.TypeDecl) error {
 		return nil
 	case *ast.RecordTypeBody:
 		// A nominal record lowers to a named Go struct. Fields are
-		// EXPORTED and carry a `json:"<tideName>"` tag so encoding/json
+		// EXPORTED and carry a `json:"<arilName>"` tag so encoding/json
 		// (reflecting from outside package main) round-trips them
 		// (lowering-go.md §Record lowering).
 		g.line(td.Span.StartLine)
@@ -1691,7 +1691,7 @@ func (g *gen) emitFuncDecl(fn *ast.FuncDecl) error {
 func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 	switch v := t.(type) {
 	case *ast.PrimitiveType:
-		// Tide primitive names map 1:1 onto Go's by spec
+		// Aril primitive names map 1:1 onto Go's by spec
 		// (lowering-go.md §Primitive type lowering); the only
 		// transform is `unit` → Go's zero-byte `struct{}`.
 		if v.Name == "unit" {
@@ -2224,7 +2224,7 @@ func (g *gen) emitTupleLit(t *ast.TupleLit) error {
 }
 
 // emitReflectCall lowers a `reflect.X(args)` call to the
-// corresponding inline tidert helper emitted by
+// corresponding inline arilrt helper emitted by
 // `writePredeclaredReflect`. Current surface: box / unbox /
 // typeOf / typeName / kind / fields / fieldValue / show
 // (PR-R1 .. PR-R3). Variants / methods / typeArgs / elementType
@@ -2232,7 +2232,7 @@ func (g *gen) emitTupleLit(t *ast.TupleLit) error {
 func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.Expr) error {
 	switch name {
 	case "box":
-		g.b.WriteString("tideBox")
+		g.b.WriteString("arilBox")
 		if len(typeArgs) > 0 {
 			g.b.WriteByte('[')
 			if err := g.emitTypeExpr(typeArgs[0]); err != nil {
@@ -2253,7 +2253,7 @@ func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.E
 		if len(typeArgs) != 1 {
 			return fmt.Errorf("codegen: reflect.unbox requires exactly one explicit type argument `reflect.unbox<T>(d)`")
 		}
-		g.b.WriteString("tideUnbox[")
+		g.b.WriteString("arilUnbox[")
 		if err := g.emitTypeExpr(typeArgs[0]); err != nil {
 			return err
 		}
@@ -2267,7 +2267,7 @@ func (g *gen) emitReflectCall(name string, typeArgs []ast.TypeExpr, args []ast.E
 		g.b.WriteByte(')')
 		return nil
 	case "typeOf", "typeName", "kind", "fields", "fieldValue", "show":
-		g.b.WriteString("tide")
+		g.b.WriteString("aril")
 		g.b.WriteString(strings.ToUpper(name[:1]))
 		g.b.WriteString(name[1:])
 		g.b.WriteByte('(')
@@ -2416,7 +2416,7 @@ func patternBindsNothing(p ast.Pattern) bool {
 // the other codegen-internal temps.
 func (g *gen) nextDestructureTemp() string {
 	g.destructureTempCounter++
-	return fmt.Sprintf("__tide_destructure_%d", g.destructureTempCounter)
+	return fmt.Sprintf("__aril_destructure_%d", g.destructureTempCounter)
 }
 
 // emitLetOrVar lowers both `let` and `var` to Go's `var name [T] = value`.
@@ -2741,7 +2741,7 @@ func (g *gen) emitField(f *ast.Field) error {
 	}
 	g.b.WriteByte('.')
 	// Foreign-handle field access (ffi.md §ExternImpl) takes the Go
-	// field name from its `@go` attribute, not the exported-Tide form.
+	// field name from its `@go` attribute, not the exported-Aril form.
 	if fld, ok := g.externFieldOf(f); ok {
 		g.b.WriteString(goRefMember(fld.Go, fld.Name))
 		return nil
@@ -2750,7 +2750,7 @@ func (g *gen) emitField(f *ast.Field) error {
 	return nil
 }
 
-// goFieldName maps a Tide *field-value* access `recv.name` to its Go
+// goFieldName maps a Aril *field-value* access `recv.name` to its Go
 // spelling. A genuine user record/class field is EXPORTED
 // (exportFieldName) so encoding/json can reach it; a stdlib-namespace
 // value access (`os.args` → `os.Args`) keeps its binding rename, and
@@ -2808,7 +2808,7 @@ func (g *gen) isDataFieldSelector(receiver ast.Expr, name string) bool {
 	return false
 }
 
-// goMethodName maps a Tide method-call selector `recv.name(...)` to its
+// goMethodName maps a Aril method-call selector `recv.name(...)` to its
 // Go spelling — the pre-export behaviour (stdlib renames + the
 // `error`→`Error` boundary, otherwise the verbatim lowercase name).
 // Methods stay unexported (package main reaches them); only data fields
@@ -2830,24 +2830,24 @@ func (g *gen) isErrorBuiltinReceiver(receiver ast.Expr) bool {
 	return ok && b.N == "error"
 }
 
-// goIdent maps a Tide identifier to its Go form. PR-C handles
+// goIdent maps a Aril identifier to its Go form. PR-C handles
 // the common cases (no transform); future PRs add Go-reserved-
-// word escaping ("type" → "tide_type") and the `$tide_NN` →
-// `_tide_NN` rewrite for codegen-synthesised names.
+// word escaping ("type" → "aril_type") and the `$aril_NN` →
+// `_aril_NN` rewrite for codegen-synthesised names.
 func goIdent(name string) string {
 	if isGoReserved(name) {
-		return "tide_" + name
+		return "aril_" + name
 	}
 	return name
 }
 
-// exportFieldName spells a Tide record/class field as an EXPORTED Go
+// exportFieldName spells a Aril record/class field as an EXPORTED Go
 // field name. encoding/json reflects from outside package main, so an
 // unexported Go field is invisible to it; exporting is what makes JSON
-// round-trip work (lowering-go.md §Record lowering). The Tide name is
+// round-trip work (lowering-go.md §Record lowering). The Aril name is
 // preserved verbatim in the field's `json:"…"` tag (field-name ==
 // JSON-key, binding-surface.md §encoding/json), so the capitalised Go
-// spelling is invisible at the Tide-source and wire levels. Exported
+// spelling is invisible at the Aril-source and wire levels. Exported
 // names always start uppercase, so they can never be Go-reserved — no
 // goIdent escaping needed.
 //
@@ -2872,12 +2872,12 @@ func exportFieldName(name string) string {
 	return "X" + name
 }
 
-// writeJSONTag emits the ` `+"`json:\"<tideName>\"`"+` ` struct tag that
-// pins the JSON key to the Tide field name regardless of the exported Go
+// writeJSONTag emits the ` `+"`json:\"<arilName>\"`"+` ` struct tag that
+// pins the JSON key to the Aril field name regardless of the exported Go
 // spelling (binding-surface.md §encoding/json: field-name == JSON-key).
-func (g *gen) writeJSONTag(tideName string) {
+func (g *gen) writeJSONTag(arilName string) {
 	g.b.WriteString(" `json:\"")
-	g.b.WriteString(tideName)
+	g.b.WriteString(arilName)
 	g.b.WriteString("\"`")
 }
 
@@ -2902,7 +2902,7 @@ func (g *gen) writeIndent() {
 }
 
 // line emits a //line directive at the start of a statement
-// boundary, mapping subsequent Go lines back to the Tide source
+// boundary, mapping subsequent Go lines back to the Aril source
 // line. Suppressed when no file path was supplied.
 func (g *gen) line(srcLine int) {
 	if g.file == "" || srcLine == g.emittedLine {

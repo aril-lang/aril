@@ -1,5 +1,5 @@
 --- TITLE ---
-A user value named `sort` with its own `.sorted(a, b)` method is NOT hijacked by the sort.sorted binding intercept: the intercept is gated on the receiver resolving to the predeclared `sort` module (sema symbol), so this emits an ordinary Go method call, no tideSorted helper, no `import "sort"`. The field access `sort.id` exports to `sort.Id` even though `sort` names a package — the export gate is the sema symbol, not the spelling (name-match footgun).
+A user value named `sort` with its own `.sorted(a, b)` method is NOT hijacked by the sort.sorted binding intercept: the intercept is gated on the receiver resolving to the predeclared `sort` module (sema symbol), so this emits an ordinary Go method call, no arilSorted helper, no `import "sort"`. The field access `sort.id` exports to `sort.Id` even though `sort` names a package — the export gate is the sema symbol, not the spelling (name-match footgun).
 
 --- INPUT ---
 import fmt

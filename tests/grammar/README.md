@@ -6,7 +6,7 @@ with three sections in the typical positive case:
 
 ```
 --- INPUT ---
-<.td source>
+<.aril source>
 
 --- AST ---
 <canonical S-expression>
@@ -20,7 +20,7 @@ For negative cases (parse errors), use `ERRORS` instead of `AST`:
 
 ```
 --- ERRORS ---
-src.td:line:col: error[EXXXX]: message
+src.aril:line:col: error[EXXXX]: message
 ```
 
 The same trailing-newline rule as `tests/lexer/` applies: the

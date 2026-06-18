@@ -55,9 +55,9 @@ func predeclaredSymbols() map[string]*Symbol {
 	return out
 }
 
-// goReservedIdent — codegen-internal `_tide_` prefix per E0107.
+// goReservedIdent — codegen-internal `_aril_` prefix per E0107.
 // Lexer already rejects this; kept as defence-in-depth for
 // synthesised names that bypass the lexer.
 func goReservedIdent(name string) bool {
-	return len(name) >= 6 && name[:6] == "_tide_"
+	return len(name) >= 6 && name[:6] == "_aril_"
 }

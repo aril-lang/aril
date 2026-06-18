@@ -1,6 +1,6 @@
 # Binding surface (target sketch)
 
-The intended Tide-side spelling of the Go-stdlib calls and types **used by
+The intended Aril-side spelling of the Go-stdlib calls and types **used by
 the v1 acceptance suite**, plus near-neighbours we expect to ship in the
 first binding-generator iteration. This document is a **contract**: when
 the binding generator (`internal/bindgen`) lands, the surface it produces
@@ -15,7 +15,7 @@ direct, variadic `interface{}` → `...Any` — apply throughout.
 
 ## fmt
 
-```td
+```aril
 // Variadic output. Each argument widens to Any at the call site.
 fmt.println(args: ...Any)
 fmt.print(args: ...Any)
@@ -33,7 +33,7 @@ fmt.errorf(format: string, args: ...Any): error
 fmt.fprintln(w: io.Writer, args: ...Any): Result<int, error>
 fmt.fprintf(w: io.Writer, format: string, args: ...Any): Result<int, error>
 
-// Stdin reading. Tide wraps Go's `fmt.Scan(&v)` (pointer-mutation
+// Stdin reading. Aril wraps Go's `fmt.Scan(&v)` (pointer-mutation
 // style) into typed return form. `T` may be any of the numeric
 // primitives (`int`, `int8..int64`, `uint..uint64`, `float32`,
 // `float64`), `bool`, `byte`, `rune`, or `string` — anything Go's
@@ -50,7 +50,7 @@ fmt.scan3<A, B, C>(): Result<(A, B, C), error>
 
 ## os
 
-```td
+```aril
 // Process arguments. A slice view of os.Args (read-only convention).
 os.args: []string
 
@@ -86,8 +86,8 @@ os.stderr: os.File
 
 ## io
 
-```td
-// Reader / Writer / Closer — bound Go interfaces. Tide classes that
+```aril
+// Reader / Writer / Closer — bound Go interfaces. Aril classes that
 // `implements io.Reader` etc. integrate seamlessly with the rest of the
 // binding (e.g. `io.readAll` accepts any class that implements Reader).
 interface io.Reader  { read(p: []byte):  Result<int, error> }
@@ -110,7 +110,7 @@ io.EOF: error
 
 ## strings
 
-```td
+```aril
 strings.fields(s: string): []string                   // splits on whitespace
 strings.split(s: string, sep: string): []string
 strings.join(parts: []string, sep: string): string
@@ -132,8 +132,8 @@ strings.toBytes(s: string):   []byte                  // Go: []byte(s)
 
 ## strconv
 
-```td
-// Integer / float parsing — Go-style (s, base, bitSize) maps to a Tide
+```aril
+// Integer / float parsing — Go-style (s, base, bitSize) maps to a Aril
 // Result.
 strconv.atoi(s: string):                                Result<int, error>
 strconv.itoa(n: int):                                   string
@@ -147,7 +147,7 @@ strconv.quote(s: string): string
 
 ## log
 
-```td
+```aril
 log.println(args: ...Any)
 log.printf(format: string, args: ...Any)
 
@@ -162,9 +162,9 @@ log.setFlags(flags: int)
 
 ## math/big
 
-```td
+```aril
 // Arbitrary-precision integer. Bound from Go's `*big.Int`; methods are
-// the canonical ones the Timus / algorithmic suite needs. Tide hides
+// the canonical ones the Timus / algorithmic suite needs. Aril hides
 // Go's pointer-mutation calling convention (`x.Add(a, b)` mutating x)
 // behind a functional surface — every method returns a fresh `BigInt`.
 class big.BigInt {
@@ -186,7 +186,7 @@ big.fromString(s: string): Result<big.BigInt, error>
 
 ## math
 
-```td
+```aril
 math.sqrt(x: float64): float64
 math.abs(x: float64):  float64
 math.pow(x: float64, y: float64): float64
@@ -201,12 +201,12 @@ math.pi: float64
 
 // Integer min/max have no Go-stdlib referent (Go's math.{Min,Max} are
 // float-typed). User code uses `if a < b { a } else { b }` for now;
-// promoting them to Tide-side built-ins (cf. refEq) is park material.
+// promoting them to Aril-side built-ins (cf. refEq) is park material.
 ```
 
 ## time
 
-```td
+```aril
 // Nominal newtype over int64 — wraps Go's time.Duration.
 newtype time.Duration = int64
 
@@ -236,7 +236,7 @@ time.sleep(d: time.Duration)
 
 ## context
 
-```td
+```aril
 interface context.Context {
   done(): RecvChan<unit>                              // closes when cancelled
   err(): Option<error>
@@ -255,8 +255,8 @@ context.withTimeout(parent: context.Context, d: time.Duration):
 
 ## encoding/json
 
-```td
-// Round-trip parse/serialize over a Tide record. Generic over the target
+```aril
+// Round-trip parse/serialize over a Aril record. Generic over the target
 // type. Implementation under the hood uses Go reflection, so structural
 // records map directly to JSON objects with field-name == JSON-key (or
 // a future @json("…") attribute resolves the override).
@@ -272,7 +272,7 @@ json.serializeIndent(v: Any, prefix: string, indent: string): Result<[]byte, err
 
 ## net
 
-```td
+```aril
 interface net.Conn extends io.Reader, io.Writer, io.Closer {
   // ... addresses, deadlines as added when needed
 }
@@ -284,7 +284,7 @@ net.dialTCP(address: string): Result<net.Conn, error>
 
 ## bufio
 
-```td
+```aril
 // Line-by-line reader over an io.Reader.
 class bufio.Scanner {
   scan(): bool                                     // false on EOF or error
@@ -307,7 +307,7 @@ bufio.newWriter(w: io.Writer): bufio.Writer
 
 ## net/url
 
-```td
+```aril
 class url.URL {
   let scheme:   string
   let host:     string                    // host:port if a port is present
@@ -331,7 +331,7 @@ url.parse(rawURL: string): Result<url.URL, error>
 
 ## net/http
 
-```td
+```aril
 // Core types.
 
 interface http.Handler {
@@ -402,7 +402,7 @@ http.isServerClosed(e: error): bool                  // sugar for errors.Is
 
 ## sync
 
-```td
+```aril
 class sync.Mutex {
   lock()
   unlock()
@@ -427,7 +427,7 @@ class sync.Once {
 
 ## os/signal
 
-```td
+```aril
 signal.notify(c: chan<-os.Signal, signals: ...os.Signal)
 signal.stop(c: chan<-os.Signal)
 
@@ -438,8 +438,8 @@ signal.terminate: os.Signal       // SIGTERM
 
 ## sort
 
-```td
-// Comparator-based sort that **returns a new slice** — the Tide wrapper
+```aril
+// Comparator-based sort that **returns a new slice** — the Aril wrapper
 // inverts Go's in-place mutation to keep `let` semantics meaningful.
 sort.sorted<T>(s: []T, less: (T, T) => bool): []T
 
@@ -452,7 +452,7 @@ sort.slice<T>(s: []T, less: (int, int) => bool)
 
 ## errors
 
-```td
+```aril
 errors.new(text: string): error                        // alias for the built-in
 errors.is(err: error, target: error): bool
 errors.as<T>(err: error): Option<T>                    // generic As
@@ -465,7 +465,7 @@ These bindings exist in Go but are out of scope until later:
 - `database/sql` — the canonical hard binding (`*Rows`, nil, resource
   lifecycle, `context`). Tracked as an open problem.
 - `reflect`, `unsafe`, `runtime`, `syscall` — unportable in principle;
-  bindgen owns them, no Tide-side surface is planned.
+  bindgen owns them, no Aril-side surface is planned.
 - `regexp` — useful but not forced by the v1 suite; will land when AoC
   / real-world examples demand it.
 - `crypto/*`, `compress/*`, `image/*`, `text/template`, `html/template` —

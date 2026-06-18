@@ -3,7 +3,7 @@ package sema
 import (
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // inferExpr returns the type of e, recording it in Info.Type and
@@ -238,7 +238,7 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 				}
 			} else if isRecordType(rt) {
 				// Unknown field on a known record — catch it here in
-				// .td coordinates rather than leaking a go/types error.
+				// .aril coordinates rather than leaking a go/types error.
 				c.report("E0201", "Record "+rt.String()+" has no field "+en.Name, en.Span)
 			}
 		case *ast.MapEntry:
@@ -370,7 +370,7 @@ func (c *checker) inferCall(call *ast.Call) Type {
 					ret = fn.Return
 				}
 			case SymExternType:
-				// An opaque handle cannot be constructed by Tide — only
+				// An opaque handle cannot be constructed by Aril — only
 				// returned from an extern function (ffi.md §ExternType).
 				c.report("E1001", "Cannot construct opaque foreign handle "+sym.Name+" — obtain it from an extern function", call.Span)
 			case SymClass:
@@ -1127,7 +1127,7 @@ func (c *checker) checkSpreadTarget(call *ast.Call) {
 
 // calleeFunc returns the resolved Func signature of a call's callee
 // (an Ident-bound function/method or a typed Field method), or nil
-// when the callee is not a Tide-typed function.
+// when the callee is not a Aril-typed function.
 func (c *checker) calleeFunc(call *ast.Call) *Func {
 	switch callee := call.Callee.(type) {
 	case *ast.Ident:

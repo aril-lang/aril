@@ -10,7 +10,7 @@
 
 ## Summary
 
-The `examples/` directory is Tide's **acceptance corpus**: a set of
+The `examples/` directory is Aril's **acceptance corpus**: a set of
 real programs that *define* what the language must be able to express
 and *drive* its development — a feature is done when an example that
 forces it compiles and runs. This RFC turns that working practice into
@@ -40,14 +40,14 @@ Three forces make a charter necessary now:
 2. **A latent gap: negative coverage.** The corpus today proves only
    that programs *compile and run*. But half of a language's
    user-experience is **how it fails** — whether a mistake yields a
-   legible diagnostic in Tide source coordinates and Tide terminology
+   legible diagnostic in Aril source coordinates and Aril terminology
    (D10), with the right stable code. Nothing in the corpus exercises
    that on *realistic* code; only minimal atomic fixtures do. We close
    the gap without standing up a wasteful parallel "broken programs"
    corpus.
 
 3. **Feature acceptance depends on examples.** RFC-0000 governs how
-   language features enter Tide, and that process is inseparable from
+   language features enter Aril, and that process is inseparable from
    the corpus (a feature is not *done* until an example drives it). For
    RFC-0000 to reference the example dimension cleanly it must point at
    another RFC, not at an internal process note — and the normative
@@ -68,7 +68,7 @@ collection. Its contract has two halves:
   *done* for the features it forces. The corpus-status ratchet measures
   this (`build_ok`, and an output-checked count, never regress).
 - **Negative:** specified mistakes in real programs produce specified
-  diagnostics — correct stable code, Tide source coordinates, Tide
+  diagnostics — correct stable code, Aril source coordinates, Aril
   terminology (D10), never a raw `go/types` message. See
   [Negative cases](#negative-cases).
 
@@ -79,7 +79,7 @@ the implementation catches up.
 ### An example is a directory
 
 The unit of the corpus is a **directory**, not a single file. An
-example may span multiple `.td` files — and *should* when the feature
+example may span multiple `.aril` files — and *should* when the feature
 under test is itself multi-file (this exercises the package model of
 RFC-0002: package = directory). A single-file example is just the
 common case of a one-file directory.
@@ -90,7 +90,7 @@ carry an `errors/` subdirectory of negative cases.
 ```
 examples/<category>/<name>/
   example.toml          # required manifest
-  main.td               # the program (one or more .td files; entry by default)
+  main.aril               # the program (one or more .aril files; entry by default)
   expected.out          # expected stdout (when expects = output-check)
   errors/               # optional: negative cases
     <case>.patch        # unified diff vs. the base program
@@ -109,7 +109,7 @@ since    = "0.1"                  # language/corpus version the example targets
 status   = "running"             # current pipeline reach: target-sketch | compiling | running
 expects  = "output-check"        # the gate: output-check | run-pass | compile-pass | no-run
 output   = "expected.out"        # expected-stdout sidecar (required when expects = output-check)
-entry    = "main.td"             # entry file for a multi-file example; optional when single-file
+entry    = "main.aril"             # entry file for a multi-file example; optional when single-file
 
 [[error]]                         # zero or more negative cases (see below)
 patch      = "errors/missing-arrow.patch"   # unified diff vs. the base, marker-anchored
@@ -177,7 +177,7 @@ Field notes:
   (`expects` here, `stage` on negative cases) is *orthogonal* to the
   purpose taxonomy: purpose says what a program is *about*;
   stage/outcome says what the harness should *do* with it and where it
-  should stop. Tide's atomic suite already carries this axis (the
+  should stop. Aril's atomic suite already carries this axis (the
   `tests/{lexer,grammar,sema,codegen}/` split and the ratchet's
   `parse`/`sema`/`emit`/`build` classification); the corpus manifest
   names it explicitly so a negative case can assert *which* stage
@@ -198,7 +198,7 @@ the two is what made the pre-charter layout — `leetcode/`, `timus/`,
 | `concurrency` | uncolored concurrency — `spawn`, `scope`, channels, `select` |
 
 `showcase` is an **orthogonal flag**, not a category: it marks the
-examples that demonstrate Tide's value over plain Go (sum types,
+examples that demonstrate Aril's value over plain Go (sum types,
 exhaustive matching, ergonomic errors, uncolored concurrency, interface
 conformance). A `core-language` example and a `concurrency` example can
 both be showcases.
@@ -207,7 +207,7 @@ The category set is intentionally small and may grow through a later
 RFC when a cluster of examples genuinely shares a purpose none of these
 captures — not by ad-hoc directory creation.
 
-Purpose is the *top-level* axis because it maps to Tide's distinctive
+Purpose is the *top-level* axis because it maps to Aril's distinctive
 value. It is coarser than the language-area trees spec suites favour
 ([test262][test262-contributing], [TypeScript
 `conformance/<area>/`][ts-conformance], the [WebAssembly
@@ -226,7 +226,7 @@ A new example earns its place if it does **at least one** of:
   *combination* not yet pinned by any existing example (it pulls a spec
   artefact into live coverage, or covers a feature interaction the
   corpus lacks).
-- **Showcase value** — it demonstrates Tide's advantage over Go more
+- **Showcase value** — it demonstrates Aril's advantage over Go more
   clearly than what exists, even if the underlying constructs are
   already covered.
 
@@ -281,13 +281,13 @@ negative cases live **as deltas against the valid base**:
     [code-registry set-difference gate](#coverage-model).
   - **`stage`** — the pipeline stage that must reject the case
     (`parse` / `sema` / `emit`). This pins the D-decision that errors
-    surface as Tide diagnostics in Tide coordinates *before* the Go
+    surface as Aril diagnostics in Aril coordinates *before* the Go
     backend (D10) — a property a code-only assertion would lose.
   - **`matches`** — a paired sidecar file (`errors/<case>.expected`)
     holding the expected diagnostic *text*, which can be multi-line and
     bulky. Kept out of the manifest so the manifest stays lean. The
     sidecar records the **ideal** diagnostic the user deserves — one that
-    lets them find the problem fast, in Tide terminology (D10), never
+    lets them find the problem fast, in Aril terminology (D10), never
     leaking compiler internals (raw `go/types`, or lexer token-kind names
     like `Punct`/`Keyword`). It is deliberately *not* a verbatim capture
     of today's output: where the compiler falls short, the case is a

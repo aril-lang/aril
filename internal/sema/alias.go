@@ -3,7 +3,7 @@ package sema
 import (
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // detectAliasCycles fires E0114 on a type-alias chain that

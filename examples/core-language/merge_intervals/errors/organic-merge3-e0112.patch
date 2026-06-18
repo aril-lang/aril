@@ -1,5 +1,5 @@
---- merge_intervals.td
-+++ merge_intervals.td
+--- merge_intervals.aril
++++ merge_intervals.aril
 @@ -14,27 +14,26 @@
  }
  
@@ -9,7 +9,7 @@
 -  }
 -
 -  // Sort by start. The wrapper takes a "less" comparator and returns a new
--  // slice — Tide preserves immutability of the input.
+-  // slice — Aril preserves immutability of the input.
    let sorted = sort.sorted(intervals, (a, b) => a.start < b.start)
 -
 -  var out: []Interval = []Interval{}

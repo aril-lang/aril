@@ -1,3 +1,3 @@
-// Package sema implements Tide's type checker.
+// Package sema implements Aril's type checker.
 // Architecture: see docs/internals/sema.md.
 package sema

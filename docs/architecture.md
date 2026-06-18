@@ -1,13 +1,13 @@
 # Architecture
 
-How the Tide compiler is built. This file is the concrete "how"; the *why*
+How the Aril compiler is built. This file is the concrete "how"; the *why*
 behind the architectural commitments (D1, D6, D8, D10, D14, D15, D16, ...)
 lives in [`docs/design-decisions.md`](design-decisions.md).
 
 ## 1. Compiler pipeline
 
 ```
-.td source
+.aril source
     │
     ▼
   lexer        internal/lexer    — text -> tokens
@@ -22,13 +22,13 @@ lives in [`docs/design-decisions.md`](design-decisions.md).
   checker      internal/sema     — type checking, inference, exhaustiveness
     │
     ▼
-  codegen      internal/codegen  — Tide AST -> Go source (+ //line directives)
+  codegen      internal/codegen  — Aril AST -> Go source (+ //line directives)
     │
     ▼
   go build     (the Go toolchain) — Go IR -> native binary
 ```
 
-The Tide compiler's job ends at emitting Go. The Go toolchain produces the
+The Aril compiler's job ends at emitting Go. The Go toolchain produces the
 binary.
 
 ## 2. Go as the intermediate representation
@@ -45,12 +45,12 @@ Go is an IR (decision D1), with these consequences:
 
 `internal/codegen` emits `//line file:line` for every construct. The Go
 compiler honors these, so runtime panics, stack traces, `runtime.Caller`, and
-(via DWARF) `delve` stepping and `pprof` profiles all report `.td` locations.
+(via DWARF) `delve` stepping and `pprof` profiles all report `.aril` locations.
 Mandatory from Phase 1 (decision D8).
 
 ### The Go subset contract
 
-Tide commits to a defined, stable subset of Go as its IR (decision D15). Codegen
+Aril commits to a defined, stable subset of Go as its IR (decision D15). Codegen
 emits only that conservative subset and never depends on experimental Go
 features. Bindgen depends only on the stable `go/importer` / `go/types` API
 (source-mode importing, keeping the toolchain dependency-free), never on
@@ -72,15 +72,15 @@ raw binding declarations     — mechanical, signature-faithful (D6)
 idiomatic wrapper pass       — agent/human: (T,error)->Result, options, etc.
     │
     ▼
-std/<package>.td             — generated, committed bindings
+std/<package>.aril             — generated, committed bindings
 ```
 
 Raw signatures are derived from the Go type checker and never hand-written.
 Only the wrapper layer involves judgment.
 
-### Mapping rules (Go -> Tide)
+### Mapping rules (Go -> Aril)
 
-| Go shape | Tide shape | Notes |
+| Go shape | Aril shape | Notes |
 |---|---|---|
 | `func F() (T, error)` | `Result<T, error>` | the dominant error idiom |
 | `func F() (T, bool)` | comma-ok form / `Option<T>` | distinct from the error case |
@@ -107,7 +107,7 @@ focus of behavioral testing (section 6).
 
 ### The FFI wall
 
-Go packages enter Tide *only* through generated bindings (D4). They are not
+Go packages enter Aril *only* through generated bindings (D4). They are not
 first-class imports. This keeps Go's `nil` / pointer / `interface{}` /
 `context` impedance at one explicit boundary.
 
@@ -128,7 +128,7 @@ Generated concurrent code must pass `go test -race`.
 
 ## 5. Module system
 
-Tide packages resolve with a decentralized, go-mod-style scheme (D5): import
+Aril packages resolve with a decentralized, go-mod-style scheme (D5): import
 path as URL, no central registry, MVS-style version selection, vendoring. Go
 packages do not resolve this way — they enter only through bindings (D4).
 
@@ -139,7 +139,7 @@ Cheapest checks first; do not spend expensive checks where cheap ones suffice.
 - **L0 — impossible by construction.** Bindings generated from `go/importer`
   type info (D6): signature bugs eliminated, not tested.
 - **L1 — round-trip compilation (free).** Every binding plus a use site is
-  compiled Tide -> Go -> `go build`. Bad symbols are rejected by the Go
+  compiled Aril -> Go -> `go build`. Bad symbols are rejected by the Go
   compiler itself. Run across multiple Go versions to catch API drift.
 - **L2 — structural diff against `go/types`.** Assert each binding is a
   faithful transform of the real signature under the mapping rules. Side
@@ -150,7 +150,7 @@ Cheapest checks first; do not spend expensive checks where cheap ones suffice.
   functions into nil/error branches where bugs live. For panics and nil: the
   agent predicts from the doc comment; a test confirms the prediction.
 - **L4 — Go `Example*` functions as oracles.** Black-box, maintained,
-  independent of Tide's generator. Convert these (not white-box unit tests)
+  independent of Aril's generator. Convert these (not white-box unit tests)
   and check `// Output:`. Necessary but not sufficient: `Example*` functions
   cover documented, happy-path usage — error and nil branches are covered by
   L3, not L4. The two layers are complementary.

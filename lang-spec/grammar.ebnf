@@ -1,4 +1,4 @@
-// Tide grammar — lexical part.
+// Aril grammar — lexical part.
 // Standard EBNF dialect (W3C-style):
 //   *      zero or more
 //   +      one or more
@@ -52,10 +52,10 @@ Ident       = Letter (Letter | Digit)* ;
 // Ident token from a non-ASCII first character.
 //
 // RESERVED PREFIX: an Ident whose first six characters are exactly
-// `_tide_` (case-sensitive) is reserved for codegen-synthesised
+// `_aril_` (case-sensitive) is reserved for codegen-synthesised
 // names and is REJECTED by the lexer with E0107 Reserved
 // identifier prefix. This guarantees no collision with the
-// `_tide_NN` fresh names introduced during desugaring; see
+// `_aril_NN` fresh names introduced during desugaring; see
 // `lowering-go.md` §Identifier encoding.
 
 // Keyword is not a separate alternative in Token below — the lexer
@@ -612,8 +612,8 @@ RecordPat    = NamedType "{" Newline? RecordPatField ( "," Newline? RecordPatFie
 RecordPatField = Ident ":" Pattern ;
 
 // Alternatives — literal patterns OR nullary variants (corpus uses
-// both: `'(' | '[' | '{'` in valid_parentheses.td and
-// `Up | Left` in p1033.td). Mixing literal and variant in one
+// both: `'(' | '[' | '{'` in valid_parentheses.aril and
+// `Up | Left` in p1033.aril). Mixing literal and variant in one
 // AltPat is legal at the grammar level; sema enforces the union
 // makes sense.
 AltPat       = AltAtom ( "|" AltAtom )+ ;

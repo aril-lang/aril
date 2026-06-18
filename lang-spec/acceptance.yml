@@ -45,7 +45,7 @@ version: 1
 # Features assumed covered by the corpus as a whole. Audit
 # passes them if `examples:` is non-empty.
 #
-# Only features that **every Tide program of meaningful size**
+# Only features that **every Aril program of meaningful size**
 # uses go here. Anything narrower belongs in the per-example
 # tag list — false positives in `ubiquitous:` defeat the audit
 # (it can't detect that nothing exercises the feature).
@@ -175,12 +175,12 @@ features:
 
 examples:
 
-  core-language/hello/hello.td:
+  core-language/hello/hello.aril:
     - top-level-func
     - binding-fmt
 
   # ── Concurrency canon ──────────────────────────────────────
-  concurrency/pipeline/pipeline.td:
+  concurrency/pipeline/pipeline.aril:
     - scope-block
     - spawn-block
     - scope-context
@@ -194,7 +194,7 @@ examples:
     - unit-type
     - binding-fmt
 
-  concurrency/worker_pool/worker_pool.td:
+  concurrency/worker_pool/worker_pool.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -211,7 +211,7 @@ examples:
     - var-binding
     - binding-fmt
 
-  concurrency/pubsub/pubsub.td:
+  concurrency/pubsub/pubsub.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -228,7 +228,7 @@ examples:
     - class-method-instance
     - binding-fmt
 
-  concurrency/rate_limited/rate_limited.td:
+  concurrency/rate_limited/rate_limited.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -239,7 +239,7 @@ examples:
     - binding-time
     - binding-fmt
 
-  concurrency/nested_scopes/nested_scopes.td:
+  concurrency/nested_scopes/nested_scopes.aril:
     - scope-block
     - spawn-block
     - scope-context
@@ -250,7 +250,7 @@ examples:
     - for-channel
     - binding-fmt
 
-  concurrency/select_showcase/select_showcase.td:
+  concurrency/select_showcase/select_showcase.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -261,7 +261,7 @@ examples:
     - binding-time
 
   # ── Services ───────────────────────────────────────────────
-  stdlib-binding/wc/wc.td:
+  stdlib-binding/wc/wc.aril:
     - top-level-func
     - record-construction
     - type-decl-record
@@ -270,7 +270,7 @@ examples:
     - binding-fmt
     - binding-strings
 
-  stdlib-binding/todo_api/todo_api.td:
+  stdlib-binding/todo_api/todo_api.aril:
     - top-level-func
     - class-decl
     - class-method-instance
@@ -304,7 +304,7 @@ examples:
     - binding-sync
     - binding-fmt
 
-  concurrency/parallel_fetcher/parallel_fetcher.td:
+  concurrency/parallel_fetcher/parallel_fetcher.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -325,7 +325,7 @@ examples:
     - binding-io
     - binding-fmt
 
-  concurrency/graceful_server/graceful_server.td:
+  concurrency/graceful_server/graceful_server.aril:
     - scope-block
     - spawn-block
     - scope-context
@@ -339,7 +339,7 @@ examples:
     - binding-sync
     - binding-fmt
 
-  stdlib-binding/healthcheck_server/healthcheck_server.td:
+  stdlib-binding/healthcheck_server/healthcheck_server.aril:
     - top-level-func
     - record-construction
     - type-decl-record
@@ -349,7 +349,7 @@ examples:
     - binding-fmt
 
   # ── LeetCode ───────────────────────────────────────────────
-  core-language/two_sum/two_sum.td:
+  core-language/two_sum/two_sum.aril:
     - top-level-func
     - for-indexed-slice
     - map-literal
@@ -361,7 +361,7 @@ examples:
     - tuple-construction
     - binding-fmt
 
-  core-language/valid_parentheses/valid_parentheses.td:
+  core-language/valid_parentheses/valid_parentheses.aril:
     - top-level-func
     - for-string
     - stack-literal
@@ -375,7 +375,7 @@ examples:
     - slice-len
     - binding-fmt
 
-  core-language/reverse_linked_list/reverse_linked_list.td:
+  core-language/reverse_linked_list/reverse_linked_list.aril:
     - class-decl
     - class-method-instance
     - class-field-var
@@ -386,7 +386,7 @@ examples:
     - while-loop
     - binding-fmt
 
-  core-language/merge_intervals/merge_intervals.td:
+  core-language/merge_intervals/merge_intervals.aril:
     - top-level-func
     - tuple-construction
     - record-construction
@@ -400,7 +400,7 @@ examples:
     - closure-short
     - binding-fmt
 
-  core-language/invert_binary_tree/invert_binary_tree.td:
+  core-language/invert_binary_tree/invert_binary_tree.aril:
     - type-decl-sum
     - generics-func
     - match-expr
@@ -409,7 +409,7 @@ examples:
     - binding-strconv
 
   # ── Interview ──────────────────────────────────────────────
-  modeling-errors/vending_machine/vending_machine.td:
+  modeling-errors/vending_machine/vending_machine.aril:
     - top-level-func
     - type-decl-sum
     - var-binding
@@ -422,7 +422,7 @@ examples:
     - binding-fmt
     - binding-strconv
 
-  core-language/lru_cache/lru_cache.td:
+  core-language/lru_cache/lru_cache.aril:
     - class-decl
     - class-generic
     - generics-class
@@ -442,7 +442,7 @@ examples:
     - refEq
     - binding-fmt
 
-  stdlib-binding/config_loader/config_loader.td:
+  stdlib-binding/config_loader/config_loader.aril:
     - top-level-func
     - type-decl-record
     - record-construction
@@ -454,7 +454,7 @@ examples:
     - binding-json
     - binding-fmt
 
-  modeling-errors/rpn_calculator/rpn_calculator.td:
+  modeling-errors/rpn_calculator/rpn_calculator.aril:
     - top-level-func
     - type-decl-sum
     - stack-literal
@@ -471,14 +471,14 @@ examples:
     - binding-fmt
     - binding-os
 
-  core-language/fizzbuzz/fizzbuzz.td:
+  core-language/fizzbuzz/fizzbuzz.aril:
     - top-level-func
     - for-range
     - if-stmt
     - binding-fmt
 
   # ── AoC 2025 ───────────────────────────────────────────────
-  core-language/d01/d01.td:
+  core-language/d01/d01.aril:
     - top-level-func
     - for-slice
     - for-indexed-slice
@@ -492,7 +492,7 @@ examples:
     - binding-os
     - binding-fmt
 
-  core-language/d02/d02.td:
+  core-language/d02/d02.aril:
     - top-level-func
     - for-slice
     - tuple-construction
@@ -504,7 +504,7 @@ examples:
     - binding-bufio
     - binding-fmt
 
-  core-language/d03/d03.td:
+  core-language/d03/d03.aril:
     - top-level-func
     - for-string
     - for-slice
@@ -521,7 +521,7 @@ examples:
     - binding-strings
     - binding-fmt
 
-  core-language/d04/d04.td:
+  core-language/d04/d04.aril:
     - top-level-func
     - for-slice
     - var-binding
@@ -530,14 +530,14 @@ examples:
     - binding-strings
     - binding-fmt
 
-  core-language/d05/d05.td:
+  core-language/d05/d05.aril:
     - top-level-func
     - for-slice
     - if-stmt
     - binding-strings
     - binding-fmt
 
-  core-language/d07/d07.td:
+  core-language/d07/d07.aril:
     - top-level-func
     - set-literal
     - set-add
@@ -549,7 +549,7 @@ examples:
     - binding-bufio
     - binding-fmt
 
-  core-language/d08/d08.td:
+  core-language/d08/d08.aril:
     - top-level-func
     - type-decl-alias
     - tuple-construction
@@ -563,7 +563,7 @@ examples:
     - binding-bufio
     - binding-fmt
 
-  core-language/d09/d09.td:
+  core-language/d09/d09.aril:
     - top-level-func
     - type-decl-alias
     - for-slice
@@ -573,7 +573,7 @@ examples:
     - binding-bufio
     - binding-fmt
 
-  core-language/d11/d11.td:
+  core-language/d11/d11.aril:
     - top-level-func
     - type-decl-alias
     - set-literal
@@ -585,7 +585,7 @@ examples:
     - binding-fmt
 
   # ── Timus ──────────────────────────────────────────────────
-  core-language/p1033/p1033.td:
+  core-language/p1033/p1033.aril:
     - top-level-func
     - top-level-let
     - type-decl-sum
@@ -602,14 +602,14 @@ examples:
     - binding-fmt
     - binding-os
 
-  core-language/p1133/p1133.td:
+  core-language/p1133/p1133.aril:
     - top-level-func
     - tuple-construction
     - binding-mathbig
     - binding-strconv
     - binding-fmt
 
-  core-language/p1242/p1242.td:
+  core-language/p1242/p1242.aril:
     - top-level-func
     - map-literal
     - map-set
@@ -622,25 +622,25 @@ examples:
     - binding-bufio
     - binding-fmt
 
-  core-language/p1335/p1335.td:
+  core-language/p1335/p1335.aril:
     - top-level-func
     - tuple-construction
     - binding-fmt
 
-  core-language/p1349/p1349.td:
+  core-language/p1349/p1349.aril:
     - top-level-func
     - var-binding
     - if-stmt
     - binding-fmt
 
-  core-language/p1404/p1404.td:
+  core-language/p1404/p1404.aril:
     - top-level-func
     - for-string
     - var-binding
     - binding-strings
     - binding-fmt
 
-  core-language/p1423/p1423.td:
+  core-language/p1423/p1423.aril:
     - top-level-func
     - for-slice
     - var-binding
@@ -650,34 +650,34 @@ examples:
     - binding-strconv
     - binding-fmt
 
-  core-language/p1605/p1605.td:
+  core-language/p1605/p1605.aril:
     - top-level-func
     - for-string
     - var-binding
     - binding-strings
     - binding-fmt
 
-  core-language/p1683/p1683.td:
+  core-language/p1683/p1683.aril:
     - top-level-func
     - for-range
     - var-binding
     - if-stmt
     - binding-fmt
 
-  core-language/p1786/p1786.td:
+  core-language/p1786/p1786.aril:
     - top-level-func
     - var-binding
     - if-stmt
     - binding-fmt
 
-  core-language/p1820/p1820.td:
+  core-language/p1820/p1820.aril:
     - top-level-func
     - var-binding
     - if-stmt
     - binding-fmt
 
   # ── Borgo ports ────────────────────────────────────────────
-  concurrency/concurrency/concurrency.td:
+  concurrency/concurrency/concurrency.aril:
     - scope-block
     - spawn-block
     - channel-make
@@ -687,12 +687,12 @@ examples:
     - binding-fmt
     - binding-time
 
-  core-language/defer_demo/defer_demo.td:
+  core-language/defer_demo/defer_demo.aril:
     - top-level-func
     - defer-call
     - binding-fmt
 
-  modeling-errors/errors_as_types/errors_as_types.td:
+  modeling-errors/errors_as_types/errors_as_types.aril:
     - class-decl
     - implements-clause
     - class-method-instance
@@ -703,7 +703,7 @@ examples:
     - unit-type
     - binding-fmt
 
-  core-language/interfaces/interfaces.td:
+  core-language/interfaces/interfaces.aril:
     - interface-decl
     - implements-clause
     - class-decl
@@ -713,7 +713,7 @@ examples:
     - record-construction
     - binding-fmt
 
-  core-language/match_on_tuples/match_on_tuples.td:
+  core-language/match_on_tuples/match_on_tuples.aril:
     - top-level-func
     - tuple-construction
     - match-expr
@@ -725,7 +725,7 @@ examples:
     - binding-fmt
 
   # ── Raku stress tests ──────────────────────────────────────
-  core-language/deep_destructure/deep_destructure.td:
+  core-language/deep_destructure/deep_destructure.aril:
     - type-decl-sum
     - type-decl-record
     - match-expr
@@ -736,7 +736,7 @@ examples:
     - option-type
     - binding-fmt
 
-  modeling-errors/error_chain/error_chain.td:
+  modeling-errors/error_chain/error_chain.aril:
     - implements-clause
     - class-decl
     - class-method-instance
@@ -751,7 +751,7 @@ examples:
     - binding-strings
     - binding-strconv
 
-  core-language/set_algebra/set_algebra.td:
+  core-language/set_algebra/set_algebra.aril:
     - top-level-func
     - set-literal
     - set-add
@@ -762,7 +762,7 @@ examples:
     - binding-fmt
 
   # ── Counterstack Pentix agent ──────────────────────────────
-  stdlib-binding/counterstack/pentix_agent.td:
+  stdlib-binding/counterstack/pentix_agent.aril:
     - scope-block
     - spawn-block
     - scope-context

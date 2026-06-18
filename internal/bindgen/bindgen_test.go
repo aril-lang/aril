@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/lexer"
-	"github.com/heni/tide-lang/internal/parser"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/lexer"
+	"github.com/aril-lang/aril/internal/parser"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 // gen runs Generate, skipping when the Go source importer is unavailable
@@ -71,7 +71,7 @@ func TestGenerateRegexpHandle(t *testing.T) {
 }
 
 // TestGenerateVariadic — a variadic Go signature (`exec.Command(name
-// string, arg ...string)`) renders its final parameter as Tide's `...T`
+// string, arg ...string)`) renders its final parameter as Aril's `...T`
 // instead of bailing (the D23 unblocker; ffi.md §Variadic).
 func TestGenerateVariadic(t *testing.T) {
 	src := gen(t, "os/exec")
@@ -79,12 +79,12 @@ func TestGenerateVariadic(t *testing.T) {
 	if !strings.Contains(src, want) {
 		t.Errorf("os/exec bindings missing variadic %q\n--- got ---\n%s", want, src)
 	}
-	if strings.Contains(src, "Tide has no variadic") {
+	if strings.Contains(src, "Aril has no variadic") {
 		t.Errorf("os/exec still emits the pre-D23 variadic bail marker\n--- got ---\n%s", src)
 	}
 }
 
-// TestGeneratedRoundTrips — the generated bindings must be valid Tide:
+// TestGeneratedRoundTrips — the generated bindings must be valid Aril:
 // they parse and type-check with no diagnostics (the generator never
 // emits something the compiler rejects; unbindable symbols are comments).
 // Precondition: a package with ≥1 binding (an all-bail package yields a
@@ -96,17 +96,17 @@ func TestGeneratedRoundTrips(t *testing.T) {
 			t.Errorf("%s: expected ≥1 binding to round-trip", path)
 			continue
 		}
-		toks, lerr := lexer.LexFile(src, path+".td")
+		toks, lerr := lexer.LexFile(src, path+".aril")
 		if lerr != nil {
 			t.Errorf("%s: generated bindings fail to lex: %v", path, lerr)
 			continue
 		}
-		f, perr := parser.ParseFile(toks, path+".td")
+		f, perr := parser.ParseFile(toks, path+".aril")
 		if perr != nil {
 			t.Errorf("%s: generated bindings fail to parse: %v", path, perr)
 			continue
 		}
-		if _, diags := sema.Check(f, path+".td"); len(diags) != 0 {
+		if _, diags := sema.Check(f, path+".aril"); len(diags) != 0 {
 			t.Errorf("%s: generated bindings produced %d sema diagnostics: %v",
 				path, len(diags), diags)
 		}
@@ -129,7 +129,7 @@ func TestAllBailPackage(t *testing.T) {
 	}
 }
 
-func TestTideName(t *testing.T) {
+func TestArilName(t *testing.T) {
 	cases := map[string]string{
 		"Atoi":        "atoi",
 		"MustCompile": "mustCompile",
@@ -138,8 +138,8 @@ func TestTideName(t *testing.T) {
 		"URL":         "uRL", // first letter only, by convention
 	}
 	for in, want := range cases {
-		if got := tideName(in); got != want {
-			t.Errorf("tideName(%q) = %q; want %q", in, got, want)
+		if got := arilName(in); got != want {
+			t.Errorf("arilName(%q) = %q; want %q", in, got, want)
 		}
 	}
 }

@@ -6,4 +6,4 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "compiling"
 expects  = "run-pass"
-entry    = "pentix_agent.td"
+entry    = "pentix_agent.aril"

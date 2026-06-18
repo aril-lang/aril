@@ -1,5 +1,5 @@
---- rpn_calculator.td
-+++ rpn_calculator.td
+--- rpn_calculator.aril
++++ rpn_calculator.aril
 @@ -54,6 +54,7 @@
      fmt.println("usage: rpn '<expression>'")
      os.exit(2)

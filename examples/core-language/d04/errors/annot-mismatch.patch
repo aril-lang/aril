@@ -1,5 +1,5 @@
---- d04.td
-+++ d04.td
+--- d04.aril
++++ d04.aril
 @@ -28,7 +28,7 @@
    let roll = byte('@')
    let n = grid.len()

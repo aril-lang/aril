@@ -1,9 +1,9 @@
-// Package corpusexec is the OS-boundary adapter for the Tide corpus-status
+// Package corpusexec is the OS-boundary adapter for the Aril corpus-status
 // tool (tools/corpus-status). It is a vendored, self-contained Go module
 // bound through the FFI (lang-spec/ffi.md §"Dependency model"), like
-// std/vendor/tidekv.
+// std/vendor/arilkv.
 //
-// It exists because Tide's `(T, error) → Result<T, error>` boundary lift is
+// It exists because Aril's `(T, error) → Result<T, error>` boundary lift is
 // *lossy*: it discards the value when the error is non-nil. A subprocess's
 // combined output is meaningful precisely when the process *fails* (a build
 // diagnostic), so `(*exec.Cmd).CombinedOutput()` cannot be bound directly —
@@ -97,14 +97,14 @@ func RunExample(name string, args []string, stdin string, dir string, timeoutMs 
 }
 
 // Sha256Hex returns the hex-encoded SHA-256 of s — the run-cache key over an
-// example's emitted Go (plus its invocation). Tide has no crypto binding yet;
+// example's emitted Go (plus its invocation). Aril has no crypto binding yet;
 // this is the one-line adapter for it.
 func Sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
-// Bytes converts a string to a byte slice. Tide has no `[]byte(s)`
+// Bytes converts a string to a byte slice. Aril has no `[]byte(s)`
 // conversion surface yet, and `os.WriteFile` needs `[]byte`; this is the
 // one-line adapter for it.
 func Bytes(s string) []byte { return []byte(s) }

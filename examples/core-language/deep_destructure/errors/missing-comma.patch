@@ -1,5 +1,5 @@
---- deep_destructure.td
-+++ deep_destructure.td
+--- deep_destructure.aril
++++ deep_destructure.aril
 @@ -29,7 +29,7 @@
    | Idle
    | Move(info: StepInfo)

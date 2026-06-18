@@ -3,7 +3,7 @@ package sema
 import (
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // constructShapes — rest of Barrier B. See docs/internals/sema.md §4.

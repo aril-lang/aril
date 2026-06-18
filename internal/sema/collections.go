@@ -3,7 +3,7 @@ package sema
 import (
 	"math"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // inferSliceLit types `[]T{...}` (annotated) and `[e1, ...]`

@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "hello.td"
+entry    = "hello.aril"
 
 [[error]]
 patch   = "errors/unknown-name.patch"   # call an undeclared name in place of the string literal
@@ -30,7 +30,7 @@ matches = "errors/bad-escape.expected"
 origin  = "synthetic"
 
 [[error]]
-patch   = "errors/reserved-prefix.patch"   # _tide_ is a reserved codegen prefix
+patch   = "errors/reserved-prefix.patch"   # _aril_ is a reserved codegen prefix
 expect  = ["E0107"]
 stage   = "parse"
 matches = "errors/reserved-prefix.expected"

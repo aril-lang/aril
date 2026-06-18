@@ -5,4 +5,4 @@ E0102: unterminated /* block comment */
 /* never closes
 
 --- ERRORS ---
-src.td:1:1: error[E0102]: Unterminated literal
+src.aril:1:1: error[E0102]: Unterminated literal

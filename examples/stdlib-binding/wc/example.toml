@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "wc.td"
+entry    = "wc.aril"
 args            = ["sample.txt"]
 expected_output = "expected-output.txt"
 

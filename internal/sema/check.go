@@ -1,7 +1,7 @@
 package sema
 
 import (
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // Check runs sema passes against f and returns the side-table
@@ -11,7 +11,7 @@ func Check(f *ast.File, file string) (*Info, []*Diag) {
 	return CheckFiles([]*ast.File{f}, []string{file})
 }
 
-// CheckFiles runs sema over a whole package — every `.td` file in a
+// CheckFiles runs sema over a whole package — every `.aril` file in a
 // directory shares one top-level scope (RFC-0002 §"Package =
 // directory"). The phases run file-by-file over the shared scope, with
 // the per-file path tracked so each diagnostic carries its own source

@@ -1,11 +1,11 @@
 --- TITLE ---
-hello.td — single import + main func + qualified call
+hello.aril — single import + main func + qualified call
 
 --- INPUT ---
 import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 
 --- AST ---
@@ -19,4 +19,4 @@ func main() {
         (Call @4:3-4:33
           (Field "println" @4:3-4:14
             (Ident "fmt" @4:3-4:6))
-          (StringLitExpr "Tide is rising." @4:15-4:32))))))
+          (StringLitExpr "Aril is rising." @4:15-4:32))))))

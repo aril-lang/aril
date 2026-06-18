@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "safe_divide.td"
+entry    = "safe_divide.aril"
 
 [[error]]
 patch   = "errors/bare-record-literal.patch"   # JS-habit bare `{…}` instead of DivError{…}

@@ -48,15 +48,15 @@ func CmdStop(reason int) Cmd {
 	return Cmd{Tag: 1, StopReason: reason}
 }
 func step(l Light, c Cmd) int {
-	__tide_match_1 := l
-	__tide_match_2 := c
+	__aril_match_1 := l
+	__aril_match_2 := c
 	switch {
-	case __tide_match_1.Tag == 0 && __tide_match_2.Tag == 0:
+	case __aril_match_1.Tag == 0 && __aril_match_2.Tag == 0:
 		return 1
-	case __tide_match_1.Tag == 0 && __tide_match_2.Tag == 1:
-		r := __tide_match_2.StopReason
+	case __aril_match_1.Tag == 0 && __aril_match_2.Tag == 1:
+		r := __aril_match_2.StopReason
 		return r
-	case __tide_match_1.Tag == 1:
+	case __aril_match_1.Tag == 1:
 		return 2
 	}
 	panic("unreachable: non-exhaustive match")

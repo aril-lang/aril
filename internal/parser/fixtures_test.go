@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/lexer"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/lexer"
 )
 
 // TestFixtures walks every *.txt manifest in ../../tests/grammar/,
@@ -39,7 +39,7 @@ func TestFixtures(t *testing.T) {
 				t.Fatalf("%s: missing INPUT section", name)
 			}
 
-			toks, lerr := lexer.LexFile(input, "src.td")
+			toks, lerr := lexer.LexFile(input, "src.aril")
 			if lerr != nil {
 				if want, ok := sections["ERRORS"]; ok {
 					if strings.TrimSpace(lerr.Error()) != strings.TrimSpace(want) {
@@ -50,7 +50,7 @@ func TestFixtures(t *testing.T) {
 				t.Fatalf("%s: lex error: %v", name, lerr)
 			}
 
-			f, perr := ParseFile(toks, "src.td")
+			f, perr := ParseFile(toks, "src.aril")
 			if perr != nil {
 				if want, ok := sections["ERRORS"]; ok {
 					if strings.TrimSpace(perr.Error()) != strings.TrimSpace(want) {

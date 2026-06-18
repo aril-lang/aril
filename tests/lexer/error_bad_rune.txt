@@ -5,4 +5,4 @@ E0111: rune literal with more than one character is malformed
 'ab'
 
 --- ERRORS ---
-src.td:1:1: error[E0111]: Malformed rune literal
+src.aril:1:1: error[E0111]: Malformed rune literal

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
-	"github.com/heni/tide-lang/internal/sema"
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 // match.go — value- and statement-position lowering for `match`,
@@ -112,7 +112,7 @@ func (g *gen) emitMatchSwitch(m *ast.MatchExpr, emitArm func(arm *ast.MatchArm) 
 // statement- and tail-position reuse the one path. An arm whose
 // components are all wildcard/fresh-ident has an empty conjunction and
 // lowers to `default:`. Arm order is preserved, so Go's first-match
-// semantics match Tide's.
+// semantics match Aril's.
 func (g *gen) emitTupleMatchSwitch(m *ast.MatchExpr, tup *ast.TupleLit, emitArm func(arm *ast.MatchArm) error) error {
 	g.line(m.Span.StartLine)
 	compTypes := g.tupleCompTypes(tup)
@@ -326,7 +326,7 @@ func (g *gen) emitMatchTail(m *ast.MatchExpr) error {
 		return err
 	}
 	// A Go `switch` without a `default` is not a terminating statement
-	// even when the Tide match is exhaustive (sema-guaranteed), so a
+	// even when the Aril match is exhaustive (sema-guaranteed), so a
 	// value-returning function would trip Go's "missing return". Emit an
 	// unreachable guard after the switch (lowering-go.md §MatchIR
 	// UnreachableIR) unless an arm already produced a `default` — which
@@ -661,7 +661,7 @@ func (g *gen) inferArmResultType(e ast.Expr) (string, error) {
 
 // goTypeFromSema renders a sema type to its Go spelling for the
 // shapes a value-position block / if / match / closure result can
-// take. Tide primitives map 1:1 (lowering-go.md §Primitive type
+// take. Aril primitives map 1:1 (lowering-go.md §Primitive type
 // lowering); classes are reference types (`*T`); `unit` has no Go
 // spelling. Shapes outside this set return false.
 func (g *gen) goTypeFromSema(t sema.Type) (string, bool) {
@@ -820,14 +820,14 @@ func (g *gen) bindSubPattern(sub ast.Pattern, valueExpr string) error {
 }
 
 // nextMatchTemp returns a fresh Go identifier reserved for the
-// captured `match` subject. The `__tide_` prefix makes it
+// captured `match` subject. The `__aril_` prefix makes it
 // vanishingly unlikely to collide with a user-written name even
 // if the user takes the unusual step of writing
 // underscore-prefixed identifiers. The runtime-prefix convention
 // is shared with other codegen-internal temps.
 func (g *gen) nextMatchTemp() string {
 	g.matchTempCounter++
-	return fmt.Sprintf("__tide_match_%d", g.matchTempCounter)
+	return fmt.Sprintf("__aril_match_%d", g.matchTempCounter)
 }
 
 // classifyPattern reports whether a pattern (or any AltPat atom)

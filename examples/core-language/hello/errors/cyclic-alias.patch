@@ -1,5 +1,5 @@
---- hello.td
-+++ hello.td
+--- hello.aril
++++ hello.aril
 @@ -4,6 +4,9 @@
  
  import fmt
@@ -8,5 +8,5 @@
 +type B = A
 +
  func main() {
-   fmt.println("Tide is rising.")
+   fmt.println("Aril is rising.")
  }

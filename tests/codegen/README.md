@@ -6,7 +6,7 @@ with these sections:
 
 ```
 --- INPUT ---
-<.td source>
+<.aril source>
 
 --- GO ---
 <emitted Go after gofmt -s>

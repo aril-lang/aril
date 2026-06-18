@@ -1,9 +1,9 @@
---- hello.td
-+++ hello.td
+--- hello.aril
++++ hello.aril
 @@ -5,5 +5,6 @@
  import fmt
  
  func main() {
-+  let _tide_x = 1
-   fmt.println("Tide is rising.")
++  let _aril_x = 1
+   fmt.println("Aril is rising.")
  }

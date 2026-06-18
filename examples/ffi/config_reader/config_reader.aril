@@ -1,0 +1,15 @@
+// Binds a third-party Go module (example.com/arilkv, vendored) through
+// the FFI and reads a config — proving generated Aril code can depend on
+// a non-stdlib Go library hermetically (ffi.md §"Dependency model").
+import fmt
+
+extern func value(data: string, key: string): string @go("example.com/arilkv.Value")
+
+extern func count(data: string): int @go("example.com/arilkv.Count")
+
+func main() {
+  let config = "name = aril\nversion = 0.1\nbackend = go\n# a comment\n"
+  fmt.println(value(config, "name"))
+  fmt.println(value(config, "backend"))
+  fmt.println(count(config))
+}

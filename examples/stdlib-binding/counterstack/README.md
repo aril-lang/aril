@@ -1,6 +1,6 @@
 # `agents/counterstack/` — Pentix-arena agent
 
-A single-file Tide sketch of the Pentix-arena agent architecture from
+A single-file Aril sketch of the Pentix-arena agent architecture from
 the *counterstack-champion* Python project. Pentix is Tetris with 12
 pentominoes, run by a 500 Hz server over JSON Lines on TCP. The Python
 project is 513 files; this directory keeps the load-bearing patterns

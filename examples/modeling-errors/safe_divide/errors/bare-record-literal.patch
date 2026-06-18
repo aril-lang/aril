@@ -1,5 +1,5 @@
---- safe_divide.td
-+++ safe_divide.td
+--- safe_divide.aril
++++ safe_divide.aril
 @@ -5,7 +5,7 @@
  
  func safeDivide(a: int, b: int): Result<int, DivError> {

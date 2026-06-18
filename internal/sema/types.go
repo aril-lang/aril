@@ -3,10 +3,10 @@ package sema
 import (
 	"strings"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
-// Type — closed sum of Tide-side type representations.
+// Type — closed sum of Aril-side type representations.
 // See docs/internals/sema.md §5. The §5 catalogue grows by one
 // case per PR as Barrier C learns to infer the corresponding
 // shape; an un-modelled shape is represented by *Unknown so a
@@ -152,7 +152,7 @@ type Dynamic struct{}
 func (*Dynamic) typeMarker()    {}
 func (*Dynamic) String() string { return "Dynamic" }
 
-// Any — Tide's other top-ish type. Shares no implicit-conversion
+// Any — Aril's other top-ish type. Shares no implicit-conversion
 // path with Dynamic (E0212).
 type Any struct{}
 

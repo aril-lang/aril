@@ -6,7 +6,7 @@ forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
 status   = "running"
 expects  = "run-pass"
-entry    = "p1033.td"
+entry    = "p1033.aril"
 stdin           = "input.txt"
 expected_output = "expected-output.txt"
 

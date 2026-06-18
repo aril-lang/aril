@@ -3,7 +3,7 @@ package sema
 import (
 	"strconv"
 
-	"github.com/heni/tide-lang/internal/ast"
+	"github.com/aril-lang/aril/internal/ast"
 )
 
 // checkBodies — Barrier C. Walks every function / method body

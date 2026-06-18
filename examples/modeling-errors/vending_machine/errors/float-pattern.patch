@@ -1,5 +1,5 @@
---- vending_machine.td
-+++ vending_machine.td
+--- vending_machine.aril
++++ vending_machine.aril
 @@ -10,7 +10,7 @@
  
  func price(i: Item): int {

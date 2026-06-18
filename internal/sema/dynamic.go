@@ -1,6 +1,6 @@
 package sema
 
-import "github.com/heni/tide-lang/internal/ast"
+import "github.com/aril-lang/aril/internal/ast"
 
 // Dynamic-doesn't-leak — the introduction whitelist.
 // See docs/internals/sema.md §6.1 and lang-spec/type-system.md

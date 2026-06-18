@@ -1,5 +1,5 @@
---- error_chain.td
-+++ error_chain.td
+--- error_chain.aril
++++ error_chain.aril
 @@ -59,7 +59,7 @@
  }
  

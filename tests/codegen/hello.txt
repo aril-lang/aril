@@ -1,11 +1,11 @@
 --- TITLE ---
-hello.td — emits `package main` + fmt.Println call
+hello.aril — emits `package main` + fmt.Println call
 
 --- INPUT ---
 import fmt
 
 func main() {
-  fmt.println("Tide is rising.")
+  fmt.println("Aril is rising.")
 }
 
 --- GO ---
@@ -14,11 +14,11 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("Tide is rising.")
+	fmt.Println("Aril is rising.")
 }
 
 --- STDOUT ---
-Tide is rising.
+Aril is rising.
 
 --- EXIT ---
 0
