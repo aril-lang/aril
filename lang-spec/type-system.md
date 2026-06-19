@@ -630,10 +630,12 @@ which returns `Never`; no dedicated rule.
 **Negative cases.** `try` whose nearest enclosing *frame* returns
 neither `Result<_, _>` nor `Option<_>` fires **E0402 `try` outside a
 Result/Option function**. The enclosing frame is usually the function,
-but a `spawn { ... }` body is itself a `Result<unit, E>` frame (T-Spawn)
-and a `scope` body a `Result<T, E>` frame (T-ScopeExpr), so a `try`
-inside either is permitted regardless of the surrounding function's
-return type. `break`/`continue` outside a loop
+but a `spawn { ... }` body is itself a `Result<unit, error>` frame
+(T-Spawn), so a `try` inside a spawn is permitted regardless of the
+surrounding function's return type; because that frame is a `Result`,
+a `try` on an `Option` there is **E0408**. (`try` in a bare `scope`
+body — not via a spawn — is not yet lifted to the scope frame; it still
+follows the enclosing function.) `break`/`continue` outside a loop
 fires **E0404**. `spawn` outside a `scope` block fires
 **E0405** (see also T-Spawn below).
 

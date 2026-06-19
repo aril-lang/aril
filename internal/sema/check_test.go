@@ -292,6 +292,42 @@ func main() {
 	}
 }
 
+func TestTryOptionInSpawnFiresE0408(t *testing.T) {
+	// A spawn body is a Result<unit, error> frame; a `try` on an Option
+	// there has no error to propagate (and codegen's bail has no `.E`),
+	// so it is rejected at sema rather than leaking invalid Go.
+	src := `func find(): Option<int> { return Some(1) }
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      let n = try find()
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); !contains(codes, "E0408") {
+		t.Errorf("expected E0408 for `try` on an Option in a spawn body, got %v", codes)
+	}
+}
+
+func TestTryResultInSpawnNoE0408(t *testing.T) {
+	// The well-formed case — a Result inner — must not fire E0408.
+	src := `func work(): Result<int, error> { return Ok(1) }
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      let n = try work()
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); contains(codes, "E0408") {
+		t.Errorf("E0408 false-fired on a Result-inner `try` in a spawn body, got %v", codes)
+	}
+}
+
 func TestScopeContextOutsideScopeFiresE0601(t *testing.T) {
 	src := `import context
 func use(ctx: context.Context) {}

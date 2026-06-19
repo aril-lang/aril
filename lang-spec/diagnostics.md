@@ -105,6 +105,7 @@ severity column.
 | E0405 | E | `spawn` outside a `scope` block | `type-system.md` T-Spawn | Wrap the call in `scope<T, error> { ... }`. |
 | E0406 | E | `defer` argument must be a call | `type-system.md` T-Defer | Use a call expression, optionally wrapping in a closure: `defer (() => { ... })()`. |
 | E0407 | E | `scope` error parameter must be `error` in v1 | `type-system.md` T-ScopeExpr / `lowering-go.md` §ScopeIR / SpawnIR | Use `scope<T, error>`; v2 will lift this restriction (typed-error adapter). |
+| E0408 | E | `try` on an `Option` inside a spawn body | `type-system.md` T-Spawn / T-Try-Result / `lowering-go.md` §SpawnIR | A spawn body is a `Result<unit, error>` frame, so it can only propagate a `Result`. Wrap the value in a `Result`, or handle the `Option` with `match`. |
 
 ### E05xx — Class scope and shadowing
 

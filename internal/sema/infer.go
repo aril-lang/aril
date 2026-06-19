@@ -195,10 +195,6 @@ func (c *checker) inferScope(s *ast.ScopeExpr) Type {
 	return &Result{T: t, E: e}
 }
 
-// inferSpawn types `spawn { body }` as unit (T-Spawn). E0405 when it
-// is not lexically inside a `scope` body. The body is checked
-// normally; its `return Ok(())` / `return Err(e)` are converted to
-// the group's error channel at lowering.
 // checkScopeRef validates a `scope`-as-value reference: it is legal only
 // inside the lexical body of a scope block (scopeDepth > 0, which the
 // resolver reaches through any enclosing spawn / block), else E0601.
@@ -208,6 +204,10 @@ func (c *checker) checkScopeRef(span ast.Span) {
 	}
 }
 
+// inferSpawn types `spawn { body }` as unit (T-Spawn). E0405 when it
+// is not lexically inside a `scope` body. The body is checked
+// normally; its `return Ok(())` / `return Err(e)` are converted to
+// the group's error channel at lowering.
 func (c *checker) inferSpawn(s *ast.SpawnExpr) Type {
 	if c.scopeDepth == 0 {
 		c.report("E0405", "`spawn` outside a `scope` block", s.Span)
@@ -215,11 +215,14 @@ func (c *checker) inferSpawn(s *ast.SpawnExpr) Type {
 	// A spawn body is an implicit `Result<unit, error>`-returning frame
 	// (it must `return Ok(())`, and its error feeds the group), so `try`
 	// inside it is permitted regardless of the enclosing function's
-	// return type — drop the try-forbidden flag for the body (T-Try).
-	savedForbidden := c.curTryForbidden
+	// return type — drop the try-forbidden flag for the body (T-Try). The
+	// frame is a Result, so a `try` on an Option there is ill-formed
+	// (E0408, flagged via curSpawnFrame in tryResultType).
+	savedForbidden, savedSpawnFrame := c.curTryForbidden, c.curSpawnFrame
 	c.curTryForbidden = false
+	c.curSpawnFrame = true
 	c.checkBlock(s.Body)
-	c.curTryForbidden = savedForbidden
+	c.curTryForbidden, c.curSpawnFrame = savedForbidden, savedSpawnFrame
 	return &Unit{}
 }
 
@@ -852,6 +855,14 @@ func (c *checker) tryResultType(inner Type, v *ast.TryExpr) Type {
 		}
 		return in.T
 	case *Option:
+		// A spawn body is a Result<unit, error> frame, so it cannot
+		// propagate an Option — there is no error to feed the group, and
+		// codegen's spawn bail (`return <tmp>.E`) has no `.E` to take
+		// (E0408). Wrap the value in a Result or handle it with `match`.
+		if c.curSpawnFrame {
+			c.report("E0408", "`try` on an Option inside a spawn body — a spawn body is a `Result<unit, error>` frame, so only a Result may be propagated; wrap the value in a Result or use `match`", v.Span)
+			return in.T
+		}
 		return in.T
 	}
 	return &Unknown{}
