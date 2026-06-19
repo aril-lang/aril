@@ -202,6 +202,14 @@ func (g *gen) hoistExprTries(e ast.Expr) error {
 // Option (None); determined from `g.curFuncReturn` which sema
 // (PR-Sema-2) will tighten to also account for inner-expr type.
 func (g *gen) emitTryPreamble(t *ast.TryExpr) (string, error) {
+	// Inside a spawn body the implicit frame is Result<unit, error> and
+	// the closure returns `error` (lowering-go.md §SpawnIR), so a `try`
+	// bails with `return <tmp>.E` — the inner Result's error — mirroring
+	// emitSpawnReturn, independent of the enclosing function's declared
+	// return type (which may even be unit, as in a `spawn` inside main).
+	if g.inSpawnBody {
+		return g.emitTryPreambleSpawn(t)
+	}
 	if g.curFuncReturn == nil {
 		return "", fmt.Errorf("codegen: `try` outside a function that returns Result/Option")
 	}
@@ -255,6 +263,40 @@ func (g *gen) emitTryPreamble(t *ast.TryExpr) (string, error) {
 		g.b.WriteString(".E")
 	}
 	g.b.WriteString("}\n")
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	return tmp, nil
+}
+
+// emitTryPreambleSpawn lowers a `try e` inside a spawn body. The spawn
+// closure returns `error`, so the bail is `return <tmp>.E` (the inner
+// Result's error) rather than a wrapped Result/Option. The inner is a
+// Result with E = error (a spawn body's frame is Result<unit, error>);
+// the caller reads the unwrapped payload via `<tmp>.V`.
+func (g *gen) emitTryPreambleSpawn(t *ast.TryExpr) (string, error) {
+	if err := g.hoistTriesIfSafe(t.Inner); err != nil {
+		return "", err
+	}
+	g.tryTempCounter++
+	tmp := fmt.Sprintf("__aril_try_%d", g.tryTempCounter)
+	g.line(t.Span.StartLine)
+	g.writeIndent()
+	g.b.WriteString(tmp)
+	g.b.WriteString(" := ")
+	if err := g.emitExpr(t.Inner); err != nil {
+		return "", err
+	}
+	g.b.WriteByte('\n')
+	g.writeIndent()
+	g.b.WriteString("if ")
+	g.b.WriteString(tmp)
+	g.b.WriteString(".Tag == 1 {\n") // Err
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("return ")
+	g.b.WriteString(tmp)
+	g.b.WriteString(".E\n")
 	g.indent--
 	g.writeIndent()
 	g.b.WriteString("}\n")

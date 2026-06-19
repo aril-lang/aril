@@ -413,6 +413,12 @@ type gen struct {
 	// channel (`return nil` / `return <e>`) rather than a Result.
 	groupVars   []string
 	inSpawnBody bool
+	// ctxVars parallels groupVars: the derived-context binding name for
+	// each enclosing scope, or "" when that scope's body never reads
+	// `scope.context` (then the context is discarded as `_` to avoid an
+	// unused variable). A `scope.context` ScopeRef lowers to the
+	// top-of-stack name (the nearest enclosing scope).
+	ctxVars []string
 	// usedGoPkgs — Go stdlib packages actually referenced in the
 	// emitted output (a `pkg.Sym`). Populated by the pre-walk; the
 	// import block is this set ∩ the .aril imports, so a binding that

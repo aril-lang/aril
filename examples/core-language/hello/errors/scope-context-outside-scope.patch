@@ -1,0 +1,7 @@
+--- hello.aril
++++ hello.aril
+@@ -7,3 +7,4 @@
+ func main() {
++  let c = scope.context
+   fmt.println("Aril is rising.")
+ }

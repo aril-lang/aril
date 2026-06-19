@@ -55,6 +55,7 @@ type checker struct {
 	curReturn       Type // declared return type of the body being checked
 	curThis         Type // receiver type inside an instance method, else nil
 	curTryForbidden bool // body returns a type that is definitely not Result/Option
+	curSpawnFrame   bool // body is a spawn body — a Result<unit, error> frame (E0408)
 	loopDepth       int  // enclosing for/while nesting — 0 ⇒ break/continue illegal (E0404)
 	scopeDepth      int  // enclosing `scope` nesting — 0 ⇒ spawn illegal (E0405)
 

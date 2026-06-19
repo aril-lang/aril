@@ -274,6 +274,107 @@ func main() {
 	}
 }
 
+func TestTryInSpawnBodyNoE0402(t *testing.T) {
+	// A spawn body is an implicit Result<unit, error> frame, so `try`
+	// inside it is permitted even though main() is not Result-returning.
+	src := `func work(): Result<int, error> { return Ok(1) }
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      let n = try work()
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); contains(codes, "E0402") {
+		t.Errorf("E0402 false-fired on `try` inside a spawn body, got %v", codes)
+	}
+}
+
+func TestTryOptionInSpawnFiresE0408(t *testing.T) {
+	// A spawn body is a Result<unit, error> frame; a `try` on an Option
+	// there has no error to propagate (and codegen's bail has no `.E`),
+	// so it is rejected at sema rather than leaking invalid Go.
+	src := `func find(): Option<int> { return Some(1) }
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      let n = try find()
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); !contains(codes, "E0408") {
+		t.Errorf("expected E0408 for `try` on an Option in a spawn body, got %v", codes)
+	}
+}
+
+func TestTryResultInSpawnNoE0408(t *testing.T) {
+	// The well-formed case — a Result inner — must not fire E0408.
+	src := `func work(): Result<int, error> { return Ok(1) }
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      let n = try work()
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); contains(codes, "E0408") {
+		t.Errorf("E0408 false-fired on a Result-inner `try` in a spawn body, got %v", codes)
+	}
+}
+
+func TestTryDirectlyInScopeBodyFiresE0402(t *testing.T) {
+	// A `try` directly in a scope body (not via a spawn) is not lifted to
+	// the scope frame in v1 — codegen has no scope-frame bail — so sema
+	// rejects it (E0402) rather than letting it mis-target the enclosing
+	// function's Result.
+	src := `func work(): Result<int, error> { return Ok(1) }
+func run(): Result<unit, error> {
+  return scope<unit, error> {
+    let n = try work()
+    return Ok(())
+  }
+}
+`
+	if codes := runCheck(t, src); !contains(codes, "E0402") {
+		t.Errorf("expected E0402 for `try` directly in a scope body, got %v", codes)
+	}
+}
+
+func TestScopeContextOutsideScopeFiresE0601(t *testing.T) {
+	src := `import context
+func use(ctx: context.Context) {}
+func main() {
+  use(scope.context)
+}
+`
+	if codes := runCheck(t, src); !contains(codes, "E0601") {
+		t.Errorf("expected E0601 for `scope` outside a scope block, got %v", codes)
+	}
+}
+
+func TestScopeContextInsideScopeNoE0601(t *testing.T) {
+	src := `import context
+func use(ctx: context.Context) {}
+func main() {
+  let r = scope<unit, error> {
+    spawn {
+      use(scope.context)
+      return Ok(())
+    }
+  }
+}
+`
+	if codes := runCheck(t, src); contains(codes, "E0601") {
+		t.Errorf("E0601 false-fired on `scope.context` inside a scope (through a spawn), got %v", codes)
+	}
+}
+
 func TestBreakOutsideLoopFiresE0404(t *testing.T) {
 	src := `func main() {
   break

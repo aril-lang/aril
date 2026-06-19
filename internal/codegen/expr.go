@@ -351,6 +351,10 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// (lowering-go.md §Primitive type lowering).
 		g.b.WriteString("struct{}{}")
 		return nil
+	case *ast.ScopeRef:
+		// A bare `scope` value lowers to its context (the only v1 handle
+		// operation); `scope.context` is intercepted in emitField.
+		return g.emitScopeContext(v.Span)
 	case *ast.ScopeExpr:
 		// Value-position structured-concurrency scope → IIFE
 		// returning Result[T, error] (lowering-go.md §ScopeIR).
@@ -582,6 +586,13 @@ func (g *gen) emitExpr(e ast.Expr) error {
 }
 
 func (g *gen) emitField(f *ast.Field) error {
+	// `scope.context` lowers to the nearest enclosing scope's derived
+	// context variable (the whole `recv.context` selector, not a Go
+	// field access on it). Any other `scope.X` is rejected by sema, so
+	// only `.context` reaches codegen here.
+	if _, ok := f.Receiver.(*ast.ScopeRef); ok {
+		return g.emitScopeContext(f.Span)
+	}
 	if err := g.emitExpr(f.Receiver); err != nil {
 		return err
 	}

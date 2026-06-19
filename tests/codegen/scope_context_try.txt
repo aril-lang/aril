@@ -1,23 +1,29 @@
 --- TITLE ---
-Scope/spawn — value-position IIFE → Result[T, error], spawn → group.Go, join + Ok-wrap
+ScopeRef `scope.context` → derived-context var; `try` in a spawn body bails `return <tmp>.E`
 
 --- INPUT ---
+import context
 import fmt
 
-func main() {
-  let ch = makeChannel<int>(2)
+func work(ctx: context.Context, n: int): Result<int, error> {
+  if n < 0 { return Err(error("neg")) }
+  return Ok(n * 2)
+}
 
-  let total = scope<int, error> {
-    spawn { ch.send(3); return Ok(()) }
-    spawn { ch.send(4); return Ok(()) }
-    let a = ch.recv()
-    let b = ch.recv()
-    a + b
+func run(): Result<unit, error> {
+  return scope<unit, error> {
+    spawn {
+      let v = try work(scope.context, 21)
+      fmt.println("v", v)
+      return Ok(())
+    }
   }
+}
 
-  match total {
-    Ok(n)  => fmt.println("total:", n),
-    Err(e) => fmt.println("err:", e),
+func main() {
+  match run() {
+    Ok(_)  => fmt.println("done"),
+    Err(e) => fmt.println("err", e),
   }
 }
 
@@ -26,6 +32,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -73,39 +80,42 @@ func (g *Group) Wait() error {
 	g.cancel()
 	return g.err
 }
-func main() {
-	var ch = make(chan int, 2)
-	var total = func() Result[int, error] {
+func work(ctx context.Context, n int) Result[int, error] {
+	if n < 0 {
+		return ResultErr[int, error](errors.New("neg"))
+	}
+	return ResultOk[int, error](n * 2)
+}
+func run() Result[struct{}, error] {
+	return func() Result[struct{}, error] {
 		_arilEg0, _arilCtx0 := NewGroup(context.Background())
 		_ = _arilCtx0
 		_arilEg0.Go(func() error {
-			ch <- 3
+			__aril_try_1 := work(_arilCtx0, 21)
+			if __aril_try_1.Tag == 1 {
+				return __aril_try_1.E
+			}
+			var v = __aril_try_1.V
+			fmt.Println("v", v)
 			return nil
 		})
-		_arilEg0.Go(func() error {
-			ch <- 4
-			return nil
-		})
-		var a = <-ch
-		var b = <-ch
 		if _err := _arilEg0.Wait(); _err != nil {
-			return ResultErr[int, error](_err)
+			return ResultErr[struct{}, error](_err)
 		}
-		return ResultOk[int, error](a + b)
+		return ResultOk[struct{}, error](struct{}{})
 	}()
-	__aril_match_1 := total
+}
+func main() {
+	__aril_match_1 := run()
 	switch __aril_match_1.Tag {
 	case 0:
-		n := __aril_match_1.V
-		fmt.Println("total:", n)
+		fmt.Println("done")
 	case 1:
 		e := __aril_match_1.E
-		fmt.Println("err:", e)
+		fmt.Println("err", e)
 	}
 }
 
 --- STDOUT ---
-total: 7
-
---- EXIT ---
-0
+v 42
+done

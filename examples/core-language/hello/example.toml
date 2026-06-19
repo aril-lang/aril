@@ -51,6 +51,13 @@ matches = "errors/redeclare-builtin-type.expected"
 origin  = "synthetic"
 
 [[error]]
+patch   = "errors/scope-context-outside-scope.patch"   # `scope.context` outside any scope block
+expect  = ["E0601"]
+stage   = "sema"
+matches = "errors/scope-context-outside-scope.expected"
+origin  = "synthetic"
+
+[[error]]
 patch   = "errors/cyclic-alias.patch"   # type aliases A and B form a cycle
 expect  = ["E0114"]
 stage   = "sema"

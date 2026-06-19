@@ -81,10 +81,12 @@ func (g *Group) Wait() error {
 func main() {
 	var ch = make(chan int, 1)
 	var r = func() Result[int, error] {
-		_arilEg0, _ := NewGroup(context.Background())
+		_arilEg0, _arilCtx0 := NewGroup(context.Background())
+		_ = _arilCtx0
 		_arilEg0.Go(func() error {
 			var inner = func() Result[int, error] {
-				_arilEg1, _ := NewGroup(context.Background())
+				_arilEg1, _arilCtx1 := NewGroup(context.Background())
+				_ = _arilCtx1
 				_arilEg1.Go(func() error {
 					return nil
 				})

@@ -870,7 +870,18 @@ func (p *parser) parsePrimary() (ast.Expr, *Diag) {
 				Inner: inner,
 			}, nil
 		case "scope":
-			return p.parseScopeExpr()
+			// `scope` heading a block (`<` TypeArgs / `(` parent / `{`
+			// body) is a ScopeExpr; otherwise it is a ScopeRef value —
+			// typically `scope.context`, with the `.` attaching as a
+			// postfix suffix (grammar.ebnf §ScopeRef disambiguation).
+			nxt := p.peekAhead(1)
+			heads := nxt.Kind == lexer.KindOp && nxt.Lexeme == "<" ||
+				nxt.Kind == lexer.KindPunct && (nxt.Lexeme == "(" || nxt.Lexeme == "{")
+			if heads {
+				return p.parseScopeExpr()
+			}
+			p.advance() // consume 'scope'
+			return &ast.ScopeRef{Span: spanFromToken(t)}, nil
 		case "spawn":
 			return p.parseSpawnExpr()
 		}

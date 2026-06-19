@@ -627,9 +627,16 @@ under-report (miss a non-exhaustive match), never over-report.
 `os.exit(code)` is a regular call typed by its binding signature
 which returns `Never`; no dedicated rule.
 
-**Negative cases.** `try` in a function that returns neither
-`Result<_, _>` nor `Option<_>` fires **E0402 `try` outside a
-Result/Option function**. `break`/`continue` outside a loop
+**Negative cases.** `try` whose nearest enclosing *frame* returns
+neither `Result<_, _>` nor `Option<_>` fires **E0402 `try` outside a
+Result/Option function**. The enclosing frame is usually the function,
+but a `spawn { ... }` body is itself a `Result<unit, error>` frame
+(T-Spawn), so a `try` inside a spawn is permitted regardless of the
+surrounding function's return type; because that frame is a `Result`,
+a `try` on an `Option` there is **E0408**. A `try` *directly* in a bare
+`scope` body — not via a spawn — is not yet lifted to the scope frame in
+v1 (codegen has no scope-frame bail), so it is rejected with **E0402**;
+wrap the work in a `spawn`. `break`/`continue` outside a loop
 fires **E0404**. `spawn` outside a `scope` block fires
 **E0405** (see also T-Spawn below).
 
