@@ -328,6 +328,24 @@ func main() {
 	}
 }
 
+func TestTryDirectlyInScopeBodyFiresE0402(t *testing.T) {
+	// A `try` directly in a scope body (not via a spawn) is not lifted to
+	// the scope frame in v1 — codegen has no scope-frame bail — so sema
+	// rejects it (E0402) rather than letting it mis-target the enclosing
+	// function's Result.
+	src := `func work(): Result<int, error> { return Ok(1) }
+func run(): Result<unit, error> {
+  return scope<unit, error> {
+    let n = try work()
+    return Ok(())
+  }
+}
+`
+	if codes := runCheck(t, src); !contains(codes, "E0402") {
+		t.Errorf("expected E0402 for `try` directly in a scope body, got %v", codes)
+	}
+}
+
 func TestScopeContextOutsideScopeFiresE0601(t *testing.T) {
 	src := `import context
 func use(ctx: context.Context) {}

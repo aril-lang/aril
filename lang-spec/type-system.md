@@ -633,9 +633,10 @@ Result/Option function**. The enclosing frame is usually the function,
 but a `spawn { ... }` body is itself a `Result<unit, error>` frame
 (T-Spawn), so a `try` inside a spawn is permitted regardless of the
 surrounding function's return type; because that frame is a `Result`,
-a `try` on an `Option` there is **E0408**. (`try` in a bare `scope`
-body — not via a spawn — is not yet lifted to the scope frame; it still
-follows the enclosing function.) `break`/`continue` outside a loop
+a `try` on an `Option` there is **E0408**. A `try` *directly* in a bare
+`scope` body — not via a spawn — is not yet lifted to the scope frame in
+v1 (codegen has no scope-frame bail), so it is rejected with **E0402**;
+wrap the work in a `spawn`. `break`/`continue` outside a loop
 fires **E0404**. `spawn` outside a `scope` block fires
 **E0405** (see also T-Spawn below).
 

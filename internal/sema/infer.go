@@ -182,9 +182,19 @@ func (c *checker) inferScope(s *ast.ScopeExpr) Type {
 	if s.Parent != nil {
 		c.inferExpr(s.Parent)
 	}
+	// The scope body is its own frame, distinct from any enclosing spawn:
+	// reset curSpawnFrame (so a `try` here is not mis-attributed to a
+	// spawn) and forbid a *direct* `try` in the scope body — codegen has
+	// no scope-frame bail (the try would mis-target the outer function's
+	// Result), so reject it at sema (E0402) rather than miscompile. A
+	// `spawn` inside re-permits `try` (inferSpawn clears the flag).
+	savedForbidden, savedSpawnFrame := c.curTryForbidden, c.curSpawnFrame
+	c.curTryForbidden = true
+	c.curSpawnFrame = false
 	c.scopeDepth++
 	c.checkBlock(s.Body)
 	c.scopeDepth--
+	c.curTryForbidden, c.curSpawnFrame = savedForbidden, savedSpawnFrame
 	// The scope evaluates to Result<T, E>, with T / E taken from the
 	// `scope<T, E>` type arguments when present (T-ScopeExpr).
 	var t, e Type = &Unknown{}, &Unknown{}
