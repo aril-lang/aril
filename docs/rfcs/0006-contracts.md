@@ -27,12 +27,18 @@ lowers them to a Contract IR) and an **`arilrt/contract.go`** runtime layer
 (mode dispatch, blame, violation rendering).
 
 Contracts are **never required**. They change no existing program. They
-exist to (1) enrich the corpus's *behavioural* signal — the `run_ok`
-metric today checks only exit code and stdout, so a program that "runs"
-can still be silently wrong; (2) give code-generating agents an
-**executable specification** they can attach and check, surfacing likely
-defects far earlier than a type error would; and (3) differentiate Aril as
-*agent-productive yet human-non-binding*.
+exist to (1) turn the acceptance corpus into an **executable specification** —
+`examples + contracts = executable spec` — deepening `run_ok` from
+`exit + stdout` to `exit + stdout + stated invariants` and letting the corpus
+(RFC-0004) grow from an acceptance suite into a behavioural specification of
+the language and its libraries; (2) give code-generating agents that same
+executable spec to attach and check, surfacing likely defects far earlier
+than a type error would; and (3) differentiate Aril as *agent-productive yet
+human-non-binding*.
+
+The first of these is the quiet but strongest payoff: it is not really about
+"contracts" as a feature, it is about what the corpus *becomes* once examples
+can state and check their own intent.
 
 ## Motivation
 
@@ -125,6 +131,26 @@ contract Interval {
 }
 ```
 
+A type invariant is checked at two precisely-defined points: (1) immediately
+after a value of the type is **constructed** (record literal / constructor),
+and (2) at the **exit of every method declared on the type**. A multi-step
+mutation performed *inside* a method may transiently break the invariant; it
+is checked once, at the method's exit — the standard Design-by-Contract
+window. To keep these the *only* checkpoints, **direct external field
+assignment to an invariant-bearing type is rejected** (E1106): mutation goes
+through a method, where the window is well-defined. So the sequence
+
+```aril
+var x = Interval{ lo: 1, hi: 9 }
+x.lo = 10        // E1106 — assign via a method on Interval
+x.hi = 5
+```
+
+does not compile; the same logic written as `x.widen(10, 5)` is checked once
+at `widen`'s exit and the `lo <= hi` violation is caught there. (Whether to
+instead admit external field writes as per-write checkpoints is recorded as
+an open question.)
+
 **Loop contracts.** A loop is anonymous, so it has no name for the block to
 target. A loop that bears a contract is **labelled**, and the function's
 `contract` block carries a nested `loop <label>` section — keeping the whole
@@ -142,22 +168,19 @@ contract bubbleSort {
   ensures isSorted(result)
   loop outer {
     invariant isSorted(slice(result, result.len() - pass, result.len()))
-    variant   xs.len() - pass            // optional decreasing measure
   }
 }
 ```
 
-A loop `invariant` is checked at loop entry and after each iteration; an
-optional `variant` is a pure int measure asserted to strictly decrease and
-stay `>= 0` each iteration (a runtime guard against a class of
-non-termination/logic bugs — full termination *proof* is static and
-deferred, §Open questions).
+A loop `invariant` is checked at loop entry and after each iteration. v1
+deliberately stops at the invariant — see §Open questions on why a loop
+`variant` (a termination measure) is left out.
 
 **Inline clauses** are an optional convenience — the same `requires` /
-`ensures` / `invariant` / `variant` keywords written directly on a
-signature or loop header, for authors who prefer the contract beside the
-code. They desugar to exactly the same Contract IR as the block; the block
-is the primary form and inline is sugar over it:
+`ensures` / `invariant` keywords written directly on a signature or loop
+header, for authors who prefer the contract beside the code. They desugar to
+exactly the same Contract IR as the block; the block is the primary form and
+inline is sugar over it:
 
 ```aril
 func abs(x: int): int
@@ -183,7 +206,7 @@ declaration's scope, extended with:
 
 Predicates must be **pure** (no I/O, no mutation, no `spawn`, no `try` that
 escapes) — a contract that changes program behaviour when enabled is a
-contradiction. Purity is checked, not trusted (§E07xx). `implies` is sugar
+contradiction. Purity is checked, not trusted (E1103). `implies` is sugar
 for `!a || b` admitted inside predicates for readability.
 
 Predicates are ordinary Aril, so they reuse the existing typechecker
@@ -236,8 +259,9 @@ Responsibilities:
 3. **Purity-check** predicates; an impure predicate is E1103.
 4. **Scope-check** `old`/`result`: `result` or `old` outside `ensures` is
    E1104; `old(e)` over an impure/forbidden `e` is E1105.
-5. **Well-form** `variant`: a `variant` measure that is not a pure int
-   expression is E1106.
+5. **Guard invariant types**: a direct external field assignment to a type
+   that declares an `invariant` is E1106 (mutation must go through a method,
+   the only invariant checkpoint besides construction).
 6. **Lower** to `contract.IR` — a per-symbol list of obligations
    (`{kind, predExpr, oldSnapshots, loopLabel?, srcSpan}`) consumed by
    codegen.
@@ -258,30 +282,40 @@ The checked-evaluation layer, mode-aware, part of the runtime contract
 type Violation struct { Kind, Pred, Where string; Bindings []Binding }
 func CheckPre(mode Mode, ok bool, v Violation)    // requires
 func CheckPost(mode Mode, ok bool, v Violation)   // ensures / invariant
-func CheckLoop(mode Mode, ok bool, v Violation)   // loop invariant / variant
+func CheckLoop(mode Mode, ok bool, v Violation)   // loop invariant
 func Stats() ViolationTally                        // for --contracts=stats
 ```
 
 Codegen lowers each obligation to a guarded call at the boundary:
 `requires` at function entry (after `old(e)` snapshots), `ensures` at each
-return, `invariant` around exported method boundaries on the type, and a
-**loop** `invariant`/`variant` at the labelled loop's entry and end of each
-iteration (the `variant` lowering also stashes the prior measure to assert
-strict decrease). Under `off`, codegen emits nothing (no IR → no call), so
-the elision is total and free.
+return, a type `invariant` after construction and at each method's exit, and
+a **loop** `invariant` at the labelled loop's entry and end of each
+iteration. Under `off`, codegen emits nothing (no IR → no call), so the
+elision is total and free.
 
-### Corpus integration (RFC-0004 / D25)
+### Corpus integration (RFC-0004 / D25) — the corpus becomes a spec
 
-`example.toml` gains an optional contract dimension: a `run-pass` example
-may declare contracts in its source, and the run pass executes it under
-`--contracts=panic`. A contract violation is then a **run failure** — the
-example fails `run_ok` until its behaviour actually satisfies its stated
-intent. This deepens `run_ok` from "exit+stdout" to "exit+stdout+stated
-invariants" without a new metric in v1. (A dedicated `contract_ok` tally —
-"examples whose contracts hold" — is a candidate follow-up, mirroring how
-`diag_ok` grew beside `build_ok`.) Atomic coverage (the hard rule) lands as
-fixtures under `tests/{grammar,sema,codegen}/` for each new construct and
-E-code; live coverage is a few corpus examples gaining `requires`/`ensures`.
+This is the centre of gravity of the RFC, not a side effect. RFC-0004
+defines the corpus as an *acceptance suite* — a set of real programs that
+prove the language can express and run them. Contracts turn each example
+into an **executable specification of its own behaviour**: not just "this
+program runs and prints X" but "this program runs, prints X, *and* its
+stated invariants hold while it does." Summed over the corpus, that is a
+growing, machine-checked behavioural specification of the language and the
+libraries the examples exercise — the corpus stops being only an acceptance
+gate and becomes a living spec.
+
+Mechanically: `example.toml` gains an optional contract dimension. A
+`run-pass` example may declare contracts in its source, and the run pass
+executes it under `--contracts=panic`; a contract violation is then a **run
+failure** — the example fails `run_ok` until its behaviour actually
+satisfies its stated intent. This deepens `run_ok` from `exit + stdout` to
+`exit + stdout + stated invariants` without a new metric in v1. (A dedicated
+`contract_ok` tally — "examples whose contracts hold" — is a candidate
+follow-up, mirroring how `diag_ok` grew beside `build_ok`.) Atomic coverage
+(the hard rule) lands as fixtures under `tests/{grammar,sema,codegen}/` for
+each new construct and E-code; live coverage is a few corpus examples
+gaining `requires`/`ensures`.
 
 ## Alternatives considered
 
@@ -348,7 +382,7 @@ On acceptance, the implementing PRs touch:
 
 - `lang-spec/grammar.ebnf` — the `contract <name> { … }` block production
   (primary), incl. nested `loop <label>` sections; a loop `label` on a loop
-  header; inline `requires`/`ensures`/`invariant`/`variant` clauses as sugar.
+  header; inline `requires`/`ensures`/`invariant` clauses as sugar.
 - `lang-spec/type-system.md` — T-Contract-Pred (predicate : bool, pure),
   T-Result (`result` typed as the return type, `ensures`-only), T-Old
   (`old(e)` typed as `e`, `ensures`-only).
@@ -357,10 +391,10 @@ On acceptance, the implementing PRs touch:
 - `lang-spec/diagnostics.md` — E1101 (contract on unknown decl / loop
   label), E1102 (non-bool predicate), E1103 (impure predicate), E1104
   (`old`/`result` outside `ensures`), E1105 (`old` over forbidden expr),
-  E1106 (`variant` not a pure int measure).
+  E1106 (direct external field assignment to an invariant-bearing type).
 - `lang-spec/lowering-go.md` — §ContractIR: snapshot/entry/exit lowering,
-  per-iteration loop-invariant/`variant` lowering, and the four-mode
-  dispatch into `arilrt`.
+  per-iteration loop-invariant lowering, and the four-mode dispatch into
+  `arilrt`.
 - RFC-0004 corpus metadata (`example.toml`) — the run-pass contract
   dimension; `examples/README.md` note.
 - `docs/rfcs/README.md` — index row.
@@ -382,11 +416,14 @@ added to them deliberately. No deprecation window needed.
    proxying and contravariant blame (Findler-Felleisen; Racket's Indy
    semantics). v1 is first-order only. Worth it given Aril's uncolored
    closures? *Deferred.*
-2. **Loop `variant` / termination depth.** v1 checks loop **invariants** at
-   runtime and offers a `variant` as a runtime strict-decrease guard, but
-   does not *prove* termination — a true termination proof is static
-   (Eiffel/Ada discharge it; we defer it to the static-discharge path, #3).
-   Open: is the runtime `variant` guard worth its cost, or invariant-only?
+2. **Loop `variant` / termination — deliberately out of v1.** `requires` /
+   `ensures` / `invariant` form one clean category: *is the state correct?*
+   A `variant` answers a different question — *does the algorithm
+   terminate?* — and is the start of a separate formal-verification branch.
+   v1 ships only the state trio (loop **invariants** included); a termination
+   `variant` is deferred and most naturally lands with the static-discharge
+   path (#3), not as a lone runtime measure. (Open: ever worth it given the
+   audience?)
 3. **Static discharge.** When does the `internal/contract` IR gain a
    prove-and-drop path (gradual verification)? Needs the decidable-fragment
    decision. *Deferred — the IR is shaped to allow it.*
@@ -397,3 +434,24 @@ added to them deliberately. No deprecation window needed.
 6. **Exposing contracts to the agent via the reflection/REPL surface**
    (RFC-0003) so an agent can enumerate a function's obligations
    programmatically. *Deferred — promising for the agent-loop story.*
+7. **Invariant-type field writes.** v1 rejects direct external field
+   assignment to an invariant-bearing type (E1106), forcing mutation through
+   a method. The alternative — admit the write and treat each external
+   `x.f = e` as its own invariant checkpoint — is more familiar to TS
+   developers but mis-fires on multi-write restorations. *Decided: reject in
+   v1; revisit if the restriction bites.*
+
+## Performance note
+
+Two costs are worth flagging up front so they are not re-litigated later:
+
+- **`old(e)` snapshots the evaluated value at function entry.** For a large
+  argument (`old(bigTree)`) that snapshot can be expensive in time and
+  memory. v1's stance: it is the author's call, but the `internal/contract`
+  pass **may warn** when an `old(e)` snapshots a large/aggregate value, and a
+  future static pass may elide snapshots provably unread on a failing path.
+- **Per-iteration loop invariants multiply cost.** A loop invariant runs
+  every iteration; under `panic`/`warn` this is real overhead. The `off`
+  mode compiles all of it out (no IR → no call), and `stats` keeps the
+  counting cheap — so perf-sensitive builds have an escape that the corpus's
+  `panic` build does not need.
