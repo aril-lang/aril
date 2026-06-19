@@ -45,6 +45,32 @@ them inside-out — the closest match wins.
    (`int(.)`, `float64(.)`, `byte(.)`, `rune(.)`, `string(.)`).
    See `builtins.md` for the full list with signatures.
 
+## Reserved type names
+
+A built-in **type** name may not be redeclared by user code. A
+`TypeDecl`, `ClassDecl`, `InterfaceDecl`, or `ExternTypeDecl` whose name
+is a predeclared type — a primitive (`bool`, `int`, `int8`..`int64`,
+`uint`..`uint64`, `float32`, `float64`, `byte`, `rune`, `string`),
+`error`, `Any`, `Dynamic`, `unit`, `Never`, or a built-in generic
+(`Result`, `Option`, `Map`, `Set`, `Stack`, `Channel`, `SendChan`,
+`RecvChan`) — is **E0118**. The reserved set is exactly the
+`SymBuiltinType` names of the predeclared scope.
+
+The rule is deliberate: these names are load-bearing across the type
+system (literals and inference key off `int` / `string` / `bool`; `try`,
+`match` exhaustiveness, and the error-propagation flows key off `Result`
+/ `Option`). Allowing a user type to redefine one would make the same
+spelling mean two things — e.g. bare `Result` (a user record) versus
+`Result<T, E>` (the built-in) in one file — which no coherent scoping
+rule supports. Reserving the names keeps the built-in reachable
+everywhere and turns the collision into one clear diagnostic at the
+declaration site instead of a confusing arity error at each use.
+
+This reservation governs **type declarations** only. Value-level
+shadowing of a predeclared identifier by a local or parameter is a
+separate concern, handled (when shadow tracking lands) by the soft
+diagnostics in §Shadowing.
+
 ## Resolution algorithm
 
 For each unqualified `Ident` AST node, lookup proceeds:

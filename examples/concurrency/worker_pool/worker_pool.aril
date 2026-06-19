@@ -15,12 +15,12 @@ type Job = {
   workN: int       // pretend CPU work — square this many times
 }
 
-type Result = {
+type JobResult = {
   jobID:  int
   output: int
 }
 
-func worker(id: int, jobs: RecvChan<Job>, results: SendChan<Result>) {
+func worker(id: int, jobs: RecvChan<Job>, results: SendChan<JobResult>) {
   for j in jobs {
     // Simulate work.
     time.sleep(time.milliseconds(50))
@@ -30,13 +30,13 @@ func worker(id: int, jobs: RecvChan<Job>, results: SendChan<Result>) {
       v = v * 2
       k = k + 1
     }
-    results.send(Result{ jobID: j.id, output: v })
+    results.send(JobResult{ jobID: j.id, output: v })
   }
 }
 
-func runPool(workerCount: int, jobs: []Job): Result<[]Result, error> {
+func runPool(workerCount: int, jobs: []Job): Result<[]JobResult, error> {
   let jobCh    = makeChannel<Job>(workerCount)
-  let resultCh = makeChannel<Result>(jobs.len())
+  let resultCh = makeChannel<JobResult>(jobs.len())
 
   // Fan out N workers. Fire-and-forget; the scope joins when every
   // worker exits (which happens after jobCh is closed and drained).
@@ -56,7 +56,7 @@ func runPool(workerCount: int, jobs: []Job): Result<[]Result, error> {
   }
   resultCh.close()
 
-  var out: []Result = []Result{}
+  var out: []JobResult = []JobResult{}
   for r in resultCh {
     out = out.push(r)
   }

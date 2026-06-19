@@ -39,6 +39,7 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 		switch v := d.(type) {
 		case *ast.TypeDecl:
 			c.checkReservedName(v.Name, v.Span)
+			c.checkReservedTypeName(v.Name, v.Span, file.parent)
 			sym := &Symbol{Name: v.Name, Kind: SymTypeDecl, Decl: v, Type: &Named{N: v.Name, Decl: v}}
 			if prev := file.declare(sym); prev != nil {
 				c.report("E0113", "Duplicate top-level declaration "+v.Name, v.Span)
@@ -67,12 +68,14 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 			}
 		case *ast.ClassDecl:
 			c.checkReservedName(v.Name, v.Span)
+			c.checkReservedTypeName(v.Name, v.Span, file.parent)
 			sym := &Symbol{Name: v.Name, Kind: SymClass, Decl: v, Type: &Named{N: v.Name, Decl: v}}
 			if prev := file.declare(sym); prev != nil {
 				c.report("E0113", "Duplicate top-level declaration "+v.Name, v.Span)
 			}
 		case *ast.InterfaceDecl:
 			c.checkReservedName(v.Name, v.Span)
+			c.checkReservedTypeName(v.Name, v.Span, file.parent)
 			sym := &Symbol{Name: v.Name, Kind: SymInterface, Decl: v, Type: &Named{N: v.Name, Decl: v}}
 			if prev := file.declare(sym); prev != nil {
 				c.report("E0113", "Duplicate top-level declaration "+v.Name, v.Span)
@@ -99,6 +102,7 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 			// the nominal Named carrying the decl, so member access can
 			// recognise the handle and refEq can admit it.
 			c.checkReservedName(v.Name, v.Span)
+			c.checkReservedTypeName(v.Name, v.Span, file.parent)
 			sym := &Symbol{Name: v.Name, Kind: SymExternType, Decl: v, Type: &Named{N: v.Name, Decl: v}}
 			if prev := file.declare(sym); prev != nil {
 				c.report("E0113", "Duplicate top-level declaration "+v.Name, v.Span)
@@ -122,5 +126,24 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 func (c *checker) checkReservedName(name string, span ast.Span) {
 	if goReservedIdent(name) {
 		c.report("E0107", "Reserved identifier prefix `_aril_` — used by codegen", span)
+	}
+}
+
+// checkReservedTypeName rejects a user type declaration that reuses a
+// built-in type name — a primitive (`int`, `string`, …), `error`,
+// `Any`/`Dynamic`/`unit`/`Never`, or a built-in generic (`Result`,
+// `Option`, `Map`, …). Built-in type names are reserved: no
+// `type`/`class`/`interface`/`extern type` may redeclare one (E0118).
+// The set is sourced from the predeclared scope (file.parent), so it
+// stays in lockstep with predeclaredSymbols. Value-level shadowing of a
+// predeclared identifier (a local / parameter) is a separate, deferred
+// concern (E0502/E0503). Contract: name-resolution.md §Reserved type
+// names / keywords.md.
+func (c *checker) checkReservedTypeName(name string, span ast.Span, pre *Scope) {
+	if pre == nil {
+		return
+	}
+	if sym := pre.lookup(name); sym != nil && sym.Kind == SymBuiltinType {
+		c.report("E0118", "`"+name+"` is a built-in type and cannot be redeclared", span)
 	}
 }
