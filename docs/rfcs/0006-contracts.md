@@ -117,7 +117,7 @@ func safeDivide(a: int, b: int): Result<int, DivError> {
 
 contract safeDivide {
   requires b != 0
-  ensures  result.isOk() implies result.unwrap() * b <= a
+  ensures  match result { Ok(q) => q * b <= a, Err(_) => true }
 }
 ```
 
@@ -167,7 +167,8 @@ func bubbleSort(xs: []int): []int {
 contract bubbleSort {
   ensures isSorted(result)
   loop outer {
-    invariant isSorted(slice(result, result.len() - pass, result.len()))
+    // isSorted is an ordinary user predicate — a pure ([]int) -> bool func
+    invariant isSorted(result[result.len() - pass : result.len()])
   }
 }
 ```
