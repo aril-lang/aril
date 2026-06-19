@@ -4,15 +4,15 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 46 / 56 examples build end-to-end** (floor 46).
-- **diag_ok — 77 / 100 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 26 / 51 run-pass examples build and run as specified** (floor 26; behavioural: exit code, and stdout vs an `expected_output` sidecar when present; `no-run` examples excluded).
+- **build_ok — 47 / 56 examples build end-to-end** (floor 47).
+- **diag_ok — 78 / 101 negative cases produce their expected diagnostic** (floor 70).
+- **run_ok — 27 / 51 run-pass examples build and run as specified** (floor 27; behavioural: exit code, and stdout vs an `expected_output` sidecar when present; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 46 |
+| ✅ build (full pipeline) | 47 |
 | emit / codegen fail | 1 |
-| sema fail | 2 |
+| sema fail | 1 |
 | parse fail | 7 |
 
 ## Per-example
@@ -23,6 +23,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/concurrency/pipeline/pipeline.aril` | build | — |
 | `examples/concurrency/rate_limited/rate_limited.aril` | build | — |
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
+| `examples/concurrency/worker_pool/worker_pool.aril` | build | — |
 | `examples/core-language/d01/d01.aril` | build | — |
 | `examples/core-language/d02/d02.aril` | build | — |
 | `examples/core-language/d03/d03.aril` | build | — |
@@ -66,7 +67,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `user_tests/leetcode_3131_idiomatic.aril` | build | — |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | emit | unknown failure |
-| `examples/concurrency/worker_pool/worker_pool.aril` | sema | error[E0207]: Wrong type arity on generic instantiation: Result expects 2 type arguments, got 0 |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/concurrency/graceful_server/graceful_server.aril` | parse | error[E0112]: expected expression, got Punct ":" |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | parse | error[E0112]: expected Punct "{", got Punct "." |
@@ -80,7 +80,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.
 
-**23 of 100 cases fall short of the ideal.**
+**23 of 101 cases fall short of the ideal.**
 
 | Case | Ideal (`.expected`) | Actual |
 |---|---|---|
@@ -112,14 +112,13 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**25 of 51 run-pass examples fall short of run_ok.**
+**24 of 51 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
 | `examples/concurrency/nested_scopes` | build-fail | 1 |
 | `examples/concurrency/pubsub` | build-fail | 1 |
 | `examples/concurrency/rate_limited` | timeout | 124 |
-| `examples/concurrency/worker_pool` | build-fail | 1 |
 | `examples/core-language/d01` | run-fail | 2 |
 | `examples/core-language/d02` | run-fail | 2 |
 | `examples/core-language/d03` | run-fail | 2 |

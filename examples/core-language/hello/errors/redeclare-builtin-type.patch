@@ -1,0 +1,12 @@
+--- hello.aril
++++ hello.aril
+@@ -5,5 +5,9 @@
+ import fmt
+ 
++type Result = {
++  ok: bool
++}
++
+ func main() {
+   fmt.println("Aril is rising.")
+ }

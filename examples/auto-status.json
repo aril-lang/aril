@@ -3,12 +3,12 @@
   "totals": {
     "total": 56,
     "parse_fail": 7,
-    "sema_fail": 2,
+    "sema_fail": 1,
     "emit_fail": 1,
-    "build_ok": 46,
-    "diag_ok": 77,
-    "diag_total": 100,
-    "run_ok": 26,
+    "build_ok": 47,
+    "diag_ok": 78,
+    "diag_total": 101,
+    "run_ok": 27,
     "run_total": 51
   },
   "files": [
@@ -54,8 +54,8 @@
     },
     {
       "path": "examples/concurrency/worker_pool/worker_pool.aril",
-      "stage": "sema",
-      "blocker": "error[E0207]: Wrong type arity on generic instantiation: Result expects 2 type arguments, got 0"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/core-language/d01/d01.aril",
@@ -425,11 +425,6 @@
       "path": "examples/concurrency/rate_limited",
       "status": "timeout",
       "code": 124
-    },
-    {
-      "path": "examples/concurrency/worker_pool",
-      "status": "build-fail",
-      "code": 1
     },
     {
       "path": "examples/core-language/d01",

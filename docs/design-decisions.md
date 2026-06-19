@@ -578,6 +578,34 @@ with Aril carry no attribution obligation.
 
 ---
 
+### D27 — Built-in type names are reserved
+
+A user type declaration — `type`, `class`, `interface`, or `extern
+type` — may not reuse a built-in type name. That covers the primitives
+(`int`, `string`, `bool`, the sized integers, `float32`/`float64`,
+`byte`, `rune`), `error`, `Any`/`Dynamic`/`unit`/`Never`, and the
+built-in generics (`Result`, `Option`, `Map`, `Set`, `Stack`,
+`Channel`, `SendChan`, `RecvChan`). The compiler reports a single, clear
+error at the declaration site.
+
+The reason is that these names are load-bearing. Literal typing and
+inference are defined in terms of `int`/`string`/`bool`; `try`, `match`
+exhaustiveness, and error propagation are defined in terms of
+`Result`/`Option`. Letting a program redefine one would make a single
+spelling mean two different types in the same file — bare `Result` (a
+user record) versus `Result<T, E>` (the built-in) — which no scoping
+rule can resolve coherently. The two principled choices are to reserve
+the names or to let a user type fully hide the built-in for the rest of
+the file; Aril reserves them, so the built-ins stay reachable everywhere
+and the clash becomes one diagnostic where the name is introduced rather
+than a confusing follow-on error at every use.
+
+This applies to type declarations only. Whether a local variable or
+parameter may shadow a predeclared name is a separate question, handled
+by Aril's shadowing rules.
+
+---
+
 ## What's not here
 
 A handful of decisions and open questions are intentionally out of scope

@@ -196,21 +196,25 @@ func main() {
 }
 
 // TestUserTypeShadowsRuntimeName guards the R3 fix for a user type whose
-// name collides with a runtime type (Dynamic / Kind / …): in vendored
-// mode emitTypeExpr must emit the user's own type, not arilrt.X. Without
-// the isShadowedRuntimeType guard a field `k: Kind` mis-emits as
-// `arilrt.Kind` (or `undefined: arilrt` with no reflect import).
+// name collides with an arilrt-*internal* runtime type — Kind /
+// TypeDescriptor / FieldInfo. These are NOT predeclared, so D27 does not
+// reserve them; a user may still declare them, and in vendored mode
+// emitTypeExpr must emit the user's own type, not arilrt.X. (The
+// *predeclared* runtime names — Option/Result/Map/Set/Stack/Dynamic —
+// are reserved by D27 and rejected at the decl site with E0118, covered
+// by the sema E0118 tests; this test guards the reservation's boundary:
+// it does not over-reach into the arilrt-internal namespace.)
 func TestUserTypeShadowsRuntimeName(t *testing.T) {
-	// Covers a class, a sum, and a record all shadowing runtime type
-	// names (Kind / Dynamic / FieldInfo), each used in type position.
+	// Covers a class, a sum, and a record shadowing arilrt-internal
+	// type names (Kind / TypeDescriptor / FieldInfo), each in type position.
 	src := `import fmt
 
 class Kind { var n: int }
-type Dynamic = | Lo | Hi
+type TypeDescriptor = | Lo | Hi
 type FieldInfo = { tag: int }
 
 func describe(k: Kind): int { return k.n }
-func name(d: Dynamic): string { match d { Lo => return "lo", Hi => return "hi" } }
+func name(d: TypeDescriptor): string { match d { Lo => return "lo", Hi => return "hi" } }
 func tagOf(f: FieldInfo): int { return f.tag }
 
 func main() {

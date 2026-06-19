@@ -76,9 +76,14 @@ those positions they are ordinary identifiers.
 
 ## Built-in identifiers (predeclared, NOT keywords)
 
-These are predeclared in the top-level scope; user code may shadow
-them but doing so is bad style. Full signatures live in
+These are predeclared in the top-level scope. Full signatures live in
 `builtins.md`.
+
+The **type** names below are **reserved**: a `type` / `class` /
+`interface` / `extern type` declaration may not redeclare one (E0118 —
+see `name-resolution.md` §Reserved type names). Value-level shadowing of
+a predeclared identifier by a local or parameter is permitted (though bad
+style) and is governed separately by the shadow diagnostics.
 
 - Types: `bool`, `int`, `int8`..`int64`, `uint`..`uint64`,
   `float32`, `float64`, `byte`, `rune`, `string`, `Any`,

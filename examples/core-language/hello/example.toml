@@ -44,6 +44,13 @@ matches = "errors/stray-backtick.expected"
 origin  = "synthetic"
 
 [[error]]
+patch   = "errors/redeclare-builtin-type.patch"   # a user `type Result` redeclares the built-in generic
+expect  = ["E0118"]
+stage   = "sema"
+matches = "errors/redeclare-builtin-type.expected"
+origin  = "synthetic"
+
+[[error]]
 patch   = "errors/cyclic-alias.patch"   # type aliases A and B form a cycle
 expect  = ["E0114"]
 stage   = "sema"

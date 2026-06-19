@@ -68,6 +68,49 @@ func foo() {}
 	}
 }
 
+func TestRedeclareBuiltinGenericFiresE0118(t *testing.T) {
+	src := `type Result = {
+  ok: bool
+}
+`
+	codes := runCheck(t, src)
+	if !contains(codes, "E0118") {
+		t.Errorf("expected E0118 (redeclare built-in type Result), got %v", codes)
+	}
+}
+
+func TestRedeclareBuiltinPrimitiveFiresE0118(t *testing.T) {
+	src := `type int = {
+  n: bool
+}
+`
+	codes := runCheck(t, src)
+	if !contains(codes, "E0118") {
+		t.Errorf("expected E0118 (redeclare built-in type int), got %v", codes)
+	}
+}
+
+func TestClassNamedBuiltinFiresE0118(t *testing.T) {
+	src := `class Option {
+}
+`
+	codes := runCheck(t, src)
+	if !contains(codes, "E0118") {
+		t.Errorf("expected E0118 (class named built-in Option), got %v", codes)
+	}
+}
+
+func TestNonBuiltinTypeNameNoE0118(t *testing.T) {
+	src := `type JobResult = {
+  ok: bool
+}
+`
+	codes := runCheck(t, src)
+	if contains(codes, "E0118") {
+		t.Errorf("E0118 false-fired on a non-builtin type name, got %v", codes)
+	}
+}
+
 func TestDuplicateVariantFiresE0106(t *testing.T) {
 	src := `type Color = | Red | Green | Red
 `

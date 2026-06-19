@@ -66,6 +66,7 @@ severity column.
 | E0115 | E | A variadic parameter must be the last parameter | `grammar.ebnf` §Param / `ffi.md` §Variadic | Move the `...T` parameter to the end of the list — only the final parameter may be variadic. |
 | E0116 | E | Cyclic package import | `manifest.md` §Resolution / `name-resolution.md` §Cross-package imports | The user-package import graph contains a cycle (`a` imports `b` imports `a`). Break it by extracting the shared code into a third package (the graph must be acyclic — D20). |
 | E0117 | E | Unknown import path | `manifest.md` §Resolution / `name-resolution.md` §Cross-package imports | The import is neither a local user package (a directory under the project name) nor a known stdlib / `[bindings]` namespace. Fix the path, create the package directory, or add the Go package to `[bindings] extra`. |
+| E0118 | E | Redeclaration of a built-in type | `name-resolution.md` §Reserved type names / `keywords.md` §Built-in identifiers | A `type` / `class` / `interface` / `extern type` reuses a built-in type name — a primitive (`int`, `string`, …), `error`, `Any` / `Dynamic` / `unit` / `Never`, or a built-in generic (`Result`, `Option`, `Map`, …). Those names are reserved; rename the declaration (e.g. `Result` → `JobResult`). |
 
 ### E02xx — Type system
 
