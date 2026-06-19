@@ -787,6 +787,8 @@ func write(b *strings.Builder, n Node, depth int) {
 		writeSpan(b, v.Span)
 		b.WriteByte('\n')
 		write(b, v.Inner, depth+1)
+	case *ScopeRef:
+		writeSpan(b, v.Span)
 	case *ScopeExpr:
 		writeSpan(b, v.Span)
 		for _, ta := range v.TypeArgs {

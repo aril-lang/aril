@@ -627,9 +627,13 @@ under-report (miss a non-exhaustive match), never over-report.
 `os.exit(code)` is a regular call typed by its binding signature
 which returns `Never`; no dedicated rule.
 
-**Negative cases.** `try` in a function that returns neither
-`Result<_, _>` nor `Option<_>` fires **E0402 `try` outside a
-Result/Option function**. `break`/`continue` outside a loop
+**Negative cases.** `try` whose nearest enclosing *frame* returns
+neither `Result<_, _>` nor `Option<_>` fires **E0402 `try` outside a
+Result/Option function**. The enclosing frame is usually the function,
+but a `spawn { ... }` body is itself a `Result<unit, E>` frame (T-Spawn)
+and a `scope` body a `Result<T, E>` frame (T-ScopeExpr), so a `try`
+inside either is permitted regardless of the surrounding function's
+return type. `break`/`continue` outside a loop
 fires **E0404**. `spawn` outside a `scope` block fires
 **E0405** (see also T-Spawn below).
 

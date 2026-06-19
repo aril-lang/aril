@@ -2,12 +2,12 @@
   "schema_version": 3,
   "totals": {
     "total": 56,
-    "parse_fail": 7,
-    "sema_fail": 1,
-    "emit_fail": 1,
+    "parse_fail": 5,
+    "sema_fail": 2,
+    "emit_fail": 2,
     "build_ok": 47,
-    "diag_ok": 78,
-    "diag_total": 101,
+    "diag_ok": 79,
+    "diag_total": 102,
     "run_ok": 27,
     "run_total": 51
   },
@@ -24,13 +24,13 @@
     },
     {
       "path": "examples/concurrency/nested_scopes/nested_scopes.aril",
-      "stage": "parse",
-      "blocker": "error[E0112]: expected Punct \"{\", got Punct \".\""
+      "stage": "emit",
+      "blocker": "go build failed"
     },
     {
       "path": "examples/concurrency/parallel_fetcher/parallel_fetcher.aril",
-      "stage": "parse",
-      "blocker": "error[E0112]: expected Punct \"{\", got Punct \".\""
+      "stage": "sema",
+      "blocker": "error[E0103]: Unknown name http"
     },
     {
       "path": "examples/concurrency/pipeline/pipeline.aril",

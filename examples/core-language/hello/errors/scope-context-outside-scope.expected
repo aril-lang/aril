@@ -1,0 +1,1 @@
+error[E0601]: `scope` outside a `scope` block

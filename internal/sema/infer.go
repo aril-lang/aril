@@ -93,6 +93,9 @@ func (c *checker) inferExpr(e ast.Expr) Type {
 			c.report("E0402", "`try` outside a Result/Option-returning function", v.Span)
 		}
 		t = c.tryResultType(inner, v)
+	case *ast.ScopeRef:
+		c.checkScopeRef(v.Span)
+		t = &Unknown{}
 	case *ast.ScopeExpr:
 		t = c.inferScope(v)
 	case *ast.SpawnExpr:
@@ -196,11 +199,27 @@ func (c *checker) inferScope(s *ast.ScopeExpr) Type {
 // is not lexically inside a `scope` body. The body is checked
 // normally; its `return Ok(())` / `return Err(e)` are converted to
 // the group's error channel at lowering.
+// checkScopeRef validates a `scope`-as-value reference: it is legal only
+// inside the lexical body of a scope block (scopeDepth > 0, which the
+// resolver reaches through any enclosing spawn / block), else E0601.
+func (c *checker) checkScopeRef(span ast.Span) {
+	if c.scopeDepth == 0 {
+		c.report("E0601", "`scope` outside a `scope` block", span)
+	}
+}
+
 func (c *checker) inferSpawn(s *ast.SpawnExpr) Type {
 	if c.scopeDepth == 0 {
 		c.report("E0405", "`spawn` outside a `scope` block", s.Span)
 	}
+	// A spawn body is an implicit `Result<unit, error>`-returning frame
+	// (it must `return Ok(())`, and its error feeds the group), so `try`
+	// inside it is permitted regardless of the enclosing function's
+	// return type — drop the try-forbidden flag for the body (T-Try).
+	savedForbidden := c.curTryForbidden
+	c.curTryForbidden = false
 	c.checkBlock(s.Body)
+	c.curTryForbidden = savedForbidden
 	return &Unit{}
 }
 
@@ -579,6 +598,15 @@ func (c *checker) checkArgTypes(fn *Func, args []Type, nodes []ast.Expr, callee 
 // its declared type, a class method gives its Func type. Module
 // access and everything else stays Unknown for PR-C1.
 func (c *checker) inferField(f *ast.Field) Type {
+	// `scope.context` — the cancellable context of the nearest enclosing
+	// scope (name-resolution.md §Special names). The ScopeRef receiver
+	// carries the E0601 (scope-outside-a-block) check. The context's type
+	// is Unknown in v1, which fits the `context.Context` parameter
+	// positions it feeds; bare `scope.<other>` is likewise Unknown.
+	if sr, ok := f.Receiver.(*ast.ScopeRef); ok {
+		c.checkScopeRef(sr.Span)
+		return &Unknown{}
+	}
 	// Static method on a class name (`Box.new`, `DSU.new`) — the
 	// receiver names the class (SymClass), not a value, so the value
 	// path below (which needs a *Named receiver) can't reach it. Look

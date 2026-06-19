@@ -6,6 +6,19 @@ import (
 	"github.com/aril-lang/aril/internal/ast"
 )
 
+// emitScopeContext lowers a `scope.context` reference (and a bare
+// ScopeRef value) to the nearest enclosing scope's derived-context
+// variable. No enclosing scope is an internal error — sema rejects
+// `scope` outside a scope block (E0601) before codegen.
+func (g *gen) emitScopeContext(_ ast.Span) error {
+	n := len(g.ctxVars)
+	if n == 0 {
+		return fmt.Errorf("codegen: `scope` reference outside a scope block")
+	}
+	g.b.WriteString(g.ctxVars[n-1])
+	return nil
+}
+
 // emitScopeExpr lowers a `scope<T, E>(parent?) { body }` expression
 // to an immediately-invoked func returning `Result[T, error]`
 // (lowering-go.md §ScopeIR). A fresh group is derived from the
@@ -25,7 +38,12 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	depth := len(g.groupVars)
 	gv := fmt.Sprintf("_arilEg%d", depth)
 	g.groupVars = append(g.groupVars, gv)
-	defer func() { g.groupVars = g.groupVars[:depth] }()
+	ctxv := fmt.Sprintf("_arilCtx%d", depth)
+	g.ctxVars = append(g.ctxVars, ctxv)
+	defer func() {
+		g.groupVars = g.groupVars[:depth]
+		g.ctxVars = g.ctxVars[:depth]
+	}()
 
 	// A scope is its own return frame: a `return` inside the scope's
 	// IIFE is not a spawn return, even when the scope is lexically
@@ -42,12 +60,14 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	g.b.WriteString(", error] {\n")
 	g.indent++
 
-	// Group + derived context. The context binding is discarded
-	// until ScopeRef (`scope.context`) lands; the group itself is
-	// used by every spawn and by Wait below.
+	// Group + derived context. The group is used by every spawn and by
+	// Wait below; the derived context is bound to ctxv and surfaced by a
+	// `scope.context` ScopeRef (lowering-go.md §ScopeIR). The defensive
+	// `_ = ctxv` covers scopes that never read it (Go would otherwise
+	// reject the unused binding); a real read re-uses ctxv regardless.
 	g.writeIndent()
 	g.b.WriteString(gv)
-	g.b.WriteString(", _ := " + g.rt("NewGroup") + "(")
+	g.b.WriteString(", " + ctxv + " := " + g.rt("NewGroup") + "(")
 	if s.Parent != nil {
 		if err := g.emitExpr(s.Parent); err != nil {
 			return err
@@ -56,6 +76,8 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 		g.b.WriteString("context.Background()")
 	}
 	g.b.WriteString(")\n")
+	g.writeIndent()
+	g.b.WriteString("_ = " + ctxv + "\n")
 
 	for _, st := range s.Body.Stmts {
 		if err := g.emitStmt(st); err != nil {

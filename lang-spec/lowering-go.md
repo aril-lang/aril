@@ -403,8 +403,11 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
   (in Go, as an expression — wrapped in an immediate function:)
 
   func() arilrt.Result[T, E] {
-    eg, _ := arilrt.NewGroup(<lowering of P; defaults to
+    eg, ctx := arilrt.NewGroup(<lowering of P; defaults to
                            context.Background()>)
+    _ = ctx                                     // ScopeRef reads ctx; the
+                                                //  blank assign covers a
+                                                //  scope that never does
     <lowering of B>                             // ends with a trailing
                                                 //  arilrt.Result[T, E]
                                                 //  value or unit-Ok
@@ -429,9 +432,11 @@ context; `Wait` blocks for every spawn and returns that error.
 prelude).
 
 `ScopeRef` (the `scope` identifier — value access to the scope's
-context) is a v1 follow-up: the derived context is currently
-discarded (`_`) and no `_scope` binding is emitted. When `ScopeRef`
-lands, `scope.context` lowers to that bound context.
+context) lowers to the derived-context variable bound above: a
+`scope.context` reference emits `ctx` (the nearest enclosing scope's
+context). The binding is always emitted with a defensive `_ = ctx` so a
+scope that never reads it still compiles. Outside any scope block a
+`ScopeRef` is **E0601** (sema).
 
 ```
 SpawnIR { parent_group: g, parent_ctx: ctx, body: B }
@@ -451,6 +456,22 @@ A spawn body in the corpus ends in an explicit `return Ok(())` /
 `return Err(e)`, so the conversion is applied per-return; the
 trailing `return nil` is emitted only when the body falls through
 without a return.
+
+**`try` inside a spawn body.** A spawn body is an implicit
+`Result<unit, error>` frame (it returns `error` to the group), so a
+`try e` inside it is permitted regardless of the enclosing function's
+return type (sema: the try-forbidden flag is cleared for the body, so
+no E0402). It lowers to the same temp + bail as a statement `try`,
+except the bail returns the inner Result's **error** directly — matching
+the `func() error` signature — rather than a wrapped Result:
+
+```
+let x = try e   (in a spawn body)
+                                       ⟿
+  tmp := <lowering of e>
+  if tmp.Tag == 1 { return tmp.E }     // Err ⟿ return the error
+  x := tmp.V
+```
 
 The asserted-`E` (`res.E.(error)`) is safe because **v1
 restricts `scope<T, E>` to `E = error`**. Any other `E` is

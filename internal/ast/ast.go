@@ -1207,6 +1207,20 @@ func (n *ScopeExpr) NodeSpan() Span   { return n.Span }
 func (n *ScopeExpr) NodeKind() string { return "ScopeExpr" }
 func (n *ScopeExpr) exprMarker()      {}
 
+// ScopeRef — `scope` used as a value rather than heading a ScopeExpr
+// block. It yields the nearest enclosing scope handle; the only v1
+// operation on it is the `.context` suffix (the scope's cancellable
+// context). Outside a scope block it is E0601. Parsed when `scope` is
+// not followed by `<` / `(` / `{` (grammar.ebnf §ScopeRef); per
+// ast.md §Expr.
+type ScopeRef struct {
+	Span Span
+}
+
+func (n *ScopeRef) NodeSpan() Span   { return n.Span }
+func (n *ScopeRef) NodeKind() string { return "ScopeRef" }
+func (n *ScopeRef) exprMarker()      {}
+
 // SpawnExpr — `spawn { body }`. Registers a goroutine on the
 // enclosing scope's group (E0405 if there is none). The body is
 // typed `Result<unit, E>`; the expression itself is unit. Per
