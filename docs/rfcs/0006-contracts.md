@@ -6,15 +6,19 @@
 | Status | draft |
 | Created | 2026-06-19 |
 | Supersedes | — |
-| Target | `lang-spec/grammar.md` (contract clauses + sidecar block), `lang-spec/type-system.md` (T-Contract-Pred, T-Old, T-Result), `lang-spec/diagnostics.md` (E07xx contract codes), `lang-spec/lowering-go.md` (§ContractIR lowering + mode dispatch), `lang-spec/builtins.md` (`old`/`result` predeclared in contract scope); `examples/README.md` + RFC-0004 corpus metadata (`example.toml` contract block); `docs/rfcs/README.md` index row |
+| Target | `lang-spec/grammar.ebnf` (the `contract` block production + inline clauses), `lang-spec/type-system.md` (T-Contract-Pred, T-Old, T-Result), `lang-spec/diagnostics.md` (E11xx contract codes), `lang-spec/lowering-go.md` (§ContractIR lowering + mode dispatch), `lang-spec/builtins.md` (`old`/`result` predeclared in contract scope); `examples/README.md` + RFC-0004 corpus metadata (`example.toml` contract block); `docs/rfcs/README.md` index row |
 
 ## Summary
 
 Add **optional, runtime-checked contracts** to Aril — preconditions
 (`requires`), postconditions (`ensures`, with `old(e)` and `result`), and
-type invariants (`invariant`) — written either inline on a declaration or
-in a **separable `contract` block** that attaches obligations to an
-existing declaration by name. Contracts are pure boolean Aril expressions.
+type invariants (`invariant`) — written primarily in a **separable
+`contract` block** that attaches obligations to an existing declaration by
+name, with optional inline clauses as sugar. The block is hierarchical: it
+carries a function's pre/post and, nested by loop label, **per-loop
+invariants** — so a function's whole behavioural spec (including its loops)
+lives beside the code without touching the body. Contracts are pure boolean
+Aril expressions.
 They are enforced by the runtime under one of four selectable modes —
 **panic / warn / stats / off** — and lower to guarded checks in `arilrt`.
 Two new compiler surfaces own them: a compile-time **`internal/contract`**
@@ -91,41 +95,80 @@ real diagnostics in Aril coordinates (D10). The comment-DSL tradeoff
 
 ## Design
 
-### Surface — two forms, one semantics
+### Surface — the `contract` block is primary
 
-**Inline clauses** on a function, between the signature and the body:
+The canonical form is a **separable `contract` block** that attaches
+obligations to an existing declaration by name. It leaves the declaration's
+signature and body untouched — which is exactly what makes contracts
+genuinely non-binding (a human writes ordinary Aril, with no contract
+syntax in sight) and what enables the agent-symbiosis (an agent bolts
+contracts onto code it did not write, by name, without editing it):
 
 ```aril
-func safeDivide(a: int, b: int): Result<int, DivError>
-  requires b != 0
-  ensures  old(a) == a            // pure: inputs unchanged
-{
+func safeDivide(a: int, b: int): Result<int, DivError> {
   return Ok(a / b)
 }
-```
 
-**Separable `contract` block**, attaching the same obligations to an
-existing declaration by name (the agent-symbiosis and corpus-enrichment
-vehicle — bolt contracts onto code without editing it):
-
-```aril
 contract safeDivide {
   requires b != 0
   ensures  result.isOk() implies result.unwrap() * b <= a
 }
 ```
 
-**Type invariant**, inline in a type decl or via a `contract` block on the
-type:
+A `contract` block on a **type** carries its invariant:
 
 ```aril
 type Interval = { lo: int, hi: int }
+
+contract Interval {
   invariant lo <= hi
+}
 ```
 
-Both surfaces desugar to the same Contract IR attached to the symbol. A
-declaration may carry inline clauses *and* a sidecar block; they union (a
-duplicate identical clause is a warning, not an error).
+**Loop contracts.** A loop is anonymous, so it has no name for the block to
+target. A loop that bears a contract is **labelled**, and the function's
+`contract` block carries a nested `loop <label>` section — keeping the whole
+function spec in one separable block, body untouched:
+
+```aril
+func bubbleSort(xs: []int): []int {
+  for pass in 0 .. xs.len() loop outer {
+    for i in 0 .. xs.len() - pass - 1 { ... }
+  }
+  return xs
+}
+
+contract bubbleSort {
+  ensures isSorted(result)
+  loop outer {
+    invariant isSorted(slice(result, result.len() - pass, result.len()))
+    variant   xs.len() - pass            // optional decreasing measure
+  }
+}
+```
+
+A loop `invariant` is checked at loop entry and after each iteration; an
+optional `variant` is a pure int measure asserted to strictly decrease and
+stay `>= 0` each iteration (a runtime guard against a class of
+non-termination/logic bugs — full termination *proof* is static and
+deferred, §Open questions).
+
+**Inline clauses** are an optional convenience — the same `requires` /
+`ensures` / `invariant` / `variant` keywords written directly on a
+signature or loop header, for authors who prefer the contract beside the
+code. They desugar to exactly the same Contract IR as the block; the block
+is the primary form and inline is sugar over it:
+
+```aril
+func abs(x: int): int
+  ensures result >= 0
+{ ... }
+```
+
+Both surfaces desugar to the same Contract IR attached to the symbol (or,
+for a loop, to the labelled loop within it). A declaration may carry inline
+clauses *and* a block; they union (a duplicate identical clause is a
+warning, not an error).
 
 ### Predicate language
 
@@ -185,15 +228,19 @@ contract.Check(prog *ast.Program, types *sema.Info) (*contract.IR, []diag.Diagno
 
 Responsibilities:
 
-1. **Bind** inline clauses and `contract` blocks to their target symbols;
-   a block naming an unknown decl is E0701.
+1. **Bind** inline clauses and `contract` blocks (incl. nested `loop
+   <label>` sections) to their target symbols; a block naming an unknown
+   decl, or a `loop` section naming an unknown/unlabelled loop, is E1101.
 2. **Type-check** each predicate as `bool` in the right scope (reusing
-   `sema.Info`); non-bool is E0702.
-3. **Purity-check** predicates; an impure predicate is E0703.
+   `sema.Info`); non-bool is E1102.
+3. **Purity-check** predicates; an impure predicate is E1103.
 4. **Scope-check** `old`/`result`: `result` or `old` outside `ensures` is
-   E0704; `old(e)` over an impure/forbidden `e` is E0705.
-5. **Lower** to `contract.IR` — a per-symbol list of obligations
-   (`{kind, predExpr, oldSnapshots, srcSpan}`) consumed by codegen.
+   E1104; `old(e)` over an impure/forbidden `e` is E1105.
+5. **Well-form** `variant`: a `variant` measure that is not a pure int
+   expression is E1106.
+6. **Lower** to `contract.IR` — a per-symbol list of obligations
+   (`{kind, predExpr, oldSnapshots, loopLabel?, srcSpan}`) consumed by
+   codegen.
 
 The pass is **purely additive**: a program with no contracts produces an
 empty IR and is byte-identical through codegen (golden-fixture safe). It is
@@ -209,16 +256,19 @@ The checked-evaluation layer, mode-aware, part of the runtime contract
 
 ```
 type Violation struct { Kind, Pred, Where string; Bindings []Binding }
-func CheckPre(mode Mode, ok bool, v Violation)   // requires
-func CheckPost(mode Mode, ok bool, v Violation)  // ensures / invariant
-func Stats() ViolationTally                       // for --contracts=stats
+func CheckPre(mode Mode, ok bool, v Violation)    // requires
+func CheckPost(mode Mode, ok bool, v Violation)   // ensures / invariant
+func CheckLoop(mode Mode, ok bool, v Violation)   // loop invariant / variant
+func Stats() ViolationTally                        // for --contracts=stats
 ```
 
 Codegen lowers each obligation to a guarded call at the boundary:
 `requires` at function entry (after `old(e)` snapshots), `ensures` at each
-return, `invariant` around exported method boundaries on the type. Under
-`off`, codegen emits nothing (no IR → no call), so the elision is total and
-free.
+return, `invariant` around exported method boundaries on the type, and a
+**loop** `invariant`/`variant` at the labelled loop's entry and end of each
+iteration (the `variant` lowering also stashes the prior measure to assert
+strict decrease). Under `off`, codegen emits nothing (no IR → no call), so
+the elision is total and free.
 
 ### Corpus integration (RFC-0004 / D25)
 
@@ -296,18 +346,21 @@ Surveyed for this RFC (citations for the paper trail):
 
 On acceptance, the implementing PRs touch:
 
-- `lang-spec/grammar.md` — `requires`/`ensures`/`invariant` clauses on
-  decls; the `contract <name> { … }` block production.
+- `lang-spec/grammar.ebnf` — the `contract <name> { … }` block production
+  (primary), incl. nested `loop <label>` sections; a loop `label` on a loop
+  header; inline `requires`/`ensures`/`invariant`/`variant` clauses as sugar.
 - `lang-spec/type-system.md` — T-Contract-Pred (predicate : bool, pure),
   T-Result (`result` typed as the return type, `ensures`-only), T-Old
   (`old(e)` typed as `e`, `ensures`-only).
 - `lang-spec/builtins.md` — `old`/`result` as contract-scope predeclared
   identifiers; `implies` predicate sugar.
-- `lang-spec/diagnostics.md` — E0701 (contract on unknown decl), E0702
-  (non-bool predicate), E0703 (impure predicate), E0704 (`old`/`result`
-  outside `ensures`), E0705 (`old` over forbidden expr).
-- `lang-spec/lowering-go.md` — §ContractIR: snapshot/entry/exit lowering and
-  the four-mode dispatch into `arilrt`.
+- `lang-spec/diagnostics.md` — E1101 (contract on unknown decl / loop
+  label), E1102 (non-bool predicate), E1103 (impure predicate), E1104
+  (`old`/`result` outside `ensures`), E1105 (`old` over forbidden expr),
+  E1106 (`variant` not a pure int measure).
+- `lang-spec/lowering-go.md` — §ContractIR: snapshot/entry/exit lowering,
+  per-iteration loop-invariant/`variant` lowering, and the four-mode
+  dispatch into `arilrt`.
 - RFC-0004 corpus metadata (`example.toml`) — the run-pass contract
   dimension; `examples/README.md` note.
 - `docs/rfcs/README.md` — index row.
@@ -329,8 +382,11 @@ added to them deliberately. No deprecation window needed.
    proxying and contravariant blame (Findler-Felleisen; Racket's Indy
    semantics). v1 is first-order only. Worth it given Aril's uncolored
    closures? *Deferred.*
-2. **Loop invariants / `variant` (termination).** Eiffel/Ada have them;
-   they matter mainly for static proof. *Out of scope for v1.*
+2. **Loop `variant` / termination depth.** v1 checks loop **invariants** at
+   runtime and offers a `variant` as a runtime strict-decrease guard, but
+   does not *prove* termination — a true termination proof is static
+   (Eiffel/Ada discharge it; we defer it to the static-discharge path, #3).
+   Open: is the runtime `variant` guard worth its cost, or invariant-only?
 3. **Static discharge.** When does the `internal/contract` IR gain a
    prove-and-drop path (gradual verification)? Needs the decidable-fragment
    decision. *Deferred — the IR is shaped to allow it.*
