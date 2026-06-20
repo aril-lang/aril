@@ -151,6 +151,16 @@ at `widen`'s exit and the `lo <= hi` violation is caught there. (Whether to
 instead admit external field writes as per-write checkpoints is recorded as
 an open question.)
 
+This rule covers **record `type` aliases**, not just classes: `Interval`
+above is a record, and a record with no methods is checked at its **literal
+construction** only — so, combined with the E1106 write-rejection, such a
+value is validated once and then effectively frozen at its constructed shape.
+A class with methods adds the method-exit checkpoints. The dry-run's
+`lru_cache` (a class whose every mutation already goes through methods, and
+whose `size <= capacity` invariant is transiently broken mid-`put` then
+restored before exit) is the clean positive case for this model; it never
+trips E1106.
+
 **Loop contracts.** A loop is anonymous, so it has no name for the block to
 target. A loop that bears a contract is **labelled**, and the function's
 `contract` block carries a nested `loop <label>` section — keeping the whole
@@ -200,19 +210,41 @@ A contract predicate is a **pure boolean Aril expression** evaluated in the
 declaration's scope, extended with:
 
 - **`result`** — the return value; legal only inside `ensures`.
-- **`old(e)`** — the value of pure expression `e` on entry; legal only
-  inside `ensures`. Lowering snapshots `old(e)` at function entry.
+- **`old(e)`** — the value of pure expression `e` **as evaluated on entry**;
+  legal only inside `ensures`. Lowering snapshots the *value* of `e` at
+  function entry, not a reference to be dereferenced later. This matters when
+  the body mutates a reference: to relate a reversed list's length to its
+  original, write `old(listLen(head))` (snapshot the length on entry), **not**
+  `listLen(old(head))` (which would walk the already-mutated nodes). The depth
+  of the snapshot follows the value of `e` — see §Performance note for the
+  cost of snapshotting a large aggregate.
+- **`match` is a legal predicate expression.** Because `Option`/`Result` (and
+  user sum types) have no methods, inspecting a sum payload is done by `match`
+  returning a `bool` — e.g. `match result { Ok(v) => v >= 0, Err(_) => true }`.
+  The corpus dry-run made this decisive: without it, every contract on Aril's
+  `Result`/`Option`-centric surface would need a wrapper helper. (A
+  discriminator sugar — `result is Ok` — is noted as a future convenience,
+  §Open questions.)
 - For an `invariant`, the type's own fields are in scope (as in the
   `Interval` example).
 
 Predicates must be **pure** (no I/O, no mutation, no `spawn`, no `try` that
-escapes) — a contract that changes program behaviour when enabled is a
-contradiction. Purity is checked, not trusted (E1103). `implies` is sugar
-for `!a || b` admitted inside predicates for readability.
+escapes, no channel `send`/`recv`) — a contract that changes program
+behaviour when enabled is a contradiction. Purity is checked, not trusted
+(E1103). `implies` is sugar for `!a || b` admitted inside predicates for
+readability.
 
 Predicates are ordinary Aril, so they reuse the existing typechecker
 end-to-end: an `ensures` that calls a user predicate function
-(`isSorted(result)`) is just a typed call.
+(`isSorted(result)`) is just a typed call. The dry-run showed the most common
+such helper is a **bounded for-all over a collection** (`isSorted`,
+`allInRange`, `allDistinct`, `isUnique`). v1 ships these as a small
+**standard predicate library** (`std.pred`) — pure functions usable in any
+contract — so the common for-all shapes need no re-writing, while the v1
+language surface stays minimal (no new quantifier expression form). A real
+quantifier (`forall x in coll: P`) is deferred to v1.1 (§Open questions); when
+it lands, the `std.pred` helpers are re-expressible on top of it without
+breaking their call sites.
 
 ### Enforcement modes
 
@@ -317,6 +349,72 @@ follow-up, mirroring how `diag_ok` grew beside `build_ok`.) Atomic coverage
 (the hard rule) lands as fixtures under `tests/{grammar,sema,codegen}/` for
 each new construct and E-code; live coverage is a few corpus examples
 gaining `requires`/`ensures`.
+
+### What the corpus dry-run found (maturity evidence)
+
+Before committing the surface, the proposed contracts were written on paper
+against 15 corpus examples across all categories. The result calibrates what
+v1 is and is not:
+
+- **Cleanly expressible, real value today:** numeric/range postconditions and
+  soundness (`safe_divide` pins the `Ok(v) => v == a/b` relation; `two_sum`
+  re-checks `nums[i]+nums[j] == target` from the returned indices; `set_algebra`
+  cardinality bounds; `wc` `bytes == data.len()`; `p1242` index-bound
+  preconditions guarding an OOB write), capacity invariants (`lru_cache`
+  `size <= capacity`), and per-state data invariants (`vending_machine`'s
+  `State`: dispensing with negative change — a bug stdout prints happily — is
+  caught). These are the cases where a runtime check sees what `exit + stdout`
+  cannot.
+- **Expressible only via a user helper:** every "for-all / exists / exactly
+  these elements" property (sortedness, set-membership, "all in range") becomes
+  a hand-written pure predicate, and for `two_sum`/`valid_parentheses`/`evalRPN`
+  that helper *re-implements the spec*, losing independence. This is the
+  dominant tax and the principal open question.
+- **Honestly out of scope:** temporal/protocol properties (see Non-goals),
+  transitive-closure/reachability postconditions (DFS soundness), and
+  whole-`Map` invariants (the v1 Map surface lacks key iteration).
+- **Examples that gain nothing** (`fizzbuzz`, `parse_int`): a deliberate data
+  point — not every program has a checkable invariant, and contracts are
+  optional precisely so those keep no ceremony.
+
+Verdict: the surface is mature for *bounds-and-soundness* checking and ships
+value now; the for-all helper tax is the one expressiveness decision that
+gates "full functional correctness" (resolved in §Open questions).
+
+## Non-goals — what contracts cannot express
+
+Contracts are **point-in-time state assertions** evaluated at function entry,
+each return, method exit, and loop entry/iteration. They read pure boolean
+expressions over reachable state. By construction they **cannot express
+liveness, termination, ordering, or protocol/session properties** — a
+predicate only runs if control *reaches* its boundary.
+
+Two concrete consequences, both surfaced by the dry-run:
+
+- **Concurrency / channels.** Aril shares Go's channels, but a pre/post/
+  invariant does **not** detect the channel bugs that matter: deadlock,
+  goroutine leak, forgotten-close, send-on-closed / double-close / nil-channel
+  panics, cross-goroutine ordering, or data races. A blocked goroutine never
+  reaches its postcondition; a deadlock means the join never completes, so no
+  downstream `ensures` ever runs — *the deadlock eats its own detector*. The
+  corpus's one real channel bug (`rate_limited`'s deadlock) would be caught by
+  **no** contract in this design. What contracts *do* buy for concurrency is
+  narrow and worth stating honestly: **value-accounting on functions that
+  return an aggregate** (`worker_pool`'s `result.len() == jobs.len()`,
+  `concurrency`'s `count <= desired`) — the arithmetic of what flowed, not
+  channel safety. Values emitted via `send` / consumed via `recv` are not even
+  observable in predicates (`recv` is impure), so idiomatic pipeline code
+  (`pipeline`, `select_showcase`) yields essentially no value contracts.
+- **State-machine protocol.** A type `invariant` captures per-state data
+  sanity and a single `step`'s legality, but not "no path from `Idle` to
+  `Dispensing` without paying" — that quantifies over the *trace* of events,
+  which pre/post/invariant cannot see.
+
+These belong to other mechanisms: the Go runtime panic (send-on-closed),
+the race detector (`-race`), structured-concurrency scope-join, static
+analysis — and, for protocol/temporal properties, a future **trace / session
+contract** branch that is a *different mechanism*, not an extension of
+pre/post/invariant. It is explicitly deferred (§Open questions).
 
 ## Alternatives considered
 
@@ -441,6 +539,33 @@ added to them deliberately. No deprecation window needed.
    `x.f = e` as its own invariant checkpoint — is more familiar to TS
    developers but mis-fires on multi-write restorations. *Decided: reject in
    v1; revisit if the restriction bites.*
+8. **Quantifiers vs. a standard predicate library — DECIDED.** The dry-run's
+   dominant gap is "for-all over a collection." A real quantifier
+   (`forall x in coll: P`) is the most expressive answer, but it expands the
+   language surface — and an open-ended predicate sub-grammar risks bloating
+   toward a Raku-scale surface we could not keep under control. v1 therefore
+   ships a small **`std.pred`** library (`isSorted`, `allInRange`,
+   `allDistinct`, `isUnique`, …) of ordinary pure functions and adds **no new
+   expression form**; a bounded quantifier is reconsidered for v1.1, on top of
+   which `std.pred` is re-expressible without breaking call sites.
+9. **Trace / session contracts (concurrency & protocol) — planned separately.**
+   The Non-goals section establishes that pre/post/invariant cannot express
+   liveness, ordering, or channel/goroutine protocol properties (deadlock,
+   leak, send-on-closed, "produced is eventually consumed", "send-then-close,
+   never after"). These need a *different mechanism* — trace / session
+   contracts. Planned as its **own RFC** (the next in this epoch), not an
+   extension of this one.
+10. **Collection iteration in predicates.** The v1 Map/Set predicate surface
+    is `.len()` / `.has()` / `.get()` with **no key iteration**, so whole-`Map`
+    invariants (e.g. transpose-consistency of two adjacency maps) are
+    unwritable even with a helper. Add a pure iteration accessor when a
+    contract needs it. *Deferred.*
+11. **Sum-discriminator sugar.** `match result { Ok(_) => true, _ => false }`
+    recurs as a tag test; a `result is Ok` sugar would cut the noise. Pure
+    convenience over `match` (already legal). *Deferred — nice-to-have.*
+12. **Transitive-closure / reachability postconditions** (DFS soundness, list
+    acyclicity) are beyond both v1 and a simple helper — named here only so
+    users do not expect them. *Out of scope.*
 
 ## Performance note
 
