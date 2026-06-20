@@ -141,6 +141,12 @@ Clauses (all optional, each a single safety obligation):
   scope; on timeout, **E1206**, reported as a *non-definitive bounded-liveness*
   signal, never as a deadlock proof.
 
+A `channel` or `closed-by` clause that names a binding or site not in scope
+(e.g. a channel created in a different function, or a `closed-by` target that
+is not a `spawn`/function in the owning scope) is **E1204** — the
+well-formedness check, resolved by the compile-time pass before any runtime
+wrapper is emitted.
+
 ### Module — runtime: `arilrt` channel wrapper
 
 Under contract, a `Channel<T>` lowers to a thin wrapper tracking typestate:
