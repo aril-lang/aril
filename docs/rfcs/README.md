@@ -28,7 +28,7 @@ This directory holds:
 | 0003 | accepted | `aril repl` and reflection API |
 | 0004 | accepted | Example corpus charter |
 | 0005 | accepted | Go FFI: the foreign-binding interface |
-| 0006 | draft | Optional runtime contracts |
+| 0006 | accepted | Optional runtime contracts |
 
 ## How to write an RFC
 

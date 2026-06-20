@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0006 |
-| Status | draft |
+| Status | accepted |
 | Created | 2026-06-19 |
 | Supersedes | — |
 | Target | `lang-spec/grammar.ebnf` (the `contract` block production + inline clauses), `lang-spec/type-system.md` (T-Contract-Pred, T-Old, T-Result), `lang-spec/diagnostics.md` (E11xx contract codes), `lang-spec/lowering-go.md` (§ContractIR lowering + mode dispatch), `lang-spec/builtins.md` (`old`/`result` predeclared in contract scope); `examples/README.md` + RFC-0004 corpus metadata (`example.toml` contract block); `docs/rfcs/README.md` index row |
@@ -587,3 +587,13 @@ Two costs are worth flagging up front so they are not re-litigated later:
   mode compiles all of it out (no IR → no call), and `stats` keeps the
   counting cheap — so perf-sensitive builds have an escape that the corpus's
   `panic` build does not need.
+
+## History
+
+- 2026-06-20 — `draft → accepted`. Design matured via a 15-example corpus
+  dry-run and three review-fix rounds. Implementation (the `internal/contract`
+  pass, `arilrt/contract.go`, codegen lowering, and the formal `lang-spec/`
+  paired edits with atomic fixtures) is deferred to a dedicated implementation
+  epoch; the paired edits are coverage-gated and land there. The concurrency /
+  protocol gap (§Non-goals) is taken up by a separate forthcoming RFC on
+  trace / session contracts.
