@@ -117,7 +117,7 @@ func safeDivide(a: int, b: int): Result<int, DivError> {
 
 contract safeDivide {
   requires b != 0
-  ensures  match result { Ok(q) => q * b <= a, Err(_) => true }
+  ensures  match result { Ok(q) => q == a / b, Err(_) => true }
 }
 ```
 
@@ -177,8 +177,10 @@ func bubbleSort(xs: []int): []int {
 contract bubbleSort {
   ensures isSorted(result)
   loop outer {
-    // isSorted is an ordinary user predicate — a pure ([]int) -> bool func
-    invariant isSorted(result[result.len() - pass : result.len()])
+    // isSorted is an ordinary user predicate — a pure ([]int) -> bool func.
+    // The invariant is over `xs` (sorted in place): result is ensures-only,
+    // and mid-loop the function has not returned yet.
+    invariant isSorted(xs[xs.len() - pass : xs.len()])
   }
 }
 ```
@@ -370,9 +372,11 @@ v1 is and is not:
   a hand-written pure predicate, and for `two_sum`/`valid_parentheses`/`evalRPN`
   that helper *re-implements the spec*, losing independence. This is the
   dominant tax and the principal open question.
-- **Honestly out of scope:** temporal/protocol properties (see Non-goals),
-  transitive-closure/reachability postconditions (DFS soundness), and
-  whole-`Map` invariants (the v1 Map surface lacks key iteration).
+- **Honestly out of scope:** temporal/protocol properties (see Non-goals) and
+  transitive-closure/reachability postconditions (DFS soundness). (Whole-`Map`
+  invariants such as transpose-consistency are *not* out of scope — `Map`
+  exposes `keys()`/`values()`/`entries()`, so they are writable as a
+  `std.pred`-style helper like any for-all property.)
 - **Examples that gain nothing** (`fizzbuzz`, `parse_int`): a deliberate data
   point — not every program has a checkable invariant, and contracts are
   optional precisely so those keep no ceremony.
@@ -555,11 +559,13 @@ added to them deliberately. No deprecation window needed.
    never after"). These need a *different mechanism* — trace / session
    contracts. Planned as its **own RFC** (the next in this epoch), not an
    extension of this one.
-10. **Collection iteration in predicates.** The v1 Map/Set predicate surface
-    is `.len()` / `.has()` / `.get()` with **no key iteration**, so whole-`Map`
-    invariants (e.g. transpose-consistency of two adjacency maps) are
-    unwritable even with a helper. Add a pure iteration accessor when a
-    contract needs it. *Deferred.*
+10. **Whole-collection invariants rely on the helper/`std.pred` pattern.**
+    `Map` already exposes `keys()`/`values()`/`entries()` (and slices give
+    index/`len()`), so whole-`Map` invariants (e.g. transpose-consistency of
+    two adjacency maps) *are* writable today as a pure helper — there is no
+    missing accessor. The only limit is the shared one: predicates are
+    expressions, so the for-all is in a helper, not inline (#8). Noted because
+    an early dry-run mis-scoped this as a surface gap.
 11. **Sum-discriminator sugar.** `match result { Ok(_) => true, _ => false }`
     recurs as a tag test; a `result is Ok` sugar would cut the noise. Pure
     convenience over `match` (already legal). *Deferred — nice-to-have.*
