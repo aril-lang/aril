@@ -6,7 +6,6 @@
 | Status | draft |
 | Created | 2026-06-20 |
 | Supersedes | — |
-| Target | `lang-spec/grammar.ebnf` (the `channel`-clause in a `contract` block), `lang-spec/type-system.md` (T-Chan-Closer, T-Chan-Drain), `lang-spec/builtins.md` (`Channel`/`SendChan`/`RecvChan` contract surface), `lang-spec/diagnostics.md` (E12xx channel codes), `lang-spec/lowering-go.md` (§ChannelContractIR — runtime typestate wrapper + scope-exit drain check); `examples/README.md` + RFC-0004 corpus metadata; `docs/rfcs/README.md` index row |
 
 ## Summary
 
@@ -126,9 +125,9 @@ contract runPool {
 
 Clauses (all optional, each a single safety obligation):
 
-- **`closed-by <site>`** — names the single closer (a `spawn` target, a
-  function, or `self`). Any `close()` from elsewhere is **E1201**; a second
-  close is **E1202**.
+- **`closed-by <site>`** — names the single closer (a `spawn` target or a
+  function; v1 uses this coarse granularity). Any `close()` from elsewhere is
+  **E1201**; a second close is **E1202**.
 - **`no-send-after-close`** — a `send` after the declared closer has closed is
   **E1203**. (This is the default for any channel under contract; the clause is
   explicit documentation.)
@@ -136,16 +135,21 @@ Clauses (all optional, each a single safety obligation):
   must be closed and its buffer empty; otherwise **E1205** (the producer left
   data no consumer took, or closed before the consumer's expected count). This
   is a *safety* check at a sound checkpoint — `scope` exit is a real boundary
-  control always reaches.
+  control always reaches. The obligation applies only to channels *owned by*
+  the scope; a channel that escapes its scope carries none.
 - **`within <dur>`** (liveness proxy, opt-in) — bound a blocking op or the
   scope; on timeout, **E1206**, reported as a *non-definitive bounded-liveness*
-  signal, never as a deadlock proof.
+  signal, never as a deadlock proof. Opt-in only; there is no default bound.
 
 A `channel` or `closed-by` clause that names a binding or site not in scope
 (e.g. a channel created in a different function, or a `closed-by` target that
 is not a `spawn`/function in the owning scope) is **E1204** — the
-well-formedness check, resolved by the compile-time pass before any runtime
-wrapper is emitted.
+well-formedness check, resolved at compile time before any runtime wrapper is
+emitted.
+
+Count/accounting obligations (`sends == recvs`, "exactly N items flow") are
+*not* a channel clause — they are a value `ensures` (RFC-0006) on the draining
+function, which already expresses such relations.
 
 ### Module — runtime: `arilrt` channel wrapper
 
@@ -166,15 +170,6 @@ violation names the offending channel, the operation, and the goroutine/role
 — in Aril coordinates (D10). Modes panic / warn / stats / off and the
 elision-under-`off` story are exactly RFC-0006's (no contract → no wrapper →
 byte-identical codegen).
-
-### Corpus integration
-
-The concurrency examples (`worker_pool`, `pipeline`, `concurrency`) gain
-channel contracts and run under `--contracts=panic` in the run pass; a
-protocol violation is a **run failure** (RFC-0004 / D25), the same deepening
-of `run_ok` RFC-0006 introduced. The `rate_limited` deadlock — uncatchable by
-any RFC-0006 contract — is now reachable only by an opt-in `within` proxy, and
-the RFC is explicit that this is a bounded approximation, not a proof.
 
 ## Alternatives considered
 
@@ -228,31 +223,6 @@ the RFC is explicit that this is a bounded approximation, not a proof.
   and liveness statically. The future static path; structured concurrency makes
   their "fencing" boundedness condition easy to satisfy.
 
-## Paired edits
-
-On acceptance, the implementing PRs touch:
-
-- `lang-spec/grammar.ebnf` — the `channel <name> { … }` clause in a `contract`
-  block; the `closed-by` / `no-send-after-close` / `drains-before-scope-exit` /
-  `within` sub-clauses.
-- `lang-spec/type-system.md` — T-Chan-Closer (single-closer well-formedness),
-  T-Chan-Drain (drain obligation references a channel of the owning scope).
-- `lang-spec/builtins.md` — the contract surface over `Channel`/`SendChan`/
-  `RecvChan` (elevating the existing "closing a closed channel panics" line
-  into a checked contract).
-- `lang-spec/diagnostics.md` — E1201 (close by non-owner / multiple closers),
-  E1202 (double close), E1203 (send after close), E1204 (channel clause names
-  an unknown channel/site), E1205 (incomplete drain at owning-scope exit),
-  E1206 (`within` bounded-liveness timeout — non-definitive).
-- `lang-spec/lowering-go.md` — §ChannelContractIR: the typestate wrapper, the
-  scope-exit drain check, the `within` timeout proxy, four-mode dispatch.
-- RFC-0004 corpus metadata (`example.toml`) — channel-contract dimension on
-  the concurrency examples; `examples/README.md` note.
-- `docs/rfcs/README.md` — index row.
-
-Atomic fixtures (hard rule) accompany each new construct and E-code in
-`tests/{grammar,sema,codegen}/`.
-
 ## Transition / compatibility
 
 Strictly additive. No existing program changes meaning; a channel with no
@@ -260,32 +230,6 @@ contract is lowered exactly as today (the Go runtime's existing close-panic
 semantics are unchanged). With contracts, default mode for `run`/corpus is
 `panic`. No deprecation window.
 
-## Open questions
-
-1. **Closer-site granularity.** `closed-by feed` names a `spawn` target; is a
-   finer grain (a specific call site, a role parameter) needed, or is
-   function/spawn-site enough for v1? *Start coarse.*
-2. **`drains-before-scope-exit` for unbounded streams.** A channel intended to
-   outlive a scope (a long-lived service bus) does not fit the drain-at-exit
-   model. v1 scopes the obligation to channels *owned by* a `scope`; channels
-   that escape are out of scope (and arguably a structured-concurrency smell).
-3. **Count contracts.** "exactly N items flow" / "sends == recvs" is a natural
-   completion obligation but needs the value-accounting of RFC-0006 (a counter
-   `ensures`). Whether to express it here or via an RFC-0006 `ensures` on the
-   draining function. *Deferred — likely RFC-0006.*
-4. **Declared session protocols** (ordering/fidelity) — the deferred Scribble/
-   MPST branch. A later RFC; the `closed-by`/`drains` facts are forward-
-   compatible with it.
-5. **Static discharge** — re-projecting the channel contract to a Godel/Gong-
-   style static partial-deadlock checker (one declaration, two backends).
-   *Deferred; the surface is shaped to allow it.*
-6. **`within` default duration / units** and whether it belongs on the channel,
-   the op, or the `scope`. *Opt-in only in v1; no default.*
-
 ## History
 
-- 2026-06-20 — created (`draft`). Scope chosen (channel typestate +
-  scope-completion; declared sessions and static inference deferred) after a
-  three-axis research pass (Go session types, runtime monitoring /
-  monitorability, real-world Go concurrency bugs). Sibling to RFC-0006; takes
-  up its §Non-goals concurrency branch.
+- 2026-06-20 — created (`draft`).
