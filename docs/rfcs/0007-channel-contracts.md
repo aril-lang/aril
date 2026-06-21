@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0007 |
-| Status | draft |
+| Status | accepted |
 | Created | 2026-06-20 |
 | Supersedes | — |
 
@@ -384,3 +384,4 @@ reported as non-definitive. No deprecation window.
 ## History
 
 - 2026-06-20 — created (`draft`).
+- 2026-06-21 — `draft → accepted`.
