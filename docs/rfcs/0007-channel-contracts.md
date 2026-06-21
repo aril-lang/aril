@@ -93,9 +93,9 @@ clause — so a `select` arm that must participate in a protocol binds its sourc
 first:
 
 ```aril
-let deadline = time.after(1s)     // named — usable in a contract
+let deadline = time.after(time.seconds(1))     // named — usable in a contract
 select { case <-deadline => … }
-// not: select { case <-time.after(1s) => … }   // anonymous — unnameable
+// not: select { case <-time.after(time.seconds(1)) => … }   // anonymous — unnameable
 ```
 
 Naming the subject costs nothing, reads better in the code, and gives the
