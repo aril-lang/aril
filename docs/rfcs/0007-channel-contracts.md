@@ -39,7 +39,9 @@ sequential code. A function contract (RFC-0006) constrains *values at call
 boundaries*; a channel contract constrains *traces of observable communication
 events*. The two axes are orthogonal — which is the whole reason RFC-0007
 exists beside RFC-0006, and why it must be a separate mechanism:
-pre/post/invariant see one call's state, never a *sequence* of events.
+pre/post/invariant see one call's state, never a *sequence* of events. Both are
+projections of one framework (set out in RFC-0006): RFC-0006 is its safety
+projection over value-states, RFC-0007 is all four kinds over event traces.
 
 ## Motivation
 

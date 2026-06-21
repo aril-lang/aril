@@ -39,6 +39,53 @@ The first of these is the quiet but strongest payoff: it is not really about
 "contracts" as a feature, it is about what the corpus *becomes* once examples
 can state and check their own intent.
 
+These value/state contracts are the **safety** projection of a single contracts
+framework — `requires`/`ensures`/`invariant` over a function or loop subject;
+its other projection, channel contracts (RFC-0007), adds coverage/liveness/
+fairness over event traces.
+
+## The contracts framework
+
+Aril's contracts form **one framework**, of which this RFC is the first
+projection — so a programmer or agent learns one core, not two languages. A
+contract is a predicate over the **trace of observable operations on a
+subject**, organized in up to four **kinds**, sharing one separable `contract`
+block, one leaf predicate language (pure boolean Aril expressions plus
+`old`/`result`), the four modes, the `arilrt` runtime, and the blame model
+(D10). The *kinds available* depend on the subject's domain; the *spine* is
+shared.
+
+- A **subject** is any named entity with observable operations; an event is
+  `subject.operation(payload)`. A function's call boundary is a degenerate
+  one-step trace (`requires`/`ensures`); a loop's iterations are a trace (loop
+  `invariant`); a channel's `send`/`recv`/`close` is the rich trace (RFC-0007).
+- The **four kinds** (defined in RFC-0007): **safety** (a forbidden event never
+  occurs — definitive), **coverage** (an event reaches every member of a set —
+  definitive at the boundary), **liveness** (an event eventually occurs —
+  bounded), **fairness** (no participant is starved — testable).
+
+**This RFC is the safety projection** — `requires`/`ensures`/`invariant` over
+function and loop subjects, sequential. RFC-0007 is all four kinds over
+channel-event traces, concurrent. `coverage`/`liveness`/`fairness` have **no
+sequential meaning**; they are the kinds of *concurrent* subjects, not arbitrary
+surface differences — which is why the two vocabularies differ (`ensures result
+>= 0` vs `forbid a.send before b.recv`) while the spine is one. Per-domain
+**check-helper libraries** (`std.pred` for values, an event-helper library for
+traces) are the extension point; the language core stays shared.
+
+**The subject model is general (forward-looking, not v1).** The same machinery
+extends to other named stateful subjects — a **mutex** (`lock`/`unlock`: no
+double-lock, no unlock-before-lock, unlocked-before-scope-exit,
+every-lock-eventually-unlock, no-starvation); a **container / stack**
+(`push`/`pop`: forbid pop when empty — the stack underflow a value `invariant`
+cannot state, plus capacity bounds); a **resource / file**
+(`open`/`read`/`close` typestate, closed-before-scope-exit); a **goroutine**
+(mostly already prevented by structured concurrency). Sequential subjects
+exercise mostly safety; concurrent ones all four. This is recorded only to
+confirm the framework's universality: the **first implementation is scoped to
+method, loop, and channel subjects** — other subjects are future work and do
+not enlarge v1.
+
 ## Motivation
 
 ### The corpus proves too little
@@ -471,3 +518,5 @@ Two costs are worth flagging up front so they are not re-litigated later:
 ## History
 
 - 2026-06-20 — `draft → accepted`.
+- 2026-06-21 — added the contracts-framework framing (this RFC as the safety
+  projection; RFC-0007 the trace projection).
