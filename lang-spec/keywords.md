@@ -73,6 +73,15 @@ those positions they are ordinary identifiers.
 | `default` | inside `select { ... }` | identifier |
 | `impl`  | immediately after `extern` (`extern impl T { … }`) | identifier |
 | `go`    | as the attribute head in `@go("…")` (a `@` token followed by `go`) | identifier |
+| `contract` | at the head of a top-level block (`contract <name> {`), RFC-0006 | identifier |
+| `channel`  | at the head of a top-level block (`channel <name> {`), RFC-0007 | identifier |
+
+`contract` / `channel` are contextual: a keyword only in the positional
+`<word> <name> {` top-level shape (where an identifier would otherwise be a
+declaration error), an ordinary identifier everywhere else. The block grammar
+(`grammar.ebnf` §ContractBlock) is the separable contract surface; during the
+CONTRACTS-IMPL bootstrap the body is parsed-and-skipped (the `--contracts=off`
+ignore level) until the enforcement pipeline lands.
 
 ## Built-in identifiers (predeclared, NOT keywords)
 

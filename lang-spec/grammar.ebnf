@@ -252,10 +252,12 @@ Token = Newline
 // Top level
 // =============================================================
 
-File         = Newline* ( Import Stmtterm )* Decl ( Stmtterm Decl )* Newline* ;
+File         = Newline* ( Import Stmtterm )* TopLevelItem ( Stmtterm TopLevelItem )* Newline* ;
 
 Import       = "import" PackagePath ;
 PackagePath  = Ident ( "/" Ident )* ;
+
+TopLevelItem = Decl | ContractBlock ;
 
 Decl         = FuncDecl
              | TypeDecl
@@ -264,6 +266,23 @@ Decl         = FuncDecl
              | TopLevelLet
              | ExternDecl
              ;
+
+// Separable contract surface (RFC-0006 / RFC-0007). A `contract` or
+// `channel` block attaches obligations to a named declaration without
+// touching its body. `contract`/`channel` are contextual: keywords only
+// at the head of a top-level block (`contract <name> {` / `channel
+// <name> {`); ordinary identifiers everywhere else (keywords.md).
+//
+// CONTRACTS-IMPL bootstrap: the *body* grammar (requires/ensures/
+// invariant, loop sections, channel/protocol clauses, fan-out, fairness)
+// is deferred to the enforcement PRs of this epoch; until then the block
+// is recognized at the top level and **skipped** — consumed without an
+// AST node, so a program with contracts lowers byte-identically to the
+// same program without them (the `--contracts=off` ignore level). The
+// inner productions land paired with `internal/contract` + codegen.
+ContractBlock = ( "contract" | "channel" ) Ident "{" ContractBody "}" ;
+ContractBody  = (* deferred to CONTRACTS-IMPL; bootstrap skips a
+                   balanced brace body *) ;
 
 TopLevelLet  = "let" Ident ( ":" TypeExpr )? "=" Expr ;
                           // `var` is intentionally not legal at the
