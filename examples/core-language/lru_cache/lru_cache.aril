@@ -126,3 +126,13 @@ func main() {
   fmt.println("get c:", cache.get("c"))       // -> Some(3)
   fmt.println("len:",   cache.len())          // -> 2
 }
+
+// The canonical type-invariant case (RFC-0006): `size <= capacity` is
+// transiently broken inside `put` (the insert bumps size past capacity
+// before `evictTail` restores it) and re-established by method exit, where
+// the invariant is checked. Every mutation goes through a method, so no
+// external field write trips E1106. Inert until `--contracts` enforcement.
+contract LRU {
+  invariant size >= 0
+  invariant size <= capacity
+}

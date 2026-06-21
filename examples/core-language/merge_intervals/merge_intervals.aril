@@ -58,3 +58,21 @@ func main() {
     fmt.println(render(iv))
   }
 }
+
+// Separable contracts (RFC-0006), inert until `--contracts` enforcement
+// lands. A record `type` invariant is checked at construction; `max` and
+// `merge` carry postconditions over `result`.
+contract Interval {
+  invariant start <= end
+}
+
+contract max {
+  ensures result >= a
+  ensures result >= b
+  ensures result == a || result == b
+}
+
+contract merge {
+  // merging never yields more intervals than it consumed
+  ensures result.len() <= intervals.len()
+}
