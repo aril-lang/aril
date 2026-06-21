@@ -103,8 +103,8 @@ Two things deliberately do **not** live in a committed RFC: the
 list of `lang-spec/` files an implementation will touch (the
 former "paired edits"), and any undecided or deferred questions
 (the former "open questions"). Both are implementation planning
-and live in the dev pipeline (`TODO.md` / `backlog.md`), not the
-public RFC. The Design must still be complete enough that the
+and live in the dev pipeline, not the public RFC. The Design must
+still be complete enough that the
 `lang-spec/` edit is mechanical from it — the *content* stays;
 only the file-list bookkeeping and the open-question log move to
 the pipeline.
