@@ -6,7 +6,6 @@
 | Status | accepted |
 | Created | 2026-05-25 |
 | Supersedes | — |
-| Target | `docs/rfcs/` (this file is self-referential) |
 
 ## Summary
 
@@ -28,10 +27,10 @@ silently or accumulate as undocumented drift. The RFC process
 is the paper trail.
 
 It is **not** a gatekeeping mechanism. The bar for a "good" RFC
-is low: a couple of pages stating motivation, the proposed
-change, and the paired edits in `lang-spec/`. The point is to
-*record* a decision in a place that survives commit-message
-archaeology.
+is low: a couple of pages stating the motivation, the proposed
+change, and a design complete enough that the eventual
+`lang-spec/` edit is mechanical. The point is to *record* a
+decision in a place that survives commit-message archaeology.
 
 ## When an RFC is required
 
@@ -65,7 +64,6 @@ free four-digit number and `<kebab-name>` is a short slug.
 | Status | draft \| accepted \| implemented \| superseded |
 | Created | YYYY-MM-DD |
 | Supersedes | — \| RFC-MMMM |
-| Target | <which lang-spec/ files this RFC will touch> |
 
 ## Summary
 A one-paragraph plain-language description of the change.
@@ -75,38 +73,41 @@ Why we want this. Concrete examples from the corpus or from
 real implementation friction beat hypothetical scenarios.
 
 ## Design
-The actual change. Sequents, grammar rules, signatures —
-the technical contract, written so that the paired edit in
-`lang-spec/` is mechanical from this text.
+The actual change. Sequents, grammar rules, signatures — the
+technical contract, written so completely that the eventual
+`lang-spec/` edit is mechanical from this text.
 
 ## Alternatives considered
 The two or three other things we could have done, and why we
 didn't. Even a one-liner per alternative is more useful than
 omitting this section.
 
-## Paired edits
-A concrete list of `lang-spec/` files this RFC will touch on
-acceptance — `type-system.md` adds rule T-Foo, `builtins.md`
-gains method `m()`, `diagnostics.md` adds E0XYZ. Reviewers
-check the paired edits exist when status moves to
-`implemented`.
-
 ## Transition / compatibility
 If the change is not strictly additive: who breaks, what does
 their migration look like, is there a deprecation window.
 
-## Open questions
-Anything not decided. RFCs MAY be accepted with open questions
-flagged, on the understanding that the questions are resolved
-before `implemented`.
+## History
+Status transitions as a bare changelog —
+`YYYY-MM-DD — draft → accepted`. Not a development narrative.
 ```
 
 All template sections (Summary, Motivation, Design,
-Alternatives, Paired edits, Transition, Open questions) are
-**required**, but the body may be `None` or `Not applicable`
-where genuinely so — declarative or purely-additive RFCs
-will have `None` paired edits and `Not applicable`
-transition sections, and that is fine.
+Alternatives, Transition) are **required**, but the body may be
+`None` or `Not applicable` where genuinely so — a declarative or
+purely-additive RFC has a `Not applicable` transition, and that
+is fine. `History` appears once the first status transition lands.
+
+An RFC captures the **conceptual foundations** of a change —
+motivation, design, and boundaries — not the development process.
+Two things deliberately do **not** live in a committed RFC: the
+list of `lang-spec/` files an implementation will touch (the
+former "paired edits"), and any undecided or deferred questions
+(the former "open questions"). Both are implementation planning
+and live in the dev pipeline, not the public RFC. The Design must
+still be complete enough that the
+`lang-spec/` edit is mechanical from it — the *content* stays;
+only the file-list bookkeeping and the open-question log move to
+the pipeline.
 
 Optional sections (rationale, performance notes, security
 implications) are welcome but never required.
@@ -117,21 +118,18 @@ implications) are welcome but never required.
 draft ──► accepted ──► implemented ──► superseded
 ```
 
-The four states are linear; an RFC may carry open questions
-through `accepted` and `implemented` (flagged in §"Open
-questions"); `superseded` is reached only when a later RFC
-sets its `Supersedes:` field to this one.
+The four states are linear; `superseded` is reached only when a
+later RFC sets its `Supersedes:` field to this one.
 
 - **`draft`** — under discussion. RFC PR is open, review may
   request structural changes. Implementation has not started.
-- **`accepted`** — the design is settled. Open questions, if
-  any, are flagged in the doc but not blockers. Implementation
-  may begin.
-- **`implemented`** — the paired edits in `lang-spec/` have
-  landed and (per the project's atomic-coverage rule) at least
-  one atomic fixture exists in
-  `tests/{lexer,grammar,sema,codegen}/`. The RFC is now a
-  historical artefact, kept for the paper trail.
+- **`accepted`** — the design is settled; implementation may
+  begin. Any deferred or still-open questions live in the dev
+  pipeline, not the RFC.
+- **`implemented`** — the `lang-spec/` edits have landed and
+  (per the project's atomic-coverage rule) at least one atomic
+  fixture exists in `tests/{lexer,grammar,sema,codegen}/`. The
+  RFC is now a historical artefact, kept for the paper trail.
 - **`superseded`** — a later RFC replaced this one. The
   superseding RFC sets its own `Supersedes:` field to this
   RFC's number. Both files stay in the directory.
@@ -172,11 +170,12 @@ reviewer on the project's conventions). For RFC PRs
 specifically the subagent checks:
 
 - Document follows the structure above.
-- `Target:` field lists realistic file targets.
-- Paired-edit list maps 1:1 to spec files.
 - Alternatives section is genuine (not a single placeholder).
 - Transition section is present when the change is not
   strictly additive.
+- The RFC stays conceptual — no implementation-planning
+  bookkeeping (a `lang-spec/` file list, an open-question log)
+  and no development-process narrative leaked into the document.
 
 `draft → accepted` requires the user's explicit ok. `accepted →
 implemented` does not — when the paired edits and fixtures land,
@@ -230,17 +229,3 @@ and accepted RFCs trigger paired edits there.
 - File names are `NNNN-<kebab-name>.md`. The slug is short and
   describes the change, not the motivation
   (`0002-iterable-typeclass.md`, not `0002-make-iter-better.md`).
-
-## Open questions for this RFC
-
-- Should an `RFC-0000 amendment` mechanism exist for tweaks
-  that don't deserve their own number? *Deferred* — current
-  bias is "just edit `0000-process.md` directly and call it
-  out in the commit message".
-- Should there be a stage between `draft` and `accepted` for
-  experimental implementations? TC39 has Stages 0–4; we have
-  draft → accepted → implemented. If a real proposal needs
-  more granularity, add it then.
-- Do removals of constructs need a deprecation window? The
-  corpus is small; current bias is "fix the corpus in the same
-  PR". Revisit when there is a second consumer.
