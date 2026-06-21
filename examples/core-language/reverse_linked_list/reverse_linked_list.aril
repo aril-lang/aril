@@ -29,8 +29,8 @@ func reverse(head: Option<Node>): Option<Node> {
 }
 
 // listLen — a pure node count. Compiled normally (it is ordinary Aril, not
-// a contract clause); the `reverse` contract below calls it. The std.pred-
-// style bounded-traversal helper a real `forall` would later subsume.
+// a contract clause); the `reverse` contract below calls it. It is the
+// std.pred-style bounded-traversal helper a real `forall` would later subsume.
 func listLen(head: Option<Node>): int {
   var n = 0
   var cur = head
