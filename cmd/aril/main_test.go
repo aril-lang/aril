@@ -768,3 +768,70 @@ func TestBuildOutputFlag(t *testing.T) {
 		t.Errorf("binary stdout = %q; want %q", string(out), "Aril is rising.\n")
 	}
 }
+
+// TestCheckContractsMode unit-tests the --contracts mode validation:
+// off is wired, panic/warn/stats are accepted vocabulary but not yet
+// enforced, anything else is a usage error (CONTRACTS-IMPL bootstrap).
+func TestCheckContractsMode(t *testing.T) {
+	if err := checkContractsMode("off"); err != nil {
+		t.Errorf("off should be accepted, got %v", err)
+	}
+	for _, m := range []string{"panic", "warn", "stats"} {
+		err := checkContractsMode(m)
+		if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
+			t.Errorf("%s: want a not-yet-implemented error, got %v", m, err)
+		}
+	}
+	if err := checkContractsMode("bogus"); err == nil ||
+		!strings.Contains(err.Error(), "unknown --contracts mode") {
+		t.Errorf("bogus: want an unknown-mode error, got %v", err)
+	}
+}
+
+// TestContractsFlagEndToEnd exercises the flag through the real binary:
+// a program carrying a separable contract block runs unchanged under the
+// default/explicit off mode (the block is skipped), while an unwired
+// enforcement mode is rejected before compilation.
+func TestContractsFlagEndToEnd(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ct.aril")
+	src := `import fmt
+
+func dbl(x: int): int {
+  return x + x
+}
+
+func main() {
+  fmt.println(dbl(3))
+}
+
+contract dbl {
+  requires x >= 0
+  ensures result >= x
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"", "off"} {
+		args := []string{"run"}
+		if mode != "" {
+			args = append(args, "--contracts="+mode)
+		}
+		args = append(args, path)
+		stdout, stderr, exit := runAril(t, args...)
+		if exit != 0 {
+			t.Fatalf("run %v exited %d (stderr: %s)", args, exit, stderr)
+		}
+		if strings.TrimSpace(stdout) != "6" {
+			t.Errorf("run %v stdout = %q; want \"6\"", args, stdout)
+		}
+	}
+	_, stderr, exit := runAril(t, "run", "--contracts=panic", path)
+	if exit != 2 {
+		t.Errorf("--contracts=panic exit = %d; want 2", exit)
+	}
+	if !strings.Contains(stderr, "not yet implemented") {
+		t.Errorf("--contracts=panic stderr = %q; want a not-yet-implemented message", stderr)
+	}
+}

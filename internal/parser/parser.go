@@ -199,6 +199,48 @@ func (p *parser) diag(code, msg string, line, col int) *Diag {
 	return &Diag{File: p.file, Code: code, Message: msg, Line: line, Col: col}
 }
 
+// atContractBlock reports whether the cursor is at a top-level
+// separable contract surface: `contract <name> {` or `channel
+// <name> {`. `contract`/`channel` are not reserved keywords, so the
+// claim is positional — at the top level only declarations are legal
+// and an identifier there is otherwise an error, making this shape
+// unambiguous. The trailing `{` is required: a lone `contract`/
+// `channel` identifier falls through to the normal decl error.
+func (p *parser) atContractBlock() bool {
+	if !p.at(lexer.KindIdent, "contract", "channel") {
+		return false
+	}
+	return p.peekAhead(1).Kind == lexer.KindIdent &&
+		p.peekAhead(2).Kind == lexer.KindPunct && p.peekAhead(2).Lexeme == "{"
+}
+
+// skipContractBlock consumes a top-level `contract`/`channel` block
+// (head identifier, target name, and the balanced `{ … }` body) and
+// discards it. Brace nesting inside the body (e.g. a `match` predicate)
+// is balanced by depth. Precondition: atContractBlock() is true.
+func (p *parser) skipContractBlock() *Diag {
+	p.advance()         // `contract` / `channel`
+	p.advance()         // target name
+	open := p.advance() // `{`
+	depth := 1
+	for depth > 0 {
+		t := p.peek()
+		if t.Kind == lexer.KindEOF {
+			return p.diag("E0112", "unterminated contract block", open.Line, open.Col)
+		}
+		p.advance()
+		if t.Kind == lexer.KindPunct {
+			switch t.Lexeme {
+			case "{":
+				depth++
+			case "}":
+				depth--
+			}
+		}
+	}
+	return nil
+}
+
 // ---- file ----
 
 func (p *parser) parseFile() (*ast.File, *Diag) {
@@ -217,6 +259,20 @@ func (p *parser) parseFile() (*ast.File, *Diag) {
 	}
 	// Then declarations.
 	for !p.at(lexer.KindEOF) {
+		// CONTRACTS-IMPL bootstrap (`--contracts=off` ignore level):
+		// a top-level separable `contract <name> { … }` / `channel
+		// <name> { … }` block is recognized and *skipped* — consumed
+		// without producing an AST node, so codegen is byte-identical
+		// to the same program without the block (RFC-0006 §Transition,
+		// golden-fixture safe). The enforcement pipeline replaces this
+		// skip with real parsing later in the epoch.
+		if p.atContractBlock() {
+			if err := p.skipContractBlock(); err != nil {
+				return nil, err
+			}
+			p.skipNewlines()
+			continue
+		}
 		d, err := p.parseDecl()
 		if err != nil {
 			return nil, err

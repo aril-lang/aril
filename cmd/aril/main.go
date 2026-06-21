@@ -58,16 +58,46 @@ func main() {
 	}
 }
 
+// addContractsFlag registers `--contracts=<mode>` on fs and returns the
+// destination. The four modes are RFC-0006's panic/warn/stats/off; only
+// `off` (the parser's contract-skip "ignore level") is wired during the
+// CONTRACTS-IMPL build-out — checkContractsMode rejects the others until
+// the enforcement pipeline lands.
+func addContractsFlag(fs *flag.FlagSet) *string {
+	return fs.String("contracts", "off",
+		"contract enforcement mode: off (skip, default) | panic | warn | stats")
+}
+
+// checkContractsMode validates a --contracts value. off is the only wired
+// mode for now; panic/warn/stats are accepted vocabulary but not yet
+// enforced; anything else is a usage error.
+func checkContractsMode(mode string) error {
+	switch mode {
+	case "off":
+		return nil
+	case "panic", "warn", "stats":
+		return fmt.Errorf("aril: --contracts=%s is not yet implemented "+
+			"(CONTRACTS-IMPL in progress); only --contracts=off is wired", mode)
+	default:
+		return fmt.Errorf("aril: unknown --contracts mode %q (want off|panic|warn|stats)", mode)
+	}
+}
+
 func cmdEmit(args []string) int {
 	fs := flag.NewFlagSet("aril emit", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	noLine := fs.Bool("no-line", false, "strip //line directives from the lowered Go (for human reading)")
 	vendor := fs.Bool("vendor-runtime", false, "emit `import .../arilrt` + arilrt.X instead of inlining the runtime (not self-contained)")
+	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] [-vendor-runtime] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] [-vendor-runtime] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if err := checkContractsMode(*contracts); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 	if fs.NArg() != 1 {
@@ -117,11 +147,16 @@ func cmdBuild(args []string) int {
 	fs.SetOutput(os.Stderr)
 	out := fs.String("o", "", "output binary path (default: ./<basename>)")
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
+	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-inline-runtime] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if err := checkContractsMode(*contracts); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 	if fs.NArg() != 1 {
@@ -364,11 +399,16 @@ func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("aril run", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
+	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril run [-inline-runtime] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril run [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if err := checkContractsMode(*contracts); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 	if fs.NArg() != 1 {

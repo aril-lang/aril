@@ -517,3 +517,77 @@ func TestSelectBracelessBody(t *testing.T) {
 		}
 	}
 }
+
+// TestContractBlockSkipped covers the CONTRACTS-IMPL bootstrap: a
+// top-level separable `contract`/`channel` block is recognized and
+// skipped (no AST node), leaving the surrounding declarations intact —
+// so the corpus can carry contract text before the enforcement pipeline
+// exists (RFC-0006 §Transition; `--contracts=off` ignore level).
+func TestContractBlockSkipped(t *testing.T) {
+	src := `func abs(x: int): int {
+  return x
+}
+
+contract abs {
+  requires x >= 0
+  // a match predicate nests braces — the skip balances them
+  ensures match result { Ok(q) => q >= 0, Err(_) => true }
+}
+
+channel results {
+  closed-by pool
+  forbid send after close
+}
+
+func id(y: int): int { return y }
+`
+	f := parseString(t, src)
+	if len(f.Decls) != 2 {
+		t.Fatalf("expected 2 decls (the contract/channel blocks skipped); got %d", len(f.Decls))
+	}
+	for i, want := range []string{"abs", "id"} {
+		fn, ok := f.Decls[i].(*ast.FuncDecl)
+		if !ok {
+			t.Fatalf("decl[%d] not FuncDecl: %T", i, f.Decls[i])
+		}
+		if fn.Name != want {
+			t.Errorf("decl[%d] name = %q, want %q", i, fn.Name, want)
+		}
+	}
+}
+
+// TestContractBlockUnterminated reports a clean diagnostic (not a panic
+// or silent EOF) when a contract block's brace is never closed.
+func TestContractBlockUnterminated(t *testing.T) {
+	src := `func main() {}
+
+contract main {
+  requires true
+`
+	toks, lerr := lexer.Lex(src)
+	if lerr != nil {
+		t.Fatalf("lex error: %v", lerr)
+	}
+	_, perr := Parse(toks)
+	if perr == nil {
+		t.Fatal("expected a diagnostic for the unterminated contract block")
+	}
+	if !strings.Contains(perr.Message, "unterminated contract block") {
+		t.Errorf("diagnostic = %q, want it to mention an unterminated contract block", perr.Message)
+	}
+}
+
+// TestContractIdentifierNotClaimed guards the positional claim: outside
+// the top-level `contract <name> {` shape, `contract`/`channel` stay
+// ordinary identifiers (here a local binding name).
+func TestContractIdentifierNotClaimed(t *testing.T) {
+	src := `func main() {
+  let contract = 1
+  let channel = 2
+}
+`
+	f := parseString(t, src)
+	if len(f.Decls) != 1 {
+		t.Fatalf("expected 1 decl; got %d", len(f.Decls))
+	}
+}
