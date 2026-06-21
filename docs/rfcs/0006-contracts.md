@@ -6,7 +6,6 @@
 | Status | accepted |
 | Created | 2026-06-19 |
 | Supersedes | — |
-| Target | `lang-spec/grammar.ebnf` (the `contract` block production + inline clauses), `lang-spec/type-system.md` (T-Contract-Pred, T-Old, T-Result), `lang-spec/diagnostics.md` (E11xx contract codes), `lang-spec/lowering-go.md` (§ContractIR lowering + mode dispatch), `lang-spec/builtins.md` (`old`/`result` predeclared in contract scope); `examples/README.md` + RFC-0004 corpus metadata (`example.toml` contract block); `docs/rfcs/README.md` index row |
 
 ## Summary
 
@@ -59,9 +58,9 @@ types, exhaustive match, `Option`/`Result`. What it structurally cannot
 express are *value relationships*: ranges (`0 <= p <= 100`), cross-field
 invariants (`lo <= hi`), size relations (output length = input length),
 ordering (sortedness), and input↔output postconditions (`abs` returns
-non-negative). These are an orthogonal axis to the algebraic-type axis (see
-*Prior art*, §refinement-vs-ADT). Contracts are how a program states them,
-and runtime checking is how the corpus *observes* them.
+non-negative). These are an orthogonal axis to the algebraic-type axis.
+Contracts are how a program states them, and runtime checking is how the
+corpus *observes* them.
 
 ### Code agents are the differentiating audience
 
@@ -97,7 +96,7 @@ JML embeds contracts in Java *comments* because a stock `javac` must ignore
 them. Aril owns its lexer, parser, sema, and codegen — we have no such
 constraint. Contracts can be real grammar, type-checked by real sema, with
 real diagnostics in Aril coordinates (D10). The comment-DSL tradeoff
-(bespoke parser, weak IDE story) buys us nothing and is rejected (§Alternatives).
+(bespoke parser, weak IDE story) buys us nothing.
 
 ## Design
 
@@ -155,11 +154,10 @@ This rule covers **record `type` aliases**, not just classes: `Interval`
 above is a record, and a record with no methods is checked at its **literal
 construction** only — so, combined with the E1106 write-rejection, such a
 value is validated once and then effectively frozen at its constructed shape.
-A class with methods adds the method-exit checkpoints. The dry-run's
-`lru_cache` (a class whose every mutation already goes through methods, and
-whose `size <= capacity` invariant is transiently broken mid-`put` then
-restored before exit) is the clean positive case for this model; it never
-trips E1106.
+A class with methods adds the method-exit checkpoints. The clean positive case
+for this model is a class whose every mutation already goes through methods
+(e.g. an LRU cache whose `size <= capacity` invariant is transiently broken
+mid-`put` then restored before the method exits): it never trips E1106.
 
 **Loop contracts.** A loop is anonymous, so it has no name for the block to
 target. A loop that bears a contract is **labelled**, and the function's
@@ -186,8 +184,9 @@ contract bubbleSort {
 ```
 
 A loop `invariant` is checked at loop entry and after each iteration. v1
-deliberately stops at the invariant — see §Open questions on why a loop
-`variant` (a termination measure) is left out.
+deliberately stops at the invariant: a loop `variant` (a termination measure)
+answers a different question — *does the algorithm terminate?* — and is the
+start of a separate formal-verification branch, out of scope here.
 
 **Inline clauses** are an optional convenience — the same `requires` /
 `ensures` / `invariant` keywords written directly on a signature or loop
@@ -218,15 +217,14 @@ declaration's scope, extended with:
   the body mutates a reference: to relate a reversed list's length to its
   original, write `old(listLen(head))` (snapshot the length on entry), **not**
   `listLen(old(head))` (which would walk the already-mutated nodes). The depth
-  of the snapshot follows the value of `e` — see §Performance note for the
-  cost of snapshotting a large aggregate.
+  of the snapshot follows the value of `e` (the Performance note flags the cost
+  of snapshotting a large aggregate).
 - **`match` is a legal predicate expression.** Because `Option`/`Result` (and
   user sum types) have no methods, inspecting a sum payload is done by `match`
   returning a `bool` — e.g. `match result { Ok(v) => v >= 0, Err(_) => true }`.
-  The corpus dry-run made this decisive: without it, every contract on Aril's
-  `Result`/`Option`-centric surface would need a wrapper helper. (A
-  discriminator sugar — `result is Ok` — is noted as a future convenience,
-  §Open questions.)
+  This is decisive: without it, every contract on Aril's `Result`/`Option`-
+  centric surface would need a wrapper helper. (A discriminator sugar —
+  `result is Ok` — is a possible future convenience over `match`.)
 - For an `invariant`, the type's own fields are in scope (as in the
   `Interval` example).
 
@@ -238,15 +236,15 @@ readability.
 
 Predicates are ordinary Aril, so they reuse the existing typechecker
 end-to-end: an `ensures` that calls a user predicate function
-(`isSorted(result)`) is just a typed call. The dry-run showed the most common
-such helper is a **bounded for-all over a collection** (`isSorted`,
-`allInRange`, `allDistinct`, `isUnique`). v1 ships these as a small
-**standard predicate library** (`std.pred`) — pure functions usable in any
-contract — so the common for-all shapes need no re-writing, while the v1
-language surface stays minimal (no new quantifier expression form). A real
-quantifier (`forall x in coll: P`) is deferred to v1.1 (§Open questions); when
-it lands, the `std.pred` helpers are re-expressible on top of it without
-breaking their call sites.
+(`isSorted(result)`) is just a typed call. The most common such helper is a
+**bounded for-all over a collection** (`isSorted`, `allInRange`, `allDistinct`,
+`isUnique`). v1 ships these as a small **standard predicate library**
+(`std.pred`) — pure functions usable in any contract — so the common for-all
+shapes need no re-writing, while the v1 language surface stays minimal (no new
+quantifier expression form): an open-ended predicate sub-grammar risks bloating
+toward a Raku-scale surface. A real quantifier (`forall x in coll: P`) is
+deferred to v1.1; when it lands, the `std.pred` helpers are re-expressible on
+top of it without breaking their call sites.
 
 ### Enforcement modes
 
@@ -273,7 +271,8 @@ callee**. A violation carries: the kind (pre/post/invariant), the Aril
 source coordinates of the clause (D10), the predicate source text, and the
 bound values of its free variables (icontract-style rendering — "`b != 0`
 with `b = 0`"). First-order only in v1; higher-order (function-valued)
-contracts and a blame calculus are explicitly out of scope (§Open questions).
+contracts and a blame calculus (Findler-Felleisen; Racket's Indy semantics)
+are out of scope.
 
 ### Module (a) — compile-time: `internal/contract`
 
@@ -352,39 +351,6 @@ follow-up, mirroring how `diag_ok` grew beside `build_ok`.) Atomic coverage
 each new construct and E-code; live coverage is a few corpus examples
 gaining `requires`/`ensures`.
 
-### What the corpus dry-run found (maturity evidence)
-
-Before committing the surface, the proposed contracts were written on paper
-against 15 corpus examples across all categories. The result calibrates what
-v1 is and is not:
-
-- **Cleanly expressible, real value today:** numeric/range postconditions and
-  soundness (`safe_divide` pins the `Ok(v) => v == a/b` relation; `two_sum`
-  re-checks `nums[i]+nums[j] == target` from the returned indices; `set_algebra`
-  cardinality bounds; `wc` `bytes == data.len()`; `p1242` index-bound
-  preconditions guarding an OOB write), capacity invariants (`lru_cache`
-  `size <= capacity`), and per-state data invariants (`vending_machine`'s
-  `State`: dispensing with negative change — a bug stdout prints happily — is
-  caught). These are the cases where a runtime check sees what `exit + stdout`
-  cannot.
-- **Expressible only via a user helper:** every "for-all / exists / exactly
-  these elements" property (sortedness, set-membership, "all in range") becomes
-  a hand-written pure predicate, and for `two_sum`/`valid_parentheses`/`evalRPN`
-  that helper *re-implements the spec*, losing independence. This is the
-  dominant tax and the principal open question.
-- **Honestly out of scope:** temporal/protocol properties (see Non-goals) and
-  transitive-closure/reachability postconditions (DFS soundness). (Whole-`Map`
-  invariants such as transpose-consistency are *not* out of scope — `Map`
-  exposes `keys()`/`values()`/`entries()`, so they are writable as a
-  `std.pred`-style helper like any for-all property.)
-- **Examples that gain nothing** (`fizzbuzz`, `parse_int`): a deliberate data
-  point — not every program has a checkable invariant, and contracts are
-  optional precisely so those keep no ceremony.
-
-Verdict: the surface is mature for *bounds-and-soundness* checking and ships
-value now; the for-all helper tax is the one expressiveness decision that
-gates "full functional correctness" (resolved in §Open questions).
-
 ## Non-goals — what contracts cannot express
 
 Contracts are **point-in-time state assertions** evaluated at function entry,
@@ -393,7 +359,7 @@ expressions over reachable state. By construction they **cannot express
 liveness, termination, ordering, or protocol/session properties** — a
 predicate only runs if control *reaches* its boundary.
 
-Two concrete consequences, both surfaced by the dry-run:
+Two concrete consequences:
 
 - **Concurrency / channels.** Aril shares Go's channels, but a pre/post/
   invariant does **not** detect the channel bugs that matter: deadlock,
@@ -416,9 +382,9 @@ Two concrete consequences, both surfaced by the dry-run:
 
 These belong to other mechanisms: the Go runtime panic (send-on-closed),
 the race detector (`-race`), structured-concurrency scope-join, static
-analysis — and, for protocol/temporal properties, a future **trace / session
+analysis — and, for protocol/temporal properties, a separate **trace / session
 contract** branch that is a *different mechanism*, not an extension of
-pre/post/invariant. It is explicitly deferred (§Open questions).
+pre/post/invariant (RFC-0007).
 
 ## Alternatives considered
 
@@ -479,32 +445,6 @@ Surveyed for this RFC (citations for the paper trail):
   statically), gradual verification (Bader/Aldrich/Tanter VMCAI 2018).
   Frames the future static-discharge door.
 
-## Paired edits
-
-On acceptance, the implementing PRs touch:
-
-- `lang-spec/grammar.ebnf` — the `contract <name> { … }` block production
-  (primary), incl. nested `loop <label>` sections; a loop `label` on a loop
-  header; inline `requires`/`ensures`/`invariant` clauses as sugar.
-- `lang-spec/type-system.md` — T-Contract-Pred (predicate : bool, pure),
-  T-Result (`result` typed as the return type, `ensures`-only), T-Old
-  (`old(e)` typed as `e`, `ensures`-only).
-- `lang-spec/builtins.md` — `old`/`result` as contract-scope predeclared
-  identifiers; `implies` predicate sugar.
-- `lang-spec/diagnostics.md` — E1101 (contract on unknown decl / loop
-  label), E1102 (non-bool predicate), E1103 (impure predicate), E1104
-  (`old`/`result` outside `ensures`), E1105 (`old` over forbidden expr),
-  E1106 (direct external field assignment to an invariant-bearing type).
-- `lang-spec/lowering-go.md` — §ContractIR: snapshot/entry/exit lowering,
-  per-iteration loop-invariant lowering, and the four-mode dispatch into
-  `arilrt`.
-- RFC-0004 corpus metadata (`example.toml`) — the run-pass contract
-  dimension; `examples/README.md` note.
-- `docs/rfcs/README.md` — index row.
-
-Atomic fixtures (hard rule) accompany each new construct and E-code in
-`tests/{grammar,sema,codegen}/`.
-
 ## Transition / compatibility
 
 Strictly additive. No existing program changes meaning; with no contracts
@@ -512,66 +452,6 @@ the new pass is a no-op and codegen output is byte-identical (golden-fixture
 and `build_ok` ratchet safe). Default mode for `run`/corpus is `panic`;
 existing examples have no contracts and are unaffected until contracts are
 added to them deliberately. No deprecation window needed.
-
-## Open questions
-
-1. **Higher-order contracts.** Function-valued contracts need wrapping/
-   proxying and contravariant blame (Findler-Felleisen; Racket's Indy
-   semantics). v1 is first-order only. Worth it given Aril's uncolored
-   closures? *Deferred.*
-2. **Loop `variant` / termination — deliberately out of v1.** `requires` /
-   `ensures` / `invariant` form one clean category: *is the state correct?*
-   A `variant` answers a different question — *does the algorithm
-   terminate?* — and is the start of a separate formal-verification branch.
-   v1 ships only the state trio (loop **invariants** included); a termination
-   `variant` is deferred and most naturally lands with the static-discharge
-   path (#3), not as a lone runtime measure. (Open: ever worth it given the
-   audience?)
-3. **Static discharge.** When does the `internal/contract` IR gain a
-   prove-and-drop path (gradual verification)? Needs the decidable-fragment
-   decision. *Deferred — the IR is shaped to allow it.*
-4. **`contract_ok` as a fourth corpus metric** vs. folding contract checks
-   into `run_ok`. v1 folds in; revisit if the signal deserves its own floor.
-5. **Mode granularity.** Global `--contracts=` only, or per-module/per-decl
-   override? Start global. *Deferred.*
-6. **Exposing contracts to the agent via the reflection/REPL surface**
-   (RFC-0003) so an agent can enumerate a function's obligations
-   programmatically. *Deferred — promising for the agent-loop story.*
-7. **Invariant-type field writes.** v1 rejects direct external field
-   assignment to an invariant-bearing type (E1106), forcing mutation through
-   a method. The alternative — admit the write and treat each external
-   `x.f = e` as its own invariant checkpoint — is more familiar to TS
-   developers but mis-fires on multi-write restorations. *Decided: reject in
-   v1; revisit if the restriction bites.*
-8. **Quantifiers vs. a standard predicate library — DECIDED.** The dry-run's
-   dominant gap is "for-all over a collection." A real quantifier
-   (`forall x in coll: P`) is the most expressive answer, but it expands the
-   language surface — and an open-ended predicate sub-grammar risks bloating
-   toward a Raku-scale surface we could not keep under control. v1 therefore
-   ships a small **`std.pred`** library (`isSorted`, `allInRange`,
-   `allDistinct`, `isUnique`, …) of ordinary pure functions and adds **no new
-   expression form**; a bounded quantifier is reconsidered for v1.1, on top of
-   which `std.pred` is re-expressible without breaking call sites.
-9. **Trace / session contracts (concurrency & protocol) — planned separately.**
-   The Non-goals section establishes that pre/post/invariant cannot express
-   liveness, ordering, or channel/goroutine protocol properties (deadlock,
-   leak, send-on-closed, "produced is eventually consumed", "send-then-close,
-   never after"). These need a *different mechanism* — trace / session
-   contracts. Planned as its **own RFC** (the next in this epoch), not an
-   extension of this one.
-10. **Whole-collection invariants rely on the helper/`std.pred` pattern.**
-    `Map` already exposes `keys()`/`values()`/`entries()` (and slices give
-    index/`len()`), so whole-`Map` invariants (e.g. transpose-consistency of
-    two adjacency maps) *are* writable today as a pure helper — there is no
-    missing accessor. The only limit is the shared one: predicates are
-    expressions, so the for-all is in a helper, not inline (#8). Noted because
-    an early dry-run mis-scoped this as a surface gap.
-11. **Sum-discriminator sugar.** `match result { Ok(_) => true, _ => false }`
-    recurs as a tag test; a `result is Ok` sugar would cut the noise. Pure
-    convenience over `match` (already legal). *Deferred — nice-to-have.*
-12. **Transitive-closure / reachability postconditions** (DFS soundness, list
-    acyclicity) are beyond both v1 and a simple helper — named here only so
-    users do not expect them. *Out of scope.*
 
 ## Performance note
 
@@ -590,10 +470,4 @@ Two costs are worth flagging up front so they are not re-litigated later:
 
 ## History
 
-- 2026-06-20 — `draft → accepted`. Design matured via a 15-example corpus
-  dry-run and three review-fix rounds. Implementation (the `internal/contract`
-  pass, `arilrt/contract.go`, codegen lowering, and the formal `lang-spec/`
-  paired edits with atomic fixtures) is deferred to a dedicated implementation
-  epoch; the paired edits are coverage-gated and land there. The concurrency /
-  protocol gap (§Non-goals) is taken up by a separate forthcoming RFC on
-  trace / session contracts.
+- 2026-06-20 — `draft → accepted`.
