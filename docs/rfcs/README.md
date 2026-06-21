@@ -29,6 +29,7 @@ This directory holds:
 | 0004 | accepted | Example corpus charter |
 | 0005 | accepted | Go FFI: the foreign-binding interface |
 | 0006 | accepted | Optional runtime contracts |
+| 0007 | accepted | Channel contracts (trace contracts) |
 
 ## How to write an RFC
 
