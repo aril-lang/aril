@@ -21,11 +21,12 @@ the implementation, at two levels:
   (`forbid results.send(Result{id}) before work.recv(Job{id})`,
   `eventually results.close after work.close`).
 
-Three kinds of clause, borrowing the **TLA+ mental model — safety / liveness /
-fairness — without any temporal-logic syntax** (TLA+ semantics underneath, a
-Go-readable protocol language above), plus a distinct **fan-out** obligation
-(`delivered-to-all { … }`) for events that must reach *every* member of a
-participant set. Contracts share RFC-0006's separable block, its four modes
+Four kinds of clause — **safety / coverage / liveness / fairness**. Three
+borrow the **TLA+ mental model without any temporal-logic syntax** (TLA+
+semantics underneath, a Go-readable protocol language above); the fourth,
+**coverage** (`delivered-to-all { … }`, for an event that must reach *every*
+member of a participant set), the channel domain adds. Contracts share
+RFC-0006's separable block, its four modes
 (panic / warn / stats / off), and `arilrt` runtime layer, and report in Aril
 source coordinates (D10).
 
@@ -59,7 +60,8 @@ contract targets only what remains:
 - **Data races** — `go test -race` already covers these.
 
 What is left is the **channel event protocol**: close-safety, ordering,
-completion, fan-out delivery, and the bounded-liveness / fairness signals
+completion, coverage (fan-out delivery), and the bounded-liveness / fairness
+signals
 around partial deadlock that Go's *global*-only detector misses (it caught 2
 of 21 blocking bugs in the study).
 
@@ -157,36 +159,31 @@ the interesting invariants — ordering, close-propagation, job→result pairing
 live one level up, where a clause can name two subjects at once. The `channel`
 block stays (local invariants are real); everything relational moves up.
 
-### Three kinds: safety, liveness, fairness
+### Four kinds: safety, coverage, liveness, fairness
 
-Every clause is one kind — the TLA+ division, in Go-readable form, each with an
-honestly-stated runtime status.
+Every clause is one of four kinds. Three are the TLA+ division (safety,
+liveness, fairness); the fourth — **coverage** — the channel domain adds, for
+an event that must reach *every* member of a set. What makes them genuinely
+different kinds, rather than sugar for one another, is the **moment of check**:
 
-**Safety — "bad things never happen".** The only *definitively* runtime-checked
-kind: a forbidden event, when it occurs, is caught at that instant with blame.
-`closed-by`, `forbid send after close`, `forbid recv after close`,
-`forbid A before B`, `never more than N in flight`, `drains-before-scope-exit`
-(the channel is closed and empty when its owning `scope` returns).
+| Kind | Says | Checked | Definitive? |
+|---|---|---|---|
+| **safety** | a forbidden event never occurs | at the event | yes |
+| **coverage** | an event reaches every participant in a set | at the scope boundary | yes |
+| **liveness** | an event eventually occurs | bounded / test mode | no |
+| **fairness** | no participant is starved | stress run | no |
 
-**Liveness — "good things eventually happen".** A function may break no safety
-rule and still hang. `every work.recv(Job{id}) eventually results.send(Result{id})`,
-`eventually results.close after work.close`. A monitor cannot *refute* a pure
-"eventually" from a finite trace, so liveness is **runtime-checkable only in a
-bounded / test mode** and reported as **non-definitive** — never as a proof.
+**Safety — "bad things never happen".** A forbidden event, when it occurs, is
+caught at that instant with blame. `closed-by`, `forbid send after close`,
+`forbid recv after close`, `forbid A before B`, `never more than N in flight`,
+`drains-before-scope-exit` (the channel is closed and empty when its owning
+`scope` returns).
 
-**Fairness — "no participant is starved forever".** Kept in its most human
-form — no weak/strong fairness, just "a `select` does not ignore one input
-indefinitely": `fairness { no-starvation inputA }`. Fairness is
-**observable/testable intent** (a stress run may search for starvation), not a
-v1 proof obligation.
-
-### Fan-out obligations
-
-Some protocols require one event to be observed by *every* participant in a
-declared set — not the ordinary "eventually one Y", but a **coverage
-obligation** over a receiver set. A Go channel is by default a **work queue**
-(each message goes to *one* receiver); **broadcast** (each message to *every*
-receiver) is a different intent the contract must mark.
+**Coverage — "every participant gets it".** Some protocols require one event to
+be observed by *every* member of a declared set — a coverage obligation over a
+participant set, not the ordinary "eventually one Y". A Go channel is by default
+a **work queue** (each message goes to *one* receiver); **broadcast** (each
+message to *every* receiver) is a different intent the contract must mark.
 
 ```aril
 contract RateLimited {
@@ -205,11 +202,15 @@ contract PubSub {
 }
 ```
 
-`delivered-to-all` is **not** sugar over `eventually` — its check has a
-different moment. At the protocol/scope boundary the expected receiver count is
-known, so a missing receiver is definitive:
+Coverage is the one kind TLA+ does not have, and it earns its own name because
+of *when* it is checked: it is **liveness made definitive by a finite
+participant set and a finite boundary.** "Every subscriber eventually receives
+`m`" is, in general, un-refutable from a finite trace (pure liveness) — but once
+the participant set is known and the owning `scope` boundary is reached,
+"eventually for all" collapses into a check that holds or fails *now*. That is
+exactly why `delivered-to-all` is **not** sugar over `eventually`:
 
-> **Fan-out obligations are discharged at the protocol/scope boundary. Missing
+> **Coverage obligations are discharged at the protocol/scope boundary. Missing
 > receivers are definitive violations, not bounded-liveness guesses.**
 
 This is what catches the one-shot-deadline footgun: `time.after` delivers to a
@@ -217,14 +218,26 @@ This is what catches the one-shot-deadline footgun: `time.after` delivers to a
 definitively at scope exit. And because the contract marks **broadcast** intent
 over a **work-queue** channel, Aril gives the teaching diagnostic *"you used a
 one-shot / work-queue channel where the protocol requires broadcast delivery to
-{producer, consumer}"* (E1209) — diagnosing the design error, not just the
-symptom.
+{producer, consumer}"* (E1209) — diagnosing the design error, not the symptom.
+
+**Liveness — "good things eventually happen".** A function may break no safety
+rule and still hang. `every work.recv(Job{id}) eventually results.send(Result{id})`,
+`eventually results.close after work.close`. A monitor cannot *refute* a pure
+"eventually" from a finite trace, so liveness is **runtime-checkable only in a
+bounded / test mode** and reported as **non-definitive** — never as a proof.
+
+**Fairness — "no participant is starved forever".** Kept in its most human
+form — no weak/strong fairness, just "a `select` does not ignore one input
+indefinitely": `fairness { no-starvation inputA }`. Fairness is
+**observable/testable intent** (a stress run may search for starvation), not a
+v1 proof obligation.
 
 ### The guard-rail — what we deliberately do *not* bring
 
 The mental model is TLA+; the surface is Go. We take the safety / liveness /
-fairness distinction, the trace-of-events model, and the fan-out coverage
-idea, and we leave out everything that fails the five-minute test:
+fairness distinction (plus coverage, the domain's own fourth kind) and the
+trace-of-events model, and we leave out everything that fails the five-minute
+test:
 
 - temporal-logic operators (`[]`, `<>`, `~>`, `WF`, `SF`);
 - state predicates with primed variables;
@@ -237,7 +250,7 @@ does not enter the surface.
 
 ### Diagnostics
 
-Grouped by kind. Safety and fan-out are definitive; liveness and fairness are
+Grouped by kind. Safety and coverage are definitive; liveness and fairness are
 bounded/testable signals, reported as non-definitive.
 
 - **Safety:** E1201 (close by a non-owner — `closed-by` violated), E1202
@@ -245,9 +258,9 @@ bounded/testable signals, reported as non-definitive.
   (a `forbid A before B` ordering pattern violated), E1206 (capacity exceeded
   — `never more than N in flight`), E1207 (incomplete drain at the owning
   scope's exit).
-- **Fan-out (definitive, at boundary):** E1208 (coverage: fewer than the
-  declared participant set observed the event), E1209 (delivery-intent
-  mismatch — a one-shot / work-queue subject used where broadcast is required).
+- **Coverage (definitive, at boundary):** E1208 (fewer than the declared
+  participant set observed the event), E1209 (delivery-intent mismatch — a
+  one-shot / work-queue subject used where broadcast is required).
 - **Well-formedness:** E1210 (a clause names an anonymous or unbound subject —
   subjects must be named).
 - **Liveness (bounded, non-definitive):** E1211 (a required `eventually` event
@@ -260,8 +273,8 @@ bounded/testable signals, reported as non-definitive.
 Under contract, each named subject lowers to a thin wrapper that appends its
 `send` / `recv` / `close` events to a per-subject trace and evaluates the
 declared clauses against it. Safety and well-formedness checks fire at the
-offending event; fan-out coverage and drain are discharged at the owning
-scope's boundary; liveness and fairness run only in the bounded / stress mode.
+offending event; coverage and drain are discharged at the owning scope's
+boundary; liveness and fairness run only in the bounded / stress mode.
 Blame is local and decentralized — a violation names the subject, the event,
 and the goroutine/role (with the role label when present), in Aril coordinates
 (D10). Modes panic / warn / stats / off and the elision-under-`off` story are
@@ -304,7 +317,7 @@ value `ensures` (RFC-0006) on the draining function, not a channel clause.
   predicate over an accumulated event trace — the formal shape used here.
 - **Monitorability** — Leucker & Schallhart 2009; Havelund & Peled (RV 2023):
   safety is monitorable from a finite trace, pure liveness is not — the basis
-  for "safety/fan-out are definitive, liveness/fairness are bounded/testable".
+  for "safety/coverage are definitive, liveness/fairness are bounded/testable".
 - **Runtime session monitoring** — Bocchi/Chen/Demangeon/Honda/Yoshida (FORTE
   2013 / TCS 2017): local per-endpoint monitors compose to a global guarantee
   — the blame model adopted here.
