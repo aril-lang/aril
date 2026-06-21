@@ -20,3 +20,14 @@ func main() {
     Err(e) => fmt.println("err", e.msg),
   }
 }
+
+// The result fully specifies the function: an Ok holds the exact quotient,
+// an Err occurs exactly when the divisor is zero. `match` is a legal
+// predicate expression (RFC-0006) — the only way to inspect a Result, which
+// has no methods. Inert until `--contracts` enforcement lands.
+contract safeDivide {
+  ensures match result {
+    Ok(q)  => q == a / b,
+    Err(_) => b == 0,
+  }
+}

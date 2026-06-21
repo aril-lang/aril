@@ -28,6 +28,23 @@ func reverse(head: Option<Node>): Option<Node> {
   }
 }
 
+// listLen — a pure node count. Compiled normally (it is ordinary Aril, not
+// a contract clause); the `reverse` contract below calls it. It is the
+// std.pred-style bounded-traversal helper a real `forall` would later subsume.
+func listLen(head: Option<Node>): int {
+  var n = 0
+  var cur = head
+  while true {
+    match cur {
+      None       => return n,
+      Some(node) => {
+        n = n + 1
+        cur = node.next
+      },
+    }
+  }
+}
+
 // 1 -> 2 -> 3 -> None
 func build(values: []int): Option<Node> {
   var head: Option<Node> = None
@@ -58,4 +75,12 @@ func main() {
   let xs = build([1, 2, 3, 4, 5])
   fmt.println("before:", render(xs))
   fmt.println("after: ", render(reverse(xs)))
+}
+
+// Reversal preserves length. `old(listLen(head))` snapshots the *entry*
+// length before the in-place pointer rewiring; writing `listLen(old(head))`
+// would instead walk the already-mutated nodes (RFC-0006 §Predicate
+// language). Inert until `--contracts` enforcement lands.
+contract reverse {
+  ensures listLen(result) == old(listLen(head))
 }
