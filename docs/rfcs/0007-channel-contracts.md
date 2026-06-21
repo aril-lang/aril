@@ -74,7 +74,7 @@ a **readability test**, applied to every construct:
 > π-calculus, we have lost.
 
 So we keep the *mental model* of TLA+ — the safety / liveness / fairness
-split — and deliberately leave its *machinery* out (see §The guard-rail).
+split — and deliberately leave its *machinery* out.
 
 ## Design
 
