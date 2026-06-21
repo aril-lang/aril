@@ -33,6 +33,13 @@ This is the trace-contract branch RFC-0006 deferred — a *different mechanism*
 from point-in-time pre/post/invariant. It targets the channel-protocol bugs
 that Aril's structured concurrency, the Go runtime, and `-race` do not cover.
 
+A channel contract is to concurrent code what a function contract is to
+sequential code. A function contract (RFC-0006) constrains *values at call
+boundaries*; a channel contract constrains *traces of observable communication
+events*. The two axes are orthogonal — which is the whole reason RFC-0007
+exists beside RFC-0006, and why it must be a separate mechanism:
+pre/post/invariant see one call's state, never a *sequence* of events.
+
 ## Motivation
 
 ### The residual that nothing else covers
