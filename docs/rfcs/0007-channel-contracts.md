@@ -169,21 +169,24 @@ different kinds, rather than sugar for one another, is the **moment of check**:
 | Kind | Says | Checked | Definitive? |
 |---|---|---|---|
 | **safety** | a forbidden event never occurs | at the event | yes |
-| **coverage** | an event reaches every participant in a set | at the scope boundary | yes |
+| **coverage** | an event reaches every member of a set | static intent (pre-run) + boundary count | yes |
 | **liveness** | an event eventually occurs | bounded / test mode | no |
 | **fairness** | no participant is starved | stress run | no |
 
 **Safety — "bad things never happen".** A forbidden event, when it occurs, is
 caught at that instant with blame. `closed-by`, `forbid send after close`,
 `forbid recv after close`, `forbid A before B`, `never more than N in flight`,
-`drains-before-scope-exit` (the channel is closed and empty when its owning
-`scope` returns).
+and the completion clauses `drains-before-scope-exit` / `drains-before-return`
+(the channel is closed and empty when its owner returns — the `scope` block, or
+the enclosing function when the drain lives in the function body *after* the
+scope, as in a fan-in result queue). The `drains-…` family is the one safety
+case checked at a boundary rather than at the event.
 
-**Coverage — "every participant gets it".** Some protocols require one event to
-be observed by *every* member of a declared set — a coverage obligation over a
-participant set, not the ordinary "eventually one Y". A Go channel is by default
-a **work queue** (each message goes to *one* receiver); **broadcast** (each
-message to *every* receiver) is a different intent the contract must mark.
+**Coverage — "every member of a set gets it".** Some protocols require one event
+to be observed by *every* member of a declared set — a coverage obligation over
+a receiver set, not the ordinary "eventually one Y". A Go channel is by default
+a **work queue** (each message to *one* receiver); **broadcast** (each message
+to *every* receiver) is a different intent the contract must mark.
 
 ```aril
 contract RateLimited {
@@ -198,27 +201,65 @@ contract PubSub {
   participant subscribers: Set<Subscriber>
   channel messages
 
-  messages.send(m) delivered-to-all subscribers
+  messages delivered-to-all subscribers
 }
 ```
 
-Coverage is the one kind TLA+ does not have, and it earns its own name because
-of *when* it is checked: it is **liveness made definitive by a finite
-participant set and a finite boundary.** "Every subscriber eventually receives
-`m`" is, in general, un-refutable from a finite trace (pure liveness) — but once
-the participant set is known and the owning `scope` boundary is reached,
-"eventually for all" collapses into a check that holds or fails *now*. That is
-exactly why `delivered-to-all` is **not** sugar over `eventually`:
+**Coverage is not a deadlock detector.** It has two enforcement arms:
 
-> **Coverage obligations are discharged at the protocol/scope boundary. Missing
-> receivers are definitive violations, not bounded-liveness guesses.**
+- **Static delivery-intent (E1209)** — the contract declares broadcast
+  (`delivered-to-all`) but the source is structurally one-shot or
+  single-consumer. Caught from the subject's *type*, before the program runs.
+- **Runtime boundary-count (E1208)** — the protocol boundary is reached, but not
+  all required members observed the delivery. This arm is the one that is
+  "liveness made definitive by a finite set and a finite boundary" — *only when
+  that boundary is actually reached.*
 
-This is what catches the one-shot-deadline footgun: `time.after` delivers to a
-*single* receiver, so `delivered-to-all { producer, consumer }` is violated
-definitively at scope exit. And because the contract marks **broadcast** intent
-over a **work-queue** channel, Aril gives the teaching diagnostic *"you used a
-one-shot / work-queue channel where the protocol requires broadcast delivery to
-{producer, consumer}"* (E1209) — diagnosing the design error, not the symptom.
+So the box is true with a stated precondition:
+
+> "Missing receivers are definitive, not timeouts" applies **only when the
+> relevant protocol boundary is reached.** If the boundary is never reached,
+> E1208 is not emitted. A deadlock caused by an *impossible* broadcast intent is
+> caught by the static arm (E1209), never by boundary counting.
+
+The two motivating examples split cleanly along the arms:
+
+- **rate_limited** — `time.after` is one-shot, the contract requires
+  `deadline delivered-to-all { producer, consumer }` ⇒ **E1209 before running**
+  (*"you used a one-shot / work-queue subject where the protocol requires
+  broadcast delivery to {producer, consumer}"*). The deadlock is a design error,
+  and the static arm names it without waiting for a boundary the deadlock would
+  prevent.
+- **pubsub** — `messages delivered-to-all subscribers`, the scope terminates,
+  only k of n subscribers observed `m` ⇒ **E1208** at the boundary.
+
+**Two modes: lossless vs best-effort.** `delivered-to-all` is **strict /
+lossless** — for the snapshot set of receivers at the source event, *each* must
+observe the message; non-delivery is a violation. It fits broadcast
+cancellation, barrier / deadline signals, a lossless event bus, a fixed
+participant set, and tests where a drop is inadmissible. It does **not** fit
+typical Go pub/sub:
+
+> `delivered-to-all` models lossless broadcast, **not** Go-style pub/sub with
+> non-blocking sends and drop-on-overflow.
+
+Best-effort fan-out — **`offered-to-all`** (the publisher must *attempt*
+delivery to every member of the snapshot, but a member may miss `m` if its queue
+is full / closed / a policy permits drop; drops are *observed and counted*, not
+silently lost) — is a **future mode, out of scope for v1**. It is named here so
+the real drop-tolerant pub/sub case is honestly out-of-scope rather than
+mis-modelled by `delivered-to-all`.
+
+**Snapshot semantics.** For a fan-out clause over a *dynamic* receiver set, the
+set is **snapshotted at the source event**: `messages.send(m)` at time *t* fixes
+the obligation set to `subscribers(t)` — a member that joins later owes nothing
+for *m*, and one that leaves immediately after still owed it. Without a snapshot,
+a mutating membership cannot even define "who should have received it".
+
+A fan-out target that is neither a declared receiver set nor a snapshot source is
+**E1210** (*"fan-out target must be a declared receiver set or snapshot
+expression"* — hint: declare it as a receiver set, or use `offered-to-all` for
+best-effort pub/sub).
 
 **Liveness — "good things eventually happen".** A function may break no safety
 rule and still hang. `every work.recv(Job{id}) eventually results.send(Result{id})`,
@@ -250,19 +291,22 @@ does not enter the surface.
 
 ### Diagnostics
 
-Grouped by kind. Safety and coverage are definitive; liveness and fairness are
+Grouped by kind. Safety and coverage are definitive (coverage's boundary-count
+arm only when the boundary is reached); liveness and fairness are
 bounded/testable signals, reported as non-definitive.
 
 - **Safety:** E1201 (close by a non-owner — `closed-by` violated), E1202
   (double close), E1203 (send after close), E1204 (recv after close), E1205
   (a `forbid A before B` ordering pattern violated), E1206 (capacity exceeded
   — `never more than N in flight`), E1207 (incomplete drain at the owning
-  scope's exit).
-- **Coverage (definitive, at boundary):** E1208 (fewer than the declared
-  participant set observed the event), E1209 (delivery-intent mismatch — a
-  one-shot / work-queue subject used where broadcast is required).
-- **Well-formedness:** E1210 (a clause names an anonymous or unbound subject —
-  subjects must be named).
+  boundary — `drains-before-scope-exit` / `drains-before-return`).
+- **Coverage:** E1208 (runtime under-delivery — the boundary is reached, but
+  fewer than the required members observed the delivery), E1209 (static
+  delivery-intent mismatch — the contract declares `delivered-to-all` but the
+  source is structurally one-shot / single-consumer; caught before running).
+- **Well-formedness:** E1210 (a clause references an anonymous/unbound subject,
+  or a fan-out target that is not a declared receiver set / snapshot source —
+  hint: name the subject, declare a receiver set, or use `offered-to-all`).
 - **Liveness (bounded, non-definitive):** E1211 (a required `eventually` event
   not observed within the bound).
 - **Fairness (testable, non-definitive):** E1212 (starvation of a declared
@@ -272,9 +316,11 @@ bounded/testable signals, reported as non-definitive.
 
 Under contract, each named subject lowers to a thin wrapper that appends its
 `send` / `recv` / `close` events to a per-subject trace and evaluates the
-declared clauses against it. Safety and well-formedness checks fire at the
-offending event; coverage and drain are discharged at the owning scope's
-boundary; liveness and fairness run only in the bounded / stress mode.
+declared clauses against it. Safety checks fire at the offending event;
+coverage's static-intent arm (E1209) is a compile-time check on the subject's
+type, and its boundary-count arm (E1208) plus the `drains-…` completion checks
+discharge at the owning boundary (scope exit or function return) *when it is
+reached*; liveness and fairness run only in the bounded / stress mode.
 Blame is local and decentralized — a violation names the subject, the event,
 and the goroutine/role (with the role label when present), in Aril coordinates
 (D10). Modes panic / warn / stats / off and the elision-under-`off` story are
