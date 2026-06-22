@@ -160,6 +160,21 @@ E10xx range.
 | E1001 | E | Cannot construct opaque foreign handle | `ffi.md` §ExternType / `type-system.md` T-Extern | An `extern type` has no visible layout — obtain the handle from an `extern func` (or an `extern impl` method) instead of a literal / constructor call. |
 | E1002 | E | Cannot destructure opaque foreign handle | `ffi.md` §ExternType / `type-system.md` T-Extern | A handle has no fields/components to bind; use its `extern impl` methods/fields via member access instead of a tuple / record pattern. |
 
+### E11xx — Contracts (RFC-0006 value/state)
+
+Codes raised by contract checking — separable `contract { … }` blocks. E1103–E1106
+(predicate purity, `old`/`result` scoping, invariant-field-write) are **reserved** —
+allocated for the clauses landing in later slices of the contract epoch.
+
+| Code | Sev | Message | Authoritative rule | Fix |
+|---|---|---|---|---|
+| E1101 | E | Contract attaches to no such declaration / loop | RFC-0006 §Surface / `grammar.ebnf` §ContractDecl | The `contract <target>` names a declaration that does not exist, or a `loop <label>` section names a loop the target's body does not label. Fix the name, or add the `loop <label>` to the body. |
+| E1102 | E | Contract predicate must be `bool` | RFC-0006 §"Predicate language" / `type-system.md` T-Contract-Pred | A `requires` / `ensures` / `invariant` predicate has a non-`bool` type. A contract predicate is a pure boolean Aril expression. |
+| E1103 | E | reserved — impure contract predicate | RFC-0006 §"Predicate language" | reserved (predicate purity check, a later slice). |
+| E1104 | E | reserved — `result` / `old` outside `ensures` | RFC-0006 §"Predicate language" | reserved. |
+| E1105 | E | reserved — `old(e)` over an impure expression | RFC-0006 §"Predicate language" | reserved. |
+| E1106 | E | reserved — external field write to an invariant type | RFC-0006 §Surface (type invariants) | reserved. |
+
 ## Diagnostic formatting
 
 Every diagnostic is emitted in this canonical format:

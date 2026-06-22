@@ -1034,6 +1034,25 @@ Opaque-handle restrictions (each backed by a diagnostic):
   `==`/`!=` (T-Cmp) and routed to `refEq`, like a class.
 - **refEq-eligible.** A handle is a reference-identity type (T-RefEq).
 
+## Contracts — T-Contract-Pred
+
+A contract predicate (a `requires` / `ensures` / `invariant` clause of a
+separable `contract { … }` block, RFC-0006) is an ordinary boolean Aril
+expression, type-checked through the same rules as any expression. It is
+checked in the scope of its target: a function's params (and `result` /
+`old(e)` for `ensures`, in later slices), a type's fields (`invariant`), or a
+labelled loop's body scope — the loop variable and enclosing locals — for a
+`loop <label>` invariant.
+
+    Γ_target ⊢ pred : bool
+    ─────────────────────── (T-Contract-Pred)
+       pred well-typed
+
+A predicate whose type is not `bool` is **E1102**. Binding failures (a
+contract on no such declaration, a `loop <label>` section with no matching
+labelled loop) are **E1101**. Predicates are additive — they do not change the
+typing or lowering of the target; under `--contracts=off` they are elided.
+
 ## Type errors — quick index
 
 The full catalog lives in `diagnostics.md` (forthcoming). Codes

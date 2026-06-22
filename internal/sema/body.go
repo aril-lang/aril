@@ -35,7 +35,9 @@ func (c *checker) checkBodies(f *ast.File) {
 				c.curReturn = c.typeFromExpr(v.ReturnType)
 				c.curThis = nil
 				c.curTryForbidden = c.definitelyNotTryable(v.ReturnType)
+				c.curContract = c.contractByTarget[v.Name]
 				c.checkBlock(v.Body)
+				c.curContract = nil
 			}
 		case *ast.ClassDecl:
 			for _, m := range v.Methods {
@@ -112,6 +114,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 			c.checkBlock(v.Body)
 			c.loopDepth--
 		}
+		c.checkLoopInvariants(v, v.Label)
 	case *ast.WhileStmt:
 		c.inferExpr(v.Cond)
 		if v.Body != nil {
@@ -119,6 +122,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 			c.checkBlock(v.Body)
 			c.loopDepth--
 		}
+		c.checkLoopInvariants(v, v.Label)
 	case *ast.DeferStmt:
 		// T-Defer: the deferred expression's AST shape must be a
 		// Call (a closure-wrapped block is spelled `(() => …)()`,

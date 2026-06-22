@@ -27,6 +27,11 @@ func CheckFiles(files []*ast.File, paths []string) (*Info, []*Diag) {
 		c.file = paths[i]
 		c.indexFile(f, scope)
 	}
+	// Contracts are indexed after all declarations are in the package
+	// scope (so a contract can attach to a decl in any file) and before
+	// resolution (so the resolve pass can bind loop-invariant predicates
+	// at their loops).
+	c.indexContracts(files, paths, scope)
 	for i, f := range files {
 		c.file = paths[i]
 		c.resolveFile(f, scope)
@@ -70,6 +75,16 @@ type checker struct {
 	// `extern impl T { … }` block carrying its methods/fields, so
 	// member access on a handle (ffi.md §ExternImpl) can resolve.
 	externImpls map[string]*ast.ExternImplDecl
+
+	// contractByTarget maps a declaration name to its separable contract
+	// block (RFC-0006); curContract is the contract of the function whose
+	// body is being resolved/checked, or nil.
+	contractByTarget map[string]*ast.ContractDecl
+	curContract      *ast.ContractDecl
+	// matchedLoopLabels tracks which of curContract's loop-section labels
+	// the resolve walk has matched against a real labelled loop, so an
+	// unmatched section can be flagged (E1101). Reset per function.
+	matchedLoopLabels map[string]bool
 }
 
 func (c *checker) report(code, message string, span ast.Span) {
