@@ -225,7 +225,44 @@ func (c *checker) resolveTypeInvariants(cd *ast.ClassDecl, memberScope *Scope) {
 // Info.TypeInvariants for codegen. Called from the check pass with curThis
 // set to the class (so a bare field reference types through the receiver).
 func (c *checker) checkTypeInvariants(cd *ast.ClassDecl) {
-	cdc := c.contractByTarget[cd.Name]
+	c.recordTypeInvariants(cd.Name)
+}
+
+// resolveRecordInvariants binds the names in a record contract's top-level
+// `invariant` predicates against a synthetic field scope — the record has no
+// implicit receiver, so each field is declared as a SymField in a fresh scope
+// just for the predicate (codegen then lowers it through the construction
+// temp). Records have no methods, so construction is their only checkpoint.
+func (c *checker) resolveRecordInvariants(t *ast.TypeDecl, rb *ast.RecordTypeBody, parent *Scope) {
+	cdc := c.contractByTarget[t.Name]
+	if cdc == nil {
+		return
+	}
+	fieldScope := newScope(parent)
+	for _, f := range rb.Fields {
+		fieldScope.declare(&Symbol{Name: f.Name, Kind: SymField, Decl: f, Type: c.typeFromExpr(f.DeclType)})
+	}
+	for _, cl := range cdc.Clauses {
+		if cl.Kind == "invariant" {
+			c.resolveExpr(cl.Pred, fieldScope)
+		}
+	}
+}
+
+// checkRecordInvariants infers each top-level record `invariant` predicate,
+// bool-checks it (E1102), and records it on Info.TypeInvariants. The fields
+// were bound as SymField in resolveRecordInvariants, so inference types them
+// directly (no curThis needed — a record has no receiver).
+func (c *checker) checkRecordInvariants(t *ast.TypeDecl) {
+	c.recordTypeInvariants(t.Name)
+}
+
+// recordTypeInvariants infers + bool-checks the top-level `invariant` clauses
+// of the contract targeting `name` and records them on Info.TypeInvariants
+// keyed by that name. Shared by the class and record check entry points (the
+// predicate idents were already bound in the respective field scope).
+func (c *checker) recordTypeInvariants(name string) {
+	cdc := c.contractByTarget[name]
 	if cdc == nil {
 		return
 	}
@@ -234,7 +271,7 @@ func (c *checker) checkTypeInvariants(cd *ast.ClassDecl) {
 			continue
 		}
 		c.requireBoolPredicate(cl.Pred)
-		c.info.TypeInvariants[cd] = append(c.info.TypeInvariants[cd], cl.Pred)
+		c.info.TypeInvariants[name] = append(c.info.TypeInvariants[name], cl.Pred)
 	}
 }
 

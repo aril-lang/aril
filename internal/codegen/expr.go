@@ -41,6 +41,27 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 	if isClass && ci.generic && len(b.TypeName.Args) == 0 {
 		return fmt.Errorf("codegen: brace literal on generic class %s needs explicit type arguments — write %s<T>{…}", name, name)
 	}
+	// A type carrying `invariant`s (RFC-0006) is checked at construction:
+	// the literal lowers inside a `func() T { _arilNew := <lit>; <checks>;
+	// return _arilNew }()` so a brace literal in any expression position is
+	// validated before use. Construction is the only checkpoint for a record
+	// (no methods); for a class it complements the method-exit checks. Under
+	// off / no-invariant the literal lowers bare (byte-identical).
+	preds := g.constructionInvariants(name)
+	if len(preds) > 0 {
+		g.b.WriteString("func() ")
+		if isClass {
+			g.b.WriteByte('*')
+		}
+		g.b.WriteString(goIdent(name))
+		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
+			return err
+		}
+		g.b.WriteString(" {\n")
+		g.indent++
+		g.writeIndent()
+		g.b.WriteString("_arilNew := ")
+	}
 	// A class is a reference type — `Bar{ x: 6 }` constructs `&Bar{…}`
 	// so its methods (declared on `*Bar`) are reachable.
 	if isClass {
@@ -81,6 +102,17 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 		}
 	}
 	g.b.WriteByte('}')
+	if len(preds) > 0 {
+		g.b.WriteByte('\n')
+		if err := g.emitConstructionInvariants(name, preds); err != nil {
+			return err
+		}
+		g.writeIndent()
+		g.b.WriteString("return _arilNew\n")
+		g.indent--
+		g.writeIndent()
+		g.b.WriteString("}()")
+	}
 	return nil
 }
 
@@ -421,13 +453,19 @@ func (g *gen) emitExpr(e ast.Expr) error {
 			g.b.WriteString(goIdent(v.Name))
 			return nil
 		}
-		// A bare ident that sema resolved to a class field (not a
+		// A bare ident that sema resolved to a class/record field (not a
 		// shadowing local/param) is an implicit-receiver reference
-		// (name-resolution §Implicit receiver) — emit `t.<field>`,
-		// since the Go field lives on the method receiver `t`.
+		// (name-resolution §Implicit receiver) — emit `<recv>.<field>`,
+		// since the Go field lives on the method receiver `t` (or, inside a
+		// type-invariant construction check, the construction temp).
 		if g.info != nil {
 			if sym := g.info.Symbol[v]; sym != nil && sym.Kind == sema.SymField {
-				g.b.WriteString("t.")
+				recv := g.contractReceiver
+				if recv == "" {
+					recv = "t"
+				}
+				g.b.WriteString(recv)
+				g.b.WriteByte('.')
 				g.b.WriteString(exportFieldName(v.Name))
 				return nil
 			}

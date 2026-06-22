@@ -880,14 +880,38 @@ Under `off`, none of this is emitted (byte-identical).
 `warn` / `stats` modes and the `arilrt` violation-rendering layer (richer blame,
 mode tally) are not lowered yet.
 
-### Type invariants — method exit (RFC-0006)
+### Type invariants — construction + method exit (RFC-0006)
 
-A class carrying a `contract <Class> { invariant P }` checks each invariant at
-**every method exit** — the mutation boundary, where a transiently-broken
+A type carrying a `contract <Type> { invariant P }` is checked at two
+checkpoints. The predicate resolves in the type's field scope (bare field
+names), and the guarded check is the same `_arilInContract` re-entrancy form
+as requires/ensures, with `<kind>` = `invariant` and `<fn>` = the type name;
+the `//line` at the predicate maps blame to the invariant's `.aril` source
+(D10). Under `off`, nothing is emitted (byte-identical).
+
+**Construction.** Every brace literal of an invariant-bearing type lowers
+inside an IIFE that validates the freshly-built value before it is used — the
+**only** checkpoint for a record (no methods), and a complement to the
+method-exit check for a class (catching an object built but never
+method-called). The predicate's field names lower against the construction
+temp `_arilNew`:
+
+```
+T{ … }   with invariant P            (T value type; a class is *T)
+  ⟿
+func() T {
+    _arilNew := T{ … }
+    <guarded check of P, fields → _arilNew.<field>>
+    return _arilNew
+}()
+```
+
+**Method exit.** A **class** additionally checks each invariant at every
+non-static method exit — the mutation boundary, where a transiently-broken
 invariant (e.g. `size <= capacity` while an insert outruns the eviction that
 restores it) must hold again. Each non-static method lowers with a `defer` that
-runs the guarded check on every return path; the predicate's bare field names
-lower through the implicit receiver to `t.<field>`, so the check reads the
+runs the guarded check on every return path; the predicate's field names lower
+through the implicit receiver to `t.<field>`, so the check reads the
 post-mutation state:
 
 ```
@@ -897,18 +921,16 @@ func (t *C) m(…) R { <body> }
 func (t *C) m(…) R {
     defer func() {
         if r := recover(); r != nil { panic(r) }   // skip on a panic-in-progress
-        <guarded check of P>                         // invariant (method exit)
+        <guarded check of P, fields → t.<field>>     // invariant (method exit)
     }()
     <body>
 }
 ```
 
-The guarded check is the same `_arilInContract` re-entrancy form as
-requires/ensures, with `<kind>` = `invariant` and `<fn>` = the class name; the
-`//line` at the predicate maps blame to the invariant's `.aril` source (D10).
-A **static** method has no receiver and is not checked here — construction-time
-checking (and record-type invariants, which have no methods) follow in a later
-slice. Under `off`, nothing is emitted (byte-identical).
+A **static** method has no receiver and gets no method-exit check (only the
+construction IIFE around its returned literal). Rejecting a direct external
+field write that could break an invariant between checkpoints (E1106) is a
+later slice.
 
 ## Generics
 

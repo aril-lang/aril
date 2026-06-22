@@ -179,11 +179,7 @@ func (g *gen) emitMethodInvariants(className string) error {
 	if g.contractMode != "panic" || g.info == nil {
 		return nil
 	}
-	cd := g.classByName(className)
-	if cd == nil {
-		return nil
-	}
-	preds := g.info.TypeInvariants[cd]
+	preds := g.info.TypeInvariants[className]
 	if len(preds) == 0 {
 		return nil
 	}
@@ -209,12 +205,29 @@ func (g *gen) emitMethodInvariants(className string) error {
 	return nil
 }
 
-// classByName returns the ClassDecl with the given Aril name, or nil. Used to
-// key the TypeInvariants side-table from a method's class name.
-func (g *gen) classByName(name string) *ast.ClassDecl {
-	for cd := range g.info.TypeInvariants {
-		if cd.Name == name {
-			return cd
+// constructionInvariants returns the type invariants to check at a brace
+// literal of the named type (nil unless --contracts=panic and the type
+// carries invariants). The construction site is the only checkpoint for a
+// record (no methods); for a class it complements the method-exit checks,
+// catching an object that is built but never subsequently method-called.
+func (g *gen) constructionInvariants(name string) []ast.Expr {
+	if g.contractMode != "panic" || g.info == nil {
+		return nil
+	}
+	return g.info.TypeInvariants[name]
+}
+
+// emitConstructionInvariants emits the guarded invariant checks for a
+// construction temp (the brace literal already bound to `_arilNew`), reading
+// the freshly-built value's fields. The predicate's field names lower against
+// the construction temp via contractReceiver.
+func (g *gen) emitConstructionInvariants(name string, preds []ast.Expr) error {
+	prev := g.contractReceiver
+	g.contractReceiver = "_arilNew"
+	defer func() { g.contractReceiver = prev }()
+	for _, pred := range preds {
+		if err := g.emitContractCheck(pred, "invariant", name); err != nil {
+			return err
 		}
 	}
 	return nil

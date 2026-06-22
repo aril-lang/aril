@@ -37,14 +37,16 @@ type Info struct {
 	// contract (or whose contract carries only loop sections).
 	FuncContracts map[*ast.FuncDecl]*FuncContract
 
-	// TypeInvariants maps a ClassDecl to the resolved, type-checked
-	// top-level `invariant` predicates its `contract <Type> { invariant … }`
-	// attaches (RFC-0006). The predicates resolve in the class's member
-	// scope (bare field names via the implicit receiver). Codegen lowers
-	// each to a method-exit check on every non-static method (the mutation
-	// boundary). Construction-time checking and record-type invariants
-	// follow in a later slice. Absent for a class with no invariant.
-	TypeInvariants map[*ast.ClassDecl][]ast.Expr
+	// TypeInvariants maps a type name (class or record) to the resolved,
+	// type-checked top-level `invariant` predicates its
+	// `contract <Type> { invariant … }` attaches (RFC-0006). The predicates
+	// resolve in the type's field scope (bare field names → SymField).
+	// Codegen lowers each to a check at every brace-literal construction
+	// site, and — for a class — at every non-static method exit (the
+	// mutation boundary). Keyed by name (unique per package, D27) so both
+	// kinds and both checkpoints share one lookup. Absent for a type with no
+	// invariant.
+	TypeInvariants map[string][]ast.Expr
 }
 
 // FuncContract is a function's resolved requires/ensures/entry obligations.
@@ -67,6 +69,6 @@ func newInfo() *Info {
 		Def:            map[ast.Node]*Symbol{},
 		LoopInvariants: map[ast.Stmt][]ast.Expr{},
 		FuncContracts:  map[*ast.FuncDecl]*FuncContract{},
-		TypeInvariants: map[*ast.ClassDecl][]ast.Expr{},
+		TypeInvariants: map[string][]ast.Expr{},
 	}
 }

@@ -117,6 +117,9 @@ func (c *checker) resolveTypeDecl(t *ast.TypeDecl, parent *Scope) {
 		for _, f := range b.Fields {
 			c.resolveTypeExpr(f.DeclType, scope)
 		}
+		// Bind a `contract <Record> { invariant … }`'s predicate fields in a
+		// synthetic field scope (RFC-0006 type invariants on records).
+		c.resolveRecordInvariants(t, b, scope)
 	}
 }
 
