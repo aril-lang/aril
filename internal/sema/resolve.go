@@ -164,6 +164,10 @@ func (c *checker) resolveClassDecl(cd *ast.ClassDecl, parent *Scope) {
 	for _, m := range cd.Methods {
 		c.resolveMethod(cd, m, classScope, memberScope)
 	}
+	// Bind a `contract <Class> { invariant … }`'s predicates in member
+	// scope (RFC-0006 type invariants) — after the members exist, so a
+	// bare field name resolves to its SymField.
+	c.resolveTypeInvariants(cd, memberScope)
 }
 
 func (c *checker) resolveMethod(cd *ast.ClassDecl, m *ast.Method, classScope, memberScope *Scope) {

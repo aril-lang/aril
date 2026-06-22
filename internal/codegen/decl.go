@@ -286,6 +286,15 @@ func (g *gen) emitMethod(className string, classTypeParams []string, m *ast.Meth
 	}
 	g.b.WriteString(" {\n")
 	g.indent++
+	// Type invariants (RFC-0006) check at every method exit, on the
+	// post-mutation receiver — emitted as a defer before the body. Static
+	// methods have no receiver and are skipped (construction-time checking
+	// is a later slice).
+	if !m.IsStatic {
+		if err := g.emitMethodInvariants(className); err != nil {
+			return err
+		}
+	}
 	prevRet := g.curFuncReturn
 	g.curFuncReturn = m.ReturnType
 	if err := g.emitFuncBody(m.Body, m.ReturnType, isUnitReturn(m.ReturnType)); err != nil {

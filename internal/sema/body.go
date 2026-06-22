@@ -54,6 +54,11 @@ func (c *checker) checkBodies(f *ast.File) {
 				}
 				c.checkBlock(m.Body)
 			}
+			// Type-invariant predicates type against the receiver, like a
+			// method body (RFC-0006). curThis is the class while inferring.
+			c.curThis = &Named{N: v.Name, Decl: v}
+			c.checkTypeInvariants(v)
+			c.curThis = nil
 		}
 	}
 }

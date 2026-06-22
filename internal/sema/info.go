@@ -36,6 +36,15 @@ type Info struct {
 	// `ensures` to a deferred post-check. Absent for a function with no
 	// contract (or whose contract carries only loop sections).
 	FuncContracts map[*ast.FuncDecl]*FuncContract
+
+	// TypeInvariants maps a ClassDecl to the resolved, type-checked
+	// top-level `invariant` predicates its `contract <Type> { invariant … }`
+	// attaches (RFC-0006). The predicates resolve in the class's member
+	// scope (bare field names via the implicit receiver). Codegen lowers
+	// each to a method-exit check on every non-static method (the mutation
+	// boundary). Construction-time checking and record-type invariants
+	// follow in a later slice. Absent for a class with no invariant.
+	TypeInvariants map[*ast.ClassDecl][]ast.Expr
 }
 
 // FuncContract is a function's resolved requires/ensures/entry obligations.
@@ -58,5 +67,6 @@ func newInfo() *Info {
 		Def:            map[ast.Node]*Symbol{},
 		LoopInvariants: map[ast.Stmt][]ast.Expr{},
 		FuncContracts:  map[*ast.FuncDecl]*FuncContract{},
+		TypeInvariants: map[*ast.ClassDecl][]ast.Expr{},
 	}
 }
