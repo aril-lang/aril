@@ -166,6 +166,60 @@ func (g *gen) emitContractCheck(pred ast.Expr, kind, fnName string) error {
 	return nil
 }
 
+// emitMethodInvariants lowers a class's type invariants (RFC-0006) to a
+// method-exit check, emitted as a `defer` at the top of every non-static
+// method body so it runs on each return path (the mutation boundary). The
+// recover-rethrow preamble keeps a panic-in-progress from being masked; each
+// predicate then runs through the re-entrancy-guarded check. The invariant's
+// field names lower to `t.<field>` (implicit receiver), so the check reads
+// the post-mutation state. Under off (the default) nothing is emitted —
+// byte-identical lowering. A static method (no receiver) is skipped here;
+// construction-time checking is a later slice.
+func (g *gen) emitMethodInvariants(className string) error {
+	if g.contractMode != "panic" || g.info == nil {
+		return nil
+	}
+	cd := g.classByName(className)
+	if cd == nil {
+		return nil
+	}
+	preds := g.info.TypeInvariants[cd]
+	if len(preds) == 0 {
+		return nil
+	}
+	g.writeIndent()
+	g.b.WriteString("defer func() {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("if r := recover(); r != nil {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("panic(r)\n")
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	for _, pred := range preds {
+		if err := g.emitContractCheck(pred, "invariant", className); err != nil {
+			return err
+		}
+	}
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}()\n")
+	return nil
+}
+
+// classByName returns the ClassDecl with the given Aril name, or nil. Used to
+// key the TypeInvariants side-table from a method's class name.
+func (g *gen) classByName(name string) *ast.ClassDecl {
+	for cd := range g.info.TypeInvariants {
+		if cd.Name == name {
+			return cd
+		}
+	}
+	return nil
+}
+
 // loopLabel returns the contract label of a for/while loop ("" if none).
 func loopLabel(loop ast.Stmt) string {
 	switch v := loop.(type) {

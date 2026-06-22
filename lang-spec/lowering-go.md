@@ -878,8 +878,37 @@ inert in v1: sequential Aril has no source-reachable panic recovery, so a
 predicate panic aborts the process (no continuation can observe a stuck flag).
 Under `off`, none of this is emitted (byte-identical).
 `warn` / `stats` modes and the `arilrt` violation-rendering layer (richer blame,
-mode tally) are not lowered yet; type-invariant lowering follows in a later
-slice.
+mode tally) are not lowered yet.
+
+### Type invariants — method exit (RFC-0006)
+
+A class carrying a `contract <Class> { invariant P }` checks each invariant at
+**every method exit** — the mutation boundary, where a transiently-broken
+invariant (e.g. `size <= capacity` while an insert outruns the eviction that
+restores it) must hold again. Each non-static method lowers with a `defer` that
+runs the guarded check on every return path; the predicate's bare field names
+lower through the implicit receiver to `t.<field>`, so the check reads the
+post-mutation state:
+
+```
+class C { … }   with invariant P            (m is a non-static method)
+func (t *C) m(…) R { <body> }
+  ⟿
+func (t *C) m(…) R {
+    defer func() {
+        if r := recover(); r != nil { panic(r) }   // skip on a panic-in-progress
+        <guarded check of P>                         // invariant (method exit)
+    }()
+    <body>
+}
+```
+
+The guarded check is the same `_arilInContract` re-entrancy form as
+requires/ensures, with `<kind>` = `invariant` and `<fn>` = the class name; the
+`//line` at the predicate maps blame to the invariant's `.aril` source (D10).
+A **static** method has no receiver and is not checked here — construction-time
+checking (and record-type invariants, which have no methods) follow in a later
+slice. Under `off`, nothing is emitted (byte-identical).
 
 ## Generics
 

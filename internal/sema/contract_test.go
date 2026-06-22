@@ -203,3 +203,45 @@ contract check {
 		t.Errorf("want E0103 (result unbound on a unit function), got %v", codes)
 	}
 }
+
+// TestTypeInvariantChecked: a class invariant binds its fields in member scope,
+// types as bool, and is recorded on Info.TypeInvariants with no diagnostics.
+func TestTypeInvariantChecked(t *testing.T) {
+	info, codes := checkContract(t, `class Counter {
+  var n: int
+  static new(): Counter { return Counter{ n: 0 } }
+  bump() { n = n + 1 }
+}
+
+contract Counter {
+  invariant n >= 0
+}
+`)
+	if len(codes) != 0 {
+		t.Fatalf("clean type invariant produced diags: %v", codes)
+	}
+	if len(info.TypeInvariants) != 1 {
+		t.Fatalf("expected 1 class with invariants recorded, got %d", len(info.TypeInvariants))
+	}
+	for _, preds := range info.TypeInvariants {
+		if len(preds) != 1 {
+			t.Errorf("expected 1 invariant predicate, got %d", len(preds))
+		}
+	}
+}
+
+// TestTypeInvariantNonBool: a non-bool class invariant predicate is E1102.
+func TestTypeInvariantNonBool(t *testing.T) {
+	_, codes := checkContract(t, `class Counter {
+  var n: int
+  static new(): Counter { return Counter{ n: 0 } }
+}
+
+contract Counter {
+  invariant n
+}
+`)
+	if !hasCode(codes, "E1102") {
+		t.Errorf("want E1102 for a non-bool type invariant, got %v", codes)
+	}
+}

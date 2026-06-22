@@ -201,6 +201,43 @@ func (c *checker) checkFuncContract(fn *ast.FuncDecl) {
 	}
 }
 
+// resolveTypeInvariants binds the names in a class contract's top-level
+// `invariant` predicates against the class member scope — where the fields
+// are visible by bare name through the implicit receiver (RFC-0006 type
+// invariants). Called from resolveClassDecl after the member symbols exist,
+// so a predicate field reference resolves to its SymField (and codegen then
+// lowers it to `t.<field>`). Loop sections / record-type targets are handled
+// elsewhere; only top-level `invariant` clauses are bound here.
+func (c *checker) resolveTypeInvariants(cd *ast.ClassDecl, memberScope *Scope) {
+	cdc := c.contractByTarget[cd.Name]
+	if cdc == nil {
+		return
+	}
+	for _, cl := range cdc.Clauses {
+		if cl.Kind == "invariant" {
+			c.resolveExpr(cl.Pred, memberScope)
+		}
+	}
+}
+
+// checkTypeInvariants infers each top-level class `invariant` predicate,
+// requires it to be `bool` (E1102), and records the obligations on
+// Info.TypeInvariants for codegen. Called from the check pass with curThis
+// set to the class (so a bare field reference types through the receiver).
+func (c *checker) checkTypeInvariants(cd *ast.ClassDecl) {
+	cdc := c.contractByTarget[cd.Name]
+	if cdc == nil {
+		return
+	}
+	for _, cl := range cdc.Clauses {
+		if cl.Kind != "invariant" {
+			continue
+		}
+		c.requireBoolPredicate(cl.Pred)
+		c.info.TypeInvariants[cd] = append(c.info.TypeInvariants[cd], cl.Pred)
+	}
+}
+
 // requireBoolPredicate infers a predicate and reports E1102 if it is neither
 // `bool` nor (already-failed) Unknown.
 func (c *checker) requireBoolPredicate(pred ast.Expr) {

@@ -107,3 +107,49 @@ contract dbl {
 		t.Errorf("off-mode emit must not lower the contract:\n%s", off)
 	}
 }
+
+// TestEmitTypeInvariant: a class invariant lowers to a method-exit `defer`
+// guarded check on every non-static method (the predicate reading the
+// post-mutation receiver `t.<field>`); a static method is not checked; off
+// emits nothing.
+func TestEmitTypeInvariant(t *testing.T) {
+	src := `class Counter {
+  var n: int
+  static new(): Counter { return Counter{ n: 0 } }
+  bump() { n = n + 1 }
+}
+
+contract Counter {
+  invariant n >= 0
+}
+`
+	got := emitContract(t, src, "panic")
+	for _, want := range []string{
+		"func (t *Counter) bump()", // the mutating method
+		"defer func()",             // method-exit defer
+		"if r := recover()",        // recover-rethrow guard
+		"if !_arilInContract {",    // re-entrancy guard
+		"t.N >= 0",                 // bare field via implicit receiver
+		"invariant violated (Counter)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("panic-mode emit missing %q:\n%s", want, got)
+		}
+	}
+	// The static factory has no receiver and is not invariant-checked: its
+	// body must carry no defer/guard.
+	staticIdx := strings.Index(got, "func counterNew()")
+	bumpIdx := strings.Index(got, "func (t *Counter) bump()")
+	if staticIdx < 0 || bumpIdx < 0 {
+		t.Fatalf("expected both the static factory and bump in the emit:\n%s", got)
+	}
+	staticBody := got[staticIdx:bumpIdx]
+	if strings.Contains(staticBody, "_arilInContract") || strings.Contains(staticBody, "invariant violated") {
+		t.Errorf("static method must not be invariant-checked:\n%s", staticBody)
+	}
+
+	off := emitContract(t, src, "off")
+	if strings.Contains(off, "_arilInContract") || strings.Contains(off, "invariant violated") {
+		t.Errorf("off-mode emit must not lower the invariant:\n%s", off)
+	}
+}

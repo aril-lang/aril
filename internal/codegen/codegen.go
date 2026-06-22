@@ -274,7 +274,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// checks are disabled while a predicate is being evaluated. v1 is a
 	// package-level flag (single-threaded contract checking; a goroutine-
 	// local form is future work).
-	if g.contractMode == "panic" && len(g.info.FuncContracts) > 0 {
+	if g.contractMode == "panic" && (len(g.info.FuncContracts) > 0 || len(g.info.TypeInvariants) > 0) {
 		g.b.WriteString("var _arilInContract bool\n\n")
 	}
 	for _, d := range f.Decls {
