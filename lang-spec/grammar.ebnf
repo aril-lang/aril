@@ -269,20 +269,33 @@ Decl         = FuncDecl
 
 // Separable contract surface (RFC-0006 / RFC-0007). A `contract` or
 // `channel` block attaches obligations to a named declaration without
-// touching its body. `contract`/`channel` are contextual: keywords only
-// at the head of a top-level block (`contract <name> {` / `channel
-// <name> {`); ordinary identifiers everywhere else (keywords.md).
-//
-// CONTRACTS-IMPL bootstrap: the *body* grammar (requires/ensures/
-// invariant, loop sections, channel/protocol clauses, fan-out, fairness)
-// is deferred to the enforcement PRs of this epoch; until then the block
-// is recognized at the top level and **skipped** — consumed without an
-// AST node, so a program with contracts lowers byte-identically to the
-// same program without them (the `--contracts=off` ignore level). The
-// inner productions land paired with `internal/contract` + codegen.
-ContractBlock = ( "contract" | "channel" ) Ident "{" ContractBody "}" ;
-ContractBody  = (* deferred to CONTRACTS-IMPL; bootstrap skips a
-                   balanced brace body *) ;
+// touching its body. `contract`/`channel`/`requires`/`ensures`/`invariant`/
+// `loop` are contextual: keywords only in these positions; ordinary
+// identifiers everywhere else (keywords.md). The clause keyword set is
+// recognized by lexeme inside the block.
+ContractBlock  = ContractDecl | ChannelBlock ;
+
+// Value/state contracts (RFC-0006) — parsed into File.Contracts (ast.md).
+// A predicate is an ordinary boolean Expr evaluated in the target's scope,
+// extended with `result`/`old(e)` (their meaning is assigned by the
+// contract pass, not the grammar — at parse time they are plain
+// identifiers/calls). A `loop <label>` section's invariants attach to the
+// like-named labelled loop in the target's body (LoopLabel).
+ContractDecl   = "contract" Ident "{" ContractClause* "}" ;
+ContractClause = ( "requires" | "ensures" | "invariant" ) Expr
+               | LoopContract ;
+LoopContract   = "loop" Ident "{" ( "invariant" Expr )* "}" ;
+
+// Channel trace contracts (RFC-0007). Recognized at the top level but the
+// clause grammar (closed-by / forbid / eventually / delivered-to-all /
+// fairness …) lands with the channel-contract epoch; until then the body is
+// **skipped** — consumed as a balanced brace blob, byte-identical lowering.
+ChannelBlock   = "channel" Ident "{" (* deferred to RFC-0007 impl; skipped *) "}" ;
+
+// Codegen elides contracts under `--contracts=off` (the default during the
+// build-out), so a program with contracts still lowers byte-identically;
+// enforcement (entry/exit/per-iteration checks) lands with the contract
+// pass + codegen lowering.
 
 TopLevelLet  = "let" Ident ( ":" TypeExpr )? "=" Expr ;
                           // `var` is intentionally not legal at the

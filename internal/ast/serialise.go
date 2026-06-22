@@ -47,6 +47,18 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteByte('\n')
 			write(b, d, depth+1)
 		}
+		for _, c := range v.Contracts {
+			b.WriteByte('\n')
+			write(b, c, depth+1)
+		}
+	case *ContractDecl:
+		b.WriteByte(' ')
+		writeQuoted(b, v.Target)
+		writeSpan(b, v.Span)
+		for _, cl := range v.Clauses {
+			b.WriteByte('\n')
+			writeContractClause(b, cl, depth+1)
+		}
 	case *Import:
 		b.WriteByte(' ')
 		writeQuoted(b, v.Path)
@@ -842,6 +854,30 @@ func writeIndent(b *strings.Builder, depth int) {
 
 func writeSpan(b *strings.Builder, s Span) {
 	fmt.Fprintf(b, " @%d:%d-%d:%d", s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+}
+
+// writeContractClause renders one ContractClause: `(requires <pred>)`,
+// `(ensures <pred>)`, `(invariant <pred>)`, or a `(loop "label" …)` section
+// holding nested invariant clauses.
+func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
+	writeIndent(b, depth)
+	b.WriteByte('(')
+	b.WriteString(cl.Kind)
+	if cl.Kind == "loop" {
+		b.WriteByte(' ')
+		writeQuoted(b, cl.Label)
+		writeSpan(b, cl.Span)
+		for _, inv := range cl.Loop {
+			b.WriteByte('\n')
+			writeContractClause(b, inv, depth+1)
+		}
+		b.WriteByte(')')
+		return
+	}
+	writeSpan(b, cl.Span)
+	b.WriteByte('\n')
+	write(b, cl.Pred, depth+1)
+	b.WriteByte(')')
 }
 
 // writeGoRef emits a `@go(...)` attribute as `(go "raw")`, or the empty

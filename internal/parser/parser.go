@@ -259,15 +259,21 @@ func (p *parser) parseFile() (*ast.File, *Diag) {
 	}
 	// Then declarations.
 	for !p.at(lexer.KindEOF) {
-		// CONTRACTS-IMPL bootstrap (`--contracts=off` ignore level):
-		// a top-level separable `contract <name> { … }` / `channel
-		// <name> { … }` block is recognized and *skipped* — consumed
-		// without producing an AST node, so codegen is byte-identical
-		// to the same program without the block (RFC-0006 §Transition,
-		// golden-fixture safe). The enforcement pipeline replaces this
-		// skip with real parsing later in the epoch.
+		// Separable contract surface. A `contract <name> { … }` block
+		// (RFC-0006 value/state) is parsed into a ContractDecl on
+		// File.Contracts — kept out of Decls, so codegen/sema (which
+		// iterate Decls) still lower byte-identically until the contract
+		// pass consumes it. A `channel <name> { … }` block (RFC-0007
+		// trace contracts) is still *skipped* — its clause grammar lands
+		// with the channel-contract epoch.
 		if p.atContractBlock() {
-			if err := p.skipContractBlock(); err != nil {
+			if p.at(lexer.KindIdent, "contract") {
+				cd, err := p.parseContractDecl()
+				if err != nil {
+					return nil, err
+				}
+				f.Contracts = append(f.Contracts, cd)
+			} else if err := p.skipContractBlock(); err != nil {
 				return nil, err
 			}
 			p.skipNewlines()

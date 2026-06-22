@@ -1,5 +1,5 @@
 --- TITLE ---
-ContractBlock — a top-level `contract`/`channel` block is skipped (CONTRACTS-IMPL bootstrap); AST identical to the bare declaration
+ContractBlock — a `contract` block parses into File.Contracts (requires/ensures); a `channel` block is still skipped (RFC-0007 deferred)
 
 --- INPUT ---
 func abs(x: int): int {
@@ -28,4 +28,11 @@ channel results {
     (Block @1:23-3:2
       (ExprStmt @2:3-2:11
         (ReturnExpr @2:3-2:11
-          (Ident "x" @2:10-2:11))))))
+          (Ident "x" @2:10-2:11)))))
+  (ContractDecl "abs" @5:1-8:2
+    (requires @6:3-6:16
+      (BoolLitExpr true @6:12-6:16))
+    (ensures @7:3-7:22
+      (Binary ">=" @7:11-7:22
+        (Ident "result" @7:11-7:17)
+        (IntLitExpr 0 @7:21-7:22)))))

@@ -22,13 +22,40 @@ type Node interface {
 
 // File is the root of a single .aril source file.
 type File struct {
-	Span    Span
-	Imports []*Import
-	Decls   []Decl
+	Span      Span
+	Imports   []*Import
+	Decls     []Decl
+	Contracts []*ContractDecl
 }
 
 func (n *File) NodeSpan() Span   { return n.Span }
 func (n *File) NodeKind() string { return "File" }
+
+// ContractDecl is a separable contract block — `contract <target> { … }`
+// (RFC-0006) — attaching value/state obligations to a declaration by name.
+// It lives in File.Contracts, *not* File.Decls: codegen and sema iterate
+// Decls, so a contract is purely additive (byte-identical lowering, no
+// type-check) until the contract pass and codegen lowering consume it.
+type ContractDecl struct {
+	Span    Span
+	Target  string // the named declaration this attaches to
+	Clauses []ContractClause
+}
+
+func (n *ContractDecl) NodeSpan() Span   { return n.Span }
+func (n *ContractDecl) NodeKind() string { return "ContractDecl" }
+
+// ContractClause is one obligation inside a ContractDecl. Kind is one of
+// "requires" | "ensures" | "invariant" (the predicate is in Pred), or
+// "loop" — a per-iteration section where Label names the target loop and
+// Loop holds its `invariant` clauses (Pred is then nil). RFC-0006.
+type ContractClause struct {
+	Span  Span
+	Kind  string
+	Pred  Expr             // the predicate; nil when Kind == "loop"
+	Label string           // the loop label; set only when Kind == "loop"
+	Loop  []ContractClause // nested invariant clauses; set only when Kind == "loop"
+}
 
 // Import is a single `import <path>` line.
 type Import struct {
