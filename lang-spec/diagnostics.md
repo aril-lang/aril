@@ -173,7 +173,7 @@ allocated for the clauses landing in later slices of the contract epoch.
 | E1103 | E | reserved — impure contract predicate | RFC-0006 §"Predicate language" | reserved (predicate purity check, a later slice). |
 | E1104 | E | reserved — `result` outside `ensures` | RFC-0006 §"Predicate language" | reserved. |
 | E1105 | E | reserved — impure `entry`-section binding expression | RFC-0006 §"Predicate language" | reserved. |
-| E1106 | E | External field write to an invariant type | RFC-0006 §Surface (type invariants) / `type-system.md` T-Contract-Pred | A direct field write `recv.field = v` whose `recv` is an invariant-bearing type, from outside that type's own methods, bypasses the invariant (re-checked only at method exit). Mutate through a method instead. The sole legal field write to such a type is its own receiver — a bare `field = v` or `this.field = v` inside its method. |
+| E1106 | E | External field write to an invariant type | RFC-0006 §Surface (type invariants) | A direct field write `recv.field = v` whose `recv` is an invariant-bearing type, from outside that type's own methods, bypasses the invariant (re-checked only at method exit). Mutate through a method instead. The sole legal field write to such a type is its own receiver — a bare `field = v` or `this.field = v` inside its method. |
 
 ## Diagnostic formatting
 
