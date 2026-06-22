@@ -135,4 +135,8 @@ func main() {
 contract LRU {
   invariant size >= 0
   invariant size <= capacity
+  // The counter and the index never drift apart — the cross-field
+  // consistency invariant that catches the classic "I bumped one but not
+  // the other" bug. Holds at every method exit (put/evictTail move both).
+  invariant size == index.len()
 }
