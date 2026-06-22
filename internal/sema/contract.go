@@ -28,7 +28,6 @@ func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope
 				continue
 			}
 			c.contractByTarget[cd.Target] = cd
-			c.checkLoopSectionLabels(cd, sym)
 		}
 	}
 }
@@ -38,69 +37,40 @@ func isContractTarget(k SymKind) bool {
 	return k == SymFunc || k == SymTypeDecl || k == SymClass || k == SymInterface
 }
 
-// checkLoopSectionLabels reports E1101 for any `loop <label>` section whose
-// label has no matching labelled loop in the target function's body.
-func (c *checker) checkLoopSectionLabels(cd *ast.ContractDecl, sym *Symbol) {
-	var labels map[string]bool
-	if fn, ok := sym.Decl.(*ast.FuncDecl); ok && fn.Body != nil {
-		labels = map[string]bool{}
-		collectLoopLabels(fn.Body, labels)
-	}
-	for _, cl := range cd.Clauses {
-		if cl.Kind != "loop" {
-			continue
-		}
-		if !labels[cl.Label] {
-			c.report("E1101",
-				"contract loop section names `"+cl.Label+"` but the target has no `loop "+cl.Label+"`",
-				cl.Span)
-		}
-	}
-}
-
-// collectLoopLabels gathers the labels of every labelled for/while loop
-// reachable through block-bearing statements (block, if, for, while bodies).
-func collectLoopLabels(b *ast.Block, out map[string]bool) {
-	if b == nil {
-		return
-	}
-	for _, s := range b.Stmts {
-		switch v := s.(type) {
-		case *ast.ForStmt:
-			if v.Label != "" {
-				out[v.Label] = true
-			}
-			collectLoopLabels(v.Body, out)
-		case *ast.WhileStmt:
-			if v.Label != "" {
-				out[v.Label] = true
-			}
-			collectLoopLabels(v.Body, out)
-		case *ast.IfStmt:
-			collectLoopLabels(v.ThenBlock, out)
-			switch e := v.Else.(type) {
-			case *ast.IfStmt:
-				collectLoopLabels(&ast.Block{Stmts: []ast.Stmt{e}}, out)
-			case *ast.Block:
-				collectLoopLabels(e, out)
-			}
-		}
-	}
-}
-
 // resolveLoopInvariants binds the names in the matching loop section's
 // invariant predicates against `scope` — the loop's body scope, where the
 // loop variable and the enclosing locals are visible. Called from the
-// resolve pass at the labelled loop.
+// resolve pass at every labelled loop, which records the label as matched so
+// reportUnmatchedLoopSections can flag a section naming a loop that does not
+// exist. Driving this off the resolve walk (rather than a separate collector)
+// means every loop is seen — including those nested in match / scope / select
+// bodies — so no real loop is mistaken for missing.
 func (c *checker) resolveLoopInvariants(label string, scope *Scope) {
 	if c.curContract == nil || label == "" {
 		return
 	}
 	for _, cl := range c.curContract.Clauses {
 		if cl.Kind == "loop" && cl.Label == label {
+			c.matchedLoopLabels[label] = true
 			for _, inv := range cl.Loop {
 				c.resolveExpr(inv.Pred, scope)
 			}
+		}
+	}
+}
+
+// reportUnmatchedLoopSections flags each `loop <label>` section of the current
+// contract whose label was not matched by any labelled loop in the body
+// (E1101). Called after the target function's body has been resolved.
+func (c *checker) reportUnmatchedLoopSections() {
+	if c.curContract == nil {
+		return
+	}
+	for _, cl := range c.curContract.Clauses {
+		if cl.Kind == "loop" && !c.matchedLoopLabels[cl.Label] {
+			c.report("E1101",
+				"contract loop section names `"+cl.Label+"` but the target has no `loop "+cl.Label+"`",
+				cl.Span)
 		}
 	}
 }

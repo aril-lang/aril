@@ -109,3 +109,28 @@ contract nope {
 		t.Errorf("want E1101 for an unknown contract target, got %v", codes)
 	}
 }
+
+// TestLoopInvariantNestedInIf: a labelled loop nested in an `if` is matched
+// by the resolve walk (no false E1101) — guards the match/scope/select
+// robustness fix (the walk visits every loop, not a partial collector).
+func TestLoopInvariantNestedInIf(t *testing.T) {
+	_, codes := checkContract(t, `func run(xs: []int): int {
+  var acc = 0
+  if xs.len() > 0 {
+    for i in 0..xs.len() loop scan {
+      acc = acc + xs[i]
+    }
+  }
+  return acc
+}
+
+contract run {
+  loop scan {
+    invariant acc >= 0
+  }
+}
+`)
+	if len(codes) != 0 {
+		t.Errorf("nested labelled loop should match (no E1101); got %v", codes)
+	}
+}

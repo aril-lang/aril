@@ -81,6 +81,10 @@ type checker struct {
 	// body is being resolved/checked, or nil.
 	contractByTarget map[string]*ast.ContractDecl
 	curContract      *ast.ContractDecl
+	// matchedLoopLabels tracks which of curContract's loop-section labels
+	// the resolve walk has matched against a real labelled loop, so an
+	// unmatched section can be flagged (E1101). Reset per function.
+	matchedLoopLabels map[string]bool
 }
 
 func (c *checker) report(code, message string, span ast.Span) {
