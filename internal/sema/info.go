@@ -29,6 +29,26 @@ type Info struct {
 	// (RFC-0006). Codegen lowers each to a per-iteration check. Absent for
 	// a loop with no contract.
 	LoopInvariants map[ast.Stmt][]ast.Expr
+
+	// FuncContracts maps a FuncDecl to its resolved, type-checked
+	// requires/ensures/entry obligations (RFC-0006). Codegen lowers
+	// `requires` to an entry check, `entry` bindings to entry temps, and
+	// `ensures` to a deferred post-check. Absent for a function with no
+	// contract (or whose contract carries only loop sections).
+	FuncContracts map[*ast.FuncDecl]*FuncContract
+}
+
+// FuncContract is a function's resolved requires/ensures/entry obligations.
+type FuncContract struct {
+	Requires []ast.Expr     // precondition predicates (param scope)
+	Ensures  []ast.Expr     // postcondition predicates (params + entry + result)
+	Entries  []EntryBinding // entry snapshots, in source order
+}
+
+// EntryBinding is one `entry { let Name = Value }` snapshot (RFC-0006).
+type EntryBinding struct {
+	Name  string
+	Value ast.Expr
 }
 
 func newInfo() *Info {
@@ -37,5 +57,6 @@ func newInfo() *Info {
 		Type:           map[ast.Expr]Type{},
 		Def:            map[ast.Node]*Symbol{},
 		LoopInvariants: map[ast.Stmt][]ast.Expr{},
+		FuncContracts:  map[*ast.FuncDecl]*FuncContract{},
 	}
 }

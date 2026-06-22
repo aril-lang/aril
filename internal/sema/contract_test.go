@@ -134,3 +134,42 @@ contract run {
 		t.Errorf("nested labelled loop should match (no E1101); got %v", codes)
 	}
 }
+
+// TestEnsuresChecked: requires/ensures/entry resolve+type-check and land on
+// Info.FuncContracts; `result` and entry names resolve; a non-bool ensures is
+// E1102.
+func TestEnsuresChecked(t *testing.T) {
+	info, codes := checkContract(t, `func dbl(x: int): int { return x + x }
+
+contract dbl {
+  requires x >= 0
+  entry { let x0 = x }
+  ensures result == x0 + x0
+}
+`)
+	if len(codes) != 0 {
+		t.Fatalf("clean contract produced diags: %v", codes)
+	}
+	fcs := info.FuncContracts
+	if len(fcs) != 1 {
+		t.Fatalf("expected 1 FuncContract recorded, got %d", len(fcs))
+	}
+	for _, fc := range fcs {
+		if len(fc.Requires) != 1 || len(fc.Ensures) != 1 || len(fc.Entries) != 1 {
+			t.Errorf("fc = %+v, want 1 requires/ensures/entry each", fc)
+		}
+	}
+}
+
+// TestEnsuresNonBool: a non-bool ensures predicate is E1102.
+func TestEnsuresNonBool(t *testing.T) {
+	_, codes := checkContract(t, `func f(x: int): int { return x }
+
+contract f {
+  ensures result
+}
+`)
+	if !hasCode(codes, "E1102") {
+		t.Errorf("want E1102 for a non-bool ensures, got %v", codes)
+	}
+}

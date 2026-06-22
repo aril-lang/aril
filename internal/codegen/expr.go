@@ -365,6 +365,18 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		g.b.WriteString("t")
 		return nil
 	case *ast.Ident:
+		// Inside an emitted contract predicate (RFC-0006): `result` is the
+		// function's return value (the Go named return `_arilRet`), and an
+		// entry-binding name resolves to its entry temp. Set while emitting
+		// requires/ensures; empty elsewhere.
+		if g.contractResultVar != "" && v.Name == "result" {
+			g.b.WriteString(g.contractResultVar)
+			return nil
+		}
+		if ev, ok := g.contractEntryVars[v.Name]; ok {
+			g.b.WriteString(ev)
+			return nil
+		}
 		// Variant identifiers (declared in any sum type in the
 		// same file) get qualified to their Go-side variable:
 		// `Red` → `ColorRed`.

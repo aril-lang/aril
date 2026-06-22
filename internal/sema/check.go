@@ -85,6 +85,10 @@ type checker struct {
 	// the resolve walk has matched against a real labelled loop, so an
 	// unmatched section can be flagged (E1101). Reset per function.
 	matchedLoopLabels map[string]bool
+	// contractEntrySyms carries a function's `entry { let … }` binding
+	// symbols from the resolve pass to the check pass (where their types
+	// are set from the inferred binding values).
+	contractEntrySyms map[*ast.FuncDecl][]*Symbol
 }
 
 func (c *checker) report(code, message string, span ast.Span) {

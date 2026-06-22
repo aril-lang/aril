@@ -221,6 +221,7 @@ func (c *checker) resolveFuncDecl(fn *ast.FuncDecl, parent *Scope) {
 		c.matchedLoopLabels = map[string]bool{}
 		c.resolveBlock(fn.Body, fnScope)
 		c.reportUnmatchedLoopSections()
+		c.resolveFuncContract(fn, fnScope)
 		c.curContract = nil
 	}
 }

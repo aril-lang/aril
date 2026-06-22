@@ -19,6 +19,7 @@ import "github.com/aril-lang/aril/internal/ast"
 // well-formed loop-section labels.
 func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope) {
 	c.contractByTarget = map[string]*ast.ContractDecl{}
+	c.contractEntrySyms = map[*ast.FuncDecl][]*Symbol{}
 	for i, f := range files {
 		c.file = paths[i]
 		for _, cd := range f.Contracts {
@@ -103,4 +104,92 @@ func (c *checker) checkLoopInvariants(loop ast.Stmt, label string) {
 func isUnknownType(t Type) bool {
 	_, ok := t.(*Unknown)
 	return ok
+}
+
+// resolveFuncContract binds the names in the current function's
+// requires/ensures/entry obligations (RFC-0006). `requires` resolves in the
+// param scope; an `entry { let … }` section's values resolve in the param
+// scope and its names are declared in an entry scope; `ensures` resolves in
+// the param scope extended with the entry names and `result` (the return
+// value). Called from the resolve pass after the body is resolved.
+func (c *checker) resolveFuncContract(fn *ast.FuncDecl, fnScope *Scope) {
+	if c.curContract == nil {
+		return
+	}
+	entryScope := newScope(fnScope)
+	var entrySyms []*Symbol
+	for _, cl := range c.curContract.Clauses {
+		if cl.Kind != "entry" {
+			continue
+		}
+		for _, bd := range cl.Bindings {
+			c.resolveExpr(bd.Value, fnScope) // entry value sees params only
+			sym := &Symbol{Name: bd.Name, Kind: SymLocal, Type: &Unknown{}}
+			entryScope.declare(sym)
+			entrySyms = append(entrySyms, sym)
+		}
+	}
+	ensScope := newScope(entryScope)
+	ensScope.declare(&Symbol{Name: "result", Kind: SymLocal, Type: c.typeFromExpr(fn.ReturnType)})
+	for _, cl := range c.curContract.Clauses {
+		switch cl.Kind {
+		case "requires":
+			c.resolveExpr(cl.Pred, fnScope) // precondition: params only
+		case "ensures":
+			c.resolveExpr(cl.Pred, ensScope) // params + entry names + result
+		}
+	}
+	if len(entrySyms) > 0 {
+		c.contractEntrySyms[fn] = entrySyms
+	}
+}
+
+// checkFuncContract infers the function's requires/ensures/entry predicates,
+// requires each predicate to be `bool` (E1102), sets the entry-binding symbol
+// types from the inferred values, and records the obligations on
+// Info.FuncContracts for codegen. Called from the check pass.
+func (c *checker) checkFuncContract(fn *ast.FuncDecl) {
+	if c.curContract == nil {
+		return
+	}
+	fc := &FuncContract{}
+	// Entry bindings first, so their names carry concrete types into the
+	// ensures inference regardless of source order.
+	entrySyms := c.contractEntrySyms[fn]
+	si := 0
+	for _, cl := range c.curContract.Clauses {
+		if cl.Kind != "entry" {
+			continue
+		}
+		for _, bd := range cl.Bindings {
+			t := c.inferExpr(bd.Value)
+			if si < len(entrySyms) {
+				entrySyms[si].Type = t
+				si++
+			}
+			fc.Entries = append(fc.Entries, EntryBinding{Name: bd.Name, Value: bd.Value})
+		}
+	}
+	for _, cl := range c.curContract.Clauses {
+		switch cl.Kind {
+		case "requires":
+			c.requireBoolPredicate(cl.Pred)
+			fc.Requires = append(fc.Requires, cl.Pred)
+		case "ensures":
+			c.requireBoolPredicate(cl.Pred)
+			fc.Ensures = append(fc.Ensures, cl.Pred)
+		}
+	}
+	if len(fc.Requires)+len(fc.Ensures)+len(fc.Entries) > 0 {
+		c.info.FuncContracts[fn] = fc
+	}
+}
+
+// requireBoolPredicate infers a predicate and reports E1102 if it is neither
+// `bool` nor (already-failed) Unknown.
+func (c *checker) requireBoolPredicate(pred ast.Expr) {
+	t := c.inferExpr(pred)
+	if !isBool(t) && !isUnknownType(t) {
+		c.report("E1102", "contract predicate must be a `bool`, got "+t.String(), pred.NodeSpan())
+	}
 }

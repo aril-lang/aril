@@ -523,6 +523,118 @@ func (g *gen) emitLoopInvariants(loop ast.Stmt) error {
 	return nil
 }
 
+// contractFor returns the function's resolved contract obligations under
+// panic mode (nil otherwise — off elides everything).
+func (g *gen) contractFor(fn *ast.FuncDecl) *sema.FuncContract {
+	if g.contractMode != "panic" || g.info == nil {
+		return nil
+	}
+	return g.info.FuncContracts[fn]
+}
+
+// emitContractPrologue lowers a function's requires/ensures/entry obligations
+// (RFC-0006, panic mode), emitted at the top of the body:
+//   - each `entry { let n = e }` → an entry temp `_arilEntry_n := <e>`;
+//   - each `requires P` → an entry check `if !(P) { panic(…) }`;
+//   - the `ensures` → a deferred post-check that, on normal return (guarded
+//     by recover-rethrow so a panic-in-progress is not masked), asserts each
+//     predicate against the named return `_arilRet` and the entry temps.
+func (g *gen) emitContractPrologue(fc *sema.FuncContract, fn *ast.FuncDecl, named bool) error {
+	entryVars := map[string]string{}
+	for _, e := range fc.Entries {
+		name := "_arilEntry_" + goIdent(e.Name)
+		entryVars[e.Name] = name
+		g.line(e.Value.NodeSpan().StartLine)
+		g.writeIndent()
+		g.b.WriteString(name)
+		g.b.WriteString(" := ")
+		if err := g.emitExpr(e.Value); err != nil {
+			return err
+		}
+		g.b.WriteByte('\n')
+		// Suppress "declared and not used" when no ensures references it.
+		g.writeIndent()
+		g.b.WriteString("_ = ")
+		g.b.WriteString(name)
+		g.b.WriteByte('\n')
+	}
+	for _, req := range fc.Requires {
+		if err := g.emitContractCheck(req, "requires", fn.Name); err != nil {
+			return err
+		}
+	}
+	if named && len(fc.Ensures) > 0 {
+		g.writeIndent()
+		g.b.WriteString("defer func() {\n")
+		g.indent++
+		g.writeIndent()
+		g.b.WriteString("if r := recover(); r != nil {\n")
+		g.indent++
+		g.writeIndent()
+		g.b.WriteString("panic(r)\n")
+		g.indent--
+		g.writeIndent()
+		g.b.WriteString("}\n")
+		g.contractResultVar = "_arilRet"
+		g.contractEntryVars = entryVars
+		for _, ens := range fc.Ensures {
+			if err := g.emitContractCheck(ens, "ensures", fn.Name); err != nil {
+				g.contractResultVar = ""
+				g.contractEntryVars = nil
+				return err
+			}
+		}
+		g.contractResultVar = ""
+		g.contractEntryVars = nil
+		g.indent--
+		g.writeIndent()
+		g.b.WriteString("}()\n")
+	}
+	return nil
+}
+
+// emitContractCheck emits a guarded predicate check:
+//
+//	if !_arilInContract {
+//	    _arilInContract = true
+//	    _arilPass := (<pred>)
+//	    _arilInContract = false
+//	    if !_arilPass { panic("…kind violated (fn)") }
+//	}
+//
+// The `_arilInContract` guard makes a predicate that calls the contracted
+// function (or a mutually-contracted one) skip *its* contract during the
+// evaluation, breaking the otherwise-unbounded recursion. The `//line` at the
+// predicate maps blame to Aril coordinates (D10).
+func (g *gen) emitContractCheck(pred ast.Expr, kind, fnName string) error {
+	g.writeIndent()
+	g.b.WriteString("if !_arilInContract {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("_arilInContract = true\n")
+	g.line(pred.NodeSpan().StartLine)
+	g.writeIndent()
+	g.b.WriteString("_arilPass := (")
+	if err := g.emitExpr(pred); err != nil {
+		return err
+	}
+	g.b.WriteString(")\n")
+	g.writeIndent()
+	g.b.WriteString("_arilInContract = false\n")
+	g.writeIndent()
+	g.b.WriteString("if !_arilPass {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString(fmt.Sprintf("panic(%q)\n", "aril: contract: "+kind+" violated ("+fnName+")"))
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	return nil
+}
+
 // loopLabel returns the contract label of a for/while loop ("" if none).
 func loopLabel(loop ast.Stmt) string {
 	switch v := loop.(type) {
