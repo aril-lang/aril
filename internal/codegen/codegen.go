@@ -52,6 +52,11 @@ type Options struct {
 	// RuntimeImportPath is the Go import path of the vendored arilrt
 	// package, e.g. "aril-output/arilrt"; required when Vendored.
 	RuntimeImportPath string
+
+	// ContractMode selects contract enforcement (RFC-0006): "off" (default,
+	// checks elided → byte-identical) or "panic" (a violated obligation
+	// aborts). warn/stats are not lowered yet. Empty means "off".
+	ContractMode string
 }
 
 // EmitFilesWithOptions is EmitFilesWithInfo with explicit runtime-mode
@@ -83,6 +88,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		info:              info,
 		vendoredRequested: opts.Vendored,
 		runtimeImport:     opts.RuntimeImportPath,
+		contractMode:      opts.ContractMode,
 		userTypeNames:     map[string]bool{},
 		variant:           map[string]variantInfo{},
 		class:             map[string]classInfo{},
@@ -333,8 +339,11 @@ type gen struct {
 	// inline (the reflect layer is not vendored yet), so runtimePrefix
 	// stays "" even when vendoredRequested — see resolveRuntimeMode.
 	vendoredRequested bool
-	runtimePrefix     string
-	runtimeImport     string
+	// contractMode is the RFC-0006 enforcement mode ("off" / "panic"); ""
+	// is treated as "off". Under off, contract checks are not emitted.
+	contractMode  string
+	runtimePrefix string
+	runtimeImport string
 	// userTypeNames holds the names of user-declared types (classes,
 	// sums, records) — used to detect a user type that shadows a runtime
 	// type name (e.g. a user `class Map` or `type Dynamic`), so

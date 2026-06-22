@@ -240,6 +240,9 @@ func (g *gen) emitWhileStmt(s *ast.WhileStmt) error {
 	if err := g.emitBlockBody(s.Body); err != nil {
 		return err
 	}
+	if err := g.emitLoopInvariants(s); err != nil {
+		return err
+	}
 	g.indent--
 	g.writeIndent()
 	g.b.WriteString("}\n")
@@ -325,6 +328,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		if err := g.emitBlockBody(s.Body); err != nil {
 			return err
 		}
+		if err := g.emitLoopInvariants(s); err != nil {
+			return err
+		}
 		g.indent--
 		g.writeIndent()
 		g.b.WriteString("}\n")
@@ -342,6 +348,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	g.b.WriteString(" {\n")
 	g.indent++
 	if err := g.emitBlockBody(s.Body); err != nil {
+		return err
+	}
+	if err := g.emitLoopInvariants(s); err != nil {
 		return err
 	}
 	g.indent--
@@ -469,10 +478,60 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 	if err := g.emitBlockBody(s.Body); err != nil {
 		return err
 	}
+	if err := g.emitLoopInvariants(s); err != nil {
+		return err
+	}
 	g.indent--
 	g.writeIndent()
 	g.b.WriteString("}\n")
 	return nil
+}
+
+// emitLoopInvariants lowers a labelled loop's contract invariants (RFC-0006)
+// to a per-iteration check, emitted at the end of the loop body so it runs
+// after every iteration. Under `--contracts=panic` a violated invariant
+// aborts; the `//line` directive at the predicate maps the panic back to the
+// `.aril` source (blame in Aril coordinates, D10). Under off (the default)
+// nothing is emitted — byte-identical lowering. Keyed by the loop node on
+// sema's Info.LoopInvariants (populated only for a labelled loop with a
+// matching `loop <label>` section).
+func (g *gen) emitLoopInvariants(loop ast.Stmt) error {
+	if g.contractMode != "panic" || g.info == nil {
+		return nil
+	}
+	preds := g.info.LoopInvariants[loop]
+	if len(preds) == 0 {
+		return nil
+	}
+	label := loopLabel(loop)
+	for _, pred := range preds {
+		g.line(pred.NodeSpan().StartLine)
+		g.writeIndent()
+		g.b.WriteString("if !(")
+		if err := g.emitExpr(pred); err != nil {
+			return err
+		}
+		g.b.WriteString(") {\n")
+		g.indent++
+		g.writeIndent()
+		g.b.WriteString(fmt.Sprintf("panic(%q)\n",
+			"aril: contract: loop invariant violated (loop "+label+")"))
+		g.indent--
+		g.writeIndent()
+		g.b.WriteString("}\n")
+	}
+	return nil
+}
+
+// loopLabel returns the contract label of a for/while loop ("" if none).
+func loopLabel(loop ast.Stmt) string {
+	switch v := loop.(type) {
+	case *ast.ForStmt:
+		return v.Label
+	case *ast.WhileStmt:
+		return v.Label
+	}
+	return ""
 }
 
 // closureParamGoType returns the Go type for closure param i when sema

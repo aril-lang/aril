@@ -769,14 +769,16 @@ func TestBuildOutputFlag(t *testing.T) {
 	}
 }
 
-// TestCheckContractsMode unit-tests the --contracts mode validation:
-// off is wired, panic/warn/stats are accepted vocabulary but not yet
-// enforced, anything else is a usage error (CONTRACTS-IMPL bootstrap).
+// TestCheckContractsMode unit-tests the --contracts mode validation: off and
+// panic are wired; warn/stats are accepted vocabulary but not yet lowered;
+// anything else is a usage error.
 func TestCheckContractsMode(t *testing.T) {
-	if err := checkContractsMode("off"); err != nil {
-		t.Errorf("off should be accepted, got %v", err)
+	for _, m := range []string{"off", "panic"} {
+		if err := checkContractsMode(m); err != nil {
+			t.Errorf("%s should be accepted, got %v", m, err)
+		}
 	}
-	for _, m := range []string{"panic", "warn", "stats"} {
+	for _, m := range []string{"warn", "stats"} {
 		err := checkContractsMode(m)
 		if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
 			t.Errorf("%s: want a not-yet-implemented error, got %v", m, err)
@@ -788,50 +790,67 @@ func TestCheckContractsMode(t *testing.T) {
 	}
 }
 
-// TestContractsFlagEndToEnd exercises the flag through the real binary:
-// a program carrying a separable contract block runs unchanged under the
-// default/explicit off mode (the block is skipped), while an unwired
-// enforcement mode is rejected before compilation.
-func TestContractsFlagEndToEnd(t *testing.T) {
+// TestContractsLoopInvariantFires is the C5a milestone end-to-end: a program
+// whose loop invariant is broken by a bug runs to completion under
+// --contracts=off (no check) but ABORTS under --contracts=panic at the
+// iteration the invariant breaks, with blame in Aril coordinates.
+func TestContractsLoopInvariantFires(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "ct.aril")
+	path := filepath.Join(dir, "firing.aril")
 	src := `import fmt
 
-func dbl(x: int): int {
-  return x + x
+func sumRange(xs: []int, lo: int, hi: int): int {
+  var s = 0
+  var k = lo
+  while k < hi { s = s + xs[k]  k = k + 1 }
+  return s
+}
+
+func prefixSums(xs: []int): []int {
+  var out: []int = []int{}
+  var acc = 0
+  for i in 0..xs.len() loop scan {
+    acc = acc + xs[i]
+    if i == 2 { acc = acc + xs[i] }
+    out = out.push(acc)
+  }
+  return out
 }
 
 func main() {
-  fmt.println(dbl(3))
+  fmt.println(prefixSums([10, 20, 30, 40]))
 }
 
-contract dbl {
-  requires x >= 0
-  ensures result >= x
+contract prefixSums {
+  loop scan {
+    invariant acc == sumRange(xs, 0, i + 1)
+  }
 }
 `
 	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"", "off"} {
-		args := []string{"run"}
-		if mode != "" {
-			args = append(args, "--contracts="+mode)
-		}
-		args = append(args, path)
+
+	// off (default and explicit): runs to completion, no contract check.
+	for _, args := range [][]string{{"run", path}, {"run", "--contracts=off", path}} {
 		stdout, stderr, exit := runAril(t, args...)
 		if exit != 0 {
-			t.Fatalf("run %v exited %d (stderr: %s)", args, exit, stderr)
+			t.Fatalf("%v exited %d (stderr: %s)", args, exit, stderr)
 		}
-		if strings.TrimSpace(stdout) != "6" {
-			t.Errorf("run %v stdout = %q; want \"6\"", args, stdout)
+		if strings.TrimSpace(stdout) != "[10 30 90 130]" {
+			t.Errorf("%v stdout = %q; want the (buggy) [10 30 90 130]", args, stdout)
 		}
 	}
-	_, stderr, exit := runAril(t, "run", "--contracts=panic", path)
-	if exit != 2 {
-		t.Errorf("--contracts=panic exit = %d; want 2", exit)
+
+	// panic: the invariant fires before the program completes.
+	stdout, stderr, exit := runAril(t, "run", "--contracts=panic", path)
+	if exit == 0 {
+		t.Fatalf("--contracts=panic should abort; got exit 0, stdout %q", stdout)
 	}
-	if !strings.Contains(stderr, "not yet implemented") {
-		t.Errorf("--contracts=panic stderr = %q; want a not-yet-implemented message", stderr)
+	if !strings.Contains(stderr, "loop invariant violated") {
+		t.Errorf("--contracts=panic stderr = %q; want a loop-invariant-violation panic", stderr)
+	}
+	if !strings.Contains(stderr, "firing.aril") {
+		t.Errorf("--contracts=panic blame = %q; want it mapped to the .aril source", stderr)
 	}
 }
