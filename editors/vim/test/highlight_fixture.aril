@@ -1,0 +1,27 @@
+// a line comment
+/* a block comment */
+import fmt
+
+func myFunc(): int {
+  let intlit   = 42
+  let hexlit   = 0xFF
+  let floatlit = 3.14
+  let s        = "string \n more"
+  let r        = 'a'
+  let half     = 1 / 2
+  let b        = true
+  let opt: Option<int> = None
+  let ok       = Ok(1)
+  panic("boom")
+  return intlit
+}
+
+type MyType = int
+
+@go("strings.Split")
+extern func split(s: string, sep: string): []string
+
+contract myFunc {
+  requires true
+  ensures result > 0
+}

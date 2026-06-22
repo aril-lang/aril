@@ -58,6 +58,23 @@ vim examples/core-language/merge_intervals/merge_intervals.aril
 
 `:set filetype?` should report `filetype=aril`.
 
+## Test
+
+`test/run.sh` is a highlight-regression test: it loads the syntax file in a
+headless Vim against `test/highlight_fixture.aril` and asserts (via `synID`)
+that each representative token — line/block comment, int/float/hex, string,
+escape, rune, keyword, type, constructor, builtin, operator, `@go`
+attribute, contract clause — highlights as the right group.
+
+```sh
+editors/vim/test/run.sh    # exit 0 = pass, 1 = a check failed, skips if vim absent
+```
+
+It guards the class of bugs a "loads without error" check cannot see: Vim's
+*last-defined-wins* match priority silently letting a later rule preempt an
+earlier one (e.g. the `/` operator eating `//`/`/*` comments, or an int match
+eating a float). Add a check here whenever you add a syntax group.
+
 ## Keeping it in sync
 
 The highlighter mirrors the spec; it is not generated. When a keyword,
