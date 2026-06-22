@@ -98,11 +98,15 @@ func main() {
 }
 
 // Separable contracts (RFC-0006), inert until `--contracts` enforcement
-// lands. The `merge` postcondition is the *full* correctness spec the
-// algorithm literature states — a length bound is not a specification (an
-// implementation returning `[]` would satisfy it). Merge is correct iff its
-// output is sorted, pairwise-disjoint, AND covers every input interval; the
-// three clauses together rule out the trivial wrong answers.
+// lands. The `merge` postcondition states the properties the algorithm
+// literature insists on — a length bound is not a specification (an
+// implementation returning `[]` would satisfy it). Sorted ∧ pairwise-
+// disjoint ∧ covers-every-input are *necessary* conditions that rule out
+// the trivial wrong answers; they are not yet sufficient — `coversAll` is
+// only the ⊇ direction (each input inside some output), so a single giant
+// `[-inf, +inf]` output would still pass. The converse (no spurious
+// coverage — each output backed by inputs) quantifies over points and needs
+// a `forall`, deferred to v1.1.
 contract Interval {
   invariant start <= end
 }

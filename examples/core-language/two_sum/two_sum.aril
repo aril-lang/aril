@@ -35,10 +35,10 @@ func main() {
 // quantifies over all pairs and needs a `forall`, deferred to v1.1.
 contract twoSum {
   ensures match result {
-    Some((i, j)) => i != j
-                    && i >= 0 && i < nums.len()
-                    && j >= 0 && j < nums.len()
-                    && nums[i] + nums[j] == target,
+    Some((i, j)) => (i != j
+                     && i >= 0 && i < nums.len()
+                     && j >= 0 && j < nums.len()
+                     && nums[i] + nums[j] == target),
     None => true,
   }
 }
