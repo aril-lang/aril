@@ -59,25 +59,24 @@ func main() {
 }
 
 // addContractsFlag registers `--contracts=<mode>` on fs and returns the
-// destination. The four modes are RFC-0006's panic/warn/stats/off; only
-// `off` (the parser's contract-skip "ignore level") is wired during the
-// CONTRACTS-IMPL build-out — checkContractsMode rejects the others until
-// the enforcement pipeline lands.
+// destination. The four modes are RFC-0006's panic/warn/stats/off; `off`
+// (default, checks elided) and `panic` (a violated obligation aborts) are
+// wired — warn/stats are not lowered yet.
 func addContractsFlag(fs *flag.FlagSet) *string {
 	return fs.String("contracts", "off",
-		"contract enforcement mode: off (skip, default) | panic | warn | stats")
+		"contract enforcement mode: off (default) | panic | warn | stats")
 }
 
-// checkContractsMode validates a --contracts value. off is the only wired
-// mode for now; panic/warn/stats are accepted vocabulary but not yet
-// enforced; anything else is a usage error.
+// checkContractsMode validates a --contracts value. off and panic are wired;
+// warn/stats are accepted vocabulary but not yet lowered; anything else is a
+// usage error.
 func checkContractsMode(mode string) error {
 	switch mode {
-	case "off":
+	case "off", "panic":
 		return nil
-	case "panic", "warn", "stats":
+	case "warn", "stats":
 		return fmt.Errorf("aril: --contracts=%s is not yet implemented "+
-			"(CONTRACTS-IMPL in progress); only --contracts=off is wired", mode)
+			"(only off and panic are wired); use --contracts=panic", mode)
 	default:
 		return fmt.Errorf("aril: unknown --contracts mode %q (want off|panic|warn|stats)", mode)
 	}
@@ -104,7 +103,7 @@ func cmdEmit(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril emit: expected exactly one <file.aril>")
 		return 2
 	}
-	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine, *vendor)
+	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine, *vendor, *contracts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -164,7 +163,7 @@ func cmdBuild(args []string) int {
 		return 2
 	}
 	srcPath := fs.Arg(0)
-	src, err := compileToTempGo(srcPath, !*inlineRT)
+	src, err := compileToTempGo(srcPath, !*inlineRT, *contracts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -229,7 +228,7 @@ func gatherSources(path string) ([]string, error) {
 // generated Go source string. Used by cmdEmit and (indirectly via
 // compileToTempGo) by build / run.
 func emitGoSource(path string) (string, error) {
-	return emitGoSourceOpts(path, false, false)
+	return emitGoSourceOpts(path, false, false, "off")
 }
 
 // emitGoSourceOpts is the variant that takes the `no-line` flag —
@@ -238,12 +237,12 @@ func emitGoSource(path string) (string, error) {
 // Build / run keep them on so panic traces and `go vet` errors
 // still point at Aril source coordinates. `emit` does not require a
 // `func main` (it lowers any package for inspection); build / run do.
-func emitGoSourceOpts(path string, stripLine, vendored bool) (string, error) {
+func emitGoSourceOpts(path string, stripLine, vendored bool, contractMode string) (string, error) {
 	files, userImports, err := buildUnit(path)
 	if err != nil {
 		return "", err
 	}
-	return compilePackage(files, userImports, stripLine, false, vendored)
+	return compilePackage(files, userImports, stripLine, false, vendored, contractMode)
 }
 
 // buildUnit resolves a build target into its full source-file set. It
@@ -280,7 +279,7 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 // each file's real path; //line labels are suppressed when stripLine is
 // set. requireMain enforces exactly one `func main` across the package
 // (RFC-0002) — on for build / run, off for emit.
-func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain, vendored bool) (string, error) {
+func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain, vendored bool, contractMode string) (string, error) {
 	trees := make([]*ast.File, len(paths))
 	labels := make([]string, len(paths))
 	for i, p := range paths {
@@ -328,7 +327,7 @@ func compilePackage(paths []string, userImports map[string]bool, stripLine, requ
 			return "", err
 		}
 	}
-	opts := codegen.Options{}
+	opts := codegen.Options{ContractMode: contractMode}
 	if vendored {
 		opts.Vendored = true
 		opts.RuntimeImportPath = runtimeImportPath
@@ -415,7 +414,7 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril run: expected exactly one <file.aril>")
 		return 2
 	}
-	src, err := compileToTempGo(fs.Arg(0), !*inlineRT)
+	src, err := compileToTempGo(fs.Arg(0), !*inlineRT, *contracts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -450,12 +449,12 @@ type compiledSource struct {
 // file or a package directory) and writes main.go + go.mod into a fresh
 // temp dir. The caller must RemoveAll the returned dir. Unlike emit, a
 // runnable build requires exactly one `func main` (RFC-0002).
-func compileToTempGo(path string, vendored bool) (*compiledSource, error) {
+func compileToTempGo(path string, vendored bool, contractMode string) (*compiledSource, error) {
 	files, userImports, err := buildUnit(path)
 	if err != nil {
 		return nil, err
 	}
-	goSrc, err := compilePackage(files, userImports, false, true, vendored)
+	goSrc, err := compilePackage(files, userImports, false, true, vendored, contractMode)
 	if err != nil {
 		return nil, err
 	}

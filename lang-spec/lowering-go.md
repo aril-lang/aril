@@ -807,6 +807,33 @@ the body (a common shape for `match`-driven loops) would otherwise
 draw a spurious "missing return" after the loop. The literal `true`
 is recognised through redundant parentheses.
 
+## Contracts — loop invariants (RFC-0006)
+
+A labelled loop carrying a `contract … { loop <label> { invariant P } }`
+section lowers its invariants to a per-iteration check, emitted at the **end of
+the loop body** (so it runs after every iteration). Under `--contracts=panic`:
+
+```
+for … { <body> }   with invariant P
+  ⟿
+for … {
+    <lowering of body>
+    //line <src>:<P-line>
+    if !(<lowering of P>) {
+        panic("aril: contract: loop invariant violated (loop <label>)")
+    }
+}
+```
+
+The `//line` directive at the check maps the panic back to the predicate's
+`.aril` source, so blame reads in Aril coordinates (D10) with no runtime
+support. Under `--contracts=off` (the default during the build-out) **nothing
+is emitted** — a contracted program lowers byte-identically to the same program
+without the contract (golden-fixture and `build_ok`-ratchet safe). `warn` /
+`stats` modes and the `arilrt` violation-rendering layer (richer blame, mode
+tally) are not lowered yet. requires/ensures/type-invariant lowering follows in
+later slices.
+
 ## Generics
 
 Aril generics lower to Go generics one-to-one:
