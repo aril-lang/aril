@@ -557,12 +557,14 @@ func id(y: int): int { return y }
 }
 
 // TestContractBlockUnterminated reports a clean diagnostic (not a panic
-// or silent EOF) when a contract block's brace is never closed.
+// or silent EOF) when a skipped `channel` block's brace is never closed.
+// (`contract` blocks now parse and error via the clause loop's `expect`;
+// this guards the remaining skip path used for RFC-0007 `channel` blocks.)
 func TestContractBlockUnterminated(t *testing.T) {
 	src := `func main() {}
 
-contract main {
-  requires true
+channel main {
+  closed-by pool
 `
 	toks, lerr := lexer.Lex(src)
 	if lerr != nil {
@@ -626,5 +628,73 @@ func TestLoopLabel(t *testing.T) {
 	fs2 := g.Decls[0].(*ast.FuncDecl).Body.Stmts[0].(*ast.ForStmt)
 	if fs2.Label != "" {
 		t.Errorf("for-in-loop: label = %q, want empty (loop is the iterable)", fs2.Label)
+	}
+}
+
+// TestContractBlockParsed covers C3b: a `contract` block parses into
+// File.Contracts (RFC-0006 value/state clauses), while a `channel` block is
+// still skipped (RFC-0007 deferred).
+func TestContractBlockParsed(t *testing.T) {
+	f := parseString(t, `func abs(x: int): int { return x }
+
+contract abs {
+  requires x >= 0
+  ensures result >= 0
+  loop scan {
+    invariant x >= 0
+  }
+}
+
+channel results { closed-by pool }
+`)
+	if len(f.Decls) != 1 {
+		t.Fatalf("expected 1 decl (the func); got %d", len(f.Decls))
+	}
+	if len(f.Contracts) != 1 {
+		t.Fatalf("expected 1 contract (channel skipped); got %d", len(f.Contracts))
+	}
+	c := f.Contracts[0]
+	if c.Target != "abs" {
+		t.Errorf("contract target = %q, want %q", c.Target, "abs")
+	}
+	if len(c.Clauses) != 3 {
+		t.Fatalf("expected 3 clauses (requires/ensures/loop); got %d", len(c.Clauses))
+	}
+	kinds := []string{c.Clauses[0].Kind, c.Clauses[1].Kind, c.Clauses[2].Kind}
+	want := []string{"requires", "ensures", "loop"}
+	for i := range want {
+		if kinds[i] != want[i] {
+			t.Errorf("clause[%d] kind = %q, want %q", i, kinds[i], want[i])
+		}
+	}
+	loop := c.Clauses[2]
+	if loop.Label != "scan" {
+		t.Errorf("loop label = %q, want %q", loop.Label, "scan")
+	}
+	if len(loop.Loop) != 1 || loop.Loop[0].Kind != "invariant" {
+		t.Errorf("loop section = %+v, want one invariant clause", loop.Loop)
+	}
+}
+
+// TestContractUnknownClause rejects a clause keyword outside the v1 set.
+func TestContractUnknownClause(t *testing.T) {
+	toks, _ := lexer.Lex(`func f() {}
+contract f { bogus x }
+`)
+	_, perr := Parse(toks)
+	if perr == nil || !strings.Contains(perr.Message, "expected a contract clause") {
+		t.Fatalf("want an unknown-clause diagnostic, got %v", perr)
+	}
+}
+
+// TestContractLoopOnlyInvariant rejects a non-invariant clause inside a loop
+// section.
+func TestContractLoopOnlyInvariant(t *testing.T) {
+	toks, _ := lexer.Lex(`func f() {}
+contract f { loop scan { ensures result > 0 } }
+`)
+	_, perr := Parse(toks)
+	if perr == nil || !strings.Contains(perr.Message, "only `invariant`") {
+		t.Fatalf("want a loop-only-invariant diagnostic, got %v", perr)
 	}
 }

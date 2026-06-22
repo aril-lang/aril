@@ -54,8 +54,37 @@ that the source file produces as a contiguous chunk has a span.
 | `span` | `Span` | yes | from first byte of input to EOF |
 | `imports` | `[]Import` | yes (may be empty) | in source order |
 | `decls` | `[]Decl` | yes (≥ 1) | every file declares at least one item |
+| `contracts` | `[]ContractDecl` | yes (may be empty) | separable contract blocks (RFC-0006), kept out of `decls` |
 
 Invariant: a `File` with `decls.len() == 0` is a parse error.
+
+`contracts` is separate from `decls` deliberately: codegen and sema iterate
+`decls`, so a contract is purely additive (byte-identical lowering, no
+type-check) until the contract pass and codegen lowering consume it.
+
+### `ContractDecl`
+
+A separable value/state contract block — `contract <target> { … }` (RFC-0006),
+grammar.ebnf §ContractDecl.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `span` | `Span` | yes | |
+| `target` | `string` | yes | the named declaration this attaches to |
+| `clauses` | `[]ContractClause` | yes (may be empty) | in source order |
+
+### `ContractClause`
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `span` | `Span` | yes | |
+| `kind` | `"requires" \| "ensures" \| "invariant" \| "loop"` | yes | |
+| `pred` | `Option<Expr>` | when `kind ≠ "loop"` | the boolean predicate |
+| `label` | `Option<string>` | when `kind == "loop"` | the target loop's `LoopLabel` |
+| `loop` | `[]ContractClause` | when `kind == "loop"` | the section's `invariant` clauses |
+
+A `channel <name> { … }` block (RFC-0007 trace contracts) is recognized at the
+top level but **skipped** (no node) until the channel-contract epoch.
 
 ### `Import`
 
