@@ -217,7 +217,9 @@ func (c *checker) resolveFuncDecl(fn *ast.FuncDecl, parent *Scope) {
 		sym.Type = c.funcSigType(fn)
 	}
 	if fn.Body != nil {
+		c.curContract = c.contractByTarget[fn.Name]
 		c.resolveBlock(fn.Body, fnScope)
+		c.curContract = nil
 	}
 }
 
@@ -273,6 +275,7 @@ func (c *checker) resolveStmt(s ast.Stmt, scope *Scope) {
 		}
 	case *ast.WhileStmt:
 		c.resolveExpr(v.Cond, scope)
+		c.resolveLoopInvariants(v.Label, scope)
 		c.resolveBlock(v.Body, scope)
 	case *ast.DeferStmt:
 		c.resolveExpr(v.Call, scope)
@@ -311,6 +314,10 @@ func (c *checker) resolveStmt(s ast.Stmt, scope *Scope) {
 		}
 		bodyScope := newScope(scope)
 		c.bindPattern(v.Pattern, bodyScope, v)
+		// Loop invariants resolve in bodyScope — the loop variable and the
+		// enclosing locals are visible; per-iteration body locals are not
+		// (the invariant holds at the iteration boundary). RFC-0006.
+		c.resolveLoopInvariants(v.Label, bodyScope)
 		if v.Body != nil {
 			// Re-use resolveBlock so block-internal scoping
 			// stays consistent with the let-in-let rule.

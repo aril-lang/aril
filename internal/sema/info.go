@@ -22,12 +22,20 @@ type Info struct {
 	// can hang an inferred type on a let/var binding and codegen
 	// can later read binding metadata without a parallel tracker.
 	Def map[ast.Node]*Symbol
+
+	// LoopInvariants maps a labelled loop (*ast.ForStmt / *ast.WhileStmt)
+	// to the resolved, type-checked invariant predicates its matching
+	// `contract … { loop <label> { invariant … } }` section attaches
+	// (RFC-0006). Codegen lowers each to a per-iteration check. Absent for
+	// a loop with no contract.
+	LoopInvariants map[ast.Stmt][]ast.Expr
 }
 
 func newInfo() *Info {
 	return &Info{
-		Symbol: map[ast.Node]*Symbol{},
-		Type:   map[ast.Expr]Type{},
-		Def:    map[ast.Node]*Symbol{},
+		Symbol:         map[ast.Node]*Symbol{},
+		Type:           map[ast.Expr]Type{},
+		Def:            map[ast.Node]*Symbol{},
+		LoopInvariants: map[ast.Stmt][]ast.Expr{},
 	}
 }
