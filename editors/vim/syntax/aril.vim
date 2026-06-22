@@ -1,7 +1,8 @@
 " Vim syntax file for the Aril programming language.
 " Language:    Aril (.aril)
 " Source:      Derived from the canonical lexical surface in
-"              lang-spec/keywords.md and lang-spec/grammar.ebnf. Those
+"              lang-spec/keywords.md and lang-spec/grammar.ebnf (and the
+"              contract vocabulary from docs/rfcs/0006 + 0007). Those
 "              files are the contract; this highlighter mirrors them and
 "              must be kept in sync on any keyword / operator / literal
 "              change (same discipline as the generated lexer).
@@ -75,13 +76,16 @@ syn keyword arilBuiltin         panic error refEq makeChannel makeSlice
 " vocabulary. Contextual per spec; highlighted as a distinct group so a
 " reader can spot the executable specification at a glance.
 " =====================================================================
+" Only the low-collision, genuinely contract-specific words are highlighted
+" globally. The RFC-0007 clause words that are also ordinary identifiers or
+" method names — `send`/`recv`/`close` (channel methods, D11), `result`,
+" `before`/`after`/`every`/`more`/`than`/`role`/`signal`/`channel` — are
+" deliberately LEFT ORDINARY: globally keywording them would light up real
+" channel code (`.send`/`.close`) and common bindings (`let result = …`) as
+" if they were contract clauses. Scoping the full vocab to inside `contract`/
+" `channel` blocks (a `syn region`) is the proper fix and a future refinement.
 syn keyword arilContractKeyword contract requires ensures invariant
-syn keyword arilContractKeyword old result implies loop
-" RFC-0007 channel/protocol/fan-out/fairness clause words
-syn keyword arilContractKeyword forbid before after eventually every
-syn keyword arilContractKeyword send recv close never more than flight
-syn keyword arilContractKeyword participant role cancel timeout signal
-syn keyword arilContractKeyword fairness
+syn keyword arilContractKeyword old implies loop forbid eventually fairness
 " Hyphenated clause keywords need a match (the '-' is not a word char)
 syn match   arilContractKeyword "\<closed-by\>"
 syn match   arilContractKeyword "\<delivered-to-all\>"
@@ -89,9 +93,6 @@ syn match   arilContractKeyword "\<offered-to-all\>"
 syn match   arilContractKeyword "\<no-starvation\>"
 syn match   arilContractKeyword "\<drains-before-scope-exit\>"
 syn match   arilContractKeyword "\<drains-before-return\>"
-" Note: `channel` is also a contract block head, but it doubles as a
-" conceptual word; it is highlighted via the type group only when it is
-" the actual subject. Left ordinary elsewhere.
 
 " =====================================================================
 " Declaration names — the identifier introduced by a declaration keyword.
@@ -101,15 +102,16 @@ syn match   arilTypeDef         "\(\<\(type\|class\|interface\)\s\+\)\@<=\h\w*"
 
 " =====================================================================
 " Numeric literals  (grammar.ebnf §Integer / Floating-point literals)
-" Floats first so `1.0` is not eaten as int `1` `.` `0`. Hex/oct/bin
-" before decimal. `_` is a legal digit separator.
+" Vim syntax priority is LAST-defined-wins (:h :syn-priority), so the float
+" matches come AFTER the decimal-int match — otherwise `1.5` is eaten as int
+" `1` + `.` + int `5`. Hex/oct/bin before decimal. `_` is a digit separator.
 " =====================================================================
-syn match   arilFloat           "\<\d\(\d\|_\)*\.\d\(\d\|_\)*\([eE][+-]\?\d\(\d\|_\)*\)\?\>"
-syn match   arilFloat           "\<\d\(\d\|_\)*[eE][+-]\?\d\(\d\|_\)*\>"
 syn match   arilNumber          "\<0x\x\(\x\|_\)*\>"
 syn match   arilNumber          "\<0o\o\(\o\|_\)*\>"
 syn match   arilNumber          "\<0b[01]\([01]\|_\)*\>"
 syn match   arilNumber          "\<\d\(\d\|_\)*\>"
+syn match   arilFloat           "\<\d\(\d\|_\)*\.\d\(\d\|_\)*\([eE][+-]\?\d\(\d\|_\)*\)\?\>"
+syn match   arilFloat           "\<\d\(\d\|_\)*[eE][+-]\?\d\(\d\|_\)*\>"
 
 " =====================================================================
 " String and rune literals  (grammar.ebnf §String and rune literals)
