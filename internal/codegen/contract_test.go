@@ -136,20 +136,75 @@ contract Counter {
 			t.Errorf("panic-mode emit missing %q:\n%s", want, got)
 		}
 	}
-	// The static factory has no receiver and is not invariant-checked: its
-	// body must carry no defer/guard.
+	// The static factory has no receiver, so it carries no method-exit
+	// `defer` check (its only invariant check is the construction IIFE around
+	// the `Counter{…}` literal, which uses no defer — covered separately by
+	// TestEmitConstructionInvariant).
 	staticIdx := strings.Index(got, "func counterNew()")
 	bumpIdx := strings.Index(got, "func (t *Counter) bump()")
 	if staticIdx < 0 || bumpIdx < 0 {
 		t.Fatalf("expected both the static factory and bump in the emit:\n%s", got)
 	}
 	staticBody := got[staticIdx:bumpIdx]
-	if strings.Contains(staticBody, "_arilInContract") || strings.Contains(staticBody, "invariant violated") {
-		t.Errorf("static method must not be invariant-checked:\n%s", staticBody)
+	if strings.Contains(staticBody, "defer func()") {
+		t.Errorf("static method must not carry a method-exit defer check:\n%s", staticBody)
 	}
 
 	off := emitContract(t, src, "off")
 	if strings.Contains(off, "_arilInContract") || strings.Contains(off, "invariant violated") {
 		t.Errorf("off-mode emit must not lower the invariant:\n%s", off)
+	}
+}
+
+// TestEmitConstructionInvariant: a brace literal of an invariant-bearing type
+// lowers inside a `func() T { _arilNew := <lit>; <check>; return _arilNew }()`
+// so construction is validated. Covers the record case (a record's only
+// checkpoint — no methods) and the off-mode byte-identical elision.
+func TestEmitConstructionInvariant(t *testing.T) {
+	// The contract block is placed last so removing it (the contract-free
+	// program below) does not shift main's source lines — the `//line`
+	// directives then match, making the off-mode byte-identity check exact.
+	src := `type Interval = {
+  start: int
+  end:   int
+}
+
+func main() {
+  let v = Interval{ start: 1, end: 5 }
+}
+
+contract Interval {
+  invariant start <= end
+}
+`
+	got := emitContract(t, src, "panic")
+	for _, want := range []string{
+		"func() Interval {",              // construction IIFE (record = value type, no *)
+		"_arilNew := Interval{Start: 1",  // the literal bound to the temp
+		"_arilNew.Start <= _arilNew.End", // fields via the construction temp
+		"invariant violated (Interval)",  // blame names the type
+		"return _arilNew",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("panic-mode emit missing %q:\n%s", want, got)
+		}
+	}
+
+	off := emitContract(t, src, "off")
+	if strings.Contains(off, "_arilNew") || strings.Contains(off, "invariant violated") {
+		t.Errorf("off-mode emit must not lower the construction check:\n%s", off)
+	}
+	// off mode is byte-identical to the same program without the contract.
+	noContract := emitContract(t, `type Interval = {
+  start: int
+  end:   int
+}
+
+func main() {
+  let v = Interval{ start: 1, end: 5 }
+}
+`, "off")
+	if off != noContract {
+		t.Errorf("off-mode emit differs from the contract-free program:\n--- with ---\n%s\n--- without ---\n%s", off, noContract)
 	}
 }

@@ -358,8 +358,13 @@ type gen struct {
 	// outside contract-predicate emission.
 	contractResultVar string
 	contractEntryVars map[string]string
-	runtimePrefix     string
-	runtimeImport     string
+	// contractReceiver is the Go receiver a type-invariant predicate's bare
+	// field names lower against: the method receiver `t` at a method-exit
+	// check (the empty default), or the construction temp `_arilNew` at a
+	// brace-literal construction check.
+	contractReceiver string
+	runtimePrefix    string
+	runtimeImport    string
 	// userTypeNames holds the names of user-declared types (classes,
 	// sums, records) — used to detect a user type that shadows a runtime
 	// type name (e.g. a user `class Map` or `type Dynamic`), so

@@ -59,6 +59,12 @@ func (c *checker) checkBodies(f *ast.File) {
 			c.curThis = &Named{N: v.Name, Decl: v}
 			c.checkTypeInvariants(v)
 			c.curThis = nil
+		case *ast.TypeDecl:
+			// Record-type invariants: fields were bound as SymField in the
+			// resolve pass, so inference types them with no receiver.
+			if _, ok := v.Body.(*ast.RecordTypeBody); ok {
+				c.checkRecordInvariants(v)
+			}
 		}
 	}
 }
