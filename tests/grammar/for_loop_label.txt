@@ -1,0 +1,26 @@
+--- TITLE ---
+ForStmt with a loop-contract label — `for x in it loop <label> { … }` (RFC-0006 loop invariants)
+
+--- INPUT ---
+func main() {
+  for i in 0..3 loop scan {
+    print(i)
+  }
+}
+
+--- AST ---
+(File @1:1-5:2
+  (FuncDecl "main" @1:1-5:2
+    (type-params)
+    (params)
+    (Block @1:13-5:2
+      (ForStmt @2:3-4:4 loop "scan"
+        (IdentPat "i" @2:7-2:8)
+        (RangeExpr exclusive @2:12-2:16
+          (IntLitExpr 0 @2:12-2:13)
+          (IntLitExpr 3 @2:15-2:16))
+        (Block @2:27-4:4
+          (ExprStmt @3:5-3:13
+            (Call @3:5-3:13
+              (Ident "print" @3:5-3:10)
+              (Ident "i" @3:11-3:12))))))))

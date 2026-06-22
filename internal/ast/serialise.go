@@ -657,6 +657,10 @@ func write(b *strings.Builder, n Node, depth int) {
 		}
 	case *ForStmt:
 		writeSpan(b, v.Span)
+		if v.Label != "" {
+			b.WriteString(" loop ")
+			writeQuoted(b, v.Label)
+		}
 		b.WriteByte('\n')
 		write(b, v.Pattern, depth+1)
 		b.WriteByte('\n')
@@ -665,6 +669,10 @@ func write(b *strings.Builder, n Node, depth int) {
 		write(b, v.Body, depth+1)
 	case *WhileStmt:
 		writeSpan(b, v.Span)
+		if v.Label != "" {
+			b.WriteString(" loop ")
+			writeQuoted(b, v.Label)
+		}
 		b.WriteByte('\n')
 		write(b, v.Cond, depth+1)
 		b.WriteByte('\n')

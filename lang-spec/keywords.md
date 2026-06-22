@@ -75,6 +75,7 @@ those positions they are ordinary identifiers.
 | `go`    | as the attribute head in `@go("…")` (a `@` token followed by `go`) | identifier |
 | `contract` | at the head of a top-level block (`contract <name> {`), RFC-0006 | identifier |
 | `channel`  | at the head of a top-level block (`channel <name> {`), RFC-0007 | identifier |
+| `loop`     | between a `for`/`while` header and its block, naming the loop (`for … loop <label> {`), RFC-0006 | identifier |
 
 `contract` / `channel` are contextual: a keyword only in the positional
 `<word> <name> {` top-level shape (where an identifier would otherwise be a

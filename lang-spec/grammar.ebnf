@@ -433,8 +433,16 @@ AssignStmt   = LValue ( "=" | AssignOp ) Expr ;
 AssignOp     = "+=" | "-=" | "*=" | "/=" | "%=" ;   // desugared by parser to `lhs = lhs <op> rhs`
 LValue       = PostfixExpr ;                 // restricted by sema to writable shapes
 IfStmt       = "if" Expr Block ( "else" ( IfStmt | Block ) )? ;
-ForStmt      = "for" Pattern "in" Iterable Block ;
-WhileStmt    = "while" Expr Block ;
+ForStmt      = "for" Pattern "in" Iterable LoopLabel? Block ;
+WhileStmt    = "while" Expr LoopLabel? Block ;
+
+// LoopLabel names a loop so a `contract` block's `loop <label>` section can
+// attach a per-iteration invariant (RFC-0006 loop contracts). `loop` is
+// contextual — a keyword only here, between the header and the block, an
+// ordinary identifier elsewhere (keywords.md). The label has no runtime
+// effect: codegen lowers a labelled loop identically to an unlabelled one;
+// it exists for contract attachment only.
+LoopLabel    = "loop" Ident ;
 SelectStmt   = "select" "{" Newline? ( SelectCase ( SelectCaseSep SelectCase )* SelectCaseSep? )? "}" ;
 SelectCaseSep = "," Newline* | Newline+ ;
 DeferStmt    = "defer" Expr ;

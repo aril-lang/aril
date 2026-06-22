@@ -427,6 +427,7 @@ func (p *parser) parseForStmt() (*ast.ForStmt, *Diag) {
 	if err != nil {
 		return nil, err
 	}
+	label := p.parseOptLoopLabel()
 	body, err := p.parseBlock()
 	if err != nil {
 		return nil, err
@@ -438,8 +439,24 @@ func (p *parser) parseForStmt() (*ast.ForStmt, *Diag) {
 		},
 		Pattern:  pat,
 		Iterable: iter,
+		Label:    label,
 		Body:     body,
 	}, nil
+}
+
+// parseOptLoopLabel consumes an optional `loop <ident>` loop-contract label
+// between a for/while header and its block (grammar.ebnf §LoopLabel). `loop`
+// is contextual — a keyword only in this position, an ordinary identifier
+// elsewhere — so the claim is guarded: it fires only on `loop` immediately
+// followed by an identifier (the label), which no header expression ends
+// with (a bare `for x in loop {` leaves `loop` as the iterable, with `{`
+// next, not an identifier). Returns "" when absent.
+func (p *parser) parseOptLoopLabel() string {
+	if p.at(lexer.KindIdent, "loop") && p.peekAhead(1).Kind == lexer.KindIdent {
+		p.advance() // 'loop'
+		return p.advance().Lexeme
+	}
+	return ""
 }
 
 // parseWhileStmt parses `while Cond Block` (grammar.ebnf WhileStmt).
@@ -452,6 +469,7 @@ func (p *parser) parseWhileStmt() (*ast.WhileStmt, *Diag) {
 	if err != nil {
 		return nil, err
 	}
+	label := p.parseOptLoopLabel()
 	body, err := p.parseBlock()
 	if err != nil {
 		return nil, err
@@ -461,8 +479,9 @@ func (p *parser) parseWhileStmt() (*ast.WhileStmt, *Diag) {
 			StartLine: kw.Line, StartCol: kw.Col,
 			EndLine: body.Span.EndLine, EndCol: body.Span.EndCol,
 		},
-		Cond: cond,
-		Body: body,
+		Cond:  cond,
+		Label: label,
+		Body:  body,
 	}, nil
 }
 

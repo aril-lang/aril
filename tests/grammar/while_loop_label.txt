@@ -1,0 +1,29 @@
+--- TITLE ---
+WhileStmt with a loop-contract label — `while cond loop <label> { … }` (RFC-0006 loop invariants)
+
+--- INPUT ---
+func main() {
+  var n = 0
+  while n < 2 loop spin {
+    n = n + 1
+  }
+}
+
+--- AST ---
+(File @1:1-6:2
+  (FuncDecl "main" @1:1-6:2
+    (type-params)
+    (params)
+    (Block @1:13-6:2
+      (VarStmt "n" @2:3-2:12
+        (IntLitExpr 0 @2:11-2:12))
+      (WhileStmt @3:3-5:4 loop "spin"
+        (Binary "<" @3:9-3:14
+          (Ident "n" @3:9-3:10)
+          (IntLitExpr 2 @3:13-3:14))
+        (Block @3:25-5:4
+          (AssignStmt @4:5-4:14
+            (Ident "n" @4:5-4:6)
+            (Binary "+" @4:9-4:14
+              (Ident "n" @4:9-4:10)
+              (IntLitExpr 1 @4:13-4:14))))))))

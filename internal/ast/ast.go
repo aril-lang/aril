@@ -501,11 +501,16 @@ func (n *IfStmt) NodeSpan() Span   { return n.Span }
 func (n *IfStmt) NodeKind() string { return "IfStmt" }
 func (n *IfStmt) stmtMarker()      {}
 
-// ForStmt — for <pattern> in <iterable> { body }.
+// ForStmt — for <pattern> in <iterable> [loop <label>] { body }.
+// Label is the optional loop-contract label (grammar.ebnf §LoopLabel,
+// RFC-0006 loop invariants); "" when absent. It names the loop so a
+// `contract` block's `loop <label>` section can attach a per-iteration
+// invariant. Codegen ignores it — a labelled loop lowers identically.
 type ForStmt struct {
 	Span     Span
 	Pattern  Pattern
 	Iterable Iterable
+	Label    string
 	Body     *Block
 }
 
@@ -513,11 +518,14 @@ func (n *ForStmt) NodeSpan() Span   { return n.Span }
 func (n *ForStmt) NodeKind() string { return "ForStmt" }
 func (n *ForStmt) stmtMarker()      {}
 
-// WhileStmt — `while <cond> { body }`. Per ast.md §Stmt.
+// WhileStmt — `while <cond> [loop <label>] { body }`. Per ast.md §Stmt.
+// Label is the optional loop-contract label (see ForStmt.Label); "" when
+// absent.
 type WhileStmt struct {
-	Span Span
-	Cond Expr
-	Body *Block
+	Span  Span
+	Cond  Expr
+	Label string
+	Body  *Block
 }
 
 func (n *WhileStmt) NodeSpan() Span   { return n.Span }
