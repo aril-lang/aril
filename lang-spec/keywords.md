@@ -84,6 +84,11 @@ declaration error), an ordinary identifier everywhere else. The block grammar
 CONTRACTS-IMPL bootstrap the body is parsed-and-skipped (the `--contracts=off`
 ignore level) until the enforcement pipeline lands.
 
+`loop` is likewise contextual: a keyword only as `loop <ident>` between a
+`for`/`while` header and its block (`grammar.ebnf` §LoopLabel), an ordinary
+identifier everywhere else — so `for x in loop { … }` keeps `loop` as the
+iterable, since no label identifier follows before the `{`.
+
 ## Built-in identifiers (predeclared, NOT keywords)
 
 These are predeclared in the top-level scope. Full signatures live in

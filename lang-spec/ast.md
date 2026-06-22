@@ -299,14 +299,20 @@ Stmt =
   | VarStmt       { name: string | "_", decl_type: Option<TypeExpr>, value: Option<Expr> }
   | AssignStmt    { lvalue: Expr, value: Expr }          // sema restricts lvalue
   | IfStmt        { cond: Expr, then_block: Block, else_branch: Option<IfStmt | Block> }
-  | ForStmt       { pattern: Pattern, iterable: Iterable, body: Block }
-  | WhileStmt     { cond: Expr, body: Block }
+  | ForStmt       { pattern: Pattern, iterable: Iterable, label: Option<string>, body: Block }
+  | WhileStmt     { cond: Expr, label: Option<string>, body: Block }
   | SelectStmt    { cases: []SelectCase }
   | DeferStmt     { call: Expr }
   | ExprStmt      { expr: Expr }
 ```
 
 `Iterable` is `RangeExpr | Expr`.
+
+`label` on `ForStmt`/`WhileStmt` is the optional loop-contract label
+(grammar.ebnf §LoopLabel, RFC-0006 loop invariants) — `None` when the loop is
+unlabelled. It names the loop so a `contract` block's `loop <label>` section
+can attach a per-iteration invariant; it has no runtime effect (a labelled loop
+lowers identically).
 
 ### `RangeExpr`
 
