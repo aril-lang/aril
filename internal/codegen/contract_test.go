@@ -76,3 +76,34 @@ contract run {
 		t.Errorf("off-mode emit differs from the contract-free program:\n--- with ---\n%s\n--- without ---\n%s", off, noContract)
 	}
 }
+
+// TestEmitEnsures: an ensures lowers to a Go named-return + deferred
+// re-entrancy-guarded post-check; entry bindings become entry temps; off
+// emits nothing.
+func TestEmitEnsures(t *testing.T) {
+	src := `func dbl(x: int): int { return x + x }
+
+contract dbl {
+  entry { let x0 = x }
+  ensures result == x0 + x0
+}
+`
+	got := emitContract(t, src, "panic")
+	for _, want := range []string{
+		"(_arilRet int)",                          // named return
+		"_arilEntry_x0 := ",                       // entry temp
+		"defer func()",                            // deferred post-check
+		"if r := recover()",                       // recover-rethrow guard
+		"if !_arilInContract {",                   // re-entrancy guard
+		"_arilRet == _arilEntry_x0+_arilEntry_x0", // result→_arilRet, entry subst
+		"ensures violated (dbl)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("panic-mode emit missing %q:\n%s", want, got)
+		}
+	}
+	off := emitContract(t, src, "off")
+	if strings.Contains(off, "_arilRet") || strings.Contains(off, "ensures violated") {
+		t.Errorf("off-mode emit must not lower the contract:\n%s", off)
+	}
+}

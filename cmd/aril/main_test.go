@@ -854,3 +854,40 @@ contract prefixSums {
 		t.Errorf("--contracts=panic blame = %q; want it mapped to the .aril source", stderr)
 	}
 }
+
+// TestContractsEnsuresFires (C5b-ii): a function whose `ensures` is broken
+// runs to completion under off but aborts under --contracts=panic, with blame
+// in Aril coordinates. Covers the entry-snapshot + result substitution.
+func TestContractsEnsuresFires(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ens.aril")
+	src := `import fmt
+
+func dbl(x: int): int {
+  return x + 1
+}
+
+func main() {
+  fmt.println(dbl(3))
+}
+
+contract dbl {
+  entry { let x0 = x }
+  ensures result == x0 + x0
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, exit := runAril(t, "run", path)
+	if exit != 0 || strings.TrimSpace(stdout) != "4" {
+		t.Fatalf("off run: exit %d stdout %q; want exit 0, \"4\"", exit, stdout)
+	}
+	_, stderr, exit := runAril(t, "run", "--contracts=panic", path)
+	if exit == 0 {
+		t.Fatalf("--contracts=panic should abort the broken ensures; got exit 0")
+	}
+	if !strings.Contains(stderr, "ensures violated") || !strings.Contains(stderr, "ens.aril") {
+		t.Errorf("--contracts=panic stderr = %q; want an ensures violation mapped to the .aril", stderr)
+	}
+}

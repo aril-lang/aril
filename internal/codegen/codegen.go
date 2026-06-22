@@ -267,6 +267,16 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		}
 	}
 	g.writeHeader(f)
+	// Contract re-entrancy guard (RFC-0006, panic mode): a contract
+	// predicate may call the contracted (or a mutually-contracted) function
+	// — `ensures setEq(result, union(b, a))` inside `union`. Checking those
+	// nested calls' contracts would recurse without bound, so contract
+	// checks are disabled while a predicate is being evaluated. v1 is a
+	// package-level flag (single-threaded contract checking; a goroutine-
+	// local form is future work).
+	if g.contractMode == "panic" && len(g.info.FuncContracts) > 0 {
+		g.b.WriteString("var _arilInContract bool\n\n")
+	}
 	for _, d := range f.Decls {
 		// Attribute this decl's //line directives to its own source
 		// file (multi-file package, RFC-0002). Reset the emitted-line
@@ -341,9 +351,15 @@ type gen struct {
 	vendoredRequested bool
 	// contractMode is the RFC-0006 enforcement mode ("off" / "panic"); ""
 	// is treated as "off". Under off, contract checks are not emitted.
-	contractMode  string
-	runtimePrefix string
-	runtimeImport string
+	contractMode string
+	// contractResultVar / contractEntryVars carry the predicate-emission
+	// substitution while emitting a requires/ensures predicate: `result` →
+	// the named return, an entry-binding name → its entry temp. Both empty
+	// outside contract-predicate emission.
+	contractResultVar string
+	contractEntryVars map[string]string
+	runtimePrefix     string
+	runtimeImport     string
 	// userTypeNames holds the names of user-declared types (classes,
 	// sums, records) — used to detect a user type that shadows a runtime
 	// type name (e.g. a user `class Map` or `type Dynamic`), so

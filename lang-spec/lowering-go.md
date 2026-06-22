@@ -829,10 +829,57 @@ The `//line` directive at the check maps the panic back to the predicate's
 `.aril` source, so blame reads in Aril coordinates (D10) with no runtime
 support. Under `--contracts=off` (the default during the build-out) **nothing
 is emitted** — a contracted program lowers byte-identically to the same program
-without the contract (golden-fixture and `build_ok`-ratchet safe). `warn` /
-`stats` modes and the `arilrt` violation-rendering layer (richer blame, mode
-tally) are not lowered yet. requires/ensures/type-invariant lowering follows in
-later slices.
+without the contract (golden-fixture and `build_ok`-ratchet safe).
+
+### requires / ensures / entry (RFC-0006)
+
+A function contract lowers with a **Go named return value** so the `ensures`
+post-check sees the returned value at every return path without rewriting
+returns:
+
+```
+func f(p…) RetType { <body> }   with entry { let n = e }, requires R, ensures S
+  ⟿
+func f(p…) (_arilRet RetType) {
+    _arilEntry_n := <e>; _ = _arilEntry_n     // entry snapshots (function entry)
+    <guarded check of R>                       // requires (function entry)
+    defer func() {
+        if r := recover(); r != nil { panic(r) }   // skip on a panic-in-progress
+        <guarded check of S>                        // ensures (normal return)
+    }()
+    <body>                                      // each `return X` sets _arilRet
+}
+```
+
+In a predicate, `result` lowers to `_arilRet` and an `entry`-binding name `n`
+to its temp `_arilEntry_n`. A **named return** is emitted only when the contract
+has `ensures` (and a non-unit return type); `requires`-only needs no named
+return.
+
+Each check is wrapped in a **re-entrancy guard** so a predicate that calls the
+contracted (or a mutually-contracted) function does not recurse without bound
+(`ensures setEq(result, union(b, a))` inside `union`):
+
+```
+if !_arilInContract {
+    _arilInContract = true
+    _arilPass := (<pred>)        // nested calls see the flag set → skip their checks
+    _arilInContract = false
+    if !_arilPass { panic("aril: contract: <kind> violated (<fn>)") }
+}
+```
+
+`_arilInContract` is a package-level flag emitted once when any function
+contract is lowered. Two v1 limitations, both superseded by the future
+`arilrt` contract layer with a goroutine-local save/restore: it is not
+goroutine-safe (single-threaded contract checking), and the `= false` reset is
+not panic-safe — a predicate that itself panics leaves the flag set. Both are
+inert in v1: sequential Aril has no source-reachable panic recovery, so a
+predicate panic aborts the process (no continuation can observe a stuck flag).
+Under `off`, none of this is emitted (byte-identical).
+`warn` / `stats` modes and the `arilrt` violation-rendering layer (richer blame,
+mode tally) are not lowered yet; type-invariant lowering follows in a later
+slice.
 
 ## Generics
 

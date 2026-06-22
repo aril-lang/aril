@@ -37,6 +37,7 @@ func (c *checker) checkBodies(f *ast.File) {
 				c.curTryForbidden = c.definitelyNotTryable(v.ReturnType)
 				c.curContract = c.contractByTarget[v.Name]
 				c.checkBlock(v.Body)
+				c.checkFuncContract(v)
 				c.curContract = nil
 			}
 		case *ast.ClassDecl:

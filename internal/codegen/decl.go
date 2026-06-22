@@ -370,14 +370,30 @@ func (g *gen) emitFuncDecl(fn *ast.FuncDecl) error {
 		}
 	}
 	g.b.WriteByte(')')
+	// A function whose contract has `ensures` lowers with a Go *named*
+	// return value (`_arilRet`) so the deferred post-check sees the value at
+	// every return path without rewriting returns (RFC-0006, panic mode).
+	fc := g.contractFor(fn)
+	named := fc != nil && len(fc.Ensures) > 0 && fn.ReturnType != nil
 	if fn.ReturnType != nil {
 		g.b.WriteByte(' ')
+		if named {
+			g.b.WriteString("(_arilRet ")
+		}
 		if err := g.emitTypeExpr(fn.ReturnType); err != nil {
 			return err
+		}
+		if named {
+			g.b.WriteByte(')')
 		}
 	}
 	g.b.WriteString(" {\n")
 	g.indent++
+	if fc != nil {
+		if err := g.emitContractPrologue(fc, fn, named); err != nil {
+			return err
+		}
+	}
 	prevRet := g.curFuncReturn
 	g.curFuncReturn = fn.ReturnType
 	if err := g.emitFuncBody(fn.Body, fn.ReturnType, isUnitReturn(fn.ReturnType)); err != nil {
