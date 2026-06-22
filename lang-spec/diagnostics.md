@@ -163,7 +163,7 @@ E10xx range.
 ### E11xx — Contracts (RFC-0006 value/state)
 
 Codes raised by contract checking — separable `contract { … }` blocks. E1103–E1106
-(predicate purity, `old`/`result` scoping, invariant-field-write) are **reserved** —
+(predicate purity, `result` / `entry`-binding scoping, invariant-field-write) are **reserved** —
 allocated for the clauses landing in later slices of the contract epoch.
 
 | Code | Sev | Message | Authoritative rule | Fix |

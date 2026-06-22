@@ -51,7 +51,7 @@ projection — so a programmer or agent learns one core, not two languages. A
 contract is a predicate over the **trace of observable operations on a
 subject**, organized in up to four **kinds**, sharing one separable `contract`
 block, one leaf predicate language (pure boolean Aril expressions plus
-`old`/`result`), the four modes, the `arilrt` runtime, and the blame model
+`result` and `entry` snapshots), the four modes, the `arilrt` runtime, and the blame model
 (D10). The *kinds available* depend on the subject's domain; the *spine* is
 shared.
 
