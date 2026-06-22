@@ -61,11 +61,70 @@ func (p *parser) parseContractClause() (ast.ContractClause, *Diag) {
 			}, nil
 		case "loop":
 			return p.parseLoopContract()
+		case "entry":
+			return p.parseEntrySection()
 		}
 	}
 	return ast.ContractClause{}, p.diag("E0112",
-		fmt.Sprintf("expected a contract clause (requires/ensures/invariant/loop), got %s %q",
+		fmt.Sprintf("expected a contract clause (requires/ensures/invariant/loop/entry), got %s %q",
 			t.Kind, t.Lexeme), t.Line, t.Col)
+}
+
+// parseEntrySection parses an `entry { (let <name> = <expr>)* }` section —
+// pure bindings evaluated at function entry and in scope for `ensures`
+// (RFC-0006; the general entry-snapshot mechanism, subsuming `old(e)`). v1
+// admits only `let` bindings: a `var` (mutable / ghost variable) has no
+// mutation site here and is deferred.
+func (p *parser) parseEntrySection() (ast.ContractClause, *Diag) {
+	kw := p.advance() // 'entry'
+	if _, err := p.expect(lexer.KindPunct, "{"); err != nil {
+		return ast.ContractClause{}, err
+	}
+	p.skipStmtSeps()
+	var binds []ast.ContractBinding
+	for !p.at(lexer.KindPunct, "}") && !p.at(lexer.KindEOF) {
+		if p.at(lexer.KindKeyword, "var") {
+			t := p.peek()
+			return ast.ContractClause{}, p.diag("E0112",
+				"a contract `entry` binding must be `let` (immutable); `var` is not admitted in v1", t.Line, t.Col)
+		}
+		if _, err := p.expect(lexer.KindKeyword, "let"); err != nil {
+			return ast.ContractClause{}, err
+		}
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return ast.ContractClause{}, p.diag("E0112", "expected binding name after `let`", t.Line, t.Col)
+		}
+		name := p.advance()
+		if _, err := p.expect(lexer.KindOp, "="); err != nil {
+			return ast.ContractClause{}, err
+		}
+		val, err := p.parseExpr()
+		if err != nil {
+			return ast.ContractClause{}, err
+		}
+		binds = append(binds, ast.ContractBinding{
+			Span: ast.Span{
+				StartLine: name.Line, StartCol: name.Col,
+				EndLine: val.NodeSpan().EndLine, EndCol: val.NodeSpan().EndCol,
+			},
+			Name:  name.Lexeme,
+			Value: val,
+		})
+		p.skipStmtSeps()
+	}
+	closeTok, err := p.expect(lexer.KindPunct, "}")
+	if err != nil {
+		return ast.ContractClause{}, err
+	}
+	return ast.ContractClause{
+		Span: ast.Span{
+			StartLine: kw.Line, StartCol: kw.Col,
+			EndLine: closeTok.Line, EndCol: closeTok.Col + 1,
+		},
+		Kind:     "entry",
+		Bindings: binds,
+	}, nil
 }
 
 // parseLoopContract parses a `loop <label> { (invariant <expr>)* }` section —

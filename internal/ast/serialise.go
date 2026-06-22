@@ -857,8 +857,9 @@ func writeSpan(b *strings.Builder, s Span) {
 }
 
 // writeContractClause renders one ContractClause: `(requires <pred>)`,
-// `(ensures <pred>)`, `(invariant <pred>)`, or a `(loop "label" …)` section
-// holding nested invariant clauses.
+// `(ensures <pred>)`, `(invariant <pred>)`, a `(loop "label" …)` section
+// holding nested invariant clauses, or an `(entry (let "n" …) …)` section
+// holding entry bindings.
 func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 	writeIndent(b, depth)
 	b.WriteByte('(')
@@ -870,6 +871,21 @@ func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 		for _, inv := range cl.Loop {
 			b.WriteByte('\n')
 			writeContractClause(b, inv, depth+1)
+		}
+		b.WriteByte(')')
+		return
+	}
+	if cl.Kind == "entry" {
+		writeSpan(b, cl.Span)
+		for _, bd := range cl.Bindings {
+			b.WriteByte('\n')
+			writeIndent(b, depth+1)
+			b.WriteString("(let ")
+			writeQuoted(b, bd.Name)
+			writeSpan(b, bd.Span)
+			b.WriteByte('\n')
+			write(b, bd.Value, depth+2)
+			b.WriteByte(')')
 		}
 		b.WriteByte(')')
 		return

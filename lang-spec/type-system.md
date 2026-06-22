@@ -1039,10 +1039,10 @@ Opaque-handle restrictions (each backed by a diagnostic):
 A contract predicate (a `requires` / `ensures` / `invariant` clause of a
 separable `contract { … }` block, RFC-0006) is an ordinary boolean Aril
 expression, type-checked through the same rules as any expression. It is
-checked in the scope of its target: a function's params (and `result` /
-`old(e)` for `ensures`, in later slices), a type's fields (`invariant`), or a
-labelled loop's body scope — the loop variable and enclosing locals — for a
-`loop <label>` invariant.
+checked in the scope of its target: a function's params (and `result` plus the
+`entry`-section bindings for `ensures`, in later slices), a type's fields
+(`invariant`), or a labelled loop's body scope — the loop variable and
+enclosing locals — for a `loop <label>` invariant.
 
     Γ_target ⊢ pred : bool
     ─────────────────────── (T-Contract-Pred)

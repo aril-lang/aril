@@ -99,11 +99,15 @@ func main() {
 }
 
 // The real spec: the output's value sequence is the input's, reversed —
-// length preservation is only its trivial corollary. `old(toValues(head))`
-// snapshots the *entry* sequence before the in-place pointer rewiring;
-// writing `toValues(old(head))` would instead walk the already-mutated
-// nodes and read back just the old head (RFC-0006 §Predicate language).
-// Inert until `--contracts` enforcement lands.
+// length preservation is only its trivial corollary. The `entry { }` section
+// snapshots the *entry* sequence (a `let` evaluated at function entry, before
+// the in-place pointer rewiring) and names it `original`; `ensures` compares
+// the result against its reverse. This is the general entry-snapshot
+// mechanism — it captures the reduced value (the `[]int`), not the whole
+// node graph, and reads cleanly without an `old(…)` wrapper (RFC-0006).
 contract reverse {
-  ensures intsEq(toValues(result), reversedInts(old(toValues(head))))
+  entry {
+    let original = toValues(head)
+  }
+  ensures intsEq(toValues(result), reversedInts(original))
 }

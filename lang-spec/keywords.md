@@ -77,6 +77,7 @@ those positions they are ordinary identifiers.
 | `channel`  | at the head of a top-level block (`channel <name> {`), RFC-0007 | identifier |
 | `loop`     | naming a loop after a `for`/`while` header (`for … loop <label> {`), and the head of a contract loop-invariant section (`loop <label> { invariant … }`), RFC-0006 | identifier |
 | `requires` / `ensures` / `invariant` | as a clause keyword inside a `contract { … }` block (and inside a `loop` section, `invariant` only), RFC-0006 | identifier |
+| `entry`    | as the head of a contract entry-snapshot section (`entry { let … }`) inside a `contract { … }` block, RFC-0006 | identifier |
 
 `contract` / `channel` are contextual: a keyword only in the positional
 `<word> <name> {` top-level shape (where an identifier would otherwise be a

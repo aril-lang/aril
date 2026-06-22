@@ -46,15 +46,28 @@ func (n *ContractDecl) NodeSpan() Span   { return n.Span }
 func (n *ContractDecl) NodeKind() string { return "ContractDecl" }
 
 // ContractClause is one obligation inside a ContractDecl. Kind is one of
-// "requires" | "ensures" | "invariant" (the predicate is in Pred), or
-// "loop" — a per-iteration section where Label names the target loop and
-// Loop holds its `invariant` clauses (Pred is then nil). RFC-0006.
+// "requires" | "ensures" | "invariant" (the predicate is in Pred); "loop" —
+// a per-iteration section where Label names the target loop and Loop holds
+// its `invariant` clauses; or "entry" — a section of `let` bindings
+// evaluated at function entry and in scope for `ensures` (Bindings holds
+// them, Pred is nil). RFC-0006.
 type ContractClause struct {
+	Span     Span
+	Kind     string
+	Pred     Expr              // the predicate; nil when Kind is "loop" / "entry"
+	Label    string            // the loop label; set only when Kind == "loop"
+	Loop     []ContractClause  // nested invariant clauses; set only when Kind == "loop"
+	Bindings []ContractBinding // entry bindings; set only when Kind == "entry"
+}
+
+// ContractBinding is one `let <name> = <value>` in a contract `entry { … }`
+// section — a pure expression evaluated at function entry and bound for use
+// in `ensures` (RFC-0006). It is the general entry-snapshot mechanism (it
+// subsumes the `old(e)` form: `old(e)` is just `entry { let e0 = e }`).
+type ContractBinding struct {
 	Span  Span
-	Kind  string
-	Pred  Expr             // the predicate; nil when Kind == "loop"
-	Label string           // the loop label; set only when Kind == "loop"
-	Loop  []ContractClause // nested invariant clauses; set only when Kind == "loop"
+	Name  string
+	Value Expr
 }
 
 // Import is a single `import <path>` line.

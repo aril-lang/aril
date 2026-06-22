@@ -698,3 +698,36 @@ contract f { loop scan { ensures result > 0 } }
 		t.Fatalf("want a loop-only-invariant diagnostic, got %v", perr)
 	}
 }
+
+// TestContractEntrySection covers the `entry { let … }` section (RFC-0006
+// entry snapshots) and the v1 let-only restriction (a `var` is rejected).
+func TestContractEntrySection(t *testing.T) {
+	f := parseString(t, `func g(x: int): int { return x }
+
+contract g {
+  entry {
+    let x0 = x
+  }
+  ensures result == x0
+}
+`)
+	if len(f.Contracts) != 1 {
+		t.Fatalf("expected 1 contract; got %d", len(f.Contracts))
+	}
+	cls := f.Contracts[0].Clauses
+	if len(cls) != 2 || cls[0].Kind != "entry" || cls[1].Kind != "ensures" {
+		t.Fatalf("clauses = %v, want [entry ensures]", []string{cls[0].Kind, cls[1].Kind})
+	}
+	if len(cls[0].Bindings) != 1 || cls[0].Bindings[0].Name != "x0" {
+		t.Errorf("entry binding = %+v, want one named x0", cls[0].Bindings)
+	}
+
+	// `var` in an entry section is rejected (v1 let-only).
+	toks, _ := lexer.Lex(`func g(x: int): int { return x }
+contract g { entry { var x0 = x } ensures result == x0 }
+`)
+	_, perr := Parse(toks)
+	if perr == nil || !strings.Contains(perr.Message, "must be `let`") {
+		t.Errorf("want a let-only diagnostic for `var` in entry, got %v", perr)
+	}
+}
