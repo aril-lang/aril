@@ -171,8 +171,8 @@ allocated for the clauses landing in later slices of the contract epoch.
 | E1101 | E | Contract attaches to no such declaration / loop | RFC-0006 §Surface / `grammar.ebnf` §ContractDecl | The `contract <target>` names a declaration that does not exist, or a `loop <label>` section names a loop the target's body does not label. Fix the name, or add the `loop <label>` to the body. |
 | E1102 | E | Contract predicate must be `bool` | RFC-0006 §"Predicate language" / `type-system.md` T-Contract-Pred | A `requires` / `ensures` / `invariant` predicate has a non-`bool` type. A contract predicate is a pure boolean Aril expression. |
 | E1103 | E | reserved — impure contract predicate | RFC-0006 §"Predicate language" | reserved (predicate purity check, a later slice). |
-| E1104 | E | reserved — `result` / `old` outside `ensures` | RFC-0006 §"Predicate language" | reserved. |
-| E1105 | E | reserved — `old(e)` over an impure expression | RFC-0006 §"Predicate language" | reserved. |
+| E1104 | E | reserved — `result` outside `ensures` | RFC-0006 §"Predicate language" | reserved. |
+| E1105 | E | reserved — impure `entry`-section binding expression | RFC-0006 §"Predicate language" | reserved. |
 | E1106 | E | reserved — external field write to an invariant type | RFC-0006 §Surface (type invariants) | reserved. |
 
 ## Diagnostic formatting

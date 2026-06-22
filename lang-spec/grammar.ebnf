@@ -277,10 +277,11 @@ ContractBlock  = ContractDecl | ChannelBlock ;
 
 // Value/state contracts (RFC-0006) — parsed into File.Contracts (ast.md).
 // A predicate is an ordinary boolean Expr evaluated in the target's scope,
-// extended with `result`/`old(e)` (their meaning is assigned by the
-// contract pass, not the grammar — at parse time they are plain
-// identifiers/calls). A `loop <label>` section's invariants attach to the
-// like-named labelled loop in the target's body (LoopLabel).
+// extended with `result` (in `ensures`) and the names bound by an `entry`
+// section — their meaning is assigned by the contract pass, not the grammar
+// (at parse time `result` is a plain identifier). A `loop <label>` section's
+// invariants attach to the like-named labelled loop in the target's body
+// (LoopLabel).
 ContractDecl   = "contract" Ident "{" ContractClause* "}" ;
 ContractClause = ( "requires" | "ensures" | "invariant" ) Expr
                | LoopContract
