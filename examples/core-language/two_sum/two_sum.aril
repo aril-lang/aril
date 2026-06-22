@@ -27,3 +27,18 @@ func main() {
     None         => fmt.println("no pair"),
   }
 }
+
+// Separable contract (RFC-0006), inert until `--contracts` enforcement.
+// Soundness: any returned pair is a genuine solution — two distinct, in-range
+// indices whose values hit the target. This is the half a monitor can check
+// from one call. The completeness half (None ⟹ no such pair exists anywhere)
+// quantifies over all pairs and needs a `forall`, deferred to v1.1.
+contract twoSum {
+  ensures match result {
+    Some((i, j)) => (i != j
+                     && i >= 0 && i < nums.len()
+                     && j >= 0 && j < nums.len()
+                     && nums[i] + nums[j] == target),
+    None => true,
+  }
+}

@@ -85,3 +85,29 @@ func main() {
   fmt.println("a == a     :", setEq(a, a))
   fmt.println("a == b     :", setEq(a, b))
 }
+
+// Separable contracts (RFC-0006), inert until `--contracts` enforcement.
+// These state the *algebraic laws* of the operators — the meaningful spec,
+// not a sanity bound — reusing the file's own `setEq`/`isSubset` as the
+// predicate vocabulary. A predicate is ordinary pure Aril, so a clause may
+// freely call the operators again (e.g. `union(b, a)` to assert commutativity).
+contract union {
+  ensures isSubset(a, result) && isSubset(b, result)   // a superset of both
+  ensures setEq(result, union(b, a))                   // commutative
+}
+
+contract intersect {
+  ensures isSubset(result, a) && isSubset(result, b)   // a subset of both
+  ensures setEq(result, intersect(b, a))               // commutative
+}
+
+contract difference {
+  ensures isSubset(result, a)                          // a - b ⊆ a
+  ensures setEq(intersect(result, b), Set<int>{})      // and disjoint from b
+}
+
+contract symmetric {
+  // A △ B = (A ∪ B) \ (A ∩ B) — the defining identity.
+  ensures setEq(result, difference(union(a, b), intersect(a, b)))
+  ensures setEq(result, symmetric(b, a))               // commutative
+}
