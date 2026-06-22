@@ -162,8 +162,8 @@ E10xx range.
 
 ### E11xx — Contracts (RFC-0006 value/state)
 
-Codes raised by contract checking — separable `contract { … }` blocks. E1103–E1106
-(predicate purity, `result` / `entry`-binding scoping, invariant-field-write) are **reserved** —
+Codes raised by contract checking — separable `contract { … }` blocks. E1103–E1105
+(predicate purity, `result` / `entry`-binding scoping) are **reserved** —
 allocated for the clauses landing in later slices of the contract epoch.
 
 | Code | Sev | Message | Authoritative rule | Fix |
@@ -173,7 +173,7 @@ allocated for the clauses landing in later slices of the contract epoch.
 | E1103 | E | reserved — impure contract predicate | RFC-0006 §"Predicate language" | reserved (predicate purity check, a later slice). |
 | E1104 | E | reserved — `result` outside `ensures` | RFC-0006 §"Predicate language" | reserved. |
 | E1105 | E | reserved — impure `entry`-section binding expression | RFC-0006 §"Predicate language" | reserved. |
-| E1106 | E | reserved — external field write to an invariant type | RFC-0006 §Surface (type invariants) | reserved. |
+| E1106 | E | External field write to an invariant type | RFC-0006 §Surface (type invariants) / `type-system.md` T-Contract-Pred | A direct field write `recv.field = v` whose `recv` is an invariant-bearing type, from outside that type's own methods, bypasses the invariant (re-checked only at method exit). Mutate through a method instead. The sole legal field write to such a type is its own receiver — a bare `field = v` or `this.field = v` inside its method. |
 
 ## Diagnostic formatting
 

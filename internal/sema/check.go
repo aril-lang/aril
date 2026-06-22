@@ -81,6 +81,11 @@ type checker struct {
 	// body is being resolved/checked, or nil.
 	contractByTarget map[string]*ast.ContractDecl
 	curContract      *ast.ContractDecl
+	// invariantTypes is the set of class/record type names carrying a
+	// top-level `invariant` (RFC-0006). Populated at index time (before
+	// bodies) so the E1106 external-field-write guard is order-independent
+	// — an assignment may precede the invariant type's declaration.
+	invariantTypes map[string]bool
 	// matchedLoopLabels tracks which of curContract's loop-section labels
 	// the resolve walk has matched against a real labelled loop, so an
 	// unmatched section can be flagged (E1101). Reset per function.

@@ -93,6 +93,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 	case *ast.VarStmt:
 		c.checkBinding(v, nil, v.DeclType, v.Value)
 	case *ast.AssignStmt:
+		c.checkExternalFieldWrite(v)
 		lt := c.inferExpr(v.LValue)
 		vt := c.inferExpr(v.Value)
 		if !c.fits(lt, v.Value, vt) {

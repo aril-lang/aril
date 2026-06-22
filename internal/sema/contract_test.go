@@ -230,6 +230,60 @@ contract Counter {
 	}
 }
 
+// TestExternalFieldWriteRejected: a direct field write to an invariant type
+// from outside its methods is E1106; the same write through `this` inside a
+// method (and a write to a non-invariant type) is clean.
+func TestExternalFieldWriteRejected(t *testing.T) {
+	_, codes := checkContract(t, `class Counter {
+  var n: int
+  static new(): Counter { return Counter{ n: 0 } }
+  bump() { n = n + 1 }
+}
+
+contract Counter {
+  invariant n >= 0
+}
+
+func main() {
+  let c = Counter.new()
+  c.n = 5
+}
+`)
+	if !hasCode(codes, "E1106") {
+		t.Errorf("want E1106 for an external field write to an invariant type, got %v", codes)
+	}
+
+	// this.field inside the type's own method is internal — allowed.
+	_, codes = checkContract(t, `class Box {
+  var v: int
+  static new(): Box { return Box{ v: 0 } }
+  set(x: int) { this.v = x }
+}
+
+contract Box {
+  invariant v >= 0
+}
+`)
+	if hasCode(codes, "E1106") {
+		t.Errorf("this.field write inside a method must not fire E1106, got %v", codes)
+	}
+
+	// A field write to a type with no invariant is unaffected.
+	_, codes = checkContract(t, `class Plain {
+  var v: int
+  static new(): Plain { return Plain{ v: 0 } }
+}
+
+func main() {
+  let p = Plain.new()
+  p.v = 9
+}
+`)
+	if hasCode(codes, "E1106") {
+		t.Errorf("a non-invariant type's field write must not fire E1106, got %v", codes)
+	}
+}
+
 // TestTypeInvariantNonBool: a non-bool class invariant predicate is E1102.
 func TestTypeInvariantNonBool(t *testing.T) {
 	_, codes := checkContract(t, `class Counter {
