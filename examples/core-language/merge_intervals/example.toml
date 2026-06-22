@@ -42,3 +42,10 @@ expect  = ["E0113"]
 stage   = "sema"
 matches = "errors/dup-merge.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/external-write-e1106.patch"   # direct field write to invariant type Interval bypasses its invariant
+expect  = ["E1106"]
+stage   = "sema"
+matches = "errors/external-write-e1106.expected"
+origin  = "synthetic"

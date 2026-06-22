@@ -20,6 +20,7 @@ import "github.com/aril-lang/aril/internal/ast"
 func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope) {
 	c.contractByTarget = map[string]*ast.ContractDecl{}
 	c.contractEntrySyms = map[*ast.FuncDecl][]*Symbol{}
+	c.invariantTypes = map[string]bool{}
 	for i, f := range files {
 		c.file = paths[i]
 		for _, cd := range f.Contracts {
@@ -29,8 +30,43 @@ func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope
 				continue
 			}
 			c.contractByTarget[cd.Target] = cd
+			// A class/record target with a top-level `invariant` is an
+			// invariant type — its fields may only be mutated through a
+			// method (the E1106 guard, checked at every body assignment).
+			if sym.Kind == SymClass || sym.Kind == SymTypeDecl {
+				for _, cl := range cd.Clauses {
+					if cl.Kind == "invariant" {
+						c.invariantTypes[cd.Target] = true
+						break
+					}
+				}
+			}
 		}
 	}
+}
+
+// checkExternalFieldWrite enforces E1106 (RFC-0006): a direct field write to
+// an invariant-bearing type from outside that type's own methods bypasses the
+// invariant (which is only re-checked at method exit). The single legal
+// field-write to such a type is through its receiver — a bare `field = v`
+// (implicit receiver, an Ident lvalue, never reaches here) or `this.field = v`
+// inside the type's method. Any other `recv.field = v` whose `recv` types to
+// an invariant type is rejected; mutate through a method instead.
+func (c *checker) checkExternalFieldWrite(a *ast.AssignStmt) {
+	fld, ok := a.LValue.(*ast.Field)
+	if !ok {
+		return
+	}
+	if _, isThis := fld.Receiver.(*ast.ThisExpr); isThis {
+		return // this.field inside the type's own method — internal, checked at method exit
+	}
+	named, ok := c.inferExpr(fld.Receiver).(*Named)
+	if !ok || !c.invariantTypes[named.N] {
+		return
+	}
+	c.report("E1106",
+		"direct field write to invariant type `"+named.N+"` bypasses its invariant — mutate through a method (the invariant is checked at method exit)",
+		a.Span)
 }
 
 // isContractTarget reports whether a symbol kind can carry a contract.

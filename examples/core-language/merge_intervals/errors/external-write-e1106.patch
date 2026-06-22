@@ -1,0 +1,11 @@
+--- merge_intervals.aril
++++ merge_intervals.aril
+@@ -27,7 +27,7 @@
+   for i in 1..sorted.len() {
+     let nxt = sorted[i]
+     if nxt.start <= cur.end {
+-      cur = Interval{ start: cur.start, end: max(cur.end, nxt.end) }
++      cur.end = max(cur.end, nxt.end)
+     } else {
+       out = out.push(cur)
+       cur = nxt
