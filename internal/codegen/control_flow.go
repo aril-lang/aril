@@ -563,7 +563,7 @@ func (g *gen) emitContractPrologue(fc *sema.FuncContract, fn *ast.FuncDecl, name
 			return err
 		}
 	}
-	if named && len(fc.Ensures) > 0 {
+	if len(fc.Ensures) > 0 {
 		g.writeIndent()
 		g.b.WriteString("defer func() {\n")
 		g.indent++
@@ -575,7 +575,12 @@ func (g *gen) emitContractPrologue(fc *sema.FuncContract, fn *ast.FuncDecl, name
 		g.indent--
 		g.writeIndent()
 		g.b.WriteString("}\n")
-		g.contractResultVar = "_arilRet"
+		// `result` lowers to the named return only on a value-returning
+		// function; a unit function's ensures references params / entry
+		// snapshots, never result (sema leaves it unbound there).
+		if named {
+			g.contractResultVar = "_arilRet"
+		}
 		g.contractEntryVars = entryVars
 		for _, ens := range fc.Ensures {
 			if err := g.emitContractCheck(ens, "ensures", fn.Name); err != nil {

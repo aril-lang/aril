@@ -106,6 +106,16 @@ func isUnknownType(t Type) bool {
 	return ok
 }
 
+// isUnitReturnType reports whether a function return annotation carries no
+// value: a nil annotation (implicit unit) or an explicit `unit`.
+func isUnitReturnType(t ast.TypeExpr) bool {
+	if t == nil {
+		return true
+	}
+	p, ok := t.(*ast.PrimitiveType)
+	return ok && p.Name == "unit"
+}
+
 // resolveFuncContract binds the names in the current function's
 // requires/ensures/entry obligations (RFC-0006). `requires` resolves in the
 // param scope; an `entry { let … }` section's values resolve in the param
@@ -130,7 +140,13 @@ func (c *checker) resolveFuncContract(fn *ast.FuncDecl, fnScope *Scope) {
 		}
 	}
 	ensScope := newScope(entryScope)
-	ensScope.declare(&Symbol{Name: "result", Kind: SymLocal, Type: c.typeFromExpr(fn.ReturnType)})
+	// `result` is in scope for `ensures` only on a value-returning function;
+	// a unit-returning function has no result, so `result` there stays
+	// unbound (E0103). An ensures over params / entry snapshots is still
+	// legal and checked on such a function.
+	if !isUnitReturnType(fn.ReturnType) {
+		ensScope.declare(&Symbol{Name: "result", Kind: SymLocal, Type: c.typeFromExpr(fn.ReturnType)})
+	}
 	for _, cl := range c.curContract.Clauses {
 		switch cl.Kind {
 		case "requires":

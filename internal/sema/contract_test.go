@@ -173,3 +173,33 @@ contract f {
 		t.Errorf("want E1102 for a non-bool ensures, got %v", codes)
 	}
 }
+
+// TestEnsuresOnUnitFunc: an ensures over params/entry on a unit-returning
+// function is accepted (recorded), but `result` is unbound there (E0103).
+func TestEnsuresOnUnitFunc(t *testing.T) {
+	info, codes := checkContract(t, `func check(x: int) {
+  return
+}
+
+contract check {
+  entry { let x0 = x }
+  ensures x0 == x
+}
+`)
+	if len(codes) != 0 {
+		t.Fatalf("unit-fn ensures over entry produced diags: %v", codes)
+	}
+	if len(info.FuncContracts) != 1 {
+		t.Fatalf("expected the unit-fn contract recorded, got %d", len(info.FuncContracts))
+	}
+
+	_, codes = checkContract(t, `func check(x: int) { return }
+
+contract check {
+  ensures result == x
+}
+`)
+	if !hasCode(codes, "E0103") {
+		t.Errorf("want E0103 (result unbound on a unit function), got %v", codes)
+	}
+}

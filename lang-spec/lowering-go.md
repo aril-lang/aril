@@ -870,8 +870,13 @@ if !_arilInContract {
 ```
 
 `_arilInContract` is a package-level flag emitted once when any function
-contract is lowered (v1 is single-threaded contract checking; a goroutine-local
-form is future work). Under `off`, none of this is emitted (byte-identical).
+contract is lowered. Two v1 limitations, both superseded by the future
+`arilrt` contract layer with a goroutine-local save/restore: it is not
+goroutine-safe (single-threaded contract checking), and the `= false` reset is
+not panic-safe — a predicate that itself panics leaves the flag set. Both are
+inert in v1: sequential Aril has no source-reachable panic recovery, so a
+predicate panic aborts the process (no continuation can observe a stuck flag).
+Under `off`, none of this is emitted (byte-identical).
 `warn` / `stats` modes and the `arilrt` violation-rendering layer (richer blame,
 mode tally) are not lowered yet; type-invariant lowering follows in a later
 slice.
