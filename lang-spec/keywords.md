@@ -75,6 +75,7 @@ those positions they are ordinary identifiers.
 | `go`    | as the attribute head in `@go("…")` (a `@` token followed by `go`) | identifier |
 | `contract` | at the head of a top-level block (`contract <name> {`), RFC-0006 | identifier |
 | `channel`  | at the head of a top-level block (`channel <name> {`), RFC-0007 | identifier |
+| `loop`     | between a `for`/`while` header and its block, naming the loop (`for … loop <label> {`), RFC-0006 | identifier |
 
 `contract` / `channel` are contextual: a keyword only in the positional
 `<word> <name> {` top-level shape (where an identifier would otherwise be a
@@ -82,6 +83,11 @@ declaration error), an ordinary identifier everywhere else. The block grammar
 (`grammar.ebnf` §ContractBlock) is the separable contract surface; during the
 CONTRACTS-IMPL bootstrap the body is parsed-and-skipped (the `--contracts=off`
 ignore level) until the enforcement pipeline lands.
+
+`loop` is likewise contextual: a keyword only as `loop <ident>` between a
+`for`/`while` header and its block (`grammar.ebnf` §LoopLabel), an ordinary
+identifier everywhere else — so `for x in loop { … }` keeps `loop` as the
+iterable, since no label identifier follows before the `{`.
 
 ## Built-in identifiers (predeclared, NOT keywords)
 

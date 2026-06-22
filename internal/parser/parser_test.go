@@ -591,3 +591,40 @@ func TestContractIdentifierNotClaimed(t *testing.T) {
 		t.Fatalf("expected 1 decl; got %d", len(f.Decls))
 	}
 }
+
+// TestLoopLabel covers the optional `loop <label>` on for/while headers
+// (RFC-0006 loop invariants) and the contextual guard: `loop` stays an
+// ordinary identifier when it is the iterable/condition itself, not a label.
+func TestLoopLabel(t *testing.T) {
+	f := parseString(t, `func main() {
+  for i in xs loop scan { print(i) }
+  while go loop spin { stop() }
+}
+`)
+	body := f.Decls[0].(*ast.FuncDecl).Body.Stmts
+	fs, ok := body[0].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("stmt[0] not ForStmt: %T", body[0])
+	}
+	if fs.Label != "scan" {
+		t.Errorf("for label = %q, want %q", fs.Label, "scan")
+	}
+	ws, ok := body[1].(*ast.WhileStmt)
+	if !ok {
+		t.Fatalf("stmt[1] not WhileStmt: %T", body[1])
+	}
+	if ws.Label != "spin" {
+		t.Errorf("while label = %q, want %q", ws.Label, "spin")
+	}
+
+	// `loop` as the iterable itself (a bare name ending the header) must NOT
+	// be eaten as a label — there is no identifier after it before the block.
+	g := parseString(t, `func main() {
+  for x in loop { use(x) }
+}
+`)
+	fs2 := g.Decls[0].(*ast.FuncDecl).Body.Stmts[0].(*ast.ForStmt)
+	if fs2.Label != "" {
+		t.Errorf("for-in-loop: label = %q, want empty (loop is the iterable)", fs2.Label)
+	}
+}
