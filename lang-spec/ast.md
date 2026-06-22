@@ -78,10 +78,24 @@ grammar.ebnf §ContractDecl.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `span` | `Span` | yes | |
-| `kind` | `"requires" \| "ensures" \| "invariant" \| "loop"` | yes | |
-| `pred` | `Option<Expr>` | when `kind ≠ "loop"` | the boolean predicate |
+| `kind` | `"requires" \| "ensures" \| "invariant" \| "loop" \| "entry"` | yes | |
+| `pred` | `Option<Expr>` | when `kind` is requires/ensures/invariant | the boolean predicate |
 | `label` | `Option<string>` | when `kind == "loop"` | the target loop's `LoopLabel` |
 | `loop` | `[]ContractClause` | when `kind == "loop"` | the section's `invariant` clauses |
+| `bindings` | `[]ContractBinding` | when `kind == "entry"` | the entry `let` bindings |
+
+### `ContractBinding`
+
+One `let <name> = <value>` of a contract `entry { … }` section — a pure
+expression evaluated at function entry, in scope for `ensures` (RFC-0006). The
+general entry-snapshot mechanism; subsumes `old(e)` (which is not in the v1
+surface). v1 admits only `let` (immutable); `var` is deferred.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `span` | `Span` | yes | |
+| `name` | `string` | yes | the binding name |
+| `value` | `Expr` | yes | the entry-evaluated expression |
 
 A `channel <name> { … }` block (RFC-0007 trace contracts) is recognized at the
 top level but **skipped** (no node) until the channel-contract epoch.

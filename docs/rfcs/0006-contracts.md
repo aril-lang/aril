@@ -10,7 +10,7 @@
 ## Summary
 
 Add **optional, runtime-checked contracts** to Aril — preconditions
-(`requires`), postconditions (`ensures`, with `old(e)` and `result`), and
+(`requires`), postconditions (`ensures`, with `result` and `entry` snapshots), and
 type invariants (`invariant`) — written primarily in a **separable
 `contract` block** that attaches obligations to an existing declaration by
 name, with optional inline clauses as sugar. The block is hierarchical: it
@@ -258,14 +258,29 @@ A contract predicate is a **pure boolean Aril expression** evaluated in the
 declaration's scope, extended with:
 
 - **`result`** — the return value; legal only inside `ensures`.
-- **`old(e)`** — the value of pure expression `e` **as evaluated on entry**;
-  legal only inside `ensures`. Lowering snapshots the *value* of `e` at
-  function entry, not a reference to be dereferenced later. This matters when
-  the body mutates a reference: to relate a reversed list's length to its
-  original, write `old(listLen(head))` (snapshot the length on entry), **not**
-  `listLen(old(head))` (which would walk the already-mutated nodes). The depth
-  of the snapshot follows the value of `e` (the Performance note flags the cost
-  of snapshotting a large aggregate).
+- **`entry { let n = e … }`** — an **entry-snapshot section**: pure `let`
+  bindings evaluated once at function entry and in scope for `ensures`. This is
+  how a postcondition relates exit state to entry state. To relate a reversed
+  list to its original, snapshot the entry value sequence and name it, then
+  compare against it on exit:
+
+  ```aril
+  contract reverse {
+    entry { let original = toValues(head) }
+    ensures intsEq(toValues(result), reversedInts(original))
+  }
+  ```
+
+  Because `let original = toValues(head)` runs at entry, it captures the
+  *reduced* value (`[]int`), never the live node graph — so the cost is the
+  snapshot you actually wrote, and the classic `fn(old(e))`-vs-`old(fn(e))`
+  confusion cannot arise (you write an ordinary entry expression). The section
+  generalizes the traditional `old(e)`: **`old` is intentionally not in the v1
+  surface** — `entry { let e0 = e }` subsumes it, names the snapshot, and lets
+  one snapshot serve several clauses. v1 admits only `let`; a `var` (a mutable
+  *ghost / history variable* updated across execution) is a real but advanced
+  feature, deferred. Entry bindings are also in scope for the function's `loop`
+  invariants.
 - **`match` is a legal predicate expression.** Because `Option`/`Result` (and
   user sum types) have no methods, inspecting a sum payload is done by `match`
   returning a `bool` — e.g. `match result { Ok(v) => v >= 0, Err(_) => true }`.
@@ -338,8 +353,8 @@ Responsibilities:
 2. **Type-check** each predicate as `bool` in the right scope (reusing
    `sema.Info`); non-bool is E1102.
 3. **Purity-check** predicates; an impure predicate is E1103.
-4. **Scope-check** `old`/`result`: `result` or `old` outside `ensures` is
-   E1104; `old(e)` over an impure/forbidden `e` is E1105.
+4. **Scope-check** `result` / entry bindings: `result` outside `ensures` is
+   E1104; an impure / forbidden `entry` binding expression is E1105.
 5. **Guard invariant types**: a direct external field assignment to a type
    that declares an `invariant` is E1106 (mutation must go through a method,
    the only invariant checkpoint besides construction).
@@ -368,7 +383,7 @@ func Stats() ViolationTally                        // for --contracts=stats
 ```
 
 Codegen lowers each obligation to a guarded call at the boundary:
-`requires` at function entry (after `old(e)` snapshots), `ensures` at each
+`requires` at function entry (after the `entry` snapshots), `ensures` at each
 return, a type `invariant` after construction and at each method's exit, and
 a **loop** `invariant` at the labelled loop's entry and end of each
 iteration. Under `off`, codegen emits nothing (no IR → no call), so the
@@ -504,11 +519,13 @@ added to them deliberately. No deprecation window needed.
 
 Two costs are worth flagging up front so they are not re-litigated later:
 
-- **`old(e)` snapshots the evaluated value at function entry.** For a large
-  argument (`old(bigTree)`) that snapshot can be expensive in time and
-  memory. v1's stance: it is the author's call, but the `internal/contract`
-  pass **may warn** when an `old(e)` snapshots a large/aggregate value, and a
-  future static pass may elide snapshots provably unread on a failing path.
+- **An `entry` binding snapshots its evaluated value at function entry.**
+  Snapshotting a large aggregate (`let t = bigTree`) is expensive in time and
+  memory — but because the binding is an arbitrary expression, the author
+  controls the cost by snapshotting a *reduction* (`let n = bigTree.size()`)
+  rather than the whole value. v1's stance: it is the author's call; the pass
+  **may warn** when a binding snapshots a large/aggregate value, and a future
+  static pass may elide snapshots provably unread on a failing path.
 - **Per-iteration loop invariants multiply cost.** A loop invariant runs
   every iteration; under `panic`/`warn` this is real overhead. The `off`
   mode compiles all of it out (no IR → no call), and `stats` keeps the
@@ -520,3 +537,7 @@ Two costs are worth flagging up front so they are not re-litigated later:
 - 2026-06-20 — `draft → accepted`.
 - 2026-06-21 — added the contracts-framework framing (this RFC as the safety
   projection; RFC-0007 the trace projection).
+- 2026-06-22 — replaced `old(e)` with the general `entry { let … }`
+  snapshot section (subsumes `old`, no `fn(old(e))` footgun, names reusable
+  snapshots); `var`/ghost-variable entry bindings deferred. Amended during the
+  CONTRACTS-IMPL build-out alongside the parser/grammar support.

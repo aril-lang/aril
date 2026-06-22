@@ -874,6 +874,21 @@ func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 		b.WriteByte(')')
 		return
 	}
+	if cl.Kind == "entry" {
+		writeSpan(b, cl.Span)
+		for _, bd := range cl.Bindings {
+			b.WriteByte('\n')
+			writeIndent(b, depth+1)
+			b.WriteString("(let ")
+			writeQuoted(b, bd.Name)
+			writeSpan(b, bd.Span)
+			b.WriteByte('\n')
+			write(b, bd.Value, depth+2)
+			b.WriteByte(')')
+		}
+		b.WriteByte(')')
+		return
+	}
 	writeSpan(b, cl.Span)
 	b.WriteByte('\n')
 	write(b, cl.Pred, depth+1)

@@ -283,8 +283,19 @@ ContractBlock  = ContractDecl | ChannelBlock ;
 // like-named labelled loop in the target's body (LoopLabel).
 ContractDecl   = "contract" Ident "{" ContractClause* "}" ;
 ContractClause = ( "requires" | "ensures" | "invariant" ) Expr
-               | LoopContract ;
+               | LoopContract
+               | EntrySection ;
 LoopContract   = "loop" Ident "{" ( "invariant" Expr )* "}" ;
+
+// An `entry` section holds pure `let` bindings evaluated once at function
+// entry and in scope for `ensures` (and the function's loop invariants). It
+// is the general entry-snapshot mechanism: a postcondition relating exit
+// state to entry state names the entry value here, rather than wrapping it in
+// `old(…)`. (`old` is intentionally NOT in the v1 surface — `entry { let e0 =
+// e }` subsumes it without the `fn(old(e))`/`old(fn(e))` footgun.) v1 admits
+// only `let`; `var` (a mutable / ghost variable updated across execution) is
+// deferred.
+EntrySection   = "entry" "{" ( "let" Ident "=" Expr )* "}" ;
 
 // Channel trace contracts (RFC-0007). Recognized at the top level but the
 // clause grammar (closed-by / forbid / eventually / delivered-to-all /
