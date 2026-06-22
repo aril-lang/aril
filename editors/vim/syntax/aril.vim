@@ -130,7 +130,11 @@ syn match   arilRune            "'\(\\\([ntr\\\"'0]\|x\x\x\|u\x\x\x\x\)\|[^'\\]\
 " =====================================================================
 syn match   arilOperator        "->\|=>\|\.\.=\|\.\.\.\|\.\.\|<-"
 syn match   arilOperator        "==\|!=\|<=\|>=\|&&\|||"
-syn match   arilOperator        "[-+*/%!<>=]"
+syn match   arilOperator        "[-+*%!<>=]"
+" `/` is an operator only when it does NOT open a `//` or `/*` comment.
+" Without this guard the single-`/` match (defined after the comment rules,
+" and Vim is last-defined-wins) would preempt the comment at its opener.
+syn match   arilOperator        "/\%(/\|\*\)\@!"
 " FFI attribute head: @go("...") (keywords.md §Contextual keywords)
 syn match   arilAttribute       "@\h\w*"
 
