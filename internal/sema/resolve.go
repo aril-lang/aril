@@ -37,8 +37,8 @@ func (c *checker) resolveExternFuncDecl(fn *ast.ExternFuncDecl, parent *Scope) {
 	c.checkReservedName(fn.Name, fn.Span)
 	fnScope := newScope(parent)
 	for _, tp := range fn.TypeParams {
-		c.checkReservedName(tp, fn.Span)
-		fnScope.declare(&Symbol{Name: tp, Kind: SymTypeParam, Type: &Named{N: tp}})
+		c.checkReservedName(tp.Name, fn.Span)
+		fnScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, p := range fn.Params {
 		c.checkReservedName(p.Name, p.Span)
@@ -79,7 +79,7 @@ func (c *checker) resolveExternImplDecl(ei *ast.ExternImplDecl, parent *Scope) {
 func (c *checker) resolveInterfaceDecl(id *ast.InterfaceDecl, parent *Scope) {
 	scope := newScope(parent)
 	for _, tp := range id.TypeParams {
-		scope.declare(&Symbol{Name: tp, Kind: SymTypeParam, Type: &Named{N: tp}})
+		scope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, e := range id.Extends {
 		c.resolveTypeExpr(e, scope)
@@ -100,8 +100,8 @@ func (c *checker) resolveTypeDecl(t *ast.TypeDecl, parent *Scope) {
 	if len(t.TypeParams) > 0 {
 		scope = newScope(parent)
 		for _, tp := range t.TypeParams {
-			c.checkReservedName(tp, t.Span)
-			scope.declare(&Symbol{Name: tp, Kind: SymTypeParam, Type: &Named{N: tp}})
+			c.checkReservedName(tp.Name, t.Span)
+			scope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 		}
 	}
 	switch b := t.Body.(type) {
@@ -126,8 +126,8 @@ func (c *checker) resolveTypeDecl(t *ast.TypeDecl, parent *Scope) {
 func (c *checker) resolveClassDecl(cd *ast.ClassDecl, parent *Scope) {
 	classScope := newScope(parent)
 	for _, tp := range cd.TypeParams {
-		c.checkReservedName(tp, cd.Span)
-		classScope.declare(&Symbol{Name: tp, Kind: SymTypeParam, Type: &Named{N: tp}})
+		c.checkReservedName(tp.Name, cd.Span)
+		classScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	// Resolve the `implements` list so an unknown interface name fires
 	// E0103 and a known one is symbol-bound — the latter lets
@@ -205,8 +205,8 @@ func (c *checker) resolveFuncDecl(fn *ast.FuncDecl, parent *Scope) {
 	c.checkReservedName(fn.Name, fn.Span)
 	fnScope := newScope(parent)
 	for _, tp := range fn.TypeParams {
-		c.checkReservedName(tp, fn.Span)
-		fnScope.declare(&Symbol{Name: tp, Kind: SymTypeParam, Type: &Named{N: tp}})
+		c.checkReservedName(tp.Name, fn.Span)
+		fnScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, p := range fn.Params {
 		c.checkReservedName(p.Name, p.Span)

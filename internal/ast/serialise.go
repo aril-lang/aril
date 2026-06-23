@@ -75,7 +75,7 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteString("(type-params")
 			for _, tp := range v.TypeParams {
 				b.WriteByte(' ')
-				writeQuoted(b, tp)
+				writeQuoted(b, tp.Name)
 			}
 			b.WriteByte(')')
 		}
@@ -191,7 +191,7 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteString("(type-params")
 			for _, tp := range v.TypeParams {
 				b.WriteByte(' ')
-				writeQuoted(b, tp)
+				writeQuoted(b, tp.Name)
 			}
 			b.WriteByte(')')
 		}
@@ -243,7 +243,7 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteString("(type-params")
 			for _, tp := range v.TypeParams {
 				b.WriteByte(' ')
-				writeQuoted(b, tp)
+				writeQuoted(b, tp.Name)
 			}
 			b.WriteByte(')')
 		}
@@ -512,7 +512,7 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteString("(type-params")
 			for _, tp := range v.TypeParams {
 				b.WriteByte(' ')
-				writeQuoted(b, tp)
+				writeQuoted(b, tp.Name)
 			}
 			b.WriteByte(')')
 		}

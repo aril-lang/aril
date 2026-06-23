@@ -578,12 +578,12 @@ func (p *parser) parseFuncDecl() (*ast.FuncDecl, *Diag) {
 // parseTypeParamList reads an optional `<T, U, ...>` list at
 // the declaration head. v1 admits only bare names (default
 // constraint `any`); user-written constraints land in PR-G3.
-func (p *parser) parseTypeParamList() ([]string, *Diag) {
+func (p *parser) parseTypeParamList() ([]ast.TypeParam, *Diag) {
 	if !p.at(lexer.KindOp, "<") {
 		return nil, nil
 	}
 	p.advance() // consume '<'
-	var out []string
+	var out []ast.TypeParam
 	for {
 		p.skipNewlines()
 		if !p.at(lexer.KindIdent) {
@@ -593,7 +593,7 @@ func (p *parser) parseTypeParamList() ([]string, *Diag) {
 				t.Line, t.Col)
 		}
 		tp := p.advance()
-		out = append(out, tp.Lexeme)
+		out = append(out, ast.TypeParam{Name: tp.Lexeme})
 		if p.at(lexer.KindPunct, ":") {
 			t := p.peek()
 			return nil, p.diag("E0112",

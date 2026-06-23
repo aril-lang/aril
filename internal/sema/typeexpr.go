@@ -170,7 +170,7 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 // function declaration from its annotations (Barrier B).
 func (c *checker) funcSigType(fn *ast.FuncDecl) *Func {
 	params, variadic := c.paramTypes(fn.Params)
-	return &Func{Params: params, Return: c.typeFromExpr(fn.ReturnType), TypeParams: fn.TypeParams, Variadic: variadic}
+	return &Func{Params: params, Return: c.typeFromExpr(fn.ReturnType), TypeParams: ast.TypeParamNames(fn.TypeParams), Variadic: variadic}
 }
 
 // methodSigType builds the canonical Func type of a class method.
@@ -213,7 +213,7 @@ func (c *checker) paramTypes(params []*ast.Param) ([]Type, bool) {
 // needed here; that lift is a codegen concern (lowering-go.md §ForeignCall).
 func (c *checker) externFuncSigType(fn *ast.ExternFuncDecl) *Func {
 	params, variadic := c.paramTypes(fn.Params)
-	return &Func{Params: params, Return: c.typeFromExpr(fn.ReturnType), TypeParams: fn.TypeParams, Variadic: variadic}
+	return &Func{Params: params, Return: c.typeFromExpr(fn.ReturnType), TypeParams: ast.TypeParamNames(fn.TypeParams), Variadic: variadic}
 }
 
 // externMethodSigType builds the Func type of an extern-impl method.

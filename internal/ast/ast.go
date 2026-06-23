@@ -87,12 +87,34 @@ type Decl interface {
 	declMarker()
 }
 
+// TypeParam is one generic type parameter — its name and an optional
+// constraint bound (`<T: Ordered>`). Bound is "" for an unconstrained
+// parameter (lowers to Go `any`); a named bound is a built-in generic
+// constraint (`Ordered` → `cmp.Ordered`, `Comparable` → `comparable`).
+type TypeParam struct {
+	Name  string
+	Bound string
+}
+
+// TypeParamNames returns just the names of a type-parameter list — a
+// convenience for the many sites that only need the names, not the bounds.
+func TypeParamNames(tps []TypeParam) []string {
+	if len(tps) == 0 {
+		return nil
+	}
+	out := make([]string, len(tps))
+	for i, tp := range tps {
+		out[i] = tp.Name
+	}
+	return out
+}
+
 // TypeDecl — `type Name = TypeBody`. TypeBody is the sum of
 // AliasBody, TupleAliasBody, RecordTypeBody, SumTypeBody.
 type TypeDecl struct {
 	Span       Span
 	Name       string
-	TypeParams []string // `type Pair<T, U> = …`; nil when non-generic
+	TypeParams []TypeParam // `type Pair<T, U> = …`; nil when non-generic
 	Body       TypeBody
 }
 
@@ -172,8 +194,8 @@ func (n *FieldDecl) NodeKind() string { return "FieldDecl" }
 type ClassDecl struct {
 	Span       Span
 	Name       string
-	TypeParams []string   // empty for PR-F4; populated by generics PR
-	Implements []TypeExpr // empty for PR-F4; populated by interfaces PR
+	TypeParams []TypeParam // empty for PR-F4; populated by generics PR
+	Implements []TypeExpr  // empty for PR-F4; populated by interfaces PR
 	Fields     []*ClassField
 	Methods    []*Method
 }
@@ -200,7 +222,7 @@ func (n *ClassField) NodeKind() string { return "ClassField" }
 type InterfaceDecl struct {
 	Span       Span
 	Name       string
-	TypeParams []string
+	TypeParams []TypeParam
 	Extends    []TypeExpr // composed interfaces
 	Methods    []*InterfaceMethodSig
 }
@@ -259,7 +281,7 @@ func (n *Method) NodeKind() string { return "Method" }
 type FuncDecl struct {
 	Span       Span
 	Name       string
-	TypeParams []string // empty for non-generic
+	TypeParams []TypeParam // empty for non-generic
 	Params     []*Param
 	ReturnType TypeExpr // nil ⇒ unit
 	Body       *Block
@@ -321,7 +343,7 @@ func (n *ExternTypeDecl) declMarker()      {}
 type ExternFuncDecl struct {
 	Span       Span
 	Name       string
-	TypeParams []string // empty for non-generic
+	TypeParams []TypeParam // empty for non-generic
 	Params     []*Param
 	ReturnType TypeExpr // nil ⇒ unit
 	Go         *GoRef
