@@ -26,6 +26,26 @@ func runCheck(t *testing.T, src string) []string {
 	return codes
 }
 
+// TestTypeParamConstraint: the built-in constraints `Ordered` / `Comparable`
+// are accepted; an unknown bound is E0119.
+func TestTypeParamConstraint(t *testing.T) {
+	if codes := runCheck(t, `func isSorted<T: Ordered>(xs: []T): bool { return true }
+func main() {}
+`); hasCode(codes, "E0119") {
+		t.Errorf("Ordered is a valid constraint, got %v", codes)
+	}
+	if codes := runCheck(t, `func allEq<T: Comparable>(xs: []T): bool { return true }
+func main() {}
+`); hasCode(codes, "E0119") {
+		t.Errorf("Comparable is a valid constraint, got %v", codes)
+	}
+	if codes := runCheck(t, `func f<T: Foo>(x: T): T { return x }
+func main() {}
+`); !hasCode(codes, "E0119") {
+		t.Errorf("want E0119 for an unknown constraint, got %v", codes)
+	}
+}
+
 func TestKnownNamesPass(t *testing.T) {
 	src := `import fmt
 class Counter { var n: int }

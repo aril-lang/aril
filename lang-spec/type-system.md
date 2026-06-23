@@ -96,6 +96,28 @@ conclusion to be well-formed.
 Arity mismatch on a generic instantiation → **E0207 Wrong type
 arity**. Unknown type name → E0103 (from name resolution).
 
+### Generic constraints
+
+A type parameter may carry an optional **constraint bound** —
+`<T: Ordered>` — restricting what `T` can be and which operators
+its values admit. v1 has two built-in constraints, mirroring Go's
+and lowering to them one-to-one:
+
+- **`Ordered`** → Go `cmp.Ordered`: `T` ranges over the orderable
+  primitives, and `<` `<=` `>` `>=` are admitted on `T` values.
+- **`Comparable`** → Go `comparable`: `==` and `!=` are admitted.
+
+A bound-less parameter defaults to `any` (no operators beyond
+assignment / passing). There are **no user-defined constraints** in
+v1; an unrecognised bound is **E0119 Unknown type-parameter
+constraint**. (The constraint spelling `Ordered` is distinct from
+the `Ord` ordering type-class in `builtins.md`: `Ordered` is the
+generic-parameter *bound*, `Ord` the predicate-level notion.) The comparator form (`sort.sorted(xs, less)`) remains
+the escape hatch for orderings a single `Ordered` bound can't
+express (reverse order, projection keys, struct fields). The
+constraint is enforced at instantiation by the Go backend; a richer
+Aril-level instantiation diagnostic is future work.
+
 ## Type judgements — expressions
 
 ### Literals

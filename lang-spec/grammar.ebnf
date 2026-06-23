@@ -326,7 +326,9 @@ TypeBody     = RecordType
              | SumType
              ;
 
-TypeParams   = "<" Ident ( "," Ident )* ">" ;
+TypeParams   = "<" TypeParam ( "," TypeParam )* ">" ;
+TypeParam    = Ident ( ":" Constraint )? ;        (* optional bound; G3b *)
+Constraint   = "Ordered" | "Comparable" ;         (* built-in; → cmp.Ordered / comparable *)
 
 RecordType   = "{" Newline? FieldDecl ( FieldSep FieldDecl )* FieldSep? "}" ;
 FieldDecl    = Ident ":" TypeExpr ;

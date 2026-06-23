@@ -323,10 +323,56 @@ func (g *gen) emitTypeParamBrackets(tps []ast.TypeParam, withConstraints bool) {
 		}
 		g.b.WriteString(goIdent(tp.Name))
 		if withConstraints {
-			g.b.WriteString(" any")
+			g.b.WriteByte(' ')
+			g.b.WriteString(goConstraint(tp.Bound))
 		}
 	}
 	g.b.WriteByte(']')
+}
+
+// detectOrderedBound sets usesCmp if any generic declaration carries an
+// `Ordered` type-parameter bound (which lowers to `cmp.Ordered`, needing
+// `import "cmp"`). Run before writeHeader so the import is emitted.
+func (g *gen) detectOrderedBound(f *ast.File) {
+	hasOrdered := func(tps []ast.TypeParam) bool {
+		for _, tp := range tps {
+			if tp.Bound == "Ordered" {
+				return true
+			}
+		}
+		return false
+	}
+	// ExternFuncDecl is intentionally omitted: an extern lowers to a direct
+	// `pkg.Sym(...)` call, never a Go generic signature carrying the
+	// constraint, so it never needs `cmp` (sema still validates its bound).
+	for _, d := range f.Decls {
+		switch v := d.(type) {
+		case *ast.FuncDecl:
+			g.usesCmp = g.usesCmp || hasOrdered(v.TypeParams)
+		case *ast.TypeDecl:
+			g.usesCmp = g.usesCmp || hasOrdered(v.TypeParams)
+		case *ast.ClassDecl:
+			g.usesCmp = g.usesCmp || hasOrdered(v.TypeParams)
+		case *ast.InterfaceDecl:
+			g.usesCmp = g.usesCmp || hasOrdered(v.TypeParams)
+		}
+	}
+}
+
+// goConstraint maps an Aril type-parameter bound to its Go constraint. An
+// empty bound (unconstrained) is Go `any`; the built-in bounds lower to
+// `Ordered` → `cmp.Ordered` (needs `import "cmp"`, tracked by usesCmp) and
+// `Comparable` → the Go built-in `comparable`. An unknown bound is rejected
+// in sema (E0119) before reaching here.
+func goConstraint(bound string) string {
+	switch bound {
+	case "Ordered":
+		return "cmp.Ordered"
+	case "Comparable":
+		return "comparable"
+	default:
+		return "any"
+	}
 }
 
 // staticMethodName returns the package-level Go name for a

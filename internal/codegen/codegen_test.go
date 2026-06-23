@@ -34,6 +34,46 @@ func emitWithFile(t *testing.T, src, file string) string {
 	return out
 }
 
+// TestEmitTypeParamConstraint: an `Ordered` bound lowers to `[T cmp.Ordered]`
+// and pulls in `import "cmp"`; a `Comparable` bound lowers to the Go built-in
+// `[T comparable]` (no import); an unconstrained parameter stays `[T any]`.
+func TestEmitTypeParamConstraint(t *testing.T) {
+	ordered := emitString(t, `func isSorted<T: Ordered>(xs: []T): bool {
+  for i in 1..xs.len() {
+    if xs[i] < xs[i - 1] { return false }
+  }
+  return true
+}
+func main() {}
+`)
+	if !strings.Contains(ordered, "func isSorted[T cmp.Ordered]") {
+		t.Errorf("Ordered bound did not lower to cmp.Ordered:\n%s", ordered)
+	}
+	if !strings.Contains(ordered, `"cmp"`) {
+		t.Errorf("Ordered bound did not pull in the cmp import:\n%s", ordered)
+	}
+
+	comparable := emitString(t, `func allEq<T: Comparable>(xs: []T, v: T): bool {
+  for i in 0..xs.len() { if xs[i] != v { return false } }
+  return true
+}
+func main() {}
+`)
+	if !strings.Contains(comparable, "func allEq[T comparable]") {
+		t.Errorf("Comparable bound did not lower to the Go comparable constraint:\n%s", comparable)
+	}
+	if strings.Contains(comparable, `"cmp"`) {
+		t.Errorf("Comparable bound must not pull in the cmp import:\n%s", comparable)
+	}
+
+	unconstrained := emitString(t, `func id<T>(x: T): T { return x }
+func main() {}
+`)
+	if !strings.Contains(unconstrained, "func id[T any]") {
+		t.Errorf("unconstrained type param must stay [T any]:\n%s", unconstrained)
+	}
+}
+
 func TestEmitHello(t *testing.T) {
 	src := `import fmt
 
