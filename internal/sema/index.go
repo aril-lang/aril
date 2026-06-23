@@ -129,6 +129,17 @@ func (c *checker) checkReservedName(name string, span ast.Span) {
 	}
 }
 
+// checkTypeParamBound validates a generic parameter's optional constraint
+// bound: only the built-in constraints `Ordered` (→ `cmp.Ordered`) and
+// `Comparable` (→ `comparable`) are admitted (E0119). An empty bound
+// (unconstrained → `any`) is always fine. v1 has no user-defined constraints.
+func (c *checker) checkTypeParamBound(tp ast.TypeParam, span ast.Span) {
+	if tp.Bound == "" || tp.Bound == "Ordered" || tp.Bound == "Comparable" {
+		return
+	}
+	c.report("E0119", "unknown type-parameter constraint `"+tp.Bound+"` — the built-in constraints are `Ordered` and `Comparable`", span)
+}
+
 // checkReservedTypeName rejects a user type declaration that reuses a
 // built-in type name — a primitive (`int`, `string`, …), `error`,
 // `Any`/`Dynamic`/`unit`/`Never`, or a built-in generic (`Result`,

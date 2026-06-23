@@ -147,6 +147,9 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// Programs that touch none of them emit identical Go to
 	// pre-F5b (no fixture churn for unrelated tests).
 	g.detectPredeclaredUsage(f)
+	// An `Ordered` type-param bound lowers to `cmp.Ordered`, so the program
+	// needs `import "cmp"`. Detected before writeHeader (which emits imports).
+	g.detectOrderedBound(f)
 	// Transitive deps: container methods produce Option / Result
 	// values, so any use of those containers forces those
 	// predeclared sums into the binary too.
@@ -409,6 +412,7 @@ type gen struct {
 	usesSet       bool
 	usesStack     bool
 	usesReflect   bool
+	usesCmp       bool // an `Ordered` type-param bound → import "cmp" (G3b)
 	usesMakeSlice bool
 	usesScan      bool
 	// usesScan2 / usesScan3 — the multi-value stdin bindings
@@ -674,6 +678,12 @@ func (g *gen) writeHeader(f *ast.File) {
 	if g.usesErrorCtor {
 		// `error(msg)` lowers to errors.New(msg) (builtins.md §error).
 		add("errors")
+	}
+	if g.usesCmp {
+		// An `Ordered` type-param bound lowers to `cmp.Ordered`; the
+		// constraint appears in the user's generic signature in main, so
+		// `cmp` is needed in both inline and vendored modes (G3b).
+		add("cmp")
 	}
 	if g.usesSortSorted && !g.vendored() {
 		// sort.sorted lowers onto the Sorted helper (sort.SliceStable),

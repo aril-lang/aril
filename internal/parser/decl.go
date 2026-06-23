@@ -593,13 +593,21 @@ func (p *parser) parseTypeParamList() ([]ast.TypeParam, *Diag) {
 				t.Line, t.Col)
 		}
 		tp := p.advance()
-		out = append(out, ast.TypeParam{Name: tp.Lexeme})
+		param := ast.TypeParam{Name: tp.Lexeme}
+		// Optional constraint bound `<T: Ordered>`. The bound name is a
+		// built-in generic constraint, validated in sema (E0119); the parser
+		// only captures it. Bound-less parameters default to `any`.
 		if p.at(lexer.KindPunct, ":") {
-			t := p.peek()
-			return nil, p.diag("E0112",
-				"type-parameter constraints (`<T: SomeInterface>`) land in PR-G3 — drop the constraint and let `any` default apply",
-				t.Line, t.Col)
+			p.advance() // consume ':'
+			if !p.at(lexer.KindIdent) {
+				t := p.peek()
+				return nil, p.diag("E0112",
+					fmt.Sprintf("expected a constraint name after `:`, got %s %q", t.Kind, t.Lexeme),
+					t.Line, t.Col)
+			}
+			param.Bound = p.advance().Lexeme
 		}
+		out = append(out, param)
 		if p.at(lexer.KindPunct, ",") {
 			p.advance()
 			continue

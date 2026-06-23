@@ -948,6 +948,14 @@ Static methods lower to package-level functions named
 `<class>` + capitalised method name (`boxNew`, `mapFrom`, …),
 preserving the lower-case visibility convention for v1.
 
+A **constraint bound** lowers to the matching Go constraint: an
+unconstrained parameter is `any`, `<T: Ordered>` is `[T cmp.Ordered]`
+(and the program gains `import "cmp"`), `<T: Comparable>` is
+`[T comparable]` (a Go built-in, no import). So `func isSorted<T:
+Ordered>(xs: []T): bool` ⟿ `func isSorted[T cmp.Ordered](xs []T)
+bool`, and `xs[i] < xs[i-1]` is a legal Go comparison because
+`cmp.Ordered` admits `<`.
+
 A **generic class brace literal** instantiates the Go type
 directly — `Box<int>{ v: 42 }` ⟿ `&Box[int]{v: 42}`. Go cannot
 infer struct type parameters from a composite literal, so the

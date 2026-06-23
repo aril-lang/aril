@@ -38,6 +38,7 @@ func (c *checker) resolveExternFuncDecl(fn *ast.ExternFuncDecl, parent *Scope) {
 	fnScope := newScope(parent)
 	for _, tp := range fn.TypeParams {
 		c.checkReservedName(tp.Name, fn.Span)
+		c.checkTypeParamBound(tp, fn.Span)
 		fnScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, p := range fn.Params {
@@ -79,6 +80,7 @@ func (c *checker) resolveExternImplDecl(ei *ast.ExternImplDecl, parent *Scope) {
 func (c *checker) resolveInterfaceDecl(id *ast.InterfaceDecl, parent *Scope) {
 	scope := newScope(parent)
 	for _, tp := range id.TypeParams {
+		c.checkTypeParamBound(tp, id.Span)
 		scope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, e := range id.Extends {
@@ -101,6 +103,7 @@ func (c *checker) resolveTypeDecl(t *ast.TypeDecl, parent *Scope) {
 		scope = newScope(parent)
 		for _, tp := range t.TypeParams {
 			c.checkReservedName(tp.Name, t.Span)
+			c.checkTypeParamBound(tp, t.Span)
 			scope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 		}
 	}
@@ -127,6 +130,7 @@ func (c *checker) resolveClassDecl(cd *ast.ClassDecl, parent *Scope) {
 	classScope := newScope(parent)
 	for _, tp := range cd.TypeParams {
 		c.checkReservedName(tp.Name, cd.Span)
+		c.checkTypeParamBound(tp, cd.Span)
 		classScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	// Resolve the `implements` list so an unknown interface name fires
@@ -206,6 +210,7 @@ func (c *checker) resolveFuncDecl(fn *ast.FuncDecl, parent *Scope) {
 	fnScope := newScope(parent)
 	for _, tp := range fn.TypeParams {
 		c.checkReservedName(tp.Name, fn.Span)
+		c.checkTypeParamBound(tp, fn.Span)
 		fnScope.declare(&Symbol{Name: tp.Name, Kind: SymTypeParam, Type: &Named{N: tp.Name}})
 	}
 	for _, p := range fn.Params {

@@ -69,16 +69,7 @@ func write(b *strings.Builder, n Node, depth int) {
 		writeSpan(b, v.Span)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
-		if len(v.TypeParams) == 0 {
-			b.WriteString("(type-params)")
-		} else {
-			b.WriteString("(type-params")
-			for _, tp := range v.TypeParams {
-				b.WriteByte(' ')
-				writeQuoted(b, tp.Name)
-			}
-			b.WriteByte(')')
-		}
+		writeTypeParams(b, v.TypeParams)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
 		if len(v.Implements) == 0 {
@@ -185,16 +176,7 @@ func write(b *strings.Builder, n Node, depth int) {
 		writeSpan(b, v.Span)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
-		if len(v.TypeParams) == 0 {
-			b.WriteString("(type-params)")
-		} else {
-			b.WriteString("(type-params")
-			for _, tp := range v.TypeParams {
-				b.WriteByte(' ')
-				writeQuoted(b, tp.Name)
-			}
-			b.WriteByte(')')
-		}
+		writeTypeParams(b, v.TypeParams)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
 		if len(v.Params) == 0 {
@@ -237,16 +219,7 @@ func write(b *strings.Builder, n Node, depth int) {
 		writeSpan(b, v.Span)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
-		if len(v.TypeParams) == 0 {
-			b.WriteString("(type-params)")
-		} else {
-			b.WriteString("(type-params")
-			for _, tp := range v.TypeParams {
-				b.WriteByte(' ')
-				writeQuoted(b, tp.Name)
-			}
-			b.WriteByte(')')
-		}
+		writeTypeParams(b, v.TypeParams)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
 		if len(v.Params) == 0 {
@@ -506,16 +479,7 @@ func write(b *strings.Builder, n Node, depth int) {
 		writeSpan(b, v.Span)
 		b.WriteByte('\n')
 		writeIndent(b, depth+1)
-		if len(v.TypeParams) == 0 {
-			b.WriteString("(type-params)")
-		} else {
-			b.WriteString("(type-params")
-			for _, tp := range v.TypeParams {
-				b.WriteByte(' ')
-				writeQuoted(b, tp.Name)
-			}
-			b.WriteByte(')')
-		}
+		writeTypeParams(b, v.TypeParams)
 		b.WriteByte('\n')
 		write(b, v.Body, depth+1)
 	case *AliasBody:
@@ -906,6 +870,28 @@ func writeGoRef(b *strings.Builder, g *GoRef, depth int) {
 	}
 	b.WriteString("(go ")
 	writeQuoted(b, g.Raw)
+	b.WriteByte(')')
+}
+
+// writeTypeParams serializes a generic declaration's type-parameter list as
+// `(type-params "T" "U: Ordered" …)` — each parameter is its name, and, when
+// constrained, `name: Bound`. An empty list is `(type-params)`. An
+// unconstrained parameter serializes to the bare name, so a pre-constraint
+// program's canonical form is unchanged.
+func writeTypeParams(b *strings.Builder, tps []TypeParam) {
+	if len(tps) == 0 {
+		b.WriteString("(type-params)")
+		return
+	}
+	b.WriteString("(type-params")
+	for _, tp := range tps {
+		b.WriteByte(' ')
+		if tp.Bound != "" {
+			writeQuoted(b, tp.Name+": "+tp.Bound)
+		} else {
+			writeQuoted(b, tp.Name)
+		}
+	}
 	b.WriteByte(')')
 }
 
