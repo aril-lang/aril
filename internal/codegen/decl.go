@@ -250,7 +250,7 @@ func (g *gen) emitInterfaceDecl(id *ast.InterfaceDecl) error {
 	return nil
 }
 
-func (g *gen) emitMethod(className string, classTypeParams []string, m *ast.Method) error {
+func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *ast.Method) error {
 	g.line(m.Span.StartLine)
 	g.b.WriteString("func ")
 	if !m.IsStatic {
@@ -310,9 +310,9 @@ func (g *gen) emitMethod(className string, classTypeParams []string, m *ast.Meth
 // list. With `withConstraints` it emits `[T any, U any, ...]`
 // (used on declarations); without, it emits `[T, U, ...]`
 // (used on uses like receiver types where the constraint has
-// already been declared). PR-G1 uses `any` as the default
-// constraint; user-written constraints land with PR-G3.
-func (g *gen) emitTypeParamBrackets(tps []string, withConstraints bool) {
+// already been declared). An unconstrained parameter defaults to
+// `any`; a built-in bound lowers to its Go constraint (G3b).
+func (g *gen) emitTypeParamBrackets(tps []ast.TypeParam, withConstraints bool) {
 	if len(tps) == 0 {
 		return
 	}
@@ -321,7 +321,7 @@ func (g *gen) emitTypeParamBrackets(tps []string, withConstraints bool) {
 		if i > 0 {
 			g.b.WriteString(", ")
 		}
-		g.b.WriteString(goIdent(tp))
+		g.b.WriteString(goIdent(tp.Name))
 		if withConstraints {
 			g.b.WriteString(" any")
 		}

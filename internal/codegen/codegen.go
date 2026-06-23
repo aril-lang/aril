@@ -219,7 +219,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			g.userTypeNames[td.Name] = true
 			if sb, ok := td.Body.(*ast.SumTypeBody); ok {
 				for i, v := range sb.Variants {
-					g.variant[v.Name] = variantInfo{owner: td.Name, tag: i, fields: v.Fields, sumTypeParams: td.TypeParams}
+					g.variant[v.Name] = variantInfo{owner: td.Name, tag: i, fields: v.Fields, sumTypeParams: ast.TypeParamNames(td.TypeParams)}
 				}
 			}
 			if rb, ok := td.Body.(*ast.RecordTypeBody); ok {
