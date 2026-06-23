@@ -110,7 +110,9 @@ and lowering to them one-to-one:
 A bound-less parameter defaults to `any` (no operators beyond
 assignment / passing). There are **no user-defined constraints** in
 v1; an unrecognised bound is **E0119 Unknown type-parameter
-constraint**. The comparator form (`sort.sorted(xs, less)`) remains
+constraint**. (The constraint spelling `Ordered` is distinct from
+the `Ord` ordering type-class in `builtins.md`: `Ordered` is the
+generic-parameter *bound*, `Ord` the predicate-level notion.) The comparator form (`sort.sorted(xs, less)`) remains
 the escape hatch for orderings a single `Ordered` bound can't
 express (reverse order, projection keys, struct fields). The
 constraint is enforced at instantiation by the Go backend; a richer

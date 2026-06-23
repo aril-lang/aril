@@ -342,6 +342,9 @@ func (g *gen) detectOrderedBound(f *ast.File) {
 		}
 		return false
 	}
+	// ExternFuncDecl is intentionally omitted: an extern lowers to a direct
+	// `pkg.Sym(...)` call, never a Go generic signature carrying the
+	// constraint, so it never needs `cmp` (sema still validates its bound).
 	for _, d := range f.Decls {
 		switch v := d.(type) {
 		case *ast.FuncDecl:
