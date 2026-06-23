@@ -323,8 +323,6 @@ func (g *gen) emitTypeParamBrackets(tps []ast.TypeParam, withConstraints bool) {
 		}
 		g.b.WriteString(goIdent(tp.Name))
 		if withConstraints {
-			// An unconstrained parameter defaults to `any`; a built-in bound
-			// lowers to its Go constraint (G3b extends this).
 			g.b.WriteString(" any")
 		}
 	}
