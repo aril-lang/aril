@@ -8,11 +8,50 @@ type Tree<T> =
   | Leaf
   | Node(value: T, left: Tree<T>, right: Tree<T>)
 
-func invert<T>(t: Tree<T>): Tree<T> {
+func invert<T: Comparable>(t: Tree<T>): Tree<T> {
   match t {
     Leaf          => Leaf,
     Node(v, l, r) => Node(v, invert(r), invert(l)),
   }
+}
+
+// The contract predicates below. `inorder` flattens a tree to its in-order
+// value sequence; `reversed` and `seqEq` are the generic sequence helpers the
+// inversion property is stated against (candidates for a future std.pred).
+func inorder<T>(t: Tree<T>): []T {
+  match t {
+    Leaf => []T{},
+    Node(v, l, r) => {
+      var out = inorder(l)
+      out = out.push(v)
+      for x in inorder(r) {
+        out = out.push(x)
+      }
+      out
+    },
+  }
+}
+
+func reversed<T>(xs: []T): []T {
+  var out = []T{}
+  var i = xs.len() - 1
+  while i >= 0 {
+    out = out.push(xs[i])
+    i = i - 1
+  }
+  return out
+}
+
+func seqEq<T: Comparable>(a: []T, b: []T): bool {
+  if a.len() != b.len() {
+    return false
+  }
+  for i in 0..a.len() {
+    if a[i] != b[i] {
+      return false
+    }
+  }
+  return true
 }
 
 // In-order traversal, rendered as "(L v R)" so the inversion is visible.
@@ -35,4 +74,15 @@ func main() {
 
   fmt.println("before:", render(t))
   fmt.println("after: ", render(invert(t)))
+}
+
+// The load-bearing correctness property of tree inversion: the in-order value
+// sequence is **reversed**. This is necessary AND sufficient for a mirror, and
+// rules out the trivially-wrong impls a weaker contract misses — crucially the
+// identity function (which is involutive, so `invert(invert(t)) == t` alone
+// would pass it) and any subtree-drop or value-corruption (which change the
+// sequence). The example's tree flattens to [1,2,3,4,6,7,9]; the inverted tree
+// to its reverse.
+contract invert {
+  ensures seqEq(inorder(result), reversed(inorder(t)))
 }
