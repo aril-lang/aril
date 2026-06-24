@@ -1,7 +1,7 @@
 --- invert_binary_tree.aril
 +++ invert_binary_tree.aril
 @@ -11,7 +11,7 @@
- func invert<T>(t: Tree<T>): Tree<T> {
+ func invert<T: Comparable>(t: Tree<T>): Tree<T> {
    match t {
      Leaf          => Leaf,
 -    Node(v, l, r) => Node(v, invert(r), invert(l)),
