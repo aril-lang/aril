@@ -6,7 +6,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 47 / 56 examples build end-to-end** (floor 47).
 - **diag_ok — 80 / 103 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 27 / 51 run-pass examples build and run as specified** (floor 27; behavioural: exit code, and stdout vs an `expected_output` sidecar when present; `no-run` examples excluded).
+- **run_ok — 27 / 51 run-pass examples build and run as specified** (floor 27; behavioural: exit code, stdout vs an `expected_output` sidecar when present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
