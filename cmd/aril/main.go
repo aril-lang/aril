@@ -264,14 +264,25 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if m == nil {
-		return files, nil, nil
+	resFiles := files
+	strip := map[string]bool{}
+	if m != nil {
+		res, err := resolvePackages(files, m)
+		if err != nil {
+			return nil, nil, err
+		}
+		resFiles = res.files
+		strip = res.userImports
 	}
-	res, err := resolvePackages(files, m)
-	if err != nil {
-		return nil, nil, err
+	// Inject bundled std modules (manifest-independent — a lone file may
+	// `import std/pred`). The virtual module paths join the build; the import
+	// paths are stripped from the Go import block like a user package.
+	stdFiles, stdStrip := gatherStdModules(resFiles)
+	resFiles = append(resFiles, stdFiles...)
+	for p := range stdStrip {
+		strip[p] = true
 	}
-	return res.files, res.userImports, nil
+	return resFiles, strip, nil
 }
 
 // compilePackage lexes / parses / sema-checks / lowers a whole package
@@ -283,9 +294,16 @@ func compilePackage(paths []string, userImports map[string]bool, stripLine, requ
 	trees := make([]*ast.File, len(paths))
 	labels := make([]string, len(paths))
 	for i, p := range paths {
-		srcBytes, err := os.ReadFile(p)
-		if err != nil {
-			return "", fmt.Errorf("aril: cannot read %s: %w", p, err)
+		var srcBytes []byte
+		if src, ok := stdModuleSourceByLabel(p); ok {
+			// A bundled std module: read its source from the embed, not disk.
+			srcBytes = []byte(src)
+		} else {
+			b, err := os.ReadFile(p)
+			if err != nil {
+				return "", fmt.Errorf("aril: cannot read %s: %w", p, err)
+			}
+			srcBytes = b
 		}
 		label := p
 		if stripLine {

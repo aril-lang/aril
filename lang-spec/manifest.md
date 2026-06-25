@@ -55,12 +55,20 @@ filesystem root), each `import P` resolves as:
    `utils.…`; the qualified-reference surface and cross-package
    visibility are specified in `name-resolution.md` §Cross-package
    imports).
-2. **Stdlib / extra binding.** Otherwise, if the path's head is a known
+2. **Bundled std module.** A path naming a compiler-bundled Aril module
+   (`std/pred` — the contract predicate vocabulary, RFC-0006) resolves to
+   the module's **embedded source**, not a directory. Its `.aril` decls
+   join the build under a stable virtual path (so `//line` blame and the
+   emitted-Go hash stay deterministic), bind by bare name like a merged
+   package, and the import is stripped from the Go output. This branch is
+   **manifest-independent** — a lone file with no `aril.toml` may
+   `import std/pred`.
+3. **Stdlib / extra binding.** Otherwise, if the path's head is a known
    stdlib namespace or matches a `[bindings] extra` entry's last segment,
    it resolves through the binding registry (no package directory to
    gather).
-3. **Failure.** Neither local nor a known binding namespace → **E0117
-   Unknown import path**.
+4. **Failure.** Neither local, bundled, nor a known binding namespace →
+   **E0117 Unknown import path**.
 
 Without a `aril.toml`, step 1 is skipped entirely: the program is a
 single package resolved against the stdlib registry — the zero-config
