@@ -11,7 +11,7 @@ import _ "embed"
 //
 // v1 ships one module — `std/pred`, the contract predicate vocabulary
 // (RFC-0006). The mechanism is manifest-independent: a lone `.aril` file with
-// no `tide.toml` can still `import std/pred`.
+// no `aril.toml` can still `import std/pred`.
 
 //go:embed std/pred.aril
 var stdPredSource string
