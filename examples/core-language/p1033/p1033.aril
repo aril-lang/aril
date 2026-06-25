@@ -49,6 +49,22 @@ func advance(grid: []string, p: Coord, d: Direction): Option<Coord> {
   return Some(next)
 }
 
+// `advance` returns the cell a move lands on, or `None` when the move leaves
+// the labyrinth (out of bounds or into a wall). The load-bearing property is a
+// **safety** invariant orthogonal to the move arithmetic: a `Some` result is
+// always an in-bounds coordinate. Its value is sharpest on the **reflect-return
+// paths** (`return Some(p)` at the two corners), where no array access precedes
+// the return: an out-of-bounds `Some` there is blamed on `advance` directly,
+// rather than slipping out to surface later as a wrong answer (off-mode) or a
+// downstream `grid[c.0][c.1]` out-of-range panic. A `None` carries no
+// coordinate, so it is unconstrained.
+contract advance {
+  ensures match result {
+    Some(c) => c.0 >= 0 && c.0 < grid.len() && c.1 >= 0 && c.1 < grid.len(),
+    None    => true,
+  }
+}
+
 func readGrid(): Result<[]string, error> {
   let n = try fmt.scan<int>()
   var rows: []string = []string{}

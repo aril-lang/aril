@@ -18,6 +18,13 @@ func parseOp(token: string): Option<Op> {
   }
 }
 
+func isDiv(op: Op): bool {
+  match op {
+    Div => true,
+    _   => false,
+  }
+}
+
 func apply(op: Op, a: float64, b: float64): Result<float64, error> {
   match op {
     Add => Ok(a + b),
@@ -28,6 +35,20 @@ func apply(op: Op, a: float64, b: float64): Result<float64, error> {
            } else {
              Ok(a / b)
            },
+  }
+}
+
+// The load-bearing property is `apply`'s *error behaviour*, the axis orthogonal
+// to the arithmetic (stating `result == a + b` would just echo the body): the
+// single failure mode is division by zero, and nothing else fails. So `Err`
+// holds **iff** the op is `Div` and the divisor is 0. This rules out a wrong
+// impl that errors spuriously (e.g. on `Sub`) or — worse — one that fails to
+// reject division by zero; a total-but-wrong arithmetic impl is a separate
+// axis the type system already constrains.
+contract apply {
+  ensures match result {
+    Ok(_)  => !(isDiv(op) && b == 0.0),
+    Err(_) => isDiv(op) && b == 0.0,
   }
 }
 
