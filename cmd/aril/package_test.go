@@ -43,6 +43,42 @@ func TestCrossPackageManifestRun(t *testing.T) {
 	}
 }
 
+// TestStdPredImport — a lone file (no manifest) can `import std/pred` and call
+// the bundled predicates by bare name; the import resolves to the embedded
+// module, not a directory, and is stripped from the Go output (the program
+// builds + runs). Exercises the manifest-independent injection path.
+func TestStdPredImport(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "main.aril",
+		"import fmt\nimport std/pred\nfunc main() { fmt.println(isSorted<int>([1, 2, 3]), seqEq<int>(reversed<int>([1, 2]), [2, 1])) }\n")
+	stdout, stderr, exit := runAril(t, "run", filepath.Join(dir, "main.aril"))
+	if exit != 0 {
+		t.Fatalf("std/pred run exited %d (stderr: %s)", exit, stderr)
+	}
+	if stdout != "true true\n" {
+		t.Errorf("stdout = %q; want \"true true\\n\"", stdout)
+	}
+}
+
+// TestStdPredContractEnforced — a contract stated against a std/pred predicate
+// is enforced under --contracts=panic: a violating impl aborts, a correct one
+// runs clean.
+func TestStdPredContractEnforced(t *testing.T) {
+	dir := t.TempDir()
+	src := "import std/pred\n" +
+		"func ident(xs: []int): []int { return xs }\n" +
+		"contract ident { ensures isSorted(result) }\n" +
+		"func main() { let _ = ident([3, 1, 2]) }\n"
+	writeFile(t, dir, "main.aril", src)
+	_, stderr, exit := runAril(t, "run", "--contracts=panic", filepath.Join(dir, "main.aril"))
+	if exit == 0 {
+		t.Fatalf("a violated std/pred contract must abort under panic; got clean exit")
+	}
+	if !strings.Contains(stderr, "ensures violated (ident)") {
+		t.Errorf("stderr = %q; want the ensures-violated panic", stderr)
+	}
+}
+
 // TestUnknownImportPath — an import that is neither a local user package
 // nor a stdlib namespace is E0117.
 func TestUnknownImportPath(t *testing.T) {

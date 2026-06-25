@@ -1,0 +1,75 @@
+// std/pred — a pure predicate vocabulary for contracts (RFC-0006).
+//
+// Imported as `import std/pred`; the predicates join the importing package's
+// top-level scope (bare names, like any merged package), so a contract reads
+// `ensures isSorted(result)`. They are the reusable half of "examples +
+// contracts = executable spec": the relations a load-bearing contract is
+// stated against, without each example re-rolling the loop. Ordered/Comparable
+// bounds keep them generic over any comparable element.
+
+// isSorted reports whether xs is non-decreasing.
+func isSorted<T: Ordered>(xs: []T): bool {
+  for i in 1..xs.len() {
+    if xs[i] < xs[i - 1] {
+      return false
+    }
+  }
+  return true
+}
+
+// allInRange reports whether every element of xs lies in [lo, hi].
+func allInRange<T: Ordered>(xs: []T, lo: T, hi: T): bool {
+  for x in xs {
+    if x < lo || x > hi {
+      return false
+    }
+  }
+  return true
+}
+
+// allDistinct reports whether xs has no repeated element.
+func allDistinct<T: Comparable>(xs: []T): bool {
+  for i in 0..xs.len() {
+    for j in (i + 1)..xs.len() {
+      if xs[i] == xs[j] {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+// isUnique reports whether x appears exactly once in xs.
+func isUnique<T: Comparable>(xs: []T, x: T): bool {
+  var count = 0
+  for e in xs {
+    if e == x {
+      count = count + 1
+    }
+  }
+  return count == 1
+}
+
+// reversed returns a new slice with xs's elements in reverse order.
+func reversed<T>(xs: []T): []T {
+  var out = []T{}
+  var i = xs.len() - 1
+  while i >= 0 {
+    out = out.push(xs[i])
+    i = i - 1
+  }
+  return out
+}
+
+// seqEq reports whether a and b are element-wise equal.
+func seqEq<T: Comparable>(a: []T, b: []T): bool {
+  if a.len() != b.len() {
+    return false
+  }
+  for i in 0..a.len() {
+    if a[i] != b[i] {
+      return false
+    }
+  }
+  return true
+}

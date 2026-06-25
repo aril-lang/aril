@@ -3,6 +3,7 @@
 
 import fmt
 import strconv
+import std/pred   // reversed, seqEq — the contract predicate vocabulary
 
 type Tree<T> =
   | Leaf
@@ -15,9 +16,8 @@ func invert<T: Comparable>(t: Tree<T>): Tree<T> {
   }
 }
 
-// The contract predicates below. `inorder` flattens a tree to its in-order
-// value sequence; `reversed` and `seqEq` are the generic sequence helpers the
-// inversion property is stated against (candidates for a future std.pred).
+// `inorder` flattens a tree to its in-order value sequence — the tree-specific
+// half of the contract; `reversed` and `seqEq` come from `std/pred`.
 func inorder<T>(t: Tree<T>): []T {
   match t {
     Leaf => []T{},
@@ -30,28 +30,6 @@ func inorder<T>(t: Tree<T>): []T {
       out
     },
   }
-}
-
-func reversed<T>(xs: []T): []T {
-  var out = []T{}
-  var i = xs.len() - 1
-  while i >= 0 {
-    out = out.push(xs[i])
-    i = i - 1
-  }
-  return out
-}
-
-func seqEq<T: Comparable>(a: []T, b: []T): bool {
-  if a.len() != b.len() {
-    return false
-  }
-  for i in 0..a.len() {
-    if a[i] != b[i] {
-      return false
-    }
-  }
-  return true
 }
 
 // In-order traversal, rendered as "(L v R)" so the inversion is visible.

@@ -64,6 +64,9 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 				switch kind {
 				case importStdlib:
 					// resolved by the binding registry; nothing to gather.
+				case importStd:
+					// a compiler-bundled module — injected manifest-
+					// independently in buildUnit; nothing to gather here.
 				case importUser:
 					r.userImports[p] = true
 					// A package importing itself (e.g. bare `import
@@ -101,6 +104,7 @@ const (
 	importStdlib importKind = iota
 	importUser
 	importUnknown
+	importStd // a compiler-bundled Aril module (`std/pred`), injected in buildUnit
 )
 
 // classifyImport decides how an import path resolves (RFC-0002
@@ -108,6 +112,9 @@ const (
 // package lives in (relative to the manifest root).
 func classifyImport(p string, m *projectManifest) (importKind, string) {
 	head := strings.SplitN(p, "/", 2)[0]
+	if isStdModule(p) {
+		return importStd, ""
+	}
 	if m != nil && (p == m.name || strings.HasPrefix(p, m.name+"/")) {
 		rest := strings.TrimPrefix(strings.TrimPrefix(p, m.name), "/")
 		return importUser, filepath.Join(m.dir, filepath.FromSlash(rest))
