@@ -887,8 +887,10 @@ func writeChannelClause(b *strings.Builder, cl ChannelClause, depth int) {
 		writeSpan(b, cl.Span)
 	case "capacity":
 		writeSpan(b, cl.Span)
-		b.WriteByte('\n')
-		write(b, cl.Bound, depth+1)
+		if cl.Bound != nil {
+			b.WriteByte('\n')
+			write(b, cl.Bound, depth+1)
+		}
 	default:
 		writeSpan(b, cl.Span)
 	}
