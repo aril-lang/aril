@@ -78,15 +78,24 @@ those positions they are ordinary identifiers.
 | `loop`     | naming a loop after a `for`/`while` header (`for … loop <label> {`), and the head of a contract loop-invariant section (`loop <label> { invariant … }`), RFC-0006 | identifier |
 | `requires` / `ensures` / `invariant` | as a clause keyword inside a `contract { … }` block (and inside a `loop` section, `invariant` only), RFC-0006 | identifier |
 | `entry`    | as the head of a contract entry-snapshot section (`entry { let … }`) inside a `contract { … }` block, RFC-0006 | identifier |
+| RFC-0007 channel clauses (`closed`-`by`, `forbid`, `never`, `drains`-`before`-…) | at clause-lead position inside a `channel { … }` block | identifier |
+| RFC-0007 protocol clauses (`channel`, `participant`, `forbid`, `eventually`, `every`, `fairness`; the infixes `before` / `after` / `role`; the phrase-keywords `delivered`-`to`-`all`, `no`-`starvation`) | at clause-lead / clause-internal position inside a `contract { … }` body | identifier |
 
 `contract` / `channel` are contextual: a keyword only in the positional
 `<word> <name> {` top-level shape (where an identifier would otherwise be a
 declaration error), an ordinary identifier everywhere else. A `contract` body
 parses into `File.Contracts` (`grammar.ebnf` §ContractDecl); a `channel` body
-(RFC-0007 trace contracts) is parsed-and-skipped until the channel-contract
-epoch. Codegen elides contracts under `--contracts=off` (the default during the
-build-out), so a program with contracts still lowers byte-identically until
-enforcement lands.
+parses into `File.Channels` (§ChannelBlock). Codegen elides contracts under
+`--contracts=off` (the default during the build-out), so a program with
+contracts still lowers byte-identically until enforcement lands.
+
+The RFC-0007 clause-lead words (channel-clause and protocol-clause keywords
+above) are contextual the same way: recognized by lexeme only at their clause
+position *inside* a `channel`/`contract` body, ordinary identifiers everywhere
+else. They are therefore reserved against a channel/participant *name* that
+collides with a clause keyword at clause-lead position (e.g. a subject literally
+named `forbid`) — the contract pass surfaces such a name clash; outside these
+bodies the words are unrestricted.
 
 `loop` is likewise contextual, in two positions: as `loop <ident>` between a
 `for`/`while` header and its block (`grammar.ebnf` §LoopLabel), and as the head
