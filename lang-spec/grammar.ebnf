@@ -298,11 +298,21 @@ LoopContract   = "loop" Ident "{" ( "invariant" Expr )* "}" ;
 // deferred.
 EntrySection   = "entry" "{" ( "let" Ident "=" Expr )* "}" ;
 
-// Channel trace contracts (RFC-0007). Recognized at the top level but the
-// clause grammar (closed-by / forbid / eventually / delivered-to-all /
-// fairness …) lands with the channel-contract epoch; until then the body is
-// **skipped** — consumed as a balanced brace blob, byte-identical lowering.
-ChannelBlock   = "channel" Ident "{" (* deferred to RFC-0007 impl; skipped *) "}" ;
+// Channel trace contracts (RFC-0007) — parsed into File.Channels (ast.md).
+// A `channel <subject> { … }` block states *local* trace invariants of one
+// named channel subject. The clause keywords are contextual (recognized by
+// lexeme inside the block); the hyphenated phrase-keywords (`closed-by`,
+// `drains-before-…`) are matched as token-lexeme sequences. The capacity
+// bound is an ordinary integer Expr. Cross-channel *protocol* clauses
+// (subject-qualified ordering / liveness / fan-out / fairness) live in a
+// `contract` body and land in a later C7a slice.
+ChannelBlock   = "channel" Ident "{" ChannelClause* "}" ;
+ChannelClause  = "closed" "-" "by" Ident
+               | "forbid" "send" "after" "close"
+               | "forbid" "recv" "after" "close"
+               | "never" "more" "than" Expr "in" "flight"
+               | "drains" "-" "before" "-" "scope" "-" "exit"
+               | "drains" "-" "before" "-" "return" ;
 
 // Codegen elides contracts under `--contracts=off` (the default during the
 // build-out), so a program with contracts still lowers byte-identically;

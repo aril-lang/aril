@@ -1,0 +1,14 @@
+--- TITLE ---
+E0112: an unrecognized clause inside a `channel` block is rejected (RFC-0007 channel clauses)
+
+--- INPUT ---
+func run() {
+  return
+}
+
+channel results {
+  bogus clause
+}
+
+--- ERRORS ---
+src.aril:6:3: error[E0112]: expected a channel clause (closed-by/forbid send|recv after close/never more than … in flight/drains-before-scope-exit/drains-before-return), got Ident "bogus"

@@ -54,13 +54,14 @@ that the source file produces as a contiguous chunk has a span.
 | `span` | `Span` | yes | from first byte of input to EOF |
 | `imports` | `[]Import` | yes (may be empty) | in source order |
 | `decls` | `[]Decl` | yes (≥ 1) | every file declares at least one item |
-| `contracts` | `[]ContractDecl` | yes (may be empty) | separable contract blocks (RFC-0006), kept out of `decls` |
+| `contracts` | `[]ContractDecl` | yes (may be empty) | separable value/state contract blocks (RFC-0006), kept out of `decls` |
+| `channels` | `[]ChannelDecl` | yes (may be empty) | separable channel-contract blocks (RFC-0007), kept out of `decls` |
 
 Invariant: a `File` with `decls.len() == 0` is a parse error.
 
-`contracts` is separate from `decls` deliberately: codegen and sema iterate
-`decls`, so a contract is purely additive (byte-identical lowering, no
-type-check) until the contract pass and codegen lowering consume it.
+`contracts` and `channels` are separate from `decls` deliberately: codegen and
+sema iterate `decls`, so a contract is purely additive (byte-identical lowering,
+no type-check) until the contract passes and codegen lowering consume it.
 
 ### `ContractDecl`
 
@@ -97,8 +98,27 @@ surface). v1 admits only `let` (immutable); `var` is deferred.
 | `name` | `string` | yes | the binding name |
 | `value` | `Expr` | yes | the entry-evaluated expression |
 
-A `channel <name> { … }` block (RFC-0007 trace contracts) is recognized at the
-top level but **skipped** (no node) until the channel-contract epoch.
+### `ChannelDecl`
+
+A separable channel-contract block — `channel <subject> { … }` (RFC-0007 trace
+contracts), grammar.ebnf §ChannelBlock. States *local* trace invariants of one
+named channel subject; cross-channel protocol clauses live in a `contract`
+body (a later C7a slice).
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `span` | `Span` | yes | |
+| `subject` | `string` | yes | the named channel this block constrains |
+| `clauses` | `[]ChannelClause` | yes (may be empty) | in source order |
+
+### `ChannelClause`
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `span` | `Span` | yes | |
+| `kind` | `"closed-by" \| "forbid-send-after-close" \| "forbid-recv-after-close" \| "capacity" \| "drains-before-scope-exit" \| "drains-before-return"` | yes | |
+| `owner` | `Option<string>` | when `kind == "closed-by"` | the sole permitted closer |
+| `bound` | `Option<Expr>` | when `kind == "capacity"` | the `never more than <bound> in flight` limit |
 
 ### `Import`
 

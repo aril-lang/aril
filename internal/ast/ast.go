@@ -26,6 +26,7 @@ type File struct {
 	Imports   []*Import
 	Decls     []Decl
 	Contracts []*ContractDecl
+	Channels  []*ChannelDecl
 }
 
 func (n *File) NodeSpan() Span   { return n.Span }
@@ -68,6 +69,36 @@ type ContractBinding struct {
 	Span  Span
 	Name  string
 	Value Expr
+}
+
+// ChannelDecl is a separable channel-contract block — `channel <name> { … }`
+// (RFC-0007 trace contracts) — stating local trace invariants of one named
+// channel subject. Like ContractDecl it lives in File.Channels, *not*
+// File.Decls: codegen and sema iterate Decls, so a channel contract is purely
+// additive (byte-identical lowering, no type-check) until the channel-contract
+// pass and codegen lowering consume it.
+type ChannelDecl struct {
+	Span    Span
+	Subject string // the named channel this block constrains
+	Clauses []ChannelClause
+}
+
+func (n *ChannelDecl) NodeSpan() Span   { return n.Span }
+func (n *ChannelDecl) NodeKind() string { return "ChannelDecl" }
+
+// ChannelClause is one local trace invariant inside a ChannelDecl. Kind is one
+// of (RFC-0007 §Design, channel clauses):
+//   - "closed-by" — Owner names the sole permitted closer;
+//   - "forbid-send-after-close" / "forbid-recv-after-close" — close-safety
+//     (no operand);
+//   - "capacity" — Bound is the `never more than <Bound> in flight` limit;
+//   - "drains-before-scope-exit" / "drains-before-return" — completion at the
+//     owning boundary (no operand).
+type ChannelClause struct {
+	Span  Span
+	Kind  string
+	Owner string // closed-by owner; set only when Kind == "closed-by"
+	Bound Expr   // capacity bound; set only when Kind == "capacity"
 }
 
 // Import is a single `import <path>` line.

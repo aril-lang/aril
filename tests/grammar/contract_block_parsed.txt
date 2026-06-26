@@ -1,5 +1,5 @@
 --- TITLE ---
-ContractBlock — a `contract` block parses into File.Contracts (requires/ensures); a `channel` block is still skipped (RFC-0007 deferred)
+ContractBlock — a `contract` block parses into File.Contracts (requires/ensures); a `channel` block parses into File.Channels (RFC-0007)
 
 --- INPUT ---
 func abs(x: int): int {
@@ -40,4 +40,7 @@ channel results {
     (ensures @8:3-8:22
       (Binary ">=" @8:11-8:22
         (Ident "result" @8:11-8:17)
-        (IntLitExpr 0 @8:21-8:22)))))
+        (IntLitExpr 0 @8:21-8:22))))
+  (ChannelDecl "results" @11:1-14:2
+    (closed-by "pool" @12:3-12:17)
+    (forbid-send-after-close @13:3-13:26)))
