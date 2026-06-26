@@ -1,0 +1,18 @@
+--- rate_limited.aril
++++ rate_limited.aril
+@@ -66,3 +66,15 @@
+   fmt.println("---")
+   fmt.println("produced:", cnt.produced, "dropped:", cnt.dropped, "emitted:", cnt.emitted)
+ }
++
++// Both goroutines wait on `deadline` to stop — but `deadline = time.after(...)`
++// is a one-shot, receive-only source: its single value reaches ONE `<-deadline`,
++// so the other goroutine hangs forever (the real deadlock this example carries).
++// Stating the intent `deadline delivered-to-all { producer, consumer }` makes the
++// coverage static arm reject it before running — a RecvChan cannot broadcast.
++contract RateLimited {
++  participant producer
++  participant consumer
++  channel deadline
++  deadline delivered-to-all { producer, consumer }
++}

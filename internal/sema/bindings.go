@@ -30,6 +30,13 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 		// json.serialize(v) / serializeIndent(v, prefix, indent) →
 		// Result<[]byte, error> (binding-surface.md §encoding/json).
 		return &Result{T: &Slice{Elem: &Builtin{N: "byte"}}, E: errT}
+	case [2]string{"time", "after"}, [2]string{"time", "tick"}:
+		// time.after(d) / time.tick(d) → RecvChan<time.Time> (Go's
+		// `<-chan time.Time`): a receive-only timer source. Typing it as
+		// RecvChan (not Unknown) lets a channel contract name it as a
+		// subject and the E1209 static delivery-intent check see its
+		// receive-only direction (binding-surface.md §time).
+		return &RecvChan{Elem: &Named{N: "time.Time"}}
 	}
 	return nil
 }

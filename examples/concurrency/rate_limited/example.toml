@@ -9,6 +9,13 @@ expects  = "run-pass"
 entry    = "rate_limited.aril"
 
 [[error]]
+patch   = "errors/deadline-delivered-to-all.patch"   # one-shot time.after deadline declared delivered-to-all to two participants
+expect  = ["E1209"]
+stage   = "sema"
+matches = "errors/deadline-delivered-to-all.expected"
+origin  = "synthetic"
+
+[[error]]
 patch   = "errors/annot-mismatch.patch"   # i annotated string but assigned an int
 expect  = ["E0201"]
 stage   = "sema"
