@@ -75,6 +75,20 @@ channel jobCh {
   forbid send after close
 }
 
+// resultCh is the fan-IN channel: every worker writes to it through the
+// directional `results: SendChan<JobResult>` parameter, and runPool closes it
+// only *after* the scope joins — i.e. after every worker has returned and can no
+// longer send. `forbid send after close` states that protocol: a bug that closed
+// resultCh while a worker was still running (closing inside the scope, or failing
+// to join before the close) would trip E1203 at the worker's `results.send`, with
+// `.aril` blame and the subject name. The send is a *cross-function directional*
+// send — the contract is enforced via the channel's registration at its bidi
+// creation site, which keys every directional view, so the callee frame's
+// `chan<- JobResult` send still finds the monitor.
+channel resultCh {
+  forbid send after close
+}
+
 func main() {
   var jobs: []Job = []Job{}
   for i in 1..=8 {

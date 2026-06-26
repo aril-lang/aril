@@ -14,22 +14,40 @@ import (
 // byte-identical lowering). The monitor is goroutine-safe: channels cross
 // `spawn`/`scope` boundaries, so each subject's state is mutex-guarded.
 //
+// Directionality: a contracted channel is created bidirectional (`chan T`) but
+// flows into callees as a directional `chan<- T` / `<-chan T` parameter, which
+// boxes to a *different* dynamic type — so a single `any`-key registration would
+// miss the directional view. RegisterChan therefore stores all three views,
+// sharing one state, so a send/close from any frame finds the monitor. The
+// `forbidSend` flag carries whether send-after-close is an E1203 violation for
+// this subject: codegen routes *every* directional send through ChanSend (the
+// source name is lost across the boundary, so it can't decide per-channel), and
+// the flag keeps a non-`forbid send after close` channel a no-op.
+//
 // The companion inline forms (predeclared.go writePredeclaredChanContract) must
 // stay byte-equivalent in behaviour (the runtime-mode equivalence guard).
 
 type chanContractState struct {
-	mu     sync.Mutex
-	name   string
-	closed bool
+	mu         sync.Mutex
+	name       string
+	forbidSend bool
+	closed     bool
 }
 
-// chanContracts maps a contracted channel value to its monitor state.
+// chanContracts maps a contracted channel value (each directional view) to its
+// shared monitor state.
 var chanContracts sync.Map // map[any]*chanContractState
 
-// RegisterChan records a contracted channel under its source subject name.
-// Idempotent — re-registering the same channel value keeps the first state.
-func RegisterChan(ch any, name string) {
-	chanContracts.LoadOrStore(ch, &chanContractState{name: name})
+// RegisterChan records a contracted channel under its source subject name,
+// keyed by every directional view of the channel so a send/close from a
+// directional callee frame still finds the state. forbidSend records whether
+// `forbid send after close` (E1203) applies. Idempotent — re-registering keeps
+// the first state.
+func RegisterChan[T any](ch chan T, name string, forbidSend bool) {
+	s := &chanContractState{name: name, forbidSend: forbidSend}
+	chanContracts.LoadOrStore(ch, s)
+	chanContracts.LoadOrStore((chan<- T)(ch), s)
+	chanContracts.LoadOrStore((<-chan T)(ch), s)
 }
 
 func chanContractOf(ch any) *chanContractState {
@@ -40,13 +58,15 @@ func chanContractOf(ch any) *chanContractState {
 }
 
 // ChanSend sends v on ch, first asserting the channel is not closed
-// (`forbid send after close`, E1203) when ch is contracted.
-func ChanSend[T any](ch chan T, v T, loc string) {
+// (`forbid send after close`, E1203) when ch is a contracted subject that
+// forbids it. Takes a send-directional channel so both a bidirectional creator
+// frame and a `chan<- T` callee frame route through it.
+func ChanSend[T any](ch chan<- T, v T, loc string) {
 	if s := chanContractOf(ch); s != nil {
 		s.mu.Lock()
-		closed, name := s.closed, s.name
+		bad, name := s.forbidSend && s.closed, s.name
 		s.mu.Unlock()
-		if closed {
+		if bad {
 			panic(chanViolation("E1203", name, "send after close", loc))
 		}
 	}
@@ -55,7 +75,7 @@ func ChanSend[T any](ch chan T, v T, loc string) {
 
 // ChanClose closes ch, asserting it was not already closed (double close,
 // E1202) and recording the close so later sends / the drain check can see it.
-func ChanClose[T any](ch chan T, loc string) {
+func ChanClose[T any](ch chan<- T, loc string) {
 	if s := chanContractOf(ch); s != nil {
 		s.mu.Lock()
 		if s.closed {
