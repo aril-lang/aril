@@ -150,6 +150,11 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// An `Ordered` type-param bound lowers to `cmp.Ordered`, so the program
 	// needs `import "cmp"`. Detected before writeHeader (which emits imports).
 	g.detectOrderedBound(f)
+	// An enforced channel trace contract (RFC-0007, panic mode) pulls in the
+	// arilrt monitor — detected before writeHeader so its import / inline
+	// prelude is in place (the per-site emit also sets the flag, but imports
+	// are computed before bodies).
+	g.detectChannelContracts()
 	// Transitive deps: container methods produce Option / Result
 	// values, so any use of those containers forces those
 	// predeclared sums into the binary too.
@@ -433,6 +438,10 @@ type gen struct {
 	usesJSONParse bool
 	usesTryRecv   bool
 	usesScope     bool
+	// usesChanContract — a channel trace contract (RFC-0007) installs the
+	// arilrt monitor (RegisterChan / ChanSend / ChanClose / ChanCheckDrained),
+	// set only under `--contracts=panic` when an enforced clause fires.
+	usesChanContract bool
 	// usesSortSorted — `sort.sorted(s, less)` is used, so its inline
 	// Sorted helper (copy + sort.SliceStable) and Go's "sort"
 	// import are needed.
@@ -620,7 +629,7 @@ func (g *gen) usesRuntime() bool {
 	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
-		g.usesScope || g.usesSortSorted
+		g.usesScope || g.usesSortSorted || g.usesChanContract
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -678,6 +687,13 @@ func (g *gen) writeHeader(f *ast.File) {
 	if g.usesErrorCtor {
 		// `error(msg)` lowers to errors.New(msg) (builtins.md §error).
 		add("errors")
+	}
+	if g.usesChanContract && !g.vendored() {
+		// The inline channel-contract monitor (RFC-0007) uses sync.Map for the
+		// per-channel registry and fmt for the violation message; vendored mode
+		// carries both in arilrt.
+		add("sync")
+		add("fmt")
 	}
 	if g.usesCmp {
 		// An `Ordered` type-param bound lowers to `cmp.Ordered`; the
@@ -761,4 +777,5 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredSortSorted()
 	g.writePredeclaredTryRecv()
 	g.writePredeclaredGroup()
+	g.writePredeclaredChanContract()
 }

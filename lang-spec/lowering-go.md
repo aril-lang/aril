@@ -932,6 +932,49 @@ construction IIFE around its returned literal). Rejecting a direct external
 field write that could break an invariant between checkpoints (E1106) is a
 later slice.
 
+## Channel contracts — the per-channel monitor (RFC-0007)
+
+A channel trace contract lowers to a per-channel **monitor** in `arilrt`
+(`arilrt/contract.go`; the inline-mode prelude mirrors it byte-for-byte). v1
+enforces the definitive **local** subset — `forbid send after close` (E1203),
+double close (E1202), and the `drains-before-…` completion check (E1207) —
+keyed by the channel **value**, so a registered channel is monitored wherever
+it flows (including across `spawn`/`scope`); the state is mutex-guarded.
+Everything is gated on `--contracts=panic`; under `off` **nothing is emitted**
+(byte-identical lowering).
+
+The monitor binds by NAME at the use site (an `Ident` whose name is a contracted
+subject, Info.ChannelContracts) over a **bidirectional** `Channel` receiver — the
+creator/owner frame where the channel is `chan T`. A directional
+`SendChan`/`RecvChan` (typically a callee parameter) is left unmonitored;
+cross-function enforcement is a follow-up.
+
+```
+let ch = makeChannel<T>(cap)     channel ch { forbid send after close; drains-before-scope-exit }
+  ⟿
+ch := make(chan T, cap)
+arilrt.RegisterChan(ch, "ch")                       // register at creation
+defer arilrt.ChanCheckDrained(ch, "<file:line:col>") // boundary drain check (drains subjects)
+
+ch.send(v)   ⟿   arilrt.ChanSend(ch, v, "<loc>")     // asserts open before send (E1203)
+ch.close()   ⟿   arilrt.ChanClose(ch, "<loc>")       // double-close (E1202); records closed
+```
+
+`ChanCheckDrained` runs as a `defer` placed at the channel's creation site, so it
+fires at the enclosing Go frame's return — the `scope` IIFE for a channel created
+inside a `scope`, the function for one created in the function body. **v1 caveat:**
+`drains-before-scope-exit` and `drains-before-return` therefore **collapse** to
+this single creation-frame boundary — the runtime does not yet distinguish them
+(a channel created inside a `scope` with `drains-before-return` is still checked
+at scope exit). Pinning each clause to its own boundary is a follow-up. A
+violation `panic`s with the code, the `.aril` `loc`, and the subject name (D10). The
+`closed` flag set by `ChanClose` is what the send (E1203) and drain (E1207)
+checks read; `drains` v1 verifies *closed*, not *closed-and-empty* (the latter
+needs in-flight accounting — a follow-up). Capacity (E1206), `closed-by` (E1201),
+recv-after-close (E1204), and the cross-channel trace kinds (ordering, coverage,
+liveness, fairness) are recognized + well-formedness-checked (E1210) but their
+runtime monitor is a follow-up.
+
 ## Generics
 
 Aril generics lower to Go generics one-to-one:

@@ -188,6 +188,77 @@ func (g *gen) writePredeclaredTryRecv() {
 `)
 }
 
+// writePredeclaredChanContract emits the inline channel trace-contract monitor
+// (RFC-0007) — the byte-equivalent of arilrt/contract.go for inline mode.
+// Conditional on usage; pulls in sync + fmt. Enforces the definitive local
+// subset: double close (E1202), send after close (E1203), drain-at-boundary
+// (E1207), keyed by the channel value across goroutines (mutex-guarded).
+func (g *gen) writePredeclaredChanContract() {
+	if !g.usesChanContract {
+		return
+	}
+	g.b.WriteString(`type chanContractState struct {
+	mu     sync.Mutex
+	name   string
+	closed bool
+}
+
+var chanContracts sync.Map
+
+func RegisterChan(ch any, name string) {
+	chanContracts.LoadOrStore(ch, &chanContractState{name: name})
+}
+
+func chanContractOf(ch any) *chanContractState {
+	if v, ok := chanContracts.Load(ch); ok {
+		return v.(*chanContractState)
+	}
+	return nil
+}
+
+func ChanSend[T any](ch chan T, v T, loc string) {
+	if s := chanContractOf(ch); s != nil {
+		s.mu.Lock()
+		closed, name := s.closed, s.name
+		s.mu.Unlock()
+		if closed {
+			panic(chanViolation("E1203", name, "send after close", loc))
+		}
+	}
+	ch <- v
+}
+
+func ChanClose[T any](ch chan T, loc string) {
+	if s := chanContractOf(ch); s != nil {
+		s.mu.Lock()
+		if s.closed {
+			name := s.name
+			s.mu.Unlock()
+			panic(chanViolation("E1202", name, "double close", loc))
+		}
+		s.closed = true
+		s.mu.Unlock()
+	}
+	close(ch)
+}
+
+func ChanCheckDrained(ch any, loc string) {
+	if s := chanContractOf(ch); s != nil {
+		s.mu.Lock()
+		closed, name := s.closed, s.name
+		s.mu.Unlock()
+		if !closed {
+			panic(chanViolation("E1207", name, "not closed before its owning boundary", loc))
+		}
+	}
+}
+
+func chanViolation(code, name, what, loc string) string {
+	return fmt.Sprintf("aril: channel contract violated [%s] at %s: channel ` + "`" + `%s` + "`" + ` — %s", code, loc, name, what)
+}
+`)
+}
+
 // writePredeclaredGroup emits the inline structured-concurrency
 // group helper backing `scope` / `spawn` (lowering-go.md §ScopeIR /
 // §SpawnIR). It replicates errgroup.WithContext semantics with only

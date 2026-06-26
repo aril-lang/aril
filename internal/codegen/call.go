@@ -7,6 +7,7 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/aril-lang/aril/internal/ast"
 	"github.com/aril-lang/aril/internal/sema"
@@ -221,6 +222,22 @@ func (g *gen) emitCall(c *ast.Call) error {
 			if len(c.Args) != 1 {
 				return fmt.Errorf("codegen: .send expects exactly one argument, got %d", len(c.Args))
 			}
+			// A `forbid send after close` subject routes its send through the
+			// arilrt monitor (RFC-0007, panic mode) — `ChanSend(ch, v, loc)`
+			// asserts the channel is open before sending.
+			if id, ok := f.Receiver.(*ast.Ident); ok && g.chanSendChecked(id) {
+				g.usesChanContract = true
+				g.b.WriteString(g.rt("ChanSend") + "(")
+				if err := g.emitExpr(f.Receiver); err != nil {
+					return err
+				}
+				g.b.WriteString(", ")
+				if err := g.emitExpr(c.Args[0]); err != nil {
+					return err
+				}
+				g.b.WriteString(", " + strconv.Quote(g.srcLoc(f.Span)) + ")")
+				return nil
+			}
 			if err := g.emitExpr(f.Receiver); err != nil {
 				return err
 			}
@@ -239,6 +256,18 @@ func (g *gen) emitCall(c *ast.Call) error {
 			g.b.WriteByte(')')
 			return nil
 		case "close":
+			// A contracted subject routes its close through the arilrt monitor
+			// (RFC-0007, panic mode) — `ChanClose(ch, loc)` detects a double
+			// close (E1202) and records the close for the send / drain checks.
+			if id, ok := f.Receiver.(*ast.Ident); ok && g.chanCloseChecked(id) {
+				g.usesChanContract = true
+				g.b.WriteString(g.rt("ChanClose") + "(")
+				if err := g.emitExpr(f.Receiver); err != nil {
+					return err
+				}
+				g.b.WriteString(", " + strconv.Quote(g.srcLoc(f.Span)) + ")")
+				return nil
+			}
 			g.b.WriteString("close(")
 			if err := g.emitExpr(f.Receiver); err != nil {
 				return err
