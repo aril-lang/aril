@@ -63,6 +63,18 @@ func runPool(workerCount: int, jobs: []Job): Result<[]JobResult, error> {
   return Ok(out)
 }
 
+// The producer goroutine feeds every job, *then* closes jobCh — never a send
+// after the close (RFC-0007 close-safety), stated here as an executable-spec
+// property of the protocol. A reordering bug (close before the loop finishes,
+// or a stray send after close) trips E1203 at the offending send with `.aril`
+// blame and the subject name — an upgrade over Go's raw, generated-Go-blamed
+// "send on closed channel" panic (D10), not a new bug class (Go crashes on it
+// either way). The silent concurrency bugs — ordering, fan-out coverage,
+// capacity — need the cross-channel trace enforcement (a follow-up).
+channel jobCh {
+  forbid send after close
+}
+
 func main() {
   var jobs: []Job = []Job{}
   for i in 1..=8 {
