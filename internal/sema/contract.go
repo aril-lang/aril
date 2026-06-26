@@ -24,6 +24,13 @@ func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope
 	for i, f := range files {
 		c.file = paths[i]
 		for _, cd := range f.Contracts {
+			// RFC-0007 protocol contracts attach to channels by subject name,
+			// not to a value/state declaration — route them to the channel-
+			// contract pass instead of resolving a (non-existent) target.
+			if hasProtocolClause(cd) {
+				c.protocolContracts = append(c.protocolContracts, contractAt{decl: cd, file: paths[i]})
+				continue
+			}
 			sym := scope.lookup(cd.Target)
 			if sym == nil || !isContractTarget(sym.Kind) {
 				c.report("E1101", "contract `"+cd.Target+"` attaches to no such declaration", cd.Span)

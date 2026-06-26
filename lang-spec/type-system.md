@@ -1075,6 +1075,29 @@ contract on no such declaration, a `loop <label>` section with no matching
 labelled loop) are **E1101**. Predicates are additive — they do not change the
 typing or lowering of the target; under `--contracts=off` they are elided.
 
+## Channel contracts — T-Event-Subject
+
+A channel contract (RFC-0007 trace contracts) constrains the observable event
+trace of a *named* channel value. A `channel <subject> { … }` block, and the
+cross-channel protocol clauses of a `contract` block, bind each subject **by
+name** to a channel-typed binding (`Channel<T>` / `SendChan<T>` / `RecvChan<T>`)
+of the same name — the binding model mirrors the name-based dispatch of channel
+method calls. A subject that names no such channel value is unbound; an event
+that is not `subject.op(payload)` over a declared subject (op ∈ send/recv/close),
+an unknown subject role, or a fan-out / fairness target that is not a declared
+participant / subject, are all **well-formedness** failures.
+
+    subject ↦ ch : Channel<T> | SendChan<T> | RecvChan<T>     op ∈ {send, recv, close}
+    ───────────────────────────────────────────────────────────────────────────── (T-Event-Subject)
+       subject.op(payload) is a well-formed event
+
+A well-formedness failure is **E1210**. Channel contracts are additive: like
+value contracts they do not change the typing or lowering of the program, and
+under `--contracts=off` they are elided. The v1 *enforcement* is the definitive
+local-safety subset (close-safety / capacity / drains); the cross-channel trace
+properties (ordering, coverage, liveness, fairness) are validated for
+well-formedness but their runtime monitor is a documented follow-up.
+
 ## Type errors — quick index
 
 The full catalog lives in `diagnostics.md` (forthcoming). Codes
