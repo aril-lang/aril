@@ -26,8 +26,16 @@ func (c *checker) indexContracts(files []*ast.File, paths []string, scope *Scope
 		for _, cd := range f.Contracts {
 			// RFC-0007 protocol contracts attach to channels by subject name,
 			// not to a value/state declaration — route them to the channel-
-			// contract pass instead of resolving a (non-existent) target.
+			// contract pass instead of resolving a (non-existent) target. A
+			// block mixing the two families is rejected (E1210): they target
+			// different things (a value/state decl vs named channels), so the
+			// value clauses would otherwise be silently dropped — split them.
 			if hasProtocolClause(cd) {
+				if hasValueClause(cd) {
+					c.report("E1210",
+						"contract `"+cd.Target+"` mixes value/state clauses (requires/ensures/invariant/loop/entry) with channel protocol clauses — put them in separate blocks",
+						cd.Span)
+				}
 				c.protocolContracts = append(c.protocolContracts, contractAt{decl: cd, file: paths[i]})
 				continue
 			}

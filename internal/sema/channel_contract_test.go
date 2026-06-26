@@ -119,6 +119,42 @@ contract C {
 	}
 }
 
+// TestProtocolMixedBlock: a contract mixing value/state clauses with protocol
+// clauses is E1210 (split them) — the value clauses would otherwise be dropped.
+func TestProtocolMixedBlock(t *testing.T) {
+	_, codes := checkContract(t, `func run() {
+  let work = makeChannel<int>(1)
+}
+
+contract C {
+  requires true
+  channel work
+}
+`)
+	if !containsCode(codes, "E1210") {
+		t.Fatalf("expected E1210 for a mixed value/protocol contract, got %v", codes)
+	}
+}
+
+// TestProtocolBareSendRejected: a `send`/`recv` event without a payload is
+// E1210 (close is the only bare event).
+func TestProtocolBareSendRejected(t *testing.T) {
+	_, codes := checkContract(t, `func run() {
+  let work = makeChannel<int>(1)
+  let results = makeChannel<int>(1)
+}
+
+contract C {
+  channel work
+  channel results
+  forbid results.send before work.recv(y)
+}
+`)
+	if !containsCode(codes, "E1210") {
+		t.Fatalf("expected E1210 for a payload-less send event, got %v", codes)
+	}
+}
+
 func containsCode(codes []string, want string) bool {
 	for _, c := range codes {
 		if c == want {

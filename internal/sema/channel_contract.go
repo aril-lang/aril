@@ -43,6 +43,17 @@ func hasProtocolClause(cd *ast.ContractDecl) bool {
 	return false
 }
 
+// hasValueClause reports whether cd carries any RFC-0006 value/state clause
+// (requires/ensures/invariant/loop/entry) — anything not a protocol clause.
+func hasValueClause(cd *ast.ContractDecl) bool {
+	for _, cl := range cd.Clauses {
+		if !protocolClauseKinds[cl.Kind] {
+			return true
+		}
+	}
+	return false
+}
+
 func isChannelType(t Type) bool {
 	switch t.(type) {
 	case *Channel, *SendChan, *RecvChan:
@@ -156,7 +167,7 @@ func (c *checker) checkEvent(e ast.Expr, subjects map[string]bool, span ast.Span
 	if e == nil {
 		return
 	}
-	subj, op, ok := eventShape(e)
+	subj, op, isCall, ok := eventShape(e)
 	if !ok {
 		c.report("E1210", "a protocol event must have the form `subject.op(payload)` with op ∈ send/recv/close", span)
 		return
@@ -165,25 +176,37 @@ func (c *checker) checkEvent(e ast.Expr, subjects map[string]bool, span ast.Span
 		c.report("E1210", "unknown event operation `"+op+"` (expected send/recv/close)", span)
 		return
 	}
+	// `send`/`recv` carry a payload (`subject.send(p)` / `subject.recv(_)`);
+	// `close` is the bare `subject.close` form (RFC-0007 §Design).
+	if op == "close" && isCall {
+		c.report("E1210", "a `close` event takes no payload — write `"+subj+".close`", span)
+		return
+	}
+	if op != "close" && !isCall {
+		c.report("E1210", "a `"+op+"` event needs a payload — write `"+subj+"."+op+"(payload)`", span)
+		return
+	}
 	if !subjects[subj] {
 		c.report("E1210", "event subject `"+subj+"` is not a declared channel subject", span)
 	}
 }
 
-// eventShape extracts (subject, op) from a `subject.op(payload)` or
+// eventShape extracts (subject, op, isCall) from a `subject.op(payload)` or
 // `subject.close` event Expr — a Field over an Ident receiver, optionally
-// wrapped in a Call (the payload args). Returns ok == false for any other shape.
-func eventShape(e ast.Expr) (subj, op string, ok bool) {
-	if call, isCall := e.(*ast.Call); isCall {
+// wrapped in a Call (the payload args). isCall reports whether the form carried
+// a call (a payload). Returns ok == false for any other shape.
+func eventShape(e ast.Expr) (subj, op string, isCall, ok bool) {
+	if call, ok := e.(*ast.Call); ok {
 		e = call.Callee
+		isCall = true
 	}
 	fld, isFld := e.(*ast.Field)
 	if !isFld {
-		return "", "", false
+		return "", "", isCall, false
 	}
 	id, isID := fld.Receiver.(*ast.Ident)
 	if !isID {
-		return "", "", false
+		return "", "", isCall, false
 	}
-	return id.Name, fld.Name, true
+	return id.Name, fld.Name, isCall, true
 }

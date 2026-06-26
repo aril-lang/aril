@@ -179,13 +179,14 @@ allocated for the clauses landing in later slices of the contract epoch.
 ### E12xx — Channel contracts (RFC-0007 trace contracts)
 
 Codes raised by channel-contract checking — `channel <subject> { … }` blocks
-and cross-channel protocol clauses. The **safety** codes (E1201–E1207) and the
-static **coverage** code (E1209) are *definitive* and enforced at runtime /
-compile time; **E1210** (well-formedness) is a sema check. The trace-monitor
-**coverage** runtime arm (E1208), **liveness** (E1211), and **fairness** (E1212)
-are bounded / non-definitive and **reserved** — the cross-channel trace monitor
-is a documented follow-up; the v1 enforcement is the definitive local-safety
-subset (close-safety / capacity / drains).
+and cross-channel protocol clauses. **E1210** (well-formedness) is the sema
+check and the only code emitted today. The **local safety** codes
+(E1201–E1204, E1206, E1207) become live with the C7c runtime — the definitive
+per-channel monitor (close-safety / capacity / drains). The cross-channel
+trace properties — ordering (E1205), the coverage runtime arm (E1208) and its
+static arm (E1209), liveness (E1211), fairness (E1212) — are **reserved**: they
+need the global trace monitor, a documented follow-up, and the liveness/fairness
+kinds are non-definitive by nature.
 
 | Code | Sev | Message | Authoritative rule | Fix |
 |---|---|---|---|---|
