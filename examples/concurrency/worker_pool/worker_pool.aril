@@ -63,6 +63,14 @@ func runPool(workerCount: int, jobs: []Job): Result<[]JobResult, error> {
   return Ok(out)
 }
 
+// The producer goroutine feeds every job, *then* closes jobCh — never a
+// send after the close (RFC-0007 close-safety). A reordering bug (close
+// before the loop finishes, or a stray send after close) trips E1203 at the
+// offending send, rather than surfacing as Go's raw "send on closed channel".
+channel jobCh {
+  forbid send after close
+}
+
 func main() {
   var jobs: []Job = []Job{}
   for i in 1..=8 {
