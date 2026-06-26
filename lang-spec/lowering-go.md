@@ -962,8 +962,12 @@ ch.close()   ⟿   arilrt.ChanClose(ch, "<loc>")       // double-close (E1202); 
 
 `ChanCheckDrained` runs as a `defer` placed at the channel's creation site, so it
 fires at the enclosing Go frame's return — the `scope` IIFE for a channel created
-inside a `scope`, the function for one created in the function body. A violation
-`panic`s with the code, the `.aril` `loc`, and the subject name (D10). The
+inside a `scope`, the function for one created in the function body. **v1 caveat:**
+`drains-before-scope-exit` and `drains-before-return` therefore **collapse** to
+this single creation-frame boundary — the runtime does not yet distinguish them
+(a channel created inside a `scope` with `drains-before-return` is still checked
+at scope exit). Pinning each clause to its own boundary is a follow-up. A
+violation `panic`s with the code, the `.aril` `loc`, and the subject name (D10). The
 `closed` flag set by `ChanClose` is what the send (E1203) and drain (E1207)
 checks read; `drains` v1 verifies *closed*, not *closed-and-empty* (the latter
 needs in-flight accounting — a follow-up). Capacity (E1206), `closed-by` (E1201),
