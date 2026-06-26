@@ -90,17 +90,6 @@ func (g *gen) emitContractPrologue(fc *sema.FuncContract, fn *ast.FuncDecl, name
 		}
 	}
 	if len(fc.Ensures) > 0 {
-		g.writeIndent()
-		g.b.WriteString("defer func() {\n")
-		g.indent++
-		g.writeIndent()
-		g.b.WriteString("if r := recover(); r != nil {\n")
-		g.indent++
-		g.writeIndent()
-		g.b.WriteString("panic(r)\n")
-		g.indent--
-		g.writeIndent()
-		g.b.WriteString("}\n")
 		// `result` lowers to the named return only on a value-returning
 		// function; a unit function's ensures references params / entry
 		// snapshots, never result (sema leaves it unbound there).
@@ -108,19 +97,41 @@ func (g *gen) emitContractPrologue(fc *sema.FuncContract, fn *ast.FuncDecl, name
 			g.contractResultVar = "_arilRet"
 		}
 		g.contractEntryVars = entryVars
-		for _, ens := range fc.Ensures {
-			if err := g.emitContractCheck(ens, "ensures", fn.Name); err != nil {
-				g.contractResultVar = ""
-				g.contractEntryVars = nil
-				return err
-			}
+		defer func() { g.contractResultVar, g.contractEntryVars = "", nil }()
+		if err := g.emitDeferredCheckBlock(fc.Ensures, "ensures", fn.Name); err != nil {
+			return err
 		}
-		g.contractResultVar = ""
-		g.contractEntryVars = nil
-		g.indent--
-		g.writeIndent()
-		g.b.WriteString("}()\n")
 	}
+	return nil
+}
+
+// emitDeferredCheckBlock emits a `defer func() { … }()` that runs the predicate
+// checks at every return path. The recover-rethrow preamble keeps a
+// panic-in-progress from being masked, so the checks (and any contract
+// violation) only fire on a *normal* return. Each predicate runs through the
+// re-entrancy-guarded check (`emitContractCheck`). Shared by the `ensures`
+// post-check and the method-exit type-invariant check — both are deferred
+// every-return-path checks with the identical wrapper.
+func (g *gen) emitDeferredCheckBlock(preds []ast.Expr, kind, name string) error {
+	g.writeIndent()
+	g.b.WriteString("defer func() {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("if r := recover(); r != nil {\n")
+	g.indent++
+	g.writeIndent()
+	g.b.WriteString("panic(r)\n")
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}\n")
+	for _, pred := range preds {
+		if err := g.emitContractCheck(pred, kind, name); err != nil {
+			return err
+		}
+	}
+	g.indent--
+	g.writeIndent()
+	g.b.WriteString("}()\n")
 	return nil
 }
 
@@ -168,13 +179,12 @@ func (g *gen) emitContractCheck(pred ast.Expr, kind, fnName string) error {
 
 // emitMethodInvariants lowers a class's type invariants (RFC-0006) to a
 // method-exit check, emitted as a `defer` at the top of every non-static
-// method body so it runs on each return path (the mutation boundary). The
-// recover-rethrow preamble keeps a panic-in-progress from being masked; each
-// predicate then runs through the re-entrancy-guarded check. The invariant's
-// field names lower to `t.<field>` (implicit receiver), so the check reads
-// the post-mutation state. Under off (the default) nothing is emitted —
-// byte-identical lowering. A static method (no receiver) is skipped here;
-// construction-time checking is a later slice.
+// method body so it runs on each return path (the mutation boundary), via the
+// shared emitDeferredCheckBlock wrapper. The invariant's field names lower to
+// `t.<field>` (implicit receiver), so the check reads the post-mutation state.
+// Under off (the default) nothing is emitted — byte-identical lowering. A
+// static method (no receiver) is skipped here; construction-time checking is a
+// later slice.
 func (g *gen) emitMethodInvariants(className string) error {
 	if g.contractMode != "panic" || g.info == nil {
 		return nil
@@ -183,26 +193,7 @@ func (g *gen) emitMethodInvariants(className string) error {
 	if len(preds) == 0 {
 		return nil
 	}
-	g.writeIndent()
-	g.b.WriteString("defer func() {\n")
-	g.indent++
-	g.writeIndent()
-	g.b.WriteString("if r := recover(); r != nil {\n")
-	g.indent++
-	g.writeIndent()
-	g.b.WriteString("panic(r)\n")
-	g.indent--
-	g.writeIndent()
-	g.b.WriteString("}\n")
-	for _, pred := range preds {
-		if err := g.emitContractCheck(pred, "invariant", className); err != nil {
-			return err
-		}
-	}
-	g.indent--
-	g.writeIndent()
-	g.b.WriteString("}()\n")
-	return nil
+	return g.emitDeferredCheckBlock(preds, "invariant", className)
 }
 
 // constructionInvariants returns the type invariants to check at a brace
