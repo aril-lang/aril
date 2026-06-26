@@ -155,6 +155,65 @@ contract C {
 	}
 }
 
+// TestProtocolDeliveryIntentRecvOnly: a `delivered-to-all` broadcast over a
+// receive-only subject (a RecvChan param, the `time.after` shape) is the
+// structurally-impossible broadcast E1209 catches before running.
+func TestProtocolDeliveryIntentRecvOnly(t *testing.T) {
+	_, codes := checkContract(t, `func run(deadline: RecvChan<int>) {
+  return
+}
+
+contract C {
+  channel deadline
+  participant producer
+  participant consumer
+  deadline delivered-to-all { producer, consumer }
+}
+`)
+	if !containsCode(codes, "E1209") {
+		t.Fatalf("expected E1209 for a broadcast over a receive-only subject, got %v", codes)
+	}
+}
+
+// TestProtocolDeliveryIntentBidiOK: the same broadcast over a bidirectional
+// channel (one a program can close to broadcast a done-signal) is satisfiable —
+// no E1209.
+func TestProtocolDeliveryIntentBidiOK(t *testing.T) {
+	_, codes := checkContract(t, `func run() {
+  let done = makeChannel<int>(1)
+}
+
+contract C {
+  channel done
+  participant producer
+  participant consumer
+  done delivered-to-all { producer, consumer }
+}
+`)
+	if containsCode(codes, "E1209") {
+		t.Fatalf("a bidirectional (closeable) broadcast subject must not trip E1209: %v", codes)
+	}
+}
+
+// TestProtocolDeliveryIntentSingleMember: a one-member fan-out is ordinary
+// delivery, satisfiable even over a receive-only subject — not a broadcast, no
+// E1209.
+func TestProtocolDeliveryIntentSingleMember(t *testing.T) {
+	_, codes := checkContract(t, `func run(deadline: RecvChan<int>) {
+  return
+}
+
+contract C {
+  channel deadline
+  participant only
+  deadline delivered-to-all { only }
+}
+`)
+	if containsCode(codes, "E1209") {
+		t.Fatalf("a single-member fan-out is not a broadcast and must not trip E1209: %v", codes)
+	}
+}
+
 func containsCode(codes []string, want string) bool {
 	for _, c := range codes {
 		if c == want {

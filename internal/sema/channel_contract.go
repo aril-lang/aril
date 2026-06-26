@@ -18,9 +18,11 @@ import "github.com/aril-lang/aril/internal/ast"
 // This pass runs after body checking, so each subject can be matched against
 // the inferred types of the program's bindings. It does well-formedness +
 // subject binding + IR (Info.ChannelContracts, the local clauses codegen
-// enforces). The cross-channel protocol clauses are validated for
-// well-formedness but their runtime enforcement (a global trace monitor) is a
-// documented follow-up — they are recognized, not yet enforced.
+// enforces) + the coverage **static arm** (E1209, checkDeliveryIntent — a
+// compile-time check on the subject's type, no monitor needed). The other
+// cross-channel protocol clauses (ordering, coverage runtime arm, liveness,
+// fairness) are validated for well-formedness but their runtime enforcement (a
+// global trace monitor) is a documented follow-up — recognized, not yet enforced.
 
 // protocolClauseKinds are the RFC-0007 ContractClause kinds. A `contract` block
 // carrying any of these is a protocol contract — exempt from the RFC-0006
@@ -150,6 +152,7 @@ func (c *checker) checkProtocolContract(cd *ast.ContractDecl, chanNames map[stri
 					c.report("E1210", "fan-out member `"+m+"` is not a declared participant", cl.Span)
 				}
 			}
+			c.checkDeliveryIntent(cl)
 		case "fairness":
 			for _, s := range cl.Names {
 				if !subjects[s] && !participants[s] {
@@ -158,6 +161,39 @@ func (c *checker) checkProtocolContract(cd *ast.ContractDecl, chanNames map[stri
 			}
 		}
 	}
+}
+
+// checkDeliveryIntent is the RFC-0007 coverage *static arm* (E1209): a
+// `delivered-to-all` clause that broadcasts to ≥2 members (or a receiver set,
+// which is ≥2 by intent) over a **receive-only** subject is structurally
+// impossible — a `RecvChan` can be neither multi-sent nor closed to broadcast,
+// so its single delivery reaches one receiver and the rest block forever (the
+// rate_limited `time.after` deadlock the RFC names). Caught before running,
+// from the subject's type. A 1-member fan-out, or a closeable channel used as a
+// done-signal broadcast, is satisfiable and not flagged.
+func (c *checker) checkDeliveryIntent(cl ast.ContractClause) {
+	broadcast := cl.RecvSet != "" || len(cl.Names) >= 2
+	if !broadcast {
+		return
+	}
+	if _, recvOnly := c.channelBindingType(cl.Subject).(*RecvChan); recvOnly {
+		c.report("E1209",
+			"`"+cl.Subject+" delivered-to-all` requires the event to reach every member, but `"+cl.Subject+"` is a receive-only channel: it delivers each value to one receiver and cannot broadcast (a work queue, or a one-shot `time.after`/`time.tick` source). Close a done-signal channel to broadcast, or use `offered-to-all` for best-effort fan-out",
+			cl.Span)
+	}
+}
+
+// channelBindingType returns the inferred type of the channel-typed binding of
+// the given name, or nil. Mirrors channelBindingNames' name-based dispatch (a
+// v1 limitation shared with the whole channel-contract surface).
+func (c *checker) channelBindingType(name string) Type {
+	var t Type
+	for _, sym := range c.info.Def {
+		if sym.Name == name && isChannelType(sym.Type) {
+			t = sym.Type
+		}
+	}
+	return t
 }
 
 // checkEvent validates one protocol event Expr: it must have the shape

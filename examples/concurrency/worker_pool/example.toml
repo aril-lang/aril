@@ -7,3 +7,10 @@ since    = "0.1"
 status   = "running"
 expects  = "run-pass"
 entry    = "worker_pool.aril"
+
+[[error]]
+patch   = "errors/jobs-delivered-to-all.patch"   # broadcast intent over the recv-only worker view of a work queue
+expect  = ["E1209"]
+stage   = "sema"
+matches = "errors/jobs-delivered-to-all.expected"
+origin  = "synthetic"

@@ -1,0 +1,1 @@
+error[E1209]: `jobs delivered-to-all` requires the event to reach every member, but `jobs` is a receive-only channel
