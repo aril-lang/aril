@@ -44,6 +44,10 @@ func CheckFiles(files []*ast.File, paths []string) (*Info, []*Diag) {
 		c.file = paths[i]
 		c.checkBodies(f)
 	}
+	// Channel contracts (RFC-0007) are checked last: subject binding matches a
+	// contract's named subjects against the inferred types of the program's
+	// bindings, which are only known after body checking.
+	c.checkChannelContracts(files, paths)
 	sortDiags(c.diags)
 	return c.info, c.diags
 }
@@ -94,6 +98,18 @@ type checker struct {
 	// symbols from the resolve pass to the check pass (where their types
 	// are set from the inferred binding values).
 	contractEntrySyms map[*ast.FuncDecl][]*Symbol
+	// protocolContracts collects the RFC-0007 cross-channel protocol contracts
+	// (a `contract` block carrying protocol clauses) skipped by the value-
+	// contract index — they attach to channels, not a value/state target, so
+	// the channel-contract pass handles them after body checking.
+	protocolContracts []contractAt
+}
+
+// contractAt pairs a contract declaration with its source path (protocol
+// contracts are collected during indexing and checked in a later pass).
+type contractAt struct {
+	decl *ast.ContractDecl
+	file string
 }
 
 func (c *checker) report(code, message string, span ast.Span) {

@@ -47,6 +47,24 @@ type Info struct {
 	// kinds and both checkpoints share one lookup. Absent for a type with no
 	// invariant.
 	TypeInvariants map[string][]ast.Expr
+
+	// ChannelContracts maps a channel-subject name to its resolved local
+	// channel-block clauses (RFC-0007 trace contracts). Codegen installs a
+	// per-channel monitor at each creation site whose binding name matches a
+	// key, enforcing the definitive local-safety subset (close-safety /
+	// capacity / drains). Cross-channel protocol clauses are validated for
+	// well-formedness but not stored here (runtime-deferred). Absent when no
+	// channel contracts exist.
+	ChannelContracts map[string]*ChannelContract
+}
+
+// ChannelContract is a channel subject's resolved local trace clauses
+// (RFC-0007). The clauses are the closed-by / forbid send|recv after close /
+// capacity / drains-before-… forms from one or more `channel <subject> { … }`
+// blocks naming this subject.
+type ChannelContract struct {
+	Subject string
+	Clauses []ast.ChannelClause
 }
 
 // FuncContract is a function's resolved requires/ensures/entry obligations.
@@ -64,11 +82,12 @@ type EntryBinding struct {
 
 func newInfo() *Info {
 	return &Info{
-		Symbol:         map[ast.Node]*Symbol{},
-		Type:           map[ast.Expr]Type{},
-		Def:            map[ast.Node]*Symbol{},
-		LoopInvariants: map[ast.Stmt][]ast.Expr{},
-		FuncContracts:  map[*ast.FuncDecl]*FuncContract{},
-		TypeInvariants: map[string][]ast.Expr{},
+		Symbol:           map[ast.Node]*Symbol{},
+		Type:             map[ast.Expr]Type{},
+		Def:              map[ast.Node]*Symbol{},
+		LoopInvariants:   map[ast.Stmt][]ast.Expr{},
+		FuncContracts:    map[*ast.FuncDecl]*FuncContract{},
+		TypeInvariants:   map[string][]ast.Expr{},
+		ChannelContracts: map[string]*ChannelContract{},
 	}
 }

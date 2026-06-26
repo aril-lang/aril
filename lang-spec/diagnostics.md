@@ -176,6 +176,33 @@ allocated for the clauses landing in later slices of the contract epoch.
 | E1105 | E | reserved — impure `entry`-section binding expression | RFC-0006 §"Predicate language" | reserved. |
 | E1106 | E | External field write to an invariant type | RFC-0006 §Surface (type invariants) | A direct field write `recv.field = v` whose `recv` is an invariant-bearing type, from outside that type's own methods, bypasses the invariant (re-checked only at method exit). Mutate through a method instead. The sole legal field write to such a type is its own receiver — a bare `field = v` or `this.field = v` inside its method. |
 
+### E12xx — Channel contracts (RFC-0007 trace contracts)
+
+Codes raised by channel-contract checking — `channel <subject> { … }` blocks
+and cross-channel protocol clauses. **E1210** (well-formedness) is the sema
+check and the only code emitted today. The **local safety** codes
+(E1201–E1204, E1206, E1207) become live with the C7c runtime — the definitive
+per-channel monitor (close-safety / capacity / drains). The cross-channel
+trace properties — ordering (E1205), the coverage runtime arm (E1208) and its
+static arm (E1209), liveness (E1211), fairness (E1212) — are **reserved**: they
+need the global trace monitor, a documented follow-up, and the liveness/fairness
+kinds are non-definitive by nature.
+
+| Code | Sev | Message | Authoritative rule | Fix |
+|---|---|---|---|---|
+| E1201 | E | Channel closed by a non-owner | RFC-0007 §Design (`closed-by`) | A `close()` on a contracted channel ran outside its declared `closed-by` owner. Close only from the owner. |
+| E1202 | E | Double close | RFC-0007 §Design (safety) | A contracted channel was closed twice. Close exactly once. |
+| E1203 | E | Send after close | RFC-0007 §Design (`forbid send after close`) | A `send` ran on a contracted channel after it was closed. |
+| E1204 | E | Recv after close | RFC-0007 §Design (`forbid recv after close`) | A `recv` ran on a contracted channel after it was closed and drained. |
+| E1205 | E | reserved — ordering violation (`forbid A before B`) | RFC-0007 §Design (safety) | reserved — cross-channel ordering needs the trace monitor (follow-up). |
+| E1206 | E | Capacity exceeded (`never more than N in flight`) | RFC-0007 §Design (safety) | More than `N` messages were in flight on a contracted channel. |
+| E1207 | E | Incomplete drain at the owning boundary | RFC-0007 §Design (`drains-before-scope-exit` / `drains-before-return`) | A contracted channel was not closed-and-empty when its owner returned. Close and drain it before the boundary. |
+| E1208 | E | reserved — runtime under-delivery (coverage) | RFC-0007 §Design (coverage) | reserved — fan-out boundary counting needs the trace monitor (follow-up). |
+| E1209 | E | reserved — static delivery-intent mismatch | RFC-0007 §Design (coverage) | reserved — `delivered-to-all` over a structurally one-shot / single-consumer source (follow-up). |
+| E1210 | E | Channel-contract well-formedness | RFC-0007 §Design (events/subjects) | A clause names an unbound channel subject, an event of the wrong shape / operation, an unknown subject role, or a fan-out / fairness target that is not a declared participant / subject. Name a real channel value; use `subject.op(payload)` with op ∈ send/recv/close; declare the participant. |
+| E1211 | E | reserved — liveness `eventually` not observed | RFC-0007 §Design (liveness) | reserved — bounded liveness is non-definitive (follow-up). |
+| E1212 | E | reserved — fairness starvation under stress | RFC-0007 §Design (fairness) | reserved — testable fairness is non-definitive (follow-up). |
+
 ## Diagnostic formatting
 
 Every diagnostic is emitted in this canonical format:
