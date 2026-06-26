@@ -1,0 +1,12 @@
+--- TITLE ---
+E0112: a `forbid A before B` protocol clause without its `before` infix is rejected (RFC-0007)
+
+--- INPUT ---
+func f() { return }
+
+contract C {
+  forbid a.send(x) work.recv(y)
+}
+
+--- ERRORS ---
+src.aril:4:20: error[E0112]: expected `before` between the two events of a `forbid` clause

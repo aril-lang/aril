@@ -76,14 +76,28 @@ grammar.ebnf §ContractDecl.
 
 ### `ContractClause`
 
+Two clause families share a `contract` body (one contract framework): the
+RFC-0006 value/state clauses and the RFC-0007 cross-channel protocol clauses.
+
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `span` | `Span` | yes | |
-| `kind` | `"requires" \| "ensures" \| "invariant" \| "loop" \| "entry"` | yes | |
+| `kind` | see below | yes | the clause discriminator |
 | `pred` | `Option<Expr>` | when `kind` is requires/ensures/invariant | the boolean predicate |
 | `label` | `Option<string>` | when `kind == "loop"` | the target loop's `LoopLabel` |
 | `loop` | `[]ContractClause` | when `kind == "loop"` | the section's `invariant` clauses |
 | `bindings` | `[]ContractBinding` | when `kind == "entry"` | the entry `let` bindings |
+| `subject` | `Option<string>` | protocol clauses | channel-subject / participant name; delivered-to-all source |
+| `role` | `Option<string>` | when `kind == "channel-subject"` | cancel / timeout / signal label (validated by the contract pass) |
+| `part_type` | `Option<TypeExpr>` | when `kind == "participant"` | the participant's type, when given |
+| `event_a`, `event_b` | `Option<Expr>` | two-event protocol clauses | the `subject.op(payload)` event operands |
+| `names` | `[]string` | delivered-to-all / fairness | explicit fan-out member set, or no-starvation subjects |
+| `recv_set` | `Option<string>` | when `kind == "delivered-to-all"` | named receiver set (when not an explicit `{ … }` set) |
+
+`kind` is one of the value/state forms — `"requires"`, `"ensures"`,
+`"invariant"`, `"loop"`, `"entry"` (RFC-0006) — or a protocol form (RFC-0007):
+`"channel-subject"`, `"participant"`, `"forbid-before"`, `"eventually-after"`,
+`"every-eventually"`, `"delivered-to-all"`, `"fairness"`.
 
 ### `ContractBinding`
 

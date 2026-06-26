@@ -63,11 +63,29 @@ func (p *parser) parseContractClause() (ast.ContractClause, *Diag) {
 			return p.parseLoopContract()
 		case "entry":
 			return p.parseEntrySection()
+		// RFC-0007 protocol clauses (cross-channel, in a contract body).
+		case "channel":
+			return p.parseSubjectDecl()
+		case "participant":
+			return p.parseParticipantDecl()
+		case "forbid":
+			return p.parseTwoEventClause("forbid-before", "before")
+		case "eventually":
+			return p.parseTwoEventClause("eventually-after", "after")
+		case "every":
+			return p.parseTwoEventClause("every-eventually", "eventually")
+		case "fairness":
+			return p.parseFairness()
+		}
+		// Fan-out leads with the subject ident: `<subject> delivered-to-all …`.
+		if p.atDeliveredToAll() {
+			return p.parseDeliveredToAll()
 		}
 	}
 	return ast.ContractClause{}, p.diag("E0112",
-		fmt.Sprintf("expected a contract clause (requires/ensures/invariant/loop/entry), got %s %q",
-			t.Kind, t.Lexeme), t.Line, t.Col)
+		fmt.Sprintf("expected a contract clause (requires/ensures/invariant/loop/entry "+
+			"or an RFC-0007 protocol clause: channel/participant/forbid/eventually/every/"+
+			"delivered-to-all/fairness), got %s %q", t.Kind, t.Lexeme), t.Line, t.Col)
 }
 
 // parseEntrySection parses an `entry { (let <name> = <expr>)* }` section —

@@ -1,0 +1,26 @@
+--- TITLE ---
+ContractDecl — RFC-0007 fan-out + fairness: `delivered-to-all { … }` (explicit member set), `delivered-to-all <set>` (named receiver set), `fairness { no-starvation <subject> }`
+
+--- INPUT ---
+func run() { return }
+
+contract RateLimited {
+  deadline delivered-to-all { producer, consumer }
+  messages delivered-to-all subscribers
+  fairness { no-starvation inputA }
+}
+
+--- AST ---
+(File @1:1-7:2
+  (FuncDecl "run" @1:1-1:22
+    (type-params)
+    (params)
+    (Block @1:12-1:22
+      (ExprStmt @1:14-1:20
+        (ReturnExpr @1:14-1:20))))
+  (ContractDecl "RateLimited" @3:1-7:2
+    (delivered-to-all "deadline" @4:3-4:51
+      (members "producer" "consumer"))
+    (delivered-to-all "messages" recv-set "subscribers" @5:3-5:40)
+    (fairness @6:3-6:36
+      (no-starvation "inputA"))))
