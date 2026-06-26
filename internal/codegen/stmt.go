@@ -350,5 +350,9 @@ func (g *gen) emitLetOrVar(span ast.Span, name string, declType ast.TypeExpr, va
 		return err
 	}
 	g.b.WriteByte('\n')
+	// A contracted channel binding registers its monitor here (RFC-0007,
+	// panic mode) and, for a `drains-before-…` subject, defers the boundary
+	// drain check. No-op under off / for an uncontracted binding.
+	g.emitChannelContractReg(name, value, span)
 	return nil
 }
