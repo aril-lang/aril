@@ -51,6 +51,18 @@ func write(b *strings.Builder, n Node, depth int) {
 			b.WriteByte('\n')
 			write(b, c, depth+1)
 		}
+		for _, c := range v.Channels {
+			b.WriteByte('\n')
+			write(b, c, depth+1)
+		}
+	case *ChannelDecl:
+		b.WriteByte(' ')
+		writeQuoted(b, v.Subject)
+		writeSpan(b, v.Span)
+		for _, cl := range v.Clauses {
+			b.WriteByte('\n')
+			writeChannelClause(b, cl, depth+1)
+		}
 	case *ContractDecl:
 		b.WriteByte(' ')
 		writeQuoted(b, v.Target)
@@ -857,6 +869,31 @@ func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 	writeSpan(b, cl.Span)
 	b.WriteByte('\n')
 	write(b, cl.Pred, depth+1)
+	b.WriteByte(')')
+}
+
+// writeChannelClause renders one ChannelClause: `(closed-by "owner")`,
+// `(forbid-send-after-close)` / `(forbid-recv-after-close)`,
+// `(capacity <bound>)`, or `(drains-before-scope-exit)` /
+// `(drains-before-return)` (RFC-0007 channel clauses).
+func writeChannelClause(b *strings.Builder, cl ChannelClause, depth int) {
+	writeIndent(b, depth)
+	b.WriteByte('(')
+	b.WriteString(cl.Kind)
+	switch cl.Kind {
+	case "closed-by":
+		b.WriteByte(' ')
+		writeQuoted(b, cl.Owner)
+		writeSpan(b, cl.Span)
+	case "capacity":
+		writeSpan(b, cl.Span)
+		if cl.Bound != nil {
+			b.WriteByte('\n')
+			write(b, cl.Bound, depth+1)
+		}
+	default:
+		writeSpan(b, cl.Span)
+	}
 	b.WriteByte(')')
 }
 

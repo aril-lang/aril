@@ -518,19 +518,19 @@ func TestSelectBracelessBody(t *testing.T) {
 	}
 }
 
-// TestContractBlockSkipped covers the CONTRACTS-IMPL bootstrap: a
-// top-level separable `contract`/`channel` block is recognized and
-// skipped (no AST node), leaving the surrounding declarations intact —
-// so the corpus can carry contract text before the enforcement pipeline
-// exists (RFC-0006 §Transition; `--contracts=off` ignore level).
-func TestContractBlockSkipped(t *testing.T) {
+// TestSeparableBlocksOutOfDecls checks that both separable contract surfaces
+// — `contract` (RFC-0006) and `channel` (RFC-0007) — parse into their side
+// tables (File.Contracts / File.Channels) and stay *out* of File.Decls, so
+// codegen/sema (which iterate Decls) lower byte-identically until the contract
+// passes consume them.
+func TestSeparableBlocksOutOfDecls(t *testing.T) {
 	src := `func abs(x: int): int {
   return x
 }
 
 contract abs {
   requires x >= 0
-  // a match predicate nests braces — the skip balances them
+  // a match predicate nests braces — the clause loop balances them
   ensures match result { Ok(q) => q >= 0, Err(_) => true }
 }
 
@@ -543,7 +543,7 @@ func id(y: int): int { return y }
 `
 	f := parseString(t, src)
 	if len(f.Decls) != 2 {
-		t.Fatalf("expected 2 decls (the contract/channel blocks skipped); got %d", len(f.Decls))
+		t.Fatalf("expected 2 decls (contract/channel blocks live in side tables); got %d", len(f.Decls))
 	}
 	for i, want := range []string{"abs", "id"} {
 		fn, ok := f.Decls[i].(*ast.FuncDecl)
@@ -554,13 +554,18 @@ func id(y: int): int { return y }
 			t.Errorf("decl[%d] name = %q, want %q", i, fn.Name, want)
 		}
 	}
+	if len(f.Contracts) != 1 {
+		t.Errorf("expected 1 contract in File.Contracts; got %d", len(f.Contracts))
+	}
+	if len(f.Channels) != 1 {
+		t.Errorf("expected 1 channel in File.Channels; got %d", len(f.Channels))
+	}
 }
 
-// TestContractBlockUnterminated reports a clean diagnostic (not a panic
-// or silent EOF) when a skipped `channel` block's brace is never closed.
-// (`contract` blocks now parse and error via the clause loop's `expect`;
-// this guards the remaining skip path used for RFC-0007 `channel` blocks.)
-func TestContractBlockUnterminated(t *testing.T) {
+// TestChannelBlockUnterminated reports a clean diagnostic (not a panic or
+// silent EOF) when a `channel` block's brace is never closed — the clause
+// loop reaches EOF and `expect("}")` surfaces a closing-brace diagnostic.
+func TestChannelBlockUnterminated(t *testing.T) {
 	src := `func main() {}
 
 channel main {
@@ -572,10 +577,10 @@ channel main {
 	}
 	_, perr := Parse(toks)
 	if perr == nil {
-		t.Fatal("expected a diagnostic for the unterminated contract block")
+		t.Fatal("expected a diagnostic for the unterminated channel block")
 	}
-	if !strings.Contains(perr.Message, "unterminated contract block") {
-		t.Errorf("diagnostic = %q, want it to mention an unterminated contract block", perr.Message)
+	if perr.Code != "E0112" || !strings.Contains(perr.Message, "}") {
+		t.Errorf("diagnostic = %q (%s), want an E0112 mentioning the missing `}`", perr.Message, perr.Code)
 	}
 }
 
@@ -632,8 +637,8 @@ func TestLoopLabel(t *testing.T) {
 }
 
 // TestContractBlockParsed covers C3b: a `contract` block parses into
-// File.Contracts (RFC-0006 value/state clauses), while a `channel` block is
-// still skipped (RFC-0007 deferred).
+// File.Contracts (RFC-0006 value/state clauses), alongside a `channel` block
+// in File.Channels (RFC-0007).
 func TestContractBlockParsed(t *testing.T) {
 	f := parseString(t, `func abs(x: int): int { return x }
 
@@ -651,7 +656,7 @@ channel results { closed-by pool }
 		t.Fatalf("expected 1 decl (the func); got %d", len(f.Decls))
 	}
 	if len(f.Contracts) != 1 {
-		t.Fatalf("expected 1 contract (channel skipped); got %d", len(f.Contracts))
+		t.Fatalf("expected 1 contract; got %d", len(f.Contracts))
 	}
 	c := f.Contracts[0]
 	if c.Target != "abs" {
@@ -673,6 +678,60 @@ channel results { closed-by pool }
 	}
 	if len(loop.Loop) != 1 || loop.Loop[0].Kind != "invariant" {
 		t.Errorf("loop section = %+v, want one invariant clause", loop.Loop)
+	}
+}
+
+// TestChannelBlockParsed covers C7a-i: a `channel` block parses into
+// File.Channels with the six local channel clauses (RFC-0007 §Design). The
+// hyphenated phrase-keywords (`closed-by`, `drains-before-scope-exit`) lex as
+// `ident - ident` runs and are matched as lexeme sequences.
+func TestChannelBlockParsed(t *testing.T) {
+	f := parseString(t, `func run(jobs: []int) { return }
+
+channel results {
+  closed-by pool
+  forbid send after close
+  forbid recv after close
+  never more than jobs.len() in flight
+  drains-before-scope-exit
+  drains-before-return
+}
+`)
+	if len(f.Channels) != 1 {
+		t.Fatalf("expected 1 channel in File.Channels; got %d", len(f.Channels))
+	}
+	ch := f.Channels[0]
+	if ch.Subject != "results" {
+		t.Errorf("channel subject = %q, want %q", ch.Subject, "results")
+	}
+	wantKinds := []string{
+		"closed-by", "forbid-send-after-close", "forbid-recv-after-close",
+		"capacity", "drains-before-scope-exit", "drains-before-return",
+	}
+	if len(ch.Clauses) != len(wantKinds) {
+		t.Fatalf("expected %d channel clauses; got %d", len(wantKinds), len(ch.Clauses))
+	}
+	for i, want := range wantKinds {
+		if ch.Clauses[i].Kind != want {
+			t.Errorf("clause[%d] kind = %q, want %q", i, ch.Clauses[i].Kind, want)
+		}
+	}
+	if ch.Clauses[0].Owner != "pool" {
+		t.Errorf("closed-by owner = %q, want %q", ch.Clauses[0].Owner, "pool")
+	}
+	if ch.Clauses[3].Bound == nil {
+		t.Error("capacity clause has no bound expression")
+	}
+}
+
+// TestChannelUnknownClause rejects a clause keyword outside the v1 channel set.
+func TestChannelUnknownClause(t *testing.T) {
+	toks, _ := lexer.Lex(`func f() {}
+channel c { bogus x }
+`)
+	_, perr := Parse(toks)
+	if perr == nil || !strings.Contains(perr.Message, "expected a channel clause") {
+		t.Fatalf("want an unknown-channel-clause diagnostic, got %v", perr)
 	}
 }
 

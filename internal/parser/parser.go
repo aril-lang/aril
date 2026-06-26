@@ -214,33 +214,6 @@ func (p *parser) atContractBlock() bool {
 		p.peekAhead(2).Kind == lexer.KindPunct && p.peekAhead(2).Lexeme == "{"
 }
 
-// skipContractBlock consumes a top-level `contract`/`channel` block
-// (head identifier, target name, and the balanced `{ … }` body) and
-// discards it. Brace nesting inside the body (e.g. a `match` predicate)
-// is balanced by depth. Precondition: atContractBlock() is true.
-func (p *parser) skipContractBlock() *Diag {
-	p.advance()         // `contract` / `channel`
-	p.advance()         // target name
-	open := p.advance() // `{`
-	depth := 1
-	for depth > 0 {
-		t := p.peek()
-		if t.Kind == lexer.KindEOF {
-			return p.diag("E0112", "unterminated contract block", open.Line, open.Col)
-		}
-		p.advance()
-		if t.Kind == lexer.KindPunct {
-			switch t.Lexeme {
-			case "{":
-				depth++
-			case "}":
-				depth--
-			}
-		}
-	}
-	return nil
-}
-
 // ---- file ----
 
 func (p *parser) parseFile() (*ast.File, *Diag) {
@@ -259,13 +232,12 @@ func (p *parser) parseFile() (*ast.File, *Diag) {
 	}
 	// Then declarations.
 	for !p.at(lexer.KindEOF) {
-		// Separable contract surface. A `contract <name> { … }` block
-		// (RFC-0006 value/state) is parsed into a ContractDecl on
-		// File.Contracts — kept out of Decls, so codegen/sema (which
-		// iterate Decls) still lower byte-identically until the contract
-		// pass consumes it. A `channel <name> { … }` block (RFC-0007
-		// trace contracts) is still *skipped* — its clause grammar lands
-		// with the channel-contract epoch.
+		// Separable contract surface. Both forms parse into side tables
+		// (File.Contracts / File.Channels) kept *out* of Decls, so codegen
+		// and sema (which iterate Decls) lower byte-identically until the
+		// contract passes consume them. `contract <name> { … }` (RFC-0006
+		// value/state) → ContractDecl; `channel <name> { … }` (RFC-0007
+		// trace contracts) → ChannelDecl.
 		if p.atContractBlock() {
 			if p.at(lexer.KindIdent, "contract") {
 				cd, err := p.parseContractDecl()
@@ -273,8 +245,12 @@ func (p *parser) parseFile() (*ast.File, *Diag) {
 					return nil, err
 				}
 				f.Contracts = append(f.Contracts, cd)
-			} else if err := p.skipContractBlock(); err != nil {
-				return nil, err
+			} else {
+				chd, err := p.parseChannelDecl()
+				if err != nil {
+					return nil, err
+				}
+				f.Channels = append(f.Channels, chd)
 			}
 			p.skipNewlines()
 			continue
