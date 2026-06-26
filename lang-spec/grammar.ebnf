@@ -285,8 +285,26 @@ ContractBlock  = ContractDecl | ChannelBlock ;
 ContractDecl   = "contract" Ident "{" ContractClause* "}" ;
 ContractClause = ( "requires" | "ensures" | "invariant" ) Expr
                | LoopContract
-               | EntrySection ;
+               | EntrySection
+               | ProtocolClause ;
 LoopContract   = "loop" Ident "{" ( "invariant" Expr )* "}" ;
+
+// RFC-0007 cross-channel protocol clauses share the `contract` body (one
+// contract framework). A subject declaration names a channel-like value (with
+// an optional cancel/timeout/signal role) or a fan-out participant set. The
+// two-event clauses range over Events of the form `subject.op(payload)` — an
+// ordinary Expr (a Call/Field chain), validated by the contract pass. Fan-out
+// (`delivered-to-all`) leads with the source subject; fairness collects
+// no-starvation subjects. The hyphenated phrase-keywords (`delivered-to-all`,
+// `no-starvation`) lex as token runs (matched by lexeme).
+ProtocolClause = "channel" Ident ( "role" Ident )?
+               | "participant" Ident ( ":" TypeExpr )?
+               | "forbid" Event "before" Event
+               | "eventually" Event "after" Event
+               | "every" Event "eventually" Event
+               | Ident "delivered" "-" "to" "-" "all" ( "{" Ident ( "," Ident )* "}" | Ident )
+               | "fairness" "{" ( "no" "-" "starvation" Ident )* "}" ;
+Event          = Expr ;   // `subject.op(payload)`; well-formedness checked by the contract pass
 
 // An `entry` section holds pure `let` bindings evaluated once at function
 // entry and in scope for `ensures` (and the function's loop invariants). It

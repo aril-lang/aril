@@ -46,19 +46,42 @@ type ContractDecl struct {
 func (n *ContractDecl) NodeSpan() Span   { return n.Span }
 func (n *ContractDecl) NodeKind() string { return "ContractDecl" }
 
-// ContractClause is one obligation inside a ContractDecl. Kind is one of
-// "requires" | "ensures" | "invariant" (the predicate is in Pred); "loop" —
-// a per-iteration section where Label names the target loop and Loop holds
-// its `invariant` clauses; or "entry" — a section of `let` bindings
-// evaluated at function entry and in scope for `ensures` (Bindings holds
-// them, Pred is nil). RFC-0006.
+// ContractClause is one clause inside a ContractDecl. Two families share the
+// block (RFC-0006 value/state + RFC-0007 channel trace — one contract
+// framework). Kind is one of:
+//
+// RFC-0006 value/state clauses:
+//   - "requires" | "ensures" | "invariant" — the predicate is in Pred;
+//   - "loop" — a per-iteration section where Label names the target loop and
+//     Loop holds its `invariant` clauses;
+//   - "entry" — a section of `let` bindings evaluated at function entry and in
+//     scope for `ensures` (Bindings holds them, Pred is nil).
+//
+// RFC-0007 protocol clauses (cross-channel, in a `contract` body):
+//   - "channel-subject" — `channel <Subject> [role <Role>]`, a subject decl;
+//   - "participant" — `participant <Subject> [: PartType]`, a fan-out member set;
+//   - "forbid-before" | "eventually-after" | "every-eventually" — a two-event
+//     ordering/liveness clause over EventA and EventB (opaque event Exprs of the
+//     form `subject.op(payload)`, validated by the contract pass, not the grammar);
+//   - "delivered-to-all" — a coverage clause: Subject is delivered to every
+//     member, either an explicit set in Names or a named receiver set in RecvSet;
+//   - "fairness" — `fairness { no-starvation … }`, the no-starvation subjects in Names.
 type ContractClause struct {
 	Span     Span
 	Kind     string
-	Pred     Expr              // the predicate; nil when Kind is "loop" / "entry"
+	Pred     Expr              // the predicate; nil when Kind is "loop" / "entry" / a protocol clause
 	Label    string            // the loop label; set only when Kind == "loop"
 	Loop     []ContractClause  // nested invariant clauses; set only when Kind == "loop"
 	Bindings []ContractBinding // entry bindings; set only when Kind == "entry"
+
+	// RFC-0007 protocol-clause fields (zero for value/state clauses):
+	Subject  string   // channel-subject / participant name; delivered-to-all source channel
+	Role     string   // channel-subject role (cancel/timeout/signal); "" when omitted
+	PartType TypeExpr // participant type; nil when omitted
+	EventA   Expr     // first event of forbid-before / eventually-after / every-eventually
+	EventB   Expr     // second event
+	Names    []string // delivered-to-all explicit member set, or fairness no-starvation subjects
+	RecvSet  string   // delivered-to-all named receiver set (when not an explicit `{ … }` set)
 }
 
 // ContractBinding is one `let <name> = <value>` in a contract `entry { … }`

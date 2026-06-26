@@ -832,15 +832,20 @@ func writeSpan(b *strings.Builder, s Span) {
 	fmt.Fprintf(b, " @%d:%d-%d:%d", s.StartLine, s.StartCol, s.EndLine, s.EndCol)
 }
 
-// writeContractClause renders one ContractClause: `(requires <pred>)`,
-// `(ensures <pred>)`, `(invariant <pred>)`, a `(loop "label" …)` section
-// holding nested invariant clauses, or an `(entry (let "n" …) …)` section
-// holding entry bindings.
+// writeContractClause renders one ContractClause. RFC-0006 value/state forms:
+// `(requires <pred>)`, `(ensures <pred>)`, `(invariant <pred>)`, a
+// `(loop "label" …)` section of nested invariants, or an `(entry (let "n" …) …)`
+// section. RFC-0007 protocol forms: `(channel-subject "s" [role "r"])`,
+// `(participant "p" [<type>])`, `(forbid-before <eventA> <eventB>)` (and the
+// like for eventually-after / every-eventually), `(delivered-to-all "s"
+// (members …))` or `(delivered-to-all "s" recv-set "set")`, and
+// `(fairness (no-starvation "s") …)`.
 func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 	writeIndent(b, depth)
 	b.WriteByte('(')
 	b.WriteString(cl.Kind)
-	if cl.Kind == "loop" {
+	switch cl.Kind {
+	case "loop":
 		b.WriteByte(' ')
 		writeQuoted(b, cl.Label)
 		writeSpan(b, cl.Span)
@@ -848,10 +853,7 @@ func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 			b.WriteByte('\n')
 			writeContractClause(b, inv, depth+1)
 		}
-		b.WriteByte(')')
-		return
-	}
-	if cl.Kind == "entry" {
+	case "entry":
 		writeSpan(b, cl.Span)
 		for _, bd := range cl.Bindings {
 			b.WriteByte('\n')
@@ -863,12 +865,63 @@ func writeContractClause(b *strings.Builder, cl ContractClause, depth int) {
 			write(b, bd.Value, depth+2)
 			b.WriteByte(')')
 		}
-		b.WriteByte(')')
-		return
+
+	// RFC-0007 protocol clauses.
+	case "channel-subject":
+		b.WriteByte(' ')
+		writeQuoted(b, cl.Subject)
+		if cl.Role != "" {
+			b.WriteString(" role ")
+			writeQuoted(b, cl.Role)
+		}
+		writeSpan(b, cl.Span)
+	case "participant":
+		b.WriteByte(' ')
+		writeQuoted(b, cl.Subject)
+		writeSpan(b, cl.Span)
+		if cl.PartType != nil {
+			b.WriteByte('\n')
+			write(b, cl.PartType, depth+1)
+		}
+	case "forbid-before", "eventually-after", "every-eventually":
+		writeSpan(b, cl.Span)
+		b.WriteByte('\n')
+		write(b, cl.EventA, depth+1)
+		b.WriteByte('\n')
+		write(b, cl.EventB, depth+1)
+	case "delivered-to-all":
+		b.WriteByte(' ')
+		writeQuoted(b, cl.Subject)
+		if cl.RecvSet != "" {
+			b.WriteString(" recv-set ")
+			writeQuoted(b, cl.RecvSet)
+			writeSpan(b, cl.Span)
+		} else {
+			writeSpan(b, cl.Span)
+			b.WriteByte('\n')
+			writeIndent(b, depth+1)
+			b.WriteString("(members")
+			for _, n := range cl.Names {
+				b.WriteByte(' ')
+				writeQuoted(b, n)
+			}
+			b.WriteByte(')')
+		}
+	case "fairness":
+		writeSpan(b, cl.Span)
+		for _, n := range cl.Names {
+			b.WriteByte('\n')
+			writeIndent(b, depth+1)
+			b.WriteString("(no-starvation ")
+			writeQuoted(b, n)
+			b.WriteByte(')')
+		}
+
+	default: // requires / ensures / invariant
+		writeSpan(b, cl.Span)
+		b.WriteByte('\n')
+		write(b, cl.Pred, depth+1)
 	}
-	writeSpan(b, cl.Span)
-	b.WriteByte('\n')
-	write(b, cl.Pred, depth+1)
 	b.WriteByte(')')
 }
 

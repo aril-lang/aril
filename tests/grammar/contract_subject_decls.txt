@@ -1,0 +1,28 @@
+--- TITLE ---
+ContractDecl — RFC-0007 subject declarations in a contract body: `channel <name>`, `channel <name> role <role>`, `participant <name>`, `participant <name>: <Type>`
+
+--- INPUT ---
+func run() { return }
+
+contract WorkerPool {
+  channel work
+  channel done role cancel
+  participant producer
+  participant subscribers: Set<Subscriber>
+}
+
+--- AST ---
+(File @1:1-8:2
+  (FuncDecl "run" @1:1-1:22
+    (type-params)
+    (params)
+    (Block @1:12-1:22
+      (ExprStmt @1:14-1:20
+        (ReturnExpr @1:14-1:20))))
+  (ContractDecl "WorkerPool" @3:1-8:2
+    (channel-subject "work" @4:3-4:15)
+    (channel-subject "done" role "cancel" @5:3-5:27)
+    (participant "producer" @6:3-6:23)
+    (participant "subscribers" @7:3-7:43
+      (NamedType "Set" @7:28-7:43
+        (NamedType "Subscriber" @7:32-7:42)))))

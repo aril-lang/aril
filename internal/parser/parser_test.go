@@ -724,6 +724,72 @@ channel results {
 	}
 }
 
+// TestContractProtocolClauses covers C7a-ii: a `contract` body hosts the
+// RFC-0007 cross-channel protocol clauses (subject decls, two-event
+// ordering/liveness, fan-out, fairness) alongside value/state clauses.
+func TestContractProtocolClauses(t *testing.T) {
+	f := parseString(t, `func run() { return }
+
+contract WorkerPool {
+  channel work
+  channel done role cancel
+  participant subscribers: Set<Subscriber>
+  forbid results.send(Result{id}) before work.recv(Job{id})
+  eventually results.close after work.close
+  every work.recv(Job{id}) eventually results.send(Result{id})
+  deadline delivered-to-all { producer, consumer }
+  messages delivered-to-all subscribers
+  fairness { no-starvation inputA }
+}
+`)
+	if len(f.Contracts) != 1 {
+		t.Fatalf("expected 1 contract; got %d", len(f.Contracts))
+	}
+	cls := f.Contracts[0].Clauses
+	wantKinds := []string{
+		"channel-subject", "channel-subject", "participant",
+		"forbid-before", "eventually-after", "every-eventually",
+		"delivered-to-all", "delivered-to-all", "fairness",
+	}
+	if len(cls) != len(wantKinds) {
+		t.Fatalf("expected %d clauses; got %d", len(wantKinds), len(cls))
+	}
+	for i, want := range wantKinds {
+		if cls[i].Kind != want {
+			t.Errorf("clause[%d] kind = %q, want %q", i, cls[i].Kind, want)
+		}
+	}
+	if cls[1].Role != "cancel" {
+		t.Errorf("subject role = %q, want %q", cls[1].Role, "cancel")
+	}
+	if cls[2].PartType == nil {
+		t.Error("typed participant has nil PartType")
+	}
+	if cls[3].EventA == nil || cls[3].EventB == nil {
+		t.Error("forbid-before clause is missing an event operand")
+	}
+	if cls[6].Kind == "delivered-to-all" && len(cls[6].Names) != 2 {
+		t.Errorf("explicit fan-out set = %v, want 2 members", cls[6].Names)
+	}
+	if cls[7].RecvSet != "subscribers" {
+		t.Errorf("named fan-out set = %q, want %q", cls[7].RecvSet, "subscribers")
+	}
+	if len(cls[8].Names) != 1 || cls[8].Names[0] != "inputA" {
+		t.Errorf("fairness no-starvation subjects = %v, want [inputA]", cls[8].Names)
+	}
+}
+
+// TestContractProtocolBadInfix rejects a two-event clause missing its infix.
+func TestContractProtocolBadInfix(t *testing.T) {
+	toks, _ := lexer.Lex(`func f() {}
+contract C { every a.recv(x) results.send(y) }
+`)
+	_, perr := Parse(toks)
+	if perr == nil || !strings.Contains(perr.Message, "expected `eventually`") {
+		t.Fatalf("want a missing-infix diagnostic, got %v", perr)
+	}
+}
+
 // TestChannelUnknownClause rejects a clause keyword outside the v1 channel set.
 func TestChannelUnknownClause(t *testing.T) {
 	toks, _ := lexer.Lex(`func f() {}

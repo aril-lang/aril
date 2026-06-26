@@ -105,6 +105,178 @@ func (p *parser) parseChannelClause() (ast.ChannelClause, *Diag) {
 			start.Kind, start.Lexeme), start.Line, start.Col)
 }
 
+// ---- RFC-0007 protocol clauses (inside a `contract` body) ----
+//
+// A `contract` body may host cross-channel *protocol* clauses alongside the
+// RFC-0006 value/state clauses (one contract framework). These parse into
+// ContractClause with the protocol-clause Kinds; the event operands are
+// ordinary Aril Exprs of the form `subject.op(payload)` (a Call/Field chain),
+// validated by the contract pass, not the grammar. Dispatched from
+// parseContractClause.
+
+// parseSubjectDecl parses a subject declaration `channel <name> [role <role>]`
+// inside a contract body (no braces — distinct from the top-level
+// `channel <name> { … }` block). The role label (cancel/timeout/signal) is
+// validated by the contract pass.
+func (p *parser) parseSubjectDecl() (ast.ContractClause, *Diag) {
+	kw := p.advance() // 'channel'
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return ast.ContractClause{}, p.diag("E0112", "expected a subject name after `channel`", t.Line, t.Col)
+	}
+	name := p.advance()
+	cl := ast.ContractClause{Kind: "channel-subject", Subject: name.Lexeme}
+	last := name
+	if p.at(lexer.KindIdent, "role") {
+		p.advance() // 'role'
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return ast.ContractClause{}, p.diag("E0112",
+				"expected a role (cancel/timeout/signal) after `role`", t.Line, t.Col)
+		}
+		role := p.advance()
+		cl.Role = role.Lexeme
+		last = role
+	}
+	cl.Span = spanTokens(kw, last)
+	return cl, nil
+}
+
+// parseParticipantDecl parses `participant <name> [: <Type>]` — a fan-out
+// member or member set (e.g. `participant subscribers: Set<Subscriber>`).
+func (p *parser) parseParticipantDecl() (ast.ContractClause, *Diag) {
+	kw := p.advance() // 'participant'
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return ast.ContractClause{}, p.diag("E0112", "expected a participant name after `participant`", t.Line, t.Col)
+	}
+	name := p.advance()
+	cl := ast.ContractClause{Kind: "participant", Subject: name.Lexeme}
+	if p.at(lexer.KindPunct, ":") {
+		p.advance() // ':'
+		ty, err := p.parseTypeExpr()
+		if err != nil {
+			return ast.ContractClause{}, err
+		}
+		cl.PartType = ty
+		end := ty.NodeSpan()
+		cl.Span = ast.Span{StartLine: kw.Line, StartCol: kw.Col, EndLine: end.EndLine, EndCol: end.EndCol}
+		return cl, nil
+	}
+	cl.Span = spanTokens(kw, name)
+	return cl, nil
+}
+
+// parseTwoEventClause parses a two-event protocol clause: the leading keyword,
+// the first event Expr, the infix word, the second event Expr. Used by the
+// forbid-before / eventually-after / every-eventually forms.
+func (p *parser) parseTwoEventClause(kind, infix string) (ast.ContractClause, *Diag) {
+	kw := p.advance() // leading keyword (forbid/eventually/every)
+	a, err := p.parseExpr()
+	if err != nil {
+		return ast.ContractClause{}, err
+	}
+	if !p.at(lexer.KindIdent, infix) {
+		t := p.peek()
+		return ast.ContractClause{}, p.diag("E0112",
+			fmt.Sprintf("expected `%s` between the two events of a `%s` clause", infix, kw.Lexeme), t.Line, t.Col)
+	}
+	p.advance() // infix word
+	b, err := p.parseExpr()
+	if err != nil {
+		return ast.ContractClause{}, err
+	}
+	bs := b.NodeSpan()
+	return ast.ContractClause{
+		Span:   ast.Span{StartLine: kw.Line, StartCol: kw.Col, EndLine: bs.EndLine, EndCol: bs.EndCol},
+		Kind:   kind,
+		EventA: a,
+		EventB: b,
+	}, nil
+}
+
+// atDeliveredToAll reports whether the cursor is at a fan-out clause
+// `<subject> delivered-to-all …` — a subject ident followed by the
+// `delivered-to-all` phrase-keyword (which lexes as `delivered - to - all`).
+func (p *parser) atDeliveredToAll() bool {
+	return p.at(lexer.KindIdent) &&
+		p.peekAhead(1).Lexeme == "delivered" && p.peekAhead(2).Lexeme == "-" &&
+		p.peekAhead(3).Lexeme == "to" && p.peekAhead(4).Lexeme == "-" &&
+		p.peekAhead(5).Lexeme == "all"
+}
+
+// parseDeliveredToAll parses a coverage clause
+// `<subject> delivered-to-all ({ m1, m2, … } | <receiverSet>)`. Precondition:
+// atDeliveredToAll() is true.
+func (p *parser) parseDeliveredToAll() (ast.ContractClause, *Diag) {
+	subj := p.advance() // subject ident
+	p.advanceN(5)       // delivered - to - all
+	cl := ast.ContractClause{Kind: "delivered-to-all", Subject: subj.Lexeme}
+	if p.at(lexer.KindPunct, "{") {
+		p.advance() // '{'
+		p.skipNewlines()
+		var names []string
+		for !p.at(lexer.KindPunct, "}") && !p.at(lexer.KindEOF) {
+			if !p.at(lexer.KindIdent) {
+				t := p.peek()
+				return ast.ContractClause{}, p.diag("E0112", "expected a member name in the fan-out set", t.Line, t.Col)
+			}
+			names = append(names, p.advance().Lexeme)
+			p.skipNewlines()
+			if p.at(lexer.KindPunct, ",") {
+				p.advance()
+				p.skipNewlines()
+			}
+		}
+		closeTok, err := p.expect(lexer.KindPunct, "}")
+		if err != nil {
+			return ast.ContractClause{}, err
+		}
+		cl.Names = names
+		cl.Span = spanTokens(subj, closeTok)
+		return cl, nil
+	}
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return ast.ContractClause{}, p.diag("E0112",
+			"expected a receiver-set name or a `{ … }` member set after `delivered-to-all`", t.Line, t.Col)
+	}
+	rs := p.advance()
+	cl.RecvSet = rs.Lexeme
+	cl.Span = spanTokens(subj, rs)
+	return cl, nil
+}
+
+// parseFairness parses `fairness { (no-starvation <subject>)* }` — the
+// no-starvation subjects collected into Names.
+func (p *parser) parseFairness() (ast.ContractClause, *Diag) {
+	kw := p.advance() // 'fairness'
+	if _, err := p.expect(lexer.KindPunct, "{"); err != nil {
+		return ast.ContractClause{}, err
+	}
+	p.skipStmtSeps()
+	var names []string
+	for !p.at(lexer.KindPunct, "}") && !p.at(lexer.KindEOF) {
+		if !p.atWords("no", "-", "starvation") {
+			t := p.peek()
+			return ast.ContractClause{}, p.diag("E0112",
+				"a `fairness` block admits only `no-starvation <subject>` clauses", t.Line, t.Col)
+		}
+		p.advanceN(3)
+		if !p.at(lexer.KindIdent) {
+			t := p.peek()
+			return ast.ContractClause{}, p.diag("E0112", "expected a subject name after `no-starvation`", t.Line, t.Col)
+		}
+		names = append(names, p.advance().Lexeme)
+		p.skipStmtSeps()
+	}
+	closeTok, err := p.expect(lexer.KindPunct, "}")
+	if err != nil {
+		return ast.ContractClause{}, err
+	}
+	return ast.ContractClause{Span: spanTokens(kw, closeTok), Kind: "fairness", Names: names}, nil
+}
+
 // atWords reports whether the next len(words) tokens have exactly these
 // lexemes in order. It matches by lexeme only (ignoring token kind), so the
 // contextual phrase-keywords whose hyphens lex as `-` operators and whose
