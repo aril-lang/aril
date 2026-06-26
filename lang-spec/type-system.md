@@ -1095,8 +1095,30 @@ A well-formedness failure is **E1210**. Channel contracts are additive: like
 value contracts they do not change the typing or lowering of the program, and
 under `--contracts=off` they are elided. The v1 *enforcement* is the definitive
 local-safety subset (close-safety / capacity / drains); the cross-channel trace
-properties (ordering, coverage, liveness, fairness) are validated for
+properties (ordering, coverage runtime arm, liveness, fairness) are validated for
 well-formedness but their runtime monitor is a documented follow-up.
+
+### Delivery intent — T-Delivery (coverage static arm, E1209)
+
+The one cross-channel property checkable **without** a runtime monitor: a
+`<subject> delivered-to-all` clause demands one event reach *every* member of a
+receiver set — a **broadcast**. A Go channel broadcasts only by **close** (every
+receiver unblocks on a closed channel); a value send is a **work queue** (one
+value → one receiver). So a broadcast to ≥2 members (or a receiver set) over a
+**receive-only** subject is structurally impossible — a `RecvChan<T>` can be
+neither multi-sent nor closed by the program, so its single value reaches one
+receiver and the rest block forever. This is caught statically from the
+subject's type:
+
+    subject ↦ ch : RecvChan<T>     |members| ≥ 2  (or a receiver set)
+    ───────────────────────────────────────────────────────────────── (T-Delivery)
+       subject delivered-to-all { members } is ill-typed — E1209
+
+A single-member fan-out is ordinary delivery (satisfiable over any subject); a
+broadcast over a closeable `Channel<T>`/`SendChan<T>` done-signal is satisfiable
+and not flagged. The complementary **runtime** arm — the boundary count that all
+members *did* observe the delivery (E1208) — needs the trace monitor and is a
+follow-up. (Best-effort fan-out `offered-to-all` is a future mode.)
 
 ## Type errors — quick index
 

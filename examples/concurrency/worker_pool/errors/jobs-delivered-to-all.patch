@@ -1,0 +1,17 @@
+--- worker_pool.aril
++++ worker_pool.aril
+@@ -104,3 +104,14 @@
+     Err(e) => fmt.println("pool error:", e),
+   }
+ }
++
++// `jobs` is the worker-side RECEIVE view of the job queue — a work queue:
++// each job goes to exactly one worker. Declaring it `delivered-to-all` (every
++// participant must observe every job) is the broadcast-vs-work-queue confusion
++// the coverage static arm rejects before running — a RecvChan cannot broadcast.
++contract JobFanout {
++  participant a
++  participant b
++  channel jobs
++  jobs delivered-to-all { a, b }
++}

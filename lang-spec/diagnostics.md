@@ -183,10 +183,13 @@ and cross-channel protocol clauses. **E1210** (well-formedness) is the sema
 check and the only code emitted today. The **local safety** codes
 (E1201–E1204, E1206, E1207) become live with the C7c runtime — the definitive
 per-channel monitor (close-safety / capacity / drains). The cross-channel
-trace properties — ordering (E1205), the coverage runtime arm (E1208) and its
-static arm (E1209), liveness (E1211), fairness (E1212) — are **reserved**: they
-need the global trace monitor, a documented follow-up, and the liveness/fairness
-kinds are non-definitive by nature.
+trace properties — ordering (E1205), the coverage runtime arm (E1208),
+liveness (E1211), fairness (E1212) — are **reserved**: they need the global
+trace monitor, a documented follow-up, and the liveness/fairness kinds are
+non-definitive by nature. The coverage **static arm** (E1209) is **live**: it is
+a compile-time check on the subject's *type*, needing no trace monitor — a
+`delivered-to-all` broadcast over a receive-only subject is rejected before
+running (see T-Delivery).
 
 | Code | Sev | Message | Authoritative rule | Fix |
 |---|---|---|---|---|
@@ -198,7 +201,7 @@ kinds are non-definitive by nature.
 | E1206 | E | Capacity exceeded (`never more than N in flight`) | RFC-0007 §Design (safety) | More than `N` messages were in flight on a contracted channel. |
 | E1207 | E | Incomplete drain at the owning boundary | RFC-0007 §Design (`drains-before-scope-exit` / `drains-before-return`) | A contracted channel was not closed-and-empty when its owner returned. Close and drain it before the boundary. |
 | E1208 | E | reserved — runtime under-delivery (coverage) | RFC-0007 §Design (coverage) | reserved — fan-out boundary counting needs the trace monitor (follow-up). |
-| E1209 | E | reserved — static delivery-intent mismatch | RFC-0007 §Design (coverage) | reserved — `delivered-to-all` over a structurally one-shot / single-consumer source (follow-up). |
+| E1209 | E | Static delivery-intent mismatch | T-Delivery; RFC-0007 §Design (coverage) | A `delivered-to-all` broadcasts to ≥2 members (or a receiver set) over a receive-only subject (a `RecvChan`, e.g. a `time.after`/`time.tick` source) — it cannot broadcast. Close a done-signal channel to broadcast, or use `offered-to-all` for best-effort fan-out. |
 | E1210 | E | Channel-contract well-formedness | RFC-0007 §Design (events/subjects) | A clause names an unbound channel subject, an event of the wrong shape / operation, an unknown subject role, or a fan-out / fairness target that is not a declared participant / subject. Name a real channel value; use `subject.op(payload)` with op ∈ send/recv/close; declare the participant. |
 | E1211 | E | reserved — liveness `eventually` not observed | RFC-0007 §Design (liveness) | reserved — bounded liveness is non-definitive (follow-up). |
 | E1212 | E | reserved — fairness starvation under stress | RFC-0007 §Design (fairness) | reserved — testable fairness is non-definitive (follow-up). |
