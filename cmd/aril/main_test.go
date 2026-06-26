@@ -195,6 +195,51 @@ func main() {
 	}
 }
 
+// TestChannelContractModeEquivalence extends the Block R divergence guard to the
+// RFC-0007 channel-contract monitor, which only emits under --contracts=panic
+// (so the other equivalence guards, running the default off mode, never exercise
+// the inline prelude writePredeclaredChanContract vs the vendored arilrt/
+// contract.go). A deterministic send-after-close — through a directional
+// SendChan callee, also covering the cross-function routing — must fire the same
+// E1203 violation in both runtime modes. No corpus example panics
+// deterministically under contracts, so the source is a temp file.
+func TestChannelContractModeEquivalence(t *testing.T) {
+	src := `func feed(out: SendChan<int>) {
+  out.close()
+  out.send(1)
+}
+
+func main() {
+  let ch = makeChannel<int>(2)
+  feed(ch)
+}
+
+channel ch {
+  forbid send after close
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "chan_contract.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	_, vErr, vExit := runAril(t, "run", "--contracts=panic", path)
+	_, iErr, iExit := runAril(t, "run", "--contracts=panic", "--inline-runtime", path)
+	if vExit == 0 || iExit == 0 {
+		t.Fatalf("expected non-zero exit (contract panic) in both modes — vendored %d, inline %d", vExit, iExit)
+	}
+	if vExit != iExit {
+		t.Errorf("channel contract: exit differs — vendored %d, inline %d", vExit, iExit)
+	}
+	// The violation line (code + subject + reason) is the behavioural contract;
+	// the goroutine stack paths legitimately differ between modes.
+	for mode, errOut := range map[string]string{"vendored": vErr, "inline": iErr} {
+		if !strings.Contains(errOut, "[E1203]") || !strings.Contains(errOut, "channel `ch` — send after close") {
+			t.Errorf("channel contract: %s mode missing the E1203 violation; stderr:\n%s", mode, errOut)
+		}
+	}
+}
+
 // TestUserTypeShadowsRuntimeName guards the R3 fix for a user type whose
 // name collides with an arilrt-*internal* runtime type — Kind /
 // TypeDescriptor / FieldInfo. These are NOT predeclared, so D27 does not
