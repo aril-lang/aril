@@ -30,7 +30,7 @@ func contains(s, sub string) bool {
 // then drain-checked, raises nothing.
 func TestChanContractCleanPath(t *testing.T) {
 	ch := make(chan int, 1)
-	RegisterChan(ch, "ok")
+	RegisterChan(ch, "ok", true)
 	ChanSend(ch, 1, "loc")
 	<-ch
 	ChanClose(ch, "loc")
@@ -41,24 +41,48 @@ func TestChanContractCleanPath(t *testing.T) {
 // E1203, raised by the monitor before the (panicking) real send.
 func TestChanContractSendAfterClose(t *testing.T) {
 	ch := make(chan int, 1)
-	RegisterChan(ch, "sac")
+	RegisterChan(ch, "sac", true)
 	ChanClose(ch, "loc")
 	mustPanic(t, "[E1203]", func() { ChanSend(ch, 1, "loc") })
 }
 
-// TestChanContractDoubleClose: closing a contracted channel twice is E1202.
+// TestChanContractDirectionalView: a channel registered bidirectional is still
+// monitored when closed / sent-to through a directional `chan<- T` view (the
+// value flowing into a callee parameter) — all views share one state. This is
+// the cross-function enforcement the registration's multi-view keying buys.
+func TestChanContractDirectionalView(t *testing.T) {
+	ch := make(chan int, 1)
+	RegisterChan(ch, "dir", true)
+	var sendOnly chan<- int = ch
+	ChanClose(sendOnly, "loc")
+	mustPanic(t, "[E1203]", func() { ChanSend(sendOnly, 1, "loc") })
+}
+
+// TestChanContractSendAllowedWhenNotForbidden: a channel that does NOT carry
+// `forbid send after close` (forbidSend=false) is not flagged E1203 by the
+// monitor — the open send proceeds (the flag keeps a drains-only or
+// double-close-only subject from a spurious send-after-close report).
+func TestChanContractSendAllowedWhenNotForbidden(t *testing.T) {
+	ch := make(chan int, 1)
+	RegisterChan(ch, "nf", false)
+	ChanSend(ch, 1, "loc") // open send, no panic
+	<-ch
+}
+
+// TestChanContractDoubleClose: closing a contracted channel twice is E1202,
+// independent of the forbidSend flag.
 func TestChanContractDoubleClose(t *testing.T) {
 	ch := make(chan int, 1)
-	RegisterChan(ch, "dc")
+	RegisterChan(ch, "dc", false)
 	ChanClose(ch, "loc")
 	mustPanic(t, "[E1202]", func() { ChanClose(ch, "loc") })
 }
 
 // TestChanContractDrainLeak: a contracted channel not closed before its
-// boundary is E1207.
+// boundary is E1207, independent of the forbidSend flag.
 func TestChanContractDrainLeak(t *testing.T) {
 	ch := make(chan int, 1)
-	RegisterChan(ch, "leak")
+	RegisterChan(ch, "leak", false)
 	mustPanic(t, "[E1207]", func() { ChanCheckDrained(ch, "loc") })
 }
 

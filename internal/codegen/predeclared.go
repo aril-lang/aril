@@ -198,15 +198,19 @@ func (g *gen) writePredeclaredChanContract() {
 		return
 	}
 	g.b.WriteString(`type chanContractState struct {
-	mu     sync.Mutex
-	name   string
-	closed bool
+	mu         sync.Mutex
+	name       string
+	forbidSend bool
+	closed     bool
 }
 
 var chanContracts sync.Map
 
-func RegisterChan(ch any, name string) {
-	chanContracts.LoadOrStore(ch, &chanContractState{name: name})
+func RegisterChan[T any](ch chan T, name string, forbidSend bool) {
+	s := &chanContractState{name: name, forbidSend: forbidSend}
+	chanContracts.LoadOrStore(ch, s)
+	chanContracts.LoadOrStore((chan<- T)(ch), s)
+	chanContracts.LoadOrStore((<-chan T)(ch), s)
 }
 
 func chanContractOf(ch any) *chanContractState {
@@ -216,19 +220,19 @@ func chanContractOf(ch any) *chanContractState {
 	return nil
 }
 
-func ChanSend[T any](ch chan T, v T, loc string) {
+func ChanSend[T any](ch chan<- T, v T, loc string) {
 	if s := chanContractOf(ch); s != nil {
 		s.mu.Lock()
-		closed, name := s.closed, s.name
+		bad, name := s.forbidSend && s.closed, s.name
 		s.mu.Unlock()
-		if closed {
+		if bad {
 			panic(chanViolation("E1203", name, "send after close", loc))
 		}
 	}
 	ch <- v
 }
 
-func ChanClose[T any](ch chan T, loc string) {
+func ChanClose[T any](ch chan<- T, loc string) {
 	if s := chanContractOf(ch); s != nil {
 		s.mu.Lock()
 		if s.closed {

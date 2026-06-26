@@ -943,21 +943,39 @@ it flows (including across `spawn`/`scope`); the state is mutex-guarded.
 Everything is gated on `--contracts=panic`; under `off` **nothing is emitted**
 (byte-identical lowering).
 
-The monitor binds by NAME at the use site (an `Ident` whose name is a contracted
-subject, Info.ChannelContracts) over a **bidirectional** `Channel` receiver — the
-creator/owner frame where the channel is `chan T`. A directional
-`SendChan`/`RecvChan` (typically a callee parameter) is left unmonitored;
-cross-function enforcement is a follow-up.
+**Registration** binds by NAME at the channel's creation site (an `Ident` whose
+name is a contracted subject, Info.ChannelContracts) over a **bidirectional**
+`Channel` value — the creator/owner frame where the channel is `chan T`.
+`RegisterChan` records the channel under **every directional view** (`chan T`,
+`chan<- T`, `<-chan T`) sharing one state, so a send/close from a callee frame
+that received the channel as a directional `SendChan`/`RecvChan` parameter still
+finds the monitor (the views box to distinct dynamic types, so a single-view key
+would miss). The `forbidSend` registration flag carries whether `forbid send
+after close` (E1203) applies to the subject.
+
+**Routing** a `.send` / `.close` through the monitor:
+
+- a **named bidirectional** receiver matches its own subject clauses precisely
+  (byte-identical to the pre-directional lowering — uncontracted bidi channels
+  stay raw);
+- a **directional `SendChan`** receiver has lost the source subject name across
+  the function boundary, so it routes whenever the program carries *any* relevant
+  contract (`forbid send after close` for sends; any enforced subject for
+  closes); the runtime monitor no-ops an unregistered channel.
+
+Bidi **aliasing** (a contracted channel rebound to another bidirectional name)
+is the one remaining unmonitored path — a follow-up.
 
 ```
 let ch = makeChannel<T>(cap)     channel ch { forbid send after close; drains-before-scope-exit }
   ⟿
 ch := make(chan T, cap)
-arilrt.RegisterChan(ch, "ch")                       // register at creation
+arilrt.RegisterChan(ch, "ch", true)                 // register (all views); forbidSend flag
 defer arilrt.ChanCheckDrained(ch, "<file:line:col>") // boundary drain check (drains subjects)
 
 ch.send(v)   ⟿   arilrt.ChanSend(ch, v, "<loc>")     // asserts open before send (E1203)
 ch.close()   ⟿   arilrt.ChanClose(ch, "<loc>")       // double-close (E1202); records closed
+out.send(v)  ⟿   arilrt.ChanSend(out, v, "<loc>")    // directional callee send — cross-function (E1203)
 ```
 
 `ChanCheckDrained` runs as a `defer` placed at the channel's creation site, so it
