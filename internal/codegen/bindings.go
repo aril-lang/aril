@@ -1,97 +1,37 @@
 package codegen
 
-// bindings.go — the stdlib binding registry. A declarative table of
-// the Go-stdlib calls and values the corpus uses, with the Aril-side
-// `pkg.method` spelling on the left and the lowering on the right.
-// Source of truth for the *intended* surface is
-// `docs/binding-surface.md`; this file is the codegen realisation of
-// the value-returning slice of it. The full bindgen pipeline (D6 —
-// signatures from `go/packages`) supersedes this hand-written table
-// later; until then it grows row-by-row as the corpus demands.
+import "github.com/aril-lang/aril/internal/binding"
+
+// bindings.go — the codegen side of the stdlib binding surface. The
+// *mechanical* rows (a value/effect rename, or a `(T, error)` → Result
+// lift) are no longer hand-written here: they are derived from the Go
+// type checker and read from the `internal/binding` registry (D6), the
+// single source `internal/sema` shares. This file keeps only the
+// *idiom* rows that are not mechanical signature transforms — the
+// `fmt.print*` effect renames and `strings.fromBytes` conversion (the
+// time-duration constructors and the runtime-helper bindings live in
+// emitCall). Source of truth for the intended surface is
+// `docs/binding-surface.md`.
 //
-// Three lowering shapes are modelled here:
+// Three lowering shapes:
 //   - rename:     `pkg.method(args)` → `pkg.GoName(args)` (or a value
-//                 reference `pkg.GoName` for a non-call binding). The
-//                 Go referent is value-returning (no error), so the
-//                 call/field lowers straight through with only an
-//                 identifier swap. Handled by mapFieldName.
+//                 reference `pkg.GoName`). Registry Rename rows +
+//                 stdlibRenameOverlay. Handled by mapFieldName.
 //   - resultWrap: `pkg.method(args)` → `ResultOf(pkg.GoName(args))`.
-//                 The Go referent returns `(T, error)`; the helper
-//                 folds that into the predeclared `Result<T, error>`.
-//                 Handled by emitCall.
-//   - conversion: `strings.fromBytes(b)` → `string(b)` etc. — a Go
-//                 type conversion, not a package call (needs no
-//                 import). Predates this table; see isConversionBinding
-//                 + the emitCall special case.
+//                 Registry ResultWrap rows. Handled by emitCall.
+//   - conversion: `strings.fromBytes(b)` → `string(b)` — a Go type
+//                 conversion, not a package call (needs no import).
 
-// stdlibRename maps a value-returning stdlib binding to its Go
-// identifier. Keyed by [pkg, method]. Covers both call bindings
-// (`strings.split` → `strings.Split(...)`) and value bindings
-// (`os.args` → `os.Args`); the call-vs-value distinction is the
-// caller's (a Field vs a Call node), not the table's.
-var stdlibRename = map[[2]string]string{
-	// fmt — output + formatting (value/effect returning).
-	{"fmt", "println"}:  "Println",
-	{"fmt", "print"}:    "Print",
-	{"fmt", "printf"}:   "Printf",
-	{"fmt", "sprintf"}:  "Sprintf",
-	{"fmt", "sprintln"}: "Sprintln",
-	{"fmt", "sprint"}:   "Sprint",
-
-	// os — process control + args (value bindings + diverging exit).
-	{"os", "exit"}:   "Exit",
-	{"os", "args"}:   "Args",
-	{"os", "getenv"}: "Getenv",
-
-	// strings — pure string transforms (all value-returning).
-	{"strings", "fields"}:     "Fields",
-	{"strings", "split"}:      "Split",
-	{"strings", "join"}:       "Join",
-	{"strings", "trimSpace"}:  "TrimSpace",
-	{"strings", "trimPrefix"}: "TrimPrefix",
-	{"strings", "trimSuffix"}: "TrimSuffix",
-	{"strings", "hasPrefix"}:  "HasPrefix",
-	{"strings", "hasSuffix"}:  "HasSuffix",
-	{"strings", "contains"}:   "Contains",
-	{"strings", "count"}:      "Count",
-	{"strings", "replace"}:    "Replace",
-	{"strings", "toLower"}:    "ToLower",
-	{"strings", "toUpper"}:    "ToUpper",
-
-	// strconv — the no-error direction (parsing is resultWrap below).
-	{"strconv", "itoa"}:       "Itoa",
-	{"strconv", "formatBool"}: "FormatBool",
-	{"strconv", "quote"}:      "Quote",
-
-	// math — float math (no error). floor/log10 predate the table.
-	{"math", "floor"}: "Floor",
-	{"math", "log10"}: "Log10",
-	{"math", "sqrt"}:  "Sqrt",
-	{"math", "abs"}:   "Abs",
-	{"math", "pow"}:   "Pow",
-	{"math", "log"}:   "Log",
-	{"math", "log2"}:  "Log2",
-	{"math", "ceil"}:  "Ceil",
-
-	// time — the channel/effect bindings are direct renames; the
-	// Duration constructors (`milliseconds`/`seconds`) are not, and
-	// lower via timeDurationUnit in emitCall.
-	{"time", "after"}: "After", // → <-chan time.Time
-	{"time", "tick"}:  "Tick",  // → <-chan time.Time
-	{"time", "sleep"}: "Sleep",
-}
-
-// stdlibResultWrap maps a stdlib binding whose Go referent returns
-// `(T, error)` to its Go identifier. The call lowers to
-// `ResultOf(pkg.GoName(args))`, folding the two-value Go return
-// into the predeclared `Result<T, error>` (binding-surface.md — the
-// `(T, error)` → Result wrapper convention). Go infers T from the
-// referent's first return, so one generic helper serves every row.
-var stdlibResultWrap = map[[2]string]string{
-	{"strconv", "atoi"}:       "Atoi",
-	{"strconv", "parseFloat"}: "ParseFloat",
-	{"strconv", "parseInt"}:   "ParseInt",
-	{"os", "readFile"}:        "ReadFile",
+// stdlibRenameOverlay holds the value/effect renames the derived
+// registry deliberately excludes because they are a curation choice,
+// not a mechanical signature transform: `fmt.Print/Printf/Println`
+// return `(int, error)` in Go, but the Aril surface treats them as
+// fire-and-forget effects that discard the count+error (binding.Manifest
+// §curation note). They lower like any other rename.
+var stdlibRenameOverlay = map[[2]string]string{
+	{"fmt", "println"}: "Println",
+	{"fmt", "print"}:   "Print",
+	{"fmt", "printf"}:  "Printf",
 }
 
 // timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to
@@ -126,21 +66,25 @@ func stdlibConversionOf(recv, name string) (string, bool) {
 	return g, ok
 }
 
-// stdlibRenameOf returns the Go identifier for a value-returning
+// stdlibRenameOf returns the Go identifier for a value/effect-returning
 // binding `recv.name`, or ("", false) when recv is not a stdlib
-// namespace ident or the pair has no rename entry.
+// namespace ident or the pair has no rename entry. Reads the derived
+// registry first (D6), then the curation overlay.
 func stdlibRenameOf(recv, name string) (string, bool) {
 	if !isStdlibNamespaceName(recv) {
 		return "", false
 	}
-	g, ok := stdlibRename[[2]string{recv, name}]
+	if g, ok := binding.RenameOf(recv, name); ok {
+		return g, true
+	}
+	g, ok := stdlibRenameOverlay[[2]string{recv, name}]
 	return g, ok
 }
 
 // stdlibResultWrapOf returns the Go identifier for a `(T, error)`
 // binding `recv.name`, or ("", false) when the pair is not a
-// result-wrapping binding.
+// result-wrapping binding. All such bindings are mechanical, so this is
+// the derived registry directly (D6).
 func stdlibResultWrapOf(recv, name string) (string, bool) {
-	g, ok := stdlibResultWrap[[2]string{recv, name}]
-	return g, ok
+	return binding.ResultWrapOf(recv, name)
 }
