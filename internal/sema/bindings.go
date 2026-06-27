@@ -1,44 +1,106 @@
 package sema
 
-import "github.com/aril-lang/aril/internal/ast"
+import (
+	"strings"
 
-// bindings.go — interim sema-side stdlib binding signatures. Sema does
-// not yet derive stdlib signatures from go/packages (the D6 bindgen
-// pipeline); until it does, it needs one fact per binding: the *return
-// type* of a value/Result-returning binding, so a `match`/`try` subject
-// over a binding call is typed instead of staying Unknown. This mirrors
-// the codegen binding tables (internal/codegen/bindings.go) — the two
-// collapse into one bindgen-derived source later. Keyed [pkg, method];
-// grows row-by-row until bindgen lands.
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
+)
+
+// bindings.go — the sema side of the stdlib binding surface. The *mechanical*
+// return types (a value/effect rename, or a `(T, error)` → Result lift) are
+// derived from the Go type checker and read from the `internal/binding`
+// registry (D6) — the single source codegen shares — so they can no longer
+// drift from codegen's lowering (the failure #43 hit). This file keeps only the
+// *idiom* rows the registry deliberately excludes (the json serialize family,
+// which lowers via a runtime helper, not a mechanical binding).
+//
+// The registry carries the return as an Aril type *spelling*
+// (binding.Fact.Return); semaTypeFromSpelling maps it to a sema Type.
 
 // stdlibBindingReturn returns the modelled Aril return type of a stdlib
-// binding `pkg.method(...)`, or nil when the pair is not (yet) tabled.
-// The `(T, error)`-wrapping bindings (codegen's stdlibResultWrap) map to
-// Result<T, error>; their `Err` payload is the Go `error` boundary type.
+// binding `pkg.method(...)`, or nil when the pair is not tabled or is a
+// unit/effect binding. Knowing the return type lets a `match`/`try` subject
+// over a binding call type instead of staying Unknown.
 func (c *checker) stdlibBindingReturn(pkg, method string) Type {
-	errT := &Builtin{N: "error"}
+	// Idiom rows the derived registry does not carry: json.serialize(v) /
+	// serializeIndent(v, prefix, indent) → Result<[]byte, error>
+	// (binding-surface.md §encoding/json), lowered via a runtime helper.
 	switch [2]string{pkg, method} {
-	case [2]string{"strconv", "atoi"}:
-		return &Result{T: &Builtin{N: "int"}, E: errT}
-	case [2]string{"strconv", "parseInt"}:
-		return &Result{T: &Builtin{N: "int64"}, E: errT}
-	case [2]string{"strconv", "parseFloat"}:
-		return &Result{T: &Builtin{N: "float64"}, E: errT}
-	case [2]string{"os", "readFile"}:
-		return &Result{T: &Slice{Elem: &Builtin{N: "byte"}}, E: errT}
 	case [2]string{"json", "serialize"}, [2]string{"json", "serializeIndent"}:
-		// json.serialize(v) / serializeIndent(v, prefix, indent) →
-		// Result<[]byte, error> (binding-surface.md §encoding/json).
-		return &Result{T: &Slice{Elem: &Builtin{N: "byte"}}, E: errT}
-	case [2]string{"time", "after"}, [2]string{"time", "tick"}:
-		// time.after(d) / time.tick(d) → RecvChan<time.Time> (Go's
-		// `<-chan time.Time`): a receive-only timer source. Typing it as
-		// RecvChan (not Unknown) lets a channel contract name it as a
-		// subject and the E1209 static delivery-intent check see its
-		// receive-only direction (binding-surface.md §time).
-		return &RecvChan{Elem: &Named{N: "time.Time"}}
+		return &Result{T: &Slice{Elem: &Builtin{N: "byte"}}, E: &Builtin{N: "error"}}
+	}
+	// Derived rows (D6): the binding registry carries the Aril return spelling
+	// (e.g. `Result<int, error>`, `RecvChan<time.Time>`, `[]string`). An empty
+	// spelling is a unit/effect binding (e.g. os.exit) — nil, as before.
+	if spelling, ok := binding.ReturnSpelling(pkg, method); ok && spelling != "" {
+		return semaTypeFromSpelling(spelling)
 	}
 	return nil
+}
+
+// semaTypeFromSpelling maps an Aril type spelling from the binding registry to
+// a sema Type. The spellings are the canonical Aril forms bindgen's translate
+// emits, over the construct set the stdlib registry uses: scalars, `[]T`,
+// `Result<T, error>`, and the directional channels. A leaf carrying a `.` is a
+// qualified opaque boundary type (`time.Time`) → Named; a bare leaf is a
+// primitive → Builtin (reproducing the former hand-built representations).
+func semaTypeFromSpelling(s string) Type {
+	s = strings.TrimSpace(s)
+	if elem, ok := strings.CutPrefix(s, "[]"); ok {
+		return &Slice{Elem: semaTypeFromSpelling(elem)}
+	}
+	if args, ok := genericArgs(s, "Result"); ok && len(args) == 2 {
+		return &Result{T: semaTypeFromSpelling(args[0]), E: semaTypeFromSpelling(args[1])}
+	}
+	if args, ok := genericArgs(s, "Option"); ok && len(args) == 1 {
+		return &Option{T: semaTypeFromSpelling(args[0])}
+	}
+	if args, ok := genericArgs(s, "RecvChan"); ok && len(args) == 1 {
+		return &RecvChan{Elem: semaTypeFromSpelling(args[0])}
+	}
+	if args, ok := genericArgs(s, "SendChan"); ok && len(args) == 1 {
+		return &SendChan{Elem: semaTypeFromSpelling(args[0])}
+	}
+	if args, ok := genericArgs(s, "Channel"); ok && len(args) == 1 {
+		return &Channel{Elem: semaTypeFromSpelling(args[0])}
+	}
+	if args, ok := genericArgs(s, "Map"); ok && len(args) == 2 {
+		return &Map{Key: semaTypeFromSpelling(args[0]), Val: semaTypeFromSpelling(args[1])}
+	}
+	switch s {
+	case "unit":
+		return &Unit{}
+	}
+	if strings.Contains(s, ".") {
+		return &Named{N: s} // a qualified opaque boundary type, e.g. time.Time
+	}
+	return &Builtin{N: s} // a primitive (int / string / byte / …) or `error`
+}
+
+// genericArgs returns the top-level type arguments of `ctor<...>` (commas at
+// angle-bracket depth 0), or ok=false when s is not that constructor.
+func genericArgs(s, ctor string) ([]string, bool) {
+	if !strings.HasPrefix(s, ctor+"<") || !strings.HasSuffix(s, ">") {
+		return nil, false
+	}
+	inner := s[len(ctor)+1 : len(s)-1]
+	var args []string
+	depth, start := 0, 0
+	for i, r := range inner {
+		switch r {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		case ',':
+			if depth == 0 {
+				args = append(args, strings.TrimSpace(inner[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	return append(args, strings.TrimSpace(inner[start:])), true
 }
 
 // bindingCallReturn types a stdlib-binding call `recv.method(...)` whose
