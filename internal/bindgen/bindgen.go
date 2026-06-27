@@ -40,6 +40,13 @@ func Generate(importPath string) (string, error) {
 type generator struct {
 	pkg  *types.Package
 	path string // Go import path, e.g. "os/exec"
+	// qualifyLocal qualifies a package-local named type with the package name
+	// (`Time` → `time.Time`) instead of the bare handle name. The `aril import`
+	// extern output uses bare names (the handle is declared `extern type Time`);
+	// the stdlib-registry deriver sets this so a return spelling like
+	// `RecvChan<time.Time>` matches the qualified type the builtin-module
+	// consumers see.
+	qualifyLocal bool
 }
 
 // run walks the package's exported scope and renders the binding file.
@@ -282,7 +289,7 @@ func (g *generator) translate(t types.Type) (string, bool, string) {
 	case *types.Pointer:
 		// *NamedInThisPackage → the opaque handle of that name.
 		if n, ok := u.Elem().(*types.Named); ok && n.Obj().Pkg() == g.pkg {
-			return n.Obj().Name(), true, ""
+			return g.localName(n), true, ""
 		}
 		return "", false, "pointer to a non-local or unnamed type"
 	case *types.Named:
@@ -290,7 +297,7 @@ func (g *generator) translate(t types.Type) (string, bool, string) {
 			return "error", true, ""
 		}
 		if u.Obj().Pkg() == g.pkg {
-			return u.Obj().Name(), true, "" // a sibling handle, used by value
+			return g.localName(u), true, "" // a sibling handle, used by value
 		}
 		return "", false, "cross-package type " + u.Obj().Pkg().Path() + "." + u.Obj().Name()
 	case *types.Interface:
@@ -384,6 +391,16 @@ func paramName(p *types.Var, i int) string {
 		return escapeKeyword(p.Name())
 	}
 	return fmt.Sprintf("a%d", i)
+}
+
+// localName spells a package-local named type: the bare handle name for the
+// `aril import` extern output, or `pkgname.Name` when qualifyLocal is set (the
+// stdlib-registry deriver).
+func (g *generator) localName(n *types.Named) string {
+	if g.qualifyLocal {
+		return g.pkg.Name() + "." + n.Obj().Name()
+	}
+	return n.Obj().Name()
 }
 
 func isErrorType(t types.Type) bool {
