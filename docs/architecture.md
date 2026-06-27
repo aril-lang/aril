@@ -78,6 +78,27 @@ std/<package>.aril             — generated, committed bindings
 Raw signatures are derived from the Go type checker and never hand-written.
 Only the wrapper layer involves judgment.
 
+### Two realizations: the `extern` files and the builtin-module registry
+
+The pipeline above feeds the **`extern` / `aril import`** world — a Go package a
+program binds explicitly with `extern func … @go("pkg.Sym")`, where `aril
+import` prints a curatable `.aril` starting point. The **builtin-module** stdlib
+surface (`import fmt` / `fmt.println(x)`) is the *same idea, different output*:
+its mechanical binding facts (the Go referent name, the rename-vs-`(T,error)`
+lowering shape, and the Aril return type) are derived from the same
+go/importer introspection over a curated symbol manifest and committed as a
+generated **Go data registry** (`internal/binding`, derived by
+`internal/bindgen`) that both `internal/sema` and `internal/codegen` read — one
+source for the typing and the lowering, so they cannot drift. The registry is
+pure data, so the compiler build needs no Go source tree; only regeneration
+does, guarded by a drift test. The *idiom* bindings that are not mechanical
+signature transforms — fire-and-forget effects (`fmt.print*`, whose Go
+`(int, error)` is deliberately discarded), the runtime-helper bindings
+(`fmt.scan*`, `json`, `sort.sorted`), the time-duration constructors, and
+`strings.fromBytes` — stay hand-authored in the consumers: the "wrapper layer
+involves judgment" rule, made concrete. (The committed-`std/<package>.aril`
+form above is the longer arc; the Go-data registry is the realized MVP.)
+
 ### Mapping rules (Go -> Aril)
 
 | Go shape | Aril shape | Notes |
