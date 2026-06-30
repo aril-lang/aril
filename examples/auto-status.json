@@ -2,14 +2,14 @@
   "schema_version": 3,
   "totals": {
     "total": 56,
-    "parse_fail": 4,
+    "parse_fail": 3,
     "sema_fail": 1,
     "emit_fail": 1,
-    "build_ok": 50,
+    "build_ok": 51,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 50,
-    "run_total": 54
+    "run_ok": 51,
+    "run_total": 55
   },
   "files": [
     {
@@ -284,8 +284,8 @@
     },
     {
       "path": "examples/stdlib-binding/todo_api/todo_api.aril",
-      "stage": "parse",
-      "blocker": "error[E0112]: mixed brace-literal entry kinds"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/wc/wc.aril",

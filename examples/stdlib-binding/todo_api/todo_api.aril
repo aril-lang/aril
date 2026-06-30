@@ -1,20 +1,24 @@
-// A small JSON REST API: GET /todos, POST /todos, GET /todos/{id},
-// DELETE /todos/{id}. State lives in memory.
+// A small JSON todo API driven in-process: concurrent clients create todos
+// through a Store-owner goroutine (an actor that serialises writes — no shared
+// mutex), then a sequential CRUD phase exercises GET/POST/DELETE and the
+// Result-to-HTTP-status mapping (200 / 201 / 400 / 404).
 //
-// Forces: DTO records, `encoding/json` round-trip, `net/http` routing,
-// `Result<T, ApiError>` mapped to HTTP status codes (200, 201, 400, 404,
-// 500), `defer` for lock release, and a class that satisfies
-// `http.Handler` via the binding (D14).
+// The original served `net/http` on :8080. Here the "server" is the actor and
+// the "clients" are goroutines; the showcase is preserved without a live
+// listener: DTO records, `encoding/json` serialisation of the responses, a
+// custom `class implements error` carrying its HTTP status, and Result mapped
+// to status codes. Concurrency is uncolored — five client goroutines submit
+// creates over a channel, the actor applies them one at a time, so the Store
+// needs no lock (sidestepping the unbound `sync.Mutex`).
+//
+// A monitor goroutine owns stdout. Phase-1 per-create lines interleave; the
+// run-check asserts the deterministic milestones in order (`expected_patterns`)
+// and that no 500 / wrong-status line appears (`forbidden_patterns`).
 
 import fmt
-import http
-import io
 import json
-import log
 import strconv
 import strings
-import sync
-// url.URL is reached transitively through http.Request.url; not imported by name.
 
 type Todo = {
   id:    int
@@ -22,12 +26,8 @@ type Todo = {
   done:  bool
 }
 
-type CreateTodo = {
-  title: string
-}
-
-// Custom error type: a class that implements the built-in `error`
-// interface. Carries both a public message and the HTTP status to use.
+// Custom error: a class implementing the built-in `error` interface, carrying
+// the HTTP status to map the failure to.
 class ApiError implements error {
   let status:  int
   let message: string
@@ -35,153 +35,161 @@ class ApiError implements error {
   error(): string { return message }
 }
 
-func badRequest(msg: string):    ApiError { return ApiError{ status: 400, message: msg } }
-func notFound(msg: string):      ApiError { return ApiError{ status: 404, message: msg } }
-func internalError(msg: string): ApiError { return ApiError{ status: 500, message: msg } }
+func notFound(msg: string):   ApiError { return ApiError{ status: 404, message: msg } }
+func badRequest(msg: string): ApiError { return ApiError{ status: 400, message: msg } }
 
+// In-memory store. Only the actor goroutine touches it during the concurrent
+// phase, and the sequential phase runs after the actor has joined, so no lock
+// is needed.
 class Store {
   var nextID: int
   var items:  Map<int, Todo>
-  let lock:   sync.Mutex
 
   static new(): Store {
-    return Store{
-      nextID: 1,
-      items:  Map<int, Todo>{},
-      lock:   sync.Mutex{},
-    }
-  }
-
-  list(): []Todo {
-    lock.lock()
-    defer lock.unlock()
-
-    var out: []Todo = []Todo{}
-    for (_, t) in items {
-      out = out.push(t)
-    }
-    return out
-  }
-
-  get(id: int): Result<Todo, ApiError> {
-    lock.lock()
-    defer lock.unlock()
-
-    match items.get(id) {
-      Some(t) => Ok(t),
-      None    => Err(notFound("todo not found")),
-    }
+    return Store{ nextID: 1, items: Map<int, Todo>{} }
   }
 
   create(title: string): Todo {
-    lock.lock()
-    defer lock.unlock()
-
-    let t = Todo{ id: nextID, title: title, done: false }
-    items.set(nextID, t)
+    let todo = Todo{ id: nextID, title: title, done: false }
+    items.set(nextID, todo)
     nextID = nextID + 1
-    return t
+    return todo
+  }
+
+  get(id: int): Result<Todo, ApiError> {
+    match items.get(id) {
+      Some(t) => Ok(t),
+      None    => Err(notFound("not found")),
+    }
   }
 
   delete(id: int): Result<unit, ApiError> {
-    lock.lock()
-    defer lock.unlock()
-
     if !items.has(id) {
-      return Err(notFound("todo not found"))
+      return Err(notFound("not found"))
     }
     items.delete(id)
     return Ok(())
   }
+
+  size(): int {
+    return items.len()
+  }
 }
 
-class TodosHandler implements http.Handler {
-  let store: Store
+type Resp = {
+  status: int
+  body:   string
+}
 
-  serveHTTP(w: http.ResponseWriter, r: http.Request) {
-    match route(r) {
-      Ok(payload) => writeJSON(w, 200, payload),
-      Err(err)    => writeJSON(w, err.status, err),
-    }
+func jsonOf(t: Todo): string {
+  match json.serialize(t) {
+    Ok(b)  => return strings.fromBytes(b),
+    Err(_) => return "{}",
   }
+}
 
-  // Path is "/todos" or "/todos/{id}".
-  route(r: http.Request): Result<Any, ApiError> {
-    let parts = strings.split(r.url.path, "/")
-    if parts.len() < 2 || parts[1] != "todos" {
-      return Err(notFound("not found"))
-    }
-
-    if parts.len() == 2 {
-      // /todos collection
-      match r.method {
-        "GET" => {
-          return Ok(store.list())
-        },
-        "POST" => {
-          let body = try readBody(r)
-          let req  = try parseJSON<CreateTodo>(body)
-          if strings.trimSpace(req.title) == "" {
-            return Err(badRequest("title must be non-empty"))
-          }
-          return Ok(store.create(req.title))
-        },
-        _ => return Err(badRequest("method not allowed")),
-      }
-    }
-
-    // /todos/{id}
-    let id = try parsePathID(parts[2])
-    match r.method {
-      "GET" => {
-        let t = try store.get(id)
-        return Ok(t)
+// route maps a request onto the Store and lifts the Result to an HTTP status —
+// the example's centrepiece. `id == 0` is the `/todos` collection; `id > 0` is
+// `/todos/{id}`.
+func route(store: Store, method: string, id: int, title: string): Resp {
+  if id == 0 {
+    match method {
+      "POST" => {
+        if strings.trimSpace(title) == "" {
+          return Resp{ status: 400, body: "title must be non-empty" }
+        }
+        return Resp{ status: 201, body: jsonOf(store.create(title)) }
       },
-      "DELETE" => {
-        try store.delete(id)
-        return Ok(())
-      },
-      _ => return Err(badRequest("method not allowed")),
+      _ => return Resp{ status: 400, body: "method not allowed" },
     }
   }
-}
-
-func readBody(r: http.Request): Result<[]byte, ApiError> {
-  match io.readAll(r.body) {
-    Ok(b)  => Ok(b),
-    Err(e) => Err(internalError("read body: " + e.error())),
-  }
-}
-
-func parseJSON<T>(data: []byte): Result<T, ApiError> {
-  match json.parse<T>(data) {
-    Ok(v)  => Ok(v),
-    Err(e) => Err(badRequest("invalid json: " + e.error())),
-  }
-}
-
-func parsePathID(s: string): Result<int, ApiError> {
-  match strconv.atoi(s) {
-    Ok(n)  => Ok(n),
-    Err(_) => Err(badRequest("bad id: " + s)),
-  }
-}
-
-func writeJSON(w: http.ResponseWriter, status: int, payload: Any) {
-  w.header().set("Content-Type", "application/json")
-  w.writeHeader(status)
-  match json.serialize(payload) {
-    Ok(data) => w.write(data),
-    Err(e)   => log.println("serialize error:", e),
+  match method {
+    "GET" => match store.get(id) {
+      Ok(t)  => return Resp{ status: 200, body: jsonOf(t) },
+      Err(e) => return Resp{ status: e.status, body: e.message },
+    },
+    "DELETE" => match store.delete(id) {
+      Ok(_)  => return Resp{ status: 200, body: "deleted" },
+      Err(e) => return Resp{ status: e.status, body: e.message },
+    },
+    _ => return Resp{ status: 400, body: "method not allowed" },
   }
 }
 
 func main() {
-  let store = Store.new()
-  let h     = TodosHandler{ store: store }
-  log.println("listening on :8080")
-  match http.listenAndServe(":8080", h) {
+  let store    = Store.new()
+  let commands = makeChannel<string>(16)
+  let log      = makeChannel<string>(64)
+
+  match scope<unit, error> {
+    // Monitor: owns stdout.
+    spawn {
+      for line in log {
+        fmt.println(line)
+      }
+      return Ok(())
+    }
+
+    // Coordinator: runs the actor + concurrent clients, then the sequential
+    // CRUD phase, then closes the log.
+    spawn {
+      try scope<unit, error> {
+        // The Store actor: applies one create at a time until the command
+        // channel closes. Serialising writes here is why no mutex is needed.
+        spawn {
+          for title in commands {
+            let t = store.create(title)
+            log.send("actor created #" + strconv.itoa(t.id) + " " + title)
+          }
+          return Ok(())
+        }
+
+        // The submitter: fan out five client goroutines that each POST a todo,
+        // then close `commands` once they have all submitted so the actor ends.
+        spawn {
+          try scope<unit, error> {
+            for i in 1..=5 {
+              spawn {
+                commands.send("task-" + strconv.itoa(i))
+                return Ok(())
+              }
+            }
+          }
+          commands.close()
+          return Ok(())
+        }
+      }
+
+      // The actor has joined: the store is quiescent and single-threaded now.
+      log.send("phase 1: 5 clients created todos concurrently")
+      log.send("phase 2: store holds " + strconv.itoa(store.size()) + " todos")
+
+      // Sequential CRUD, demonstrating Result -> HTTP status. The five
+      // concurrent creates took ids 1..5, so the next id is deterministically 6.
+      let r1 = route(store, "POST", 0, "demo")
+      log.send("POST /todos -> " + strconv.itoa(r1.status) + " " + r1.body)
+
+      let r2 = route(store, "GET", 6, "")
+      log.send("GET /todos/6 -> " + strconv.itoa(r2.status) + " " + r2.body)
+
+      let r3 = route(store, "GET", 999, "")
+      log.send("GET /todos/999 -> " + strconv.itoa(r3.status) + " " + r3.body)
+
+      let r4 = route(store, "POST", 0, "   ")
+      log.send("POST /todos -> " + strconv.itoa(r4.status) + " " + r4.body)
+
+      let r5 = route(store, "DELETE", 6, "")
+      log.send("DELETE /todos/6 -> " + strconv.itoa(r5.status) + " " + r5.body)
+
+      let r6 = route(store, "GET", 6, "")
+      log.send("GET /todos/6 -> " + strconv.itoa(r6.status) + " " + r6.body)
+
+      log.send("phase 2 complete: store holds " + strconv.itoa(store.size()) + " todos")
+      log.close()
+      return Ok(())
+    }
+  } {
     Ok(_)  => {},
-    Err(e) => log.fatal(e),
+    Err(e) => fmt.println("server error:", e),
   }
 }

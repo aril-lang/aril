@@ -4,16 +4,16 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 50 / 56 examples build end-to-end** (floor 50).
+- **build_ok — 51 / 56 examples build end-to-end** (floor 51).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 50 / 54 run-pass examples build and run as specified** (floor 50; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 51 / 55 run-pass examples build and run as specified** (floor 51; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 50 |
+| ✅ build (full pipeline) | 51 |
 | emit / codegen fail | 1 |
 | sema fail | 1 |
-| parse fail | 4 |
+| parse fail | 3 |
 
 ## Per-example
 
@@ -68,13 +68,13 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/vending_machine/vending_machine.aril` | build | — |
 | `examples/stdlib-binding/config_loader/config_loader.aril` | build | — |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | build | — |
+| `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
 | `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
 | `examples/core-language/p1133/p1133.aril` | parse | error[E0112]: expected parameter name |
-| `examples/stdlib-binding/todo_api/todo_api.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
 
 ## Diagnostic-quality gaps
 
@@ -112,7 +112,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**4 of 54 run-pass examples fall short of run_ok.**
+**4 of 55 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

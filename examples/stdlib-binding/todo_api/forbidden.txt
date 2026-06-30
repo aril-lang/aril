@@ -1,0 +1,5 @@
+-> 500
+GET /todos/999 -> 200
+DELETE /todos/6 -> 404
+store holds 6 todos
+store holds 4 todos
