@@ -1,10 +1,10 @@
 --- rate_limited.aril
 +++ rate_limited.aril
-@@ -17,6 +17,7 @@
+@@ -25,6 +25,7 @@
  }
  
  func main() {
 +  break
-   let deadline = time.after(time.milliseconds(500))
+   let deadline = makeChannel<unit>(0)
    let ticks    = time.tick(time.milliseconds(50))
    let buffer   = makeChannel<int>(4)

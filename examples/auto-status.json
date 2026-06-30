@@ -8,7 +8,7 @@
     "build_ok": 47,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 45,
+    "run_ok": 46,
     "run_total": 51
   },
   "files": [
@@ -420,11 +420,6 @@
       "path": "examples/concurrency/pubsub",
       "status": "build-fail",
       "code": 1
-    },
-    {
-      "path": "examples/concurrency/rate_limited",
-      "status": "timeout",
-      "code": 124
     },
     {
       "path": "examples/core-language/lru_cache",
