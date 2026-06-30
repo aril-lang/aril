@@ -1,0 +1,10 @@
+description = "LeetCode 3131 — special letters via a sum-type state machine"
+source   = "leetcode 3131"
+category = "core-language"
+showcase = false
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "leetcode_3131.aril"
+expected_output = "expected-output.txt"
