@@ -4,11 +4,11 @@
     "total": 56,
     "parse_fail": 4,
     "sema_fail": 1,
-    "emit_fail": 2,
-    "build_ok": 49,
+    "emit_fail": 1,
+    "build_ok": 50,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 49,
+    "run_ok": 50,
     "run_total": 54
   },
   "files": [
@@ -274,8 +274,8 @@
     },
     {
       "path": "examples/stdlib-binding/counterstack/pentix_agent.aril",
-      "stage": "emit",
-      "blocker": "unknown failure"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
@@ -428,11 +428,6 @@
     },
     {
       "path": "examples/core-language/p1133",
-      "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/stdlib-binding/counterstack",
       "status": "build-fail",
       "code": 1
     }

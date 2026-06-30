@@ -1,9 +1,11 @@
-description = "counterstack"
+description = "Sum-typed JSON wire protocol over an in-process channel transport with concurrent reader/writer"
 source   = "agents counterstack"
 category = "stdlib-binding"
 showcase = false
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "compiling"
+status   = "running"
 expects  = "run-pass"
 entry    = "pentix_agent.aril"
+expected_patterns  = "patterns.txt"
+forbidden_patterns = "forbidden.txt"
