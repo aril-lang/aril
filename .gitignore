@@ -12,6 +12,10 @@
 __pycache__/
 *.pyc
 
+# Local-only scratch: personal example drafts staged before promotion into
+# examples/. Never published — kept out of git on purpose.
+/user_tests/
+
 # Editor / OS junk
 .DS_Store
 .idea/
