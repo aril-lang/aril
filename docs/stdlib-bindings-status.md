@@ -34,7 +34,7 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | Package | Bound symbols | Kind |
 |---|---|---|
 | `fmt` | `println` `print` `printf` (effects) · `sprint` `sprintf` `sprintln` · `errorf` (`%w` wrapping) · `scan` `scan2` `scan3` (stdin) | idiom + mechanical |
-| `os` | `args` `exit` `getenv` `readFile` `writeFile` | mechanical |
+| `os` | `args` `exit` `getenv` `readFile` `writeFile` · `lookupEnv` (→ `Option`) | mechanical + idiom |
 | `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
 | `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pow` `sqrt` | mechanical |
@@ -49,13 +49,14 @@ Grouped by how close each is to landing — the upper rows are mostly small
 additive bindings, the lower rows need translator work or are whole subsystems.
 
 **Small surface gaps (a missing method on an already-bound package).**
-`os.lookupEnv` / the std streams (`os.stdin` / `stdout` / `stderr`); `math.pi`.
+The std streams (`os.stdin` / `stdout` / `stderr`); `math.pi`.
 
 **Error inspection.** Construction (`errors.new` / `fmt.errorf` with `%w`
 wrapping), folding into `Result<T, error>`, and *classification* (`errors.is`,
 which walks the wrapped chain) are bound. The remaining gap is typed
-*unwrapping* — `errors.as<T>` (extract a concrete error type to `Option<T>`),
-which needs the comma-ok→Option lift.
+*unwrapping* — `errors.as<T>` (extract a concrete error type to `Option<T>`):
+the comma-ok→Option lift it needs now exists (`os.lookupEnv` uses it), but
+`errors.As`'s pointer-out protocol is a distinct, harder shape.
 
 **Value-typed handles and bound methods.** Packages whose surface is a type
 carrying methods — `time.Time` (clock/formatting), `math/big` (`BigInt`

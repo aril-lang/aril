@@ -1,0 +1,10 @@
+description = "os.lookupEnv → Option<string> (unset vs empty) with a default fallback"
+source   = "stdlib-coverage env_config"
+category = "stdlib-binding"
+showcase = false
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "env_config.aril"
+expected_output = "expected-output.txt"

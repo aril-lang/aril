@@ -34,6 +34,11 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	// §errors / §fmt). errors.new mirrors the `error(msg)` built-in.
 	case [2]string{"errors", "new"}, [2]string{"fmt", "errorf"}:
 		return &Builtin{N: "error"}
+	// Comma-ok `(T, bool)` → Option<T> binding (codegen stdlibCommaOk):
+	// os.lookupEnv distinguishes an unset env var from an empty one
+	// (binding-surface.md §os).
+	case [2]string{"os", "lookupEnv"}:
+		return &Option{T: &Builtin{N: "string"}}
 	}
 	// Derived rows (D6): the binding registry carries the Aril return spelling
 	// (e.g. `Result<int, error>`, `RecvChan<time.Time>`, `[]string`). An empty

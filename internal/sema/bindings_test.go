@@ -35,6 +35,20 @@ func TestBareErrorConstructorReturns(t *testing.T) {
 	}
 }
 
+// TestCommaOkOptionReturn locks the comma-ok idiom row: os.lookupEnv types as
+// Option<string> (a `(T, bool)` Go referent lifted to Option<T>, not Result).
+func TestCommaOkOptionReturn(t *testing.T) {
+	c := &checker{}
+	got := c.stdlibBindingReturn("os", "lookupEnv")
+	o, ok := got.(*Option)
+	if !ok {
+		t.Fatalf("stdlibBindingReturn(os, lookupEnv) = %v; want *Option", got)
+	}
+	if b, ok := o.T.(*Builtin); !ok || b.N != "string" {
+		t.Errorf("os.lookupEnv Option payload = %v; want Builtin string", o.T)
+	}
+}
+
 // TestSemaTypeFromSpellingShape checks the structural mapping, not just the
 // stringification: a leaf with a dot is a Named (opaque boundary type), a bare
 // primitive is a Builtin, and the registry's (T, error) lift is a Result.

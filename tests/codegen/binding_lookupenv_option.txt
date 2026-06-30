@@ -1,0 +1,69 @@
+--- TITLE ---
+Comma-ok (T,bool) → Option binding: os.lookupEnv lowers to OptionOf(os.LookupEnv(...))
+
+--- INPUT ---
+import fmt
+import os
+
+func main() {
+  // PATH is reliably present; report only presence (value is non-deterministic).
+  match os.lookupEnv("PATH") {
+    Some(_) => fmt.println("present"),
+    None    => fmt.println("absent"),
+  }
+  // A variable nothing sets → None.
+  match os.lookupEnv("ARIL_UNSET_FIXTURE_VAR") {
+    Some(_) => fmt.println("present"),
+    None    => fmt.println("absent"),
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+func OptionOf[T any](v T, ok bool) Option[T] {
+	if ok {
+		return OptionSome[T](v)
+	}
+	return OptionNone[T]()
+}
+func main() {
+	__aril_match_1 := OptionOf(os.LookupEnv("PATH"))
+	switch __aril_match_1.Tag {
+	case 1:
+		fmt.Println("present")
+	case 0:
+		fmt.Println("absent")
+	}
+	__aril_match_2 := OptionOf(os.LookupEnv("ARIL_UNSET_FIXTURE_VAR"))
+	switch __aril_match_2.Tag {
+	case 1:
+		fmt.Println("present")
+	case 0:
+		fmt.Println("absent")
+	}
+}
+
+--- STDOUT ---
+present
+absent
+
+--- EXIT ---
+0
