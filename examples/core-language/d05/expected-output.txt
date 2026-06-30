@@ -1,0 +1,3 @@
+Fresh DB size: 3 => 2
+Available Fresh: 3
+Total Fresh: 14

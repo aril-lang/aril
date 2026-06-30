@@ -1,0 +1,8 @@
+you: a b
+a: out
+b: out
+svr: fft dac e
+e: fft
+fft: c dac
+c: dac out
+dac: out

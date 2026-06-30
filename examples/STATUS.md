@@ -6,7 +6,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 47 / 56 examples build end-to-end** (floor 47).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 27 / 51 run-pass examples build and run as specified** (floor 27; behavioural: exit code, stdout vs an `expected_output` sidecar when present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 36 / 51 run-pass examples build and run as specified** (floor 36; behavioural: exit code, stdout vs an `expected_output` sidecar when present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
@@ -112,22 +112,13 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**24 of 51 run-pass examples fall short of run_ok.**
+**15 of 51 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
 | `examples/concurrency/nested_scopes` | build-fail | 1 |
 | `examples/concurrency/pubsub` | build-fail | 1 |
 | `examples/concurrency/rate_limited` | timeout | 124 |
-| `examples/core-language/d01` | run-fail | 2 |
-| `examples/core-language/d02` | run-fail | 2 |
-| `examples/core-language/d03` | run-fail | 2 |
-| `examples/core-language/d04` | run-fail | 2 |
-| `examples/core-language/d05` | run-fail | 2 |
-| `examples/core-language/d07` | run-fail | 2 |
-| `examples/core-language/d08` | run-fail | 2 |
-| `examples/core-language/d09` | run-fail | 2 |
-| `examples/core-language/d11` | run-fail | 2 |
 | `examples/core-language/lru_cache` | build-fail | 1 |
 | `examples/core-language/p1133` | build-fail | 1 |
 | `examples/core-language/p1242` | run-fail | 1 |
