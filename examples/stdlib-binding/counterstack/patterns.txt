@@ -1,0 +1,8 @@
+agent -> ready (pentris-7)
+agent <- hello from pentix-server v5
+agent -> action drop @tick 1
+agent -> action drop @tick 2
+agent -> pong 42
+agent -> action drop @tick 3
+agent <- match_end score=120 rank=3
+agent: final score 120
