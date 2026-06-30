@@ -11,8 +11,9 @@ import math
 
 func main() {
   let sentinel: error = error("limit exceeded")
+  let other:    error = error("other")
   let e: error = sentinel
-  fmt.println("is-sentinel:", errors.is(e, sentinel))
+  fmt.println("is-sentinel:", errors.is(e, sentinel), "is-other:", errors.is(e, other))
 
   fmt.println("max:", math.max(2.5, 7.5), "min:", math.min(2.5, 7.5))
 
@@ -72,8 +73,9 @@ func ResultUnit(err error) Result[struct{}, error] {
 }
 func main() {
 	var sentinel error = errors.New("limit exceeded")
+	var other error = errors.New("other")
 	var e error = sentinel
-	fmt.Println("is-sentinel:", errors.Is(e, sentinel))
+	fmt.Println("is-sentinel:", errors.Is(e, sentinel), "is-other:", errors.Is(e, other))
 	fmt.Println("max:", math.Max(2.5, 7.5), "min:", math.Min(2.5, 7.5))
 	__aril_match_1 := ResultOf(strconv.ParseBool("true"))
 	switch __aril_match_1.Tag {
@@ -104,7 +106,7 @@ func main() {
 }
 
 --- STDOUT ---
-is-sentinel: true
+is-sentinel: true is-other: false
 max: 7.5 min: 2.5
 bool: true
 fmt: 3.14

@@ -1,4 +1,5 @@
 strict: true
 max: 11
-min: 2.5
-breaches: 1
+min: -1
+below: 1
+above: 1
