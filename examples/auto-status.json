@@ -8,8 +8,8 @@
     "build_ok": 47,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 46,
-    "run_total": 51
+    "run_ok": 47,
+    "run_total": 52
   },
   "files": [
     {
@@ -129,6 +129,11 @@
     },
     {
       "path": "examples/core-language/invert_binary_tree/invert_binary_tree.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/leetcode_3131/leetcode_3131.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -284,11 +289,6 @@
     },
     {
       "path": "examples/stdlib-binding/wc/wc.aril",
-      "stage": "build",
-      "blocker": ""
-    },
-    {
-      "path": "user_tests/leetcode_3131_idiomatic.aril",
       "stage": "build",
       "blocker": ""
     }
