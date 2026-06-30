@@ -129,7 +129,11 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 		if _, ok := v.Expr.(*ast.BreakExpr); ok {
 			g.line(v.Span.StartLine)
 			g.writeIndent()
-			g.b.WriteString("break\n")
+			// A `break` inside a lowered switch/select (a `match` arm or
+			// `select` case) must target the loop by label, not the
+			// switch (§LabeledBreak).
+			g.b.WriteString(g.breakTarget())
+			g.b.WriteString("\n")
 			return nil
 		}
 		if _, ok := v.Expr.(*ast.ContinueExpr); ok {
@@ -171,7 +175,7 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 	case *ast.IfStmt:
 		return g.emitIfStmt(v)
 	case *ast.WhileStmt:
-		return g.emitWhileStmt(v)
+		return g.emitLoop(v.Body, func() error { return g.emitWhileStmt(v) })
 	case *ast.SelectStmt:
 		return g.emitSelectStmt(v)
 	case *ast.DeferStmt:
@@ -186,7 +190,7 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 		g.b.WriteByte('\n')
 		return nil
 	case *ast.ForStmt:
-		return g.emitForStmt(v)
+		return g.emitLoop(v.Body, func() error { return g.emitForStmt(v) })
 	case *ast.LetStmt:
 		switch pat := v.Pattern.(type) {
 		case *ast.IdentPat:

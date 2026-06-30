@@ -1,0 +1,56 @@
+--- TITLE ---
+Labeled break — a `break` inside a `match` arm targets the loop, not the lowered switch
+
+--- INPUT ---
+import fmt
+
+func main() {
+  var i = 0
+  while true {
+    match i {
+      3 => break,
+      _ => { i = i + 1 },
+    }
+  }
+  fmt.println("matched", i)
+  var k = 0
+  for j in 0..10 {
+    if j == 4 { break }
+    k = k + 1
+  }
+  fmt.println("plain", k)
+}
+
+--- GO ---
+package main
+
+import "fmt"
+
+func main() {
+	var i = 0
+_arilLoop1:
+	for {
+		switch i {
+		case 3:
+			break _arilLoop1
+		default:
+			i = i + 1
+		}
+	}
+	fmt.Println("matched", i)
+	var k = 0
+	for j := 0; j < 10; j++ {
+		if j == 4 {
+			break
+		}
+		k = k + 1
+	}
+	fmt.Println("plain", k)
+}
+
+--- STDOUT ---
+matched 3
+plain 4
+
+--- EXIT ---
+0

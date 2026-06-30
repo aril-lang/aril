@@ -29,6 +29,10 @@ import (
 // arm set is variant-based or literal-based; mixing is not
 // reached by the corpus and rejected.
 func (g *gen) emitMatchSwitch(m *ast.MatchExpr, emitArm func(arm *ast.MatchArm) error) error {
+	// A `match` lowers to a Go `switch`, which captures a bare `break`;
+	// track the nesting so a `break` in an arm targets the enclosing
+	// loop by label (§LabeledBreak).
+	defer g.exitSwitch(g.enterSwitch())
 	// A tuple-subject match (`match (s, e) { (Idle, InsertCoin(n)) => … }`)
 	// can't switch on a single tag — it lowers to a boolean decision tree
 	// (`switch { case t0.Tag==X && t1.Tag==Y: … }`). Both statement- and
