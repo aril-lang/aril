@@ -689,14 +689,19 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				g.usesScan3 = true
 				g.usesResult = true
 			}
-			// A `(T, error)` stdlib binding (`strconv.atoi`,
-			// `os.readFile`, …) lowers via the ResultOf helper,
-			// which returns Result<T, error> — pull both in.
+			// A result-wrapping stdlib binding lowers via a lift
+			// helper: `(T, error)` (`strconv.atoi`, `os.readFile`, …)
+			// via ResultOf; a bare `error` (`os.writeFile`, …) via
+			// ResultUnit. Both fold into Result — pull it in too.
 			if f, ok := v.Callee.(*ast.Field); ok {
 				if recv, ok := f.Receiver.(*ast.Ident); ok {
 					if _, isWrap := stdlibResultWrapOf(recv.Name, f.Name); isWrap {
-						g.usesResultOf = true
 						g.usesResult = true
+						if stdlibResultWrapIsUnit(recv.Name, f.Name) {
+							g.usesResultUnit = true
+						} else {
+							g.usesResultOf = true
+						}
 					}
 				}
 			}

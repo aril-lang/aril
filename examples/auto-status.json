@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 56,
+    "total": 57,
     "parse_fail": 3,
     "sema_fail": 1,
     "emit_fail": 1,
-    "build_ok": 51,
+    "build_ok": 52,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 51,
-    "run_total": 55
+    "run_ok": 52,
+    "run_total": 56
   },
   "files": [
     {
@@ -281,6 +281,11 @@
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
       "stage": "sema",
       "blocker": "error[E0103]: Unknown name http"
+    },
+    {
+      "path": "examples/stdlib-binding/reading_validator/reading_validator.aril",
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/todo_api/todo_api.aril",

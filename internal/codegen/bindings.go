@@ -57,6 +57,7 @@ func timeDurationUnit(name string) (string, bool) {
 // imports.
 var stdlibConversion = map[[2]string]string{
 	{"strings", "fromBytes"}: "string", // []byte → string
+	{"strings", "toBytes"}:   "[]byte", // string → []byte
 }
 
 // stdlibConversionOf returns the Go conversion target for a conversion
@@ -87,4 +88,14 @@ func stdlibRenameOf(recv, name string) (string, bool) {
 // the derived registry directly (D6).
 func stdlibResultWrapOf(recv, name string) (string, bool) {
 	return binding.ResultWrapOf(recv, name)
+}
+
+// stdlibResultWrapIsUnit reports whether a ResultWrap binding lifts a
+// bare `error` (Go referent `func(...) error`, e.g. os.writeFile) — which
+// lowers via the `ResultUnit` helper to Result<unit, error> — rather than a
+// `(T, error)` pair, which lowers via `ResultOf`. The registry carries the
+// distinction in the return spelling (Result<unit, error> vs Result<T, error>).
+func stdlibResultWrapIsUnit(recv, name string) bool {
+	s, ok := binding.ReturnSpelling(recv, name)
+	return ok && s == "Result<unit, error>"
 }
