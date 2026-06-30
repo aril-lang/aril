@@ -33,7 +33,7 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 
 | Package | Bound symbols | Kind |
 |---|---|---|
-| `fmt` | `println` `print` `printf` (effects) · `sprint` `sprintf` `sprintln` · `scan` `scan2` `scan3` (stdin) | idiom + mechanical |
+| `fmt` | `println` `print` `printf` (effects) · `sprint` `sprintf` `sprintln` · `errorf` (`%w` wrapping) · `scan` `scan2` `scan3` (stdin) | idiom + mechanical |
 | `os` | `args` `exit` `getenv` `readFile` `writeFile` | mechanical |
 | `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
@@ -41,7 +41,7 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
 | `sort` | `sorted` (comparator, returns a new slice) | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |
-| `errors` | `is` (sentinel/chain classification) | mechanical |
+| `errors` | `is` (sentinel/chain classification) · `new` (constructor) | mechanical + idiom |
 
 ## Not yet available
 
@@ -49,14 +49,13 @@ Grouped by how close each is to landing — the upper rows are mostly small
 additive bindings, the lower rows need translator work or are whole subsystems.
 
 **Small surface gaps (a missing method on an already-bound package).**
-`os.lookupEnv` / the std streams (`os.stdin` / `stdout` / `stderr`); `math.pi`;
-`fmt.errorf`.
+`os.lookupEnv` / the std streams (`os.stdin` / `stdout` / `stderr`); `math.pi`.
 
-**Error inspection.** `errors.is` is bound; `errors.new` (the `error(msg)`
-built-in already covers construction) and `errors.as<T>` (unwrap to
-`Option<T>`, needs the comma-ok lift) remain. Aril can construct errors, fold
-them into `Result<T, error>`, and now *classify* them with `errors.is`; typed
-*unwrapping* is the remaining gap.
+**Error inspection.** Construction (`errors.new` / `fmt.errorf` with `%w`
+wrapping), folding into `Result<T, error>`, and *classification* (`errors.is`,
+which walks the wrapped chain) are bound. The remaining gap is typed
+*unwrapping* — `errors.as<T>` (extract a concrete error type to `Option<T>`),
+which needs the comma-ok→Option lift.
 
 **Value-typed handles and bound methods.** Packages whose surface is a type
 carrying methods — `time.Time` (clock/formatting), `math/big` (`BigInt`

@@ -1,0 +1,3 @@
+reject (empty): name: empty field
+ok: alice
+reject (too long): name (12 chars): field too long
