@@ -1,81 +1,120 @@
 // Showcase: uncolored concurrency (D7) — any function may block, and the
-// Go scheduler handles it. A structured-concurrency `scope` joins
-// spawned tasks at its end; the first failure cancels its siblings
+// Go scheduler handles it. A structured-concurrency `scope` joins the
+// spawned fetches at its end; the first failure cancels its siblings
 // (mapping onto errgroup + context under the hood, per
 // docs/architecture.md §4).
 //
-// The program fetches a list of URLs in parallel with a per-request
-// timeout and prints either the page sizes or the first error.
+// The "network" here is simulated in-process so the example is
+// self-contained, deterministic, and runnable: each fetch is a goroutine
+// that waits its source's latency, racing a per-request deadline via
+// `select` + `time.after`. A source slower than the deadline yields an
+// Err, which short-circuits the scope and cancels the in-flight siblings —
+// exactly the per-request-timeout + cancellation choreography a real
+// `net/http` fetch would exhibit, minus the live server.
 
-import context
 import fmt
-import http
-import io
-import os
 import time
+
+type Source = {
+  url:     string
+  size:    int
+  latency: time.Duration
+}
 
 type Page = {
   url:  string
   size: int
 }
 
-// `scope.context` is the cancellable context of the surrounding
-// concurrency scope (lexically bound). Each fetch attaches its
-// own deadline derived from that context.
-func fetch(parent: context.Context, url: string, timeout: time.Duration):
-    Result<Page, error> {
-  let (ctx, cancel) = context.withTimeout(parent, timeout)
-  defer cancel()
-
-  let req  = try http.newRequest("GET", url, None)
-  let resp = try http.do(req.withContext(ctx))
-  defer resp.body.close()
-
-  let body = try io.readAll(resp.body)
-  return Ok(Page{ url: url, size: body.len() })
+// Fetch one source: the "request" completes when its latency elapses,
+// unless the deadline fires first. Both arms are one-shot `time.after`
+// channels; `select` takes whichever is ready first.
+func fetch(s: Source, timeout: time.Duration): Result<Page, error> {
+  let arrived  = time.after(s.latency)
+  let deadline = time.after(timeout)
+  select {
+    case <-arrived => {
+      return Ok(Page{ url: s.url, size: s.size })
+    },
+    case <-deadline => {
+      return Err(error("fetch " + s.url + ": deadline exceeded"))
+    },
+  }
 }
 
-// Under the unified scope model (Result<T, E> with trailing-expr-after-
-// join), per-spawn results flow back through a channel that the scope's
-// trailing expression drains.
-func fetchAll(urls: []string, timeout: time.Duration): Result<[]Page, error> {
-  return scope<[]Page, error> {
-    // Buffer size = number of spawns so a successful sibling never
-    // blocks on `collect.send(p)` even if the scope short-circuits on
-    // another spawn's Err and the trailing-expression drain never
-    // runs. Don't shrink without revisiting deadlock.
-    let collect = makeChannel<Page>(urls.len())
-    for u in urls {
+// Fetch every source in parallel under one deadline. The scope joins all
+// spawns; if any fetch errors, `try scope` short-circuits with that Err
+// and the drain below never runs (so a slow source aborts the batch).
+// Buffer size = number of spawns so a successful sibling never blocks on
+// `collect.send` even when another spawn's Err short-circuits the scope
+// before the drain — don't shrink without revisiting deadlock. The close
+// happens *after* the scope joins (every spawn has returned and can no
+// longer send), matching the worker_pool fan-in protocol.
+func fetchAll(sources: []Source, timeout: time.Duration): Result<[]Page, error> {
+  let collect = makeChannel<Page>(sources.len())
+  try scope<unit, error> {
+    for s in sources {
       spawn {
-        let p = try fetch(scope.context, u, timeout)
+        let p = try fetch(s, timeout)
         collect.send(p)
         return Ok(())
       }
     }
-    // Trailing expression — runs after every spawn has joined.
-    collect.close()
-    var out: []Page = []Page{}
-    for p in collect { out = out.push(p) }
-    out
   }
+  collect.close()
+  var out: []Page = []Page{}
+  for p in collect { out = out.push(p) }
+  return Ok(sortBySize(out))
+}
+
+// Insertion sort by size — concurrent completion order is nondeterministic,
+// so we sort on a stable key to make the printed batch deterministic.
+func sortBySize(pages: []Page): []Page {
+  var xs = pages
+  var i = 1
+  while i < xs.len() {
+    let cur = xs[i]
+    var j = i - 1
+    while j >= 0 && xs[j].size > cur.size {
+      xs[j + 1] = xs[j]
+      j = j - 1
+    }
+    xs[j + 1] = cur
+    i = i + 1
+  }
+  return xs
 }
 
 func main() {
-  let urls = [
-    "https://example.com/",
-    "https://example.org/",
-    "https://example.net/",
+  // Batch 1: every source is comfortably faster than the 2s deadline.
+  let fast = [
+    Source{ url: "https://aril.example/a", size: 1024, latency: time.milliseconds(60) },
+    Source{ url: "https://aril.example/b", size: 2048, latency: time.milliseconds(30) },
+    Source{ url: "https://aril.example/c", size: 512,  latency: time.milliseconds(90) },
   ]
-
-  match fetchAll(urls, time.seconds(2)) {
+  match fetchAll(fast, time.seconds(2)) {
     Ok(pages) => {
+      fmt.println("batch 1:", pages.len(), "pages")
       for p in pages {
-        fmt.println(p.url, "->", p.size, "bytes")
+        fmt.println("  ", p.url, "->", p.size, "bytes")
       }
     },
-    Err(e) => {
-      fmt.println("fetch failed:", e)
-      os.exit(1)
+    Err(e) => fmt.println("batch 1 failed:", e),
+  }
+
+  // Batch 2: one source is slower than the 100ms deadline; its Err
+  // short-circuits the scope and cancels the (faster) siblings.
+  let slow = [
+    Source{ url: "https://aril.example/a",    size: 1024, latency: time.milliseconds(20) },
+    Source{ url: "https://aril.example/slow", size: 4096, latency: time.milliseconds(500) },
+  ]
+  match fetchAll(slow, time.milliseconds(100)) {
+    Ok(pages) => {
+      fmt.println("batch 2:", pages.len(), "pages")
+      for p in pages {
+        fmt.println("  ", p.url, "->", p.size, "bytes")
+      }
     },
+    Err(e) => fmt.println("batch 2:", e),
   }
 }

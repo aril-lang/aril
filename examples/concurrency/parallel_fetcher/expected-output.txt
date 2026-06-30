@@ -1,0 +1,5 @@
+batch 1: 3 pages
+   https://aril.example/c -> 512 bytes
+   https://aril.example/a -> 1024 bytes
+   https://aril.example/b -> 2048 bytes
+batch 2: fetch https://aril.example/slow: deadline exceeded
