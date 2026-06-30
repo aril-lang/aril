@@ -1,9 +1,10 @@
-description = "Structured-concurrent fetch with context cancellation"
+description = "Structured-concurrent fetch with per-request deadline + scope cancellation"
 source   = "services parallel_fetcher"
 category = "concurrency"
 showcase = true
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "target-sketch"
-expects  = "no-run"
+status   = "running"
+expects  = "run-pass"
 entry    = "parallel_fetcher.aril"
+expected_output = "expected-output.txt"

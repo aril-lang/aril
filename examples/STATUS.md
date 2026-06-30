@@ -4,15 +4,15 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 47 / 56 examples build end-to-end** (floor 47).
+- **build_ok — 48 / 56 examples build end-to-end** (floor 48).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 47 / 52 run-pass examples build and run as specified** (floor 47; behavioural: exit code, stdout vs an `expected_output` sidecar when present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 48 / 53 run-pass examples build and run as specified** (floor 48; behavioural: exit code, stdout vs an `expected_output` sidecar when present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 47 |
+| ✅ build (full pipeline) | 48 |
 | emit / codegen fail | 2 |
-| sema fail | 2 |
+| sema fail | 1 |
 | parse fail | 5 |
 
 ## Per-example
@@ -20,6 +20,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | Example | Stage | First blocker |
 |---|---|---|
 | `examples/concurrency/concurrency/concurrency.aril` | build | — |
+| `examples/concurrency/parallel_fetcher/parallel_fetcher.aril` | build | — |
 | `examples/concurrency/pipeline/pipeline.aril` | build | — |
 | `examples/concurrency/rate_limited/rate_limited.aril` | build | — |
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
@@ -68,7 +69,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | emit | go build failed |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | emit | unknown failure |
-| `examples/concurrency/parallel_fetcher/parallel_fetcher.aril` | sema | error[E0103]: Unknown name http |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/concurrency/graceful_server/graceful_server.aril` | parse | error[E0112]: expected expression, got Punct ":" |
 | `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
@@ -112,7 +112,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**5 of 52 run-pass examples fall short of run_ok.**
+**5 of 53 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
