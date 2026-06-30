@@ -21,6 +21,6 @@
 #     gate is fast and deterministic.
 
 build_ok_min = 49   # current build_ok; strict ratchet
-diag_ok_min  = 70   # headroom below current diag_ok (80) so an
+diag_ok_min  = 70   # headroom below current diag_ok (82) so an
                     # individual imprecise message is a penalty, not a red
 run_ok_min   = 49   # current run_ok; strict ratchet

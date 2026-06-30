@@ -27,14 +27,17 @@ type Request = {
   costMs: int
 }
 
-// Handle one request, bounded by the shared shutdown grace deadline.
-// Returns true if it completed within grace, false if the deadline fired
-// first (the connection is force-closed, as Server.Shutdown does once its
-// context deadline elapses).
-func handle(r: Request, grace: RecvChan<time.Time>): bool {
+// Handle one request, bounded by the shutdown grace window. Returns true if
+// it completed within grace, false if the window closed first (the connection
+// is force-closed, as Server.Shutdown does once its context deadline elapses).
+// `graceExpired` is broadcast by CLOSE, not a one-shot value: a closed channel
+// makes every `<-graceExpired` return immediately, so this stays correct for
+// any number of force-closed requests across the drain (cf. rate_limited's
+// close-to-broadcast) — a one-shot `time.after` would block the second waiter.
+func handle(r: Request, graceExpired: RecvChan<unit>): bool {
   select {
     case <-time.after(time.milliseconds(r.costMs)) => return true,
-    case <-grace                                    => return false,
+    case <-graceExpired                             => return false,
   }
 }
 
@@ -56,8 +59,9 @@ func main() {
   // Event over `log`, the monitor prints them as they arrive. Concurrent,
   // interleaved logging — the run-check requires the milestones below in
   // order, tolerating any extra lines between them.
-  let log      = makeChannel<string>(accepted.len() + 4)
-  let shutdown = makeChannel<unit>(0)
+  let log          = makeChannel<string>(accepted.len() + 4)
+  let shutdown     = makeChannel<unit>(0)
+  let graceExpired = makeChannel<unit>(0)
 
   match scope<unit, error> {
     // The monitor: drain the log channel until closed, printing each line.
@@ -77,20 +81,32 @@ func main() {
       return Ok(())
     }
 
-    // The server: wait for the shutdown signal, arm the grace clock, then
-    // drain the accepted requests — finishing what fits, force-closing the
-    // rest at the deadline. It is the sole writer to `log` after the signal,
-    // so the handled/force-closed lines stay in id order; it closes `log`
-    // on the way out so the monitor (and the scope) can finish.
+    // Grace clock: starts when the shutdown signal lands, then broadcasts the
+    // window's end by closing `graceExpired`.
+    spawn {
+      select {
+        case <-shutdown => {},
+      }
+      select {
+        case <-time.after(time.milliseconds(200)) => {},
+      }
+      graceExpired.close()
+      return Ok(())
+    }
+
+    // The server: wait for the shutdown signal, then drain the accepted
+    // requests under the grace window — finishing what fits, force-closing the
+    // rest when `graceExpired` closes. It is the sole writer to `log` after the
+    // signal, so the handled/force-closed lines stay in id order; it closes
+    // `log` on the way out so the monitor (and the scope) can finish.
     spawn {
       log.send("server: serving, waiting for shutdown")
       select {
         case <-shutdown => {},
       }
       log.send("server: draining in-flight requests within grace")
-      let grace = time.after(time.milliseconds(200))
       for r in inbox {
-        if handle(r, grace) {
+        if handle(r, graceExpired) {
           log.send(fmt.sprintf("handled #%d (%dms)", r.id, r.costMs))
         } else {
           log.send(fmt.sprintf("force-closed #%d (grace exceeded)", r.id))
