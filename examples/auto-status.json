@@ -8,7 +8,7 @@
     "build_ok": 47,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 44,
+    "run_ok": 45,
     "run_total": 51
   },
   "files": [
@@ -434,11 +434,6 @@
     {
       "path": "examples/core-language/p1133",
       "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1242",
-      "status": "run-fail",
       "code": 1
     },
     {

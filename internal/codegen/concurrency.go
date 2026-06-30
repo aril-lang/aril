@@ -128,6 +128,10 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 // an optional `x :=` binding), send cases `ch <- v`, and `default`
 // the non-blocking fall-through.
 func (g *gen) emitSelectStmt(s *ast.SelectStmt) error {
+	// Go's `select` captures a bare `break` like a switch — track it so
+	// a `break` in a case targets the enclosing loop by label
+	// (§LabeledBreak).
+	defer g.exitSwitch(g.enterSwitch())
 	g.line(s.Span.StartLine)
 	g.writeIndent()
 	g.b.WriteString("select {\n")

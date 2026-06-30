@@ -807,6 +807,36 @@ the body (a common shape for `match`-driven loops) would otherwise
 draw a spurious "missing return" after the loop. The literal `true`
 is recognised through redundant parentheses.
 
+### LabeledBreak
+
+An Aril `break` always targets its nearest enclosing loop. A `match`
+lowers to a Go `switch` (§MatchIR) and a `select` to a Go `select`,
+**both of which capture a bare Go `break`**. So a `break` written
+inside a `match` arm (or `select` case) nested in a loop would break
+the switch, not the loop — silently turning the loop infinite. When a
+loop body contains such a break, the loop is emitted with a generated
+Go label and those breaks lower to `break <label>`:
+
+```
+while true { match i { 3 => break, _ => { i = i + 1 } } }
+  ⟿
+_arilLoop1:
+	for {
+		switch i {
+		case 3:
+			break _arilLoop1
+		default:
+			i = i + 1
+		}
+	}
+```
+
+The label is emitted **only** when needed: a `break` directly in the
+loop body (no intervening switch/select) lowers to a bare `break`, and
+a loop with no captured break gets no label (so existing lowerings stay
+byte-identical). `continue` needs no treatment — Go's `switch`/`select`
+do not capture it, so a bare `continue` already targets the loop.
+
 ## Contracts — loop invariants (RFC-0006)
 
 A labelled loop carrying a `contract … { loop <label> { invariant P } }`

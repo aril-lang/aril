@@ -519,6 +519,24 @@ type gen struct {
 	// `for _ in low..high` (a wildcard loop var over a numeric range,
 	// where Go's `i++` form needs a named — not `_` — counter).
 	loopTempCounter int
+	// loopFrames is the stack of enclosing loops being emitted. Each
+	// frame carries the Go label assigned to its `for` (when a `break`
+	// inside a lowered `switch`/`select` needs to target the loop
+	// rather than the switch — see §LabeledBreak / lowering-go.md) and
+	// the current nesting depth of such switch frames within that loop.
+	loopFrames []*loopFrame
+	// loopLabelCounter generates unique loop label names.
+	loopLabelCounter int
+}
+
+// loopFrame tracks one enclosing loop during emission. label is "" when
+// the loop needs no Go label (no break crosses a switch/select to reach
+// it); switchDepth counts the match/select switch frames currently open
+// inside this loop, so a `break` knows whether Go's `switch`/`select`
+// would capture it.
+type loopFrame struct {
+	label       string
+	switchDepth int
 }
 
 type variantInfo struct {
