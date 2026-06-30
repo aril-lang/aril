@@ -5,7 +5,15 @@
 //
 // Forces: time.tick (returns a RecvChan<time.Time>), select with
 // `default` for non-blocking buffer pushes, time.after as a one-shot
-// deadline.
+// deadline broadcast to both goroutines by closing a `deadline` channel.
+//
+// A `time.after` channel fires ONCE — receiving it delivers the deadline
+// to a single goroutine. Two goroutines both blocking on the same
+// one-shot channel would leave one hanging forever (a deadlock). To
+// signal *all* goroutines, a coordinator waits the one-shot deadline and
+// then CLOSES a shared `deadline` channel: a closed channel makes every
+// `<-deadline` return immediately, the canonical deliver-to-all
+// broadcast (the property a raw one-shot cannot have — cf. E1209).
 
 import fmt
 import time
@@ -17,12 +25,22 @@ class Counters {
 }
 
 func main() {
-  let deadline = time.after(time.milliseconds(500))
+  let deadline = makeChannel<unit>(0)
   let ticks    = time.tick(time.milliseconds(50))
   let buffer   = makeChannel<int>(4)
   let cnt      = Counters{ produced: 0, dropped: 0, emitted: 0 }
 
   match scope<unit, error> {
+    // Deadline coordinator: wait the one-shot timer once, then broadcast
+    // by closing `deadline` so every goroutine's `<-deadline` fires.
+    spawn {
+      let timer = time.after(time.milliseconds(500))
+      select {
+        case <-timer => { deadline.close() },
+      }
+      return Ok(())
+    }
+
     // Producer: every iteration tries to enqueue a sequential number;
     // drops if the buffer is full. Exits when deadline closes.
     spawn {

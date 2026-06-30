@@ -1,6 +1,6 @@
 --- rate_limited.aril
 +++ rate_limited.aril
-@@ -26,7 +26,7 @@
+@@ -44,7 +44,7 @@
      // Producer: every iteration tries to enqueue a sequential number;
      // drops if the buffer is full. Exits when deadline closes.
      spawn {

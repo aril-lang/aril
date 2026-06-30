@@ -1,15 +1,39 @@
 --- rate_limited.aril
 +++ rate_limited.aril
-@@ -66,3 +66,15 @@
+@@ -25,22 +25,12 @@
+ }
+ 
+ func main() {
+-  let deadline = makeChannel<unit>(0)
++  let deadline = time.after(time.milliseconds(500))
+   let ticks    = time.tick(time.milliseconds(50))
+   let buffer   = makeChannel<int>(4)
+   let cnt      = Counters{ produced: 0, dropped: 0, emitted: 0 }
+ 
+   match scope<unit, error> {
+-    // Deadline coordinator: wait the one-shot timer once, then broadcast
+-    // by closing `deadline` so every goroutine's `<-deadline` fires.
+-    spawn {
+-      let timer = time.after(time.milliseconds(500))
+-      select {
+-        case <-timer => { deadline.close() },
+-      }
+-      return Ok(())
+-    }
+-
+     // Producer: every iteration tries to enqueue a sequential number;
+     // drops if the buffer is full. Exits when deadline closes.
+     spawn {
+@@ -84,3 +74,15 @@
    fmt.println("---")
    fmt.println("produced:", cnt.produced, "dropped:", cnt.dropped, "emitted:", cnt.emitted)
  }
 +
 +// Both goroutines wait on `deadline` to stop — but `deadline = time.after(...)`
 +// is a one-shot, receive-only source: its single value reaches ONE `<-deadline`,
-+// so the other goroutine hangs forever (the real deadlock this example carries).
-+// Stating the intent `deadline delivered-to-all { producer, consumer }` makes the
-+// coverage static arm reject it before running — a RecvChan cannot broadcast.
++// so the other goroutine hangs forever (the real deadlock this example avoids by
++// broadcasting). Stating the intent `deadline delivered-to-all { producer,
++// consumer }` makes the coverage static arm reject it — a RecvChan cannot broadcast.
 +contract RateLimited {
 +  participant producer
 +  participant consumer
