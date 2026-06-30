@@ -32,6 +32,13 @@ var stdlibRenameOverlay = map[[2]string]string{
 	{"fmt", "println"}: "Println",
 	{"fmt", "print"}:   "Print",
 	{"fmt", "printf"}:  "Printf",
+	// Bare-`error` *constructors* (binding.Manifest §curation note): the
+	// returned `error` IS the value, not a failure signal, so they are a
+	// bare-`error` Rename here — NOT a registry ResultWrap row (which would
+	// wrongly lift them to Result<unit, error>). errors.new mirrors the
+	// `error(msg)` built-in; fmt.errorf adds `%w` wrapping.
+	{"errors", "new"}: "New",
+	{"fmt", "errorf"}: "Errorf",
 }
 
 // timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to

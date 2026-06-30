@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 52 / 57 examples build end-to-end** (floor 52).
+- **build_ok — 53 / 58 examples build end-to-end** (floor 53).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 52 / 56 run-pass examples build and run as specified** (floor 52; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 53 / 57 run-pass examples build and run as specified** (floor 53; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 52 |
+| ✅ build (full pipeline) | 53 |
 | emit / codegen fail | 1 |
 | sema fail | 1 |
 | parse fail | 3 |
@@ -61,6 +61,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/ffi/config_reader/config_reader.aril` | build | — |
 | `examples/ffi/sum_numbers/sum_numbers.aril` | build | — |
 | `examples/modeling-errors/error_chain/error_chain.aril` | build | — |
+| `examples/modeling-errors/error_wrapping/error_wrapping.aril` | build | — |
 | `examples/modeling-errors/errors_as_types/errors_as_types.aril` | build | — |
 | `examples/modeling-errors/parse_int/parse_int.aril` | build | — |
 | `examples/modeling-errors/rpn_calculator/rpn_calculator.aril` | build | — |
@@ -113,7 +114,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**4 of 56 run-pass examples fall short of run_ok.**
+**4 of 57 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

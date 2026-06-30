@@ -29,6 +29,11 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	switch [2]string{pkg, method} {
 	case [2]string{"json", "serialize"}, [2]string{"json", "serializeIndent"}:
 		return &Result{T: &Slice{Elem: &Builtin{N: "byte"}}, E: &Builtin{N: "error"}}
+	// Bare-`error` constructors (codegen stdlibRenameOverlay): the returned
+	// `error` is the value, not a Result failure-signal (binding-surface.md
+	// §errors / §fmt). errors.new mirrors the `error(msg)` built-in.
+	case [2]string{"errors", "new"}, [2]string{"fmt", "errorf"}:
+		return &Builtin{N: "error"}
 	}
 	// Derived rows (D6): the binding registry carries the Aril return spelling
 	// (e.g. `Result<int, error>`, `RecvChan<time.Time>`, `[]string`). An empty

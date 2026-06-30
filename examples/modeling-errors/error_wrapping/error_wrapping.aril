@@ -1,0 +1,40 @@
+// Sentinel errors + wrapping, the stdlib idiom — the counterpart to the
+// custom-error-class `error_chain` example. Low-level checks wrap a package
+// sentinel with call-site context via `fmt.errorf("…: %w", …)`, and the
+// top-level handler classifies the failure by walking the wrapped chain with
+// `errors.is` — never string-matching the message. `errors.new` constructs a
+// plain sentinel; `fmt.errorf` with `%w` is what makes the chain inspectable.
+
+import fmt
+import errors
+
+let errEmpty:   error = errors.new("empty field")
+let errTooLong: error = errors.new("field too long")
+
+func checkName(name: string): Result<string, error> {
+  if name.len() == 0 {
+    return Err(fmt.errorf("name: %w", errEmpty))
+  }
+  if name.len() > 8 {
+    return Err(fmt.errorf("name (%v chars): %w", name.len(), errTooLong))
+  }
+  return Ok(name)
+}
+
+func main() {
+  let inputs = ["", "alice", "verylongname"]
+  for n in inputs {
+    match checkName(n) {
+      Ok(v)  => fmt.println("ok:", v),
+      Err(e) => {
+        if errors.is(e, errEmpty) {
+          fmt.println("reject (empty):", e)
+        } else {
+          if errors.is(e, errTooLong) {
+            fmt.println("reject (too long):", e)
+          }
+        }
+      },
+    }
+  }
+}

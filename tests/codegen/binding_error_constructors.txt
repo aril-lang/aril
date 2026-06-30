@@ -1,0 +1,42 @@
+--- TITLE ---
+Bare-error constructor bindings: errors.new → errors.New, fmt.errorf → fmt.Errorf (both bare error, NOT Result-lifted), unwrapped via errors.is
+
+--- INPUT ---
+import fmt
+import errors
+
+let sentinel: error = errors.new("sentinel")
+
+func wrap(): error {
+  return fmt.errorf("context: %w", sentinel)
+}
+
+func main() {
+  let w = wrap()
+  fmt.println("wrapped:", w, "is-sentinel:", errors.is(w, sentinel))
+}
+
+--- GO ---
+
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var sentinel error = errors.New("sentinel")
+
+func wrap() error {
+	return fmt.Errorf("context: %w", sentinel)
+}
+func main() {
+	var w = wrap()
+	fmt.Println("wrapped:", w, "is-sentinel:", errors.Is(w, sentinel))
+}
+
+--- STDOUT ---
+wrapped: context: sentinel is-sentinel: true
+
+--- EXIT ---
+0

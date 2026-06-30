@@ -20,6 +20,21 @@ func TestSemaTypeFromSpelling(t *testing.T) {
 	}
 }
 
+// TestBareErrorConstructorReturns locks the idiom rows for the bare-`error`
+// constructors (errors.new / fmt.errorf): they return a plain `error` value,
+// NOT a Result<unit, error> — they are constructors, not failure-signalling
+// effects, so they must not be confused with the registry's bare-error lift.
+func TestBareErrorConstructorReturns(t *testing.T) {
+	c := &checker{}
+	for _, pm := range [][2]string{{"errors", "new"}, {"fmt", "errorf"}} {
+		got := c.stdlibBindingReturn(pm[0], pm[1])
+		b, ok := got.(*Builtin)
+		if !ok || b.N != "error" {
+			t.Errorf("stdlibBindingReturn(%s, %s) = %v; want Builtin error", pm[0], pm[1], got)
+		}
+	}
+}
+
 // TestSemaTypeFromSpellingShape checks the structural mapping, not just the
 // stringification: a leaf with a dot is a Named (opaque boundary type), a bare
 // primitive is a Builtin, and the registry's (T, error) lift is a Result.

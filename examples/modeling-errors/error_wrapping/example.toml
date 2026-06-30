@@ -1,0 +1,10 @@
+description = "Sentinel errors wrapped with fmt.errorf %w, classified by errors.is"
+source   = "stdlib-coverage error_wrapping"
+category = "modeling-errors"
+showcase = false
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "error_wrapping.aril"
+expected_output = "expected-output.txt"
