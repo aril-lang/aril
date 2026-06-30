@@ -8,7 +8,7 @@
     "build_ok": 47,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 36,
+    "run_ok": 44,
     "run_total": 51
   },
   "files": [
@@ -438,46 +438,6 @@
     },
     {
       "path": "examples/core-language/p1242",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1335",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1349",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1404",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1423",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1605",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1683",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1786",
-      "status": "run-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/core-language/p1820",
       "status": "run-fail",
       "code": 1
     },
