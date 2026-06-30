@@ -8,7 +8,7 @@
     "build_ok": 47,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 27,
+    "run_ok": 36,
     "run_total": 51
   },
   "files": [
@@ -425,51 +425,6 @@
       "path": "examples/concurrency/rate_limited",
       "status": "timeout",
       "code": 124
-    },
-    {
-      "path": "examples/core-language/d01",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d02",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d03",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d04",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d05",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d07",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d08",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d09",
-      "status": "run-fail",
-      "code": 2
-    },
-    {
-      "path": "examples/core-language/d11",
-      "status": "run-fail",
-      "code": 2
     },
     {
       "path": "examples/core-language/lru_cache",

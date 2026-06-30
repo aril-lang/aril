@@ -1,0 +1,5 @@
+Step 1 => 4 cells cleaned up
+Step 2 => 4 cells cleaned up
+Step 3 => 4 cells cleaned up
+Step 4 => 1 cells cleaned up
+Total cleaned up: 13

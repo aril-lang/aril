@@ -7,6 +7,8 @@ since    = "0.1"
 status   = "running"
 expects  = "run-pass"
 entry    = "d08.aril"
+args            = ["input.txt", "3"]
+expected_output = "expected-output.txt"
 
 [[error]]
 patch   = "errors/annot-mismatch.patch"   # i annotated string but assigned an int
