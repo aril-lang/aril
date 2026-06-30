@@ -1,0 +1,9 @@
+phase 1: 5 clients created todos concurrently
+phase 2: store holds 5 todos
+POST /todos -> 201 {"id":6,"title":"demo","done":false}
+GET /todos/6 -> 200 {"id":6,"title":"demo","done":false}
+GET /todos/999 -> 404 not found
+POST /todos -> 400 title must be non-empty
+DELETE /todos/6 -> 200 deleted
+GET /todos/6 -> 404 not found
+phase 2 complete: store holds 5 todos

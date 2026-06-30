@@ -1,9 +1,11 @@
-description = "JSON REST CRUD mapping Result to HTTP status"
+description = "JSON CRUD over an actor-serialised store; Result mapped to HTTP status"
 source   = "services todo_api"
 category = "stdlib-binding"
 showcase = false
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "target-sketch"
-expects  = "no-run"
+status   = "running"
+expects  = "run-pass"
 entry    = "todo_api.aril"
+expected_patterns  = "patterns.txt"
+forbidden_patterns = "forbidden.txt"
