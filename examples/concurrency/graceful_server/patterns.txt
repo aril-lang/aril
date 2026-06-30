@@ -1,0 +1,8 @@
+signal: shutdown requested
+server: draining in-flight requests within grace
+handled #1 (20ms)
+handled #2 (20ms)
+handled #3 (20ms)
+handled #4 (20ms)
+force-closed #5 (grace exceeded)
+server: clean exit

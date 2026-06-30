@@ -1,9 +1,11 @@
-description = "Graceful HTTP shutdown via signal + context + select"
+description = "Graceful shutdown: drain in-flight requests within a grace deadline, then force-close"
 source   = "services graceful_server"
 category = "concurrency"
 showcase = true
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "target-sketch"
-expects  = "no-run"
+status   = "running"
+expects  = "run-pass"
 entry    = "graceful_server.aril"
+expected_patterns  = "patterns.txt"
+forbidden_patterns = "forbidden.txt"

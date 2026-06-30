@@ -1,68 +1,123 @@
-// Showcase: graceful shutdown. The server listens on :8080; an interrupt
-// (SIGINT/SIGTERM) triggers a shutdown that lets in-flight requests
-// complete up to a deadline, then stops the listener.
+// Showcase: graceful shutdown. A shutdown signal lets in-flight requests
+// complete up to a grace deadline, then force-closes whatever is still
+// running — Go's `http.Server.Shutdown(ctx)` semantics (drain within the
+// context deadline, then stop).
 //
-// Forces: net/http, os/signal, context, channels, `select`, and a
-// structured scope joining the listener and the signal handler.
+// The "server", its "signal", and a monitor goroutine are modelled
+// in-process so the example is self-contained and runnable: requests
+// accepted before the signal sit buffered in `inbox` (as real in-flight
+// connections would when SIGINT lands); a sibling goroutine closes
+// `shutdown` to broadcast the signal (a closed channel reaches every
+// waiter — cf. rate_limited); the server drains `inbox`, each handler
+// racing one shared grace deadline via `select`; a handler slower than the
+// remaining grace is force-closed. This is the choreography net/http +
+// os/signal + context would drive, minus the live listener.
+//
+// Unlike a collect-then-print example, the goroutines log their events as
+// they happen — concurrent, interleaved output. The run-check asserts the
+// protocol milestones appear in order (the `expected_patterns` ordered
+// subsequence), not an exact byte-for-byte stdout: the stdout projection of
+// an RFC-0007-style event trace.
 
-import context
 import fmt
-import http
-import log
-import os
-import signal
 import time
 
-class Hello implements http.Handler {
-  serveHTTP(w: http.ResponseWriter, r: http.Request) {
-    // Simulate a slow handler so shutdown has something to wait on.
-    time.sleep(time.seconds(1))
-    w.writeString("hello\n")
+type Request = {
+  id:     int
+  costMs: int
+}
+
+// Handle one request, bounded by the shutdown grace window. Returns true if
+// it completed within grace, false if the window closed first (the connection
+// is force-closed, as Server.Shutdown does once its context deadline elapses).
+// `graceExpired` is broadcast by CLOSE, not a one-shot value: a closed channel
+// makes every `<-graceExpired` return immediately, so this stays correct for
+// any number of force-closed requests across the drain (cf. rate_limited's
+// close-to-broadcast) — a one-shot `time.after` would block the second waiter.
+func handle(r: Request, graceExpired: RecvChan<unit>): bool {
+  select {
+    case <-time.after(time.milliseconds(r.costMs)) => return true,
+    case <-graceExpired                             => return false,
   }
 }
 
 func main() {
-  let srv = http.Server{
-    addr:    ":8080",
-    handler: Hello{},
-  }
+  // Requests accepted before the shutdown signal — all buffered, as a real
+  // server would have them in-flight when the interrupt arrives.
+  let accepted = [
+    Request{ id: 1, costMs: 20 },
+    Request{ id: 2, costMs: 20 },
+    Request{ id: 3, costMs: 20 },
+    Request{ id: 4, costMs: 20 },
+    Request{ id: 5, costMs: 600 },   // a slow handler that outlives the grace window
+  ]
+  let inbox = makeChannel<Request>(accepted.len())
+  for r in accepted { inbox.send(r) }
+  inbox.close()
 
-  let sigs = makeChannel<os.Signal>(1)
-  signal.notify(sigs, signal.interrupt, signal.terminate)
+  // The monitor goroutine owns stdout: every other goroutine reports an
+  // Event over `log`, the monitor prints them as they arrive. Concurrent,
+  // interleaved logging — the run-check requires the milestones below in
+  // order, tolerating any extra lines between them.
+  let log          = makeChannel<string>(accepted.len() + 4)
+  let shutdown     = makeChannel<unit>(0)
+  let graceExpired = makeChannel<unit>(0)
 
-  let result = scope<unit, error> {
-    // The listener.
+  match scope<unit, error> {
+    // The monitor: drain the log channel until closed, printing each line.
     spawn {
-      log.println("listening on :8080")
-      match srv.listenAndServe() {
-        Err(e) => if !http.isServerClosed(e) { return Err(e) },
-        Ok(_)  => {},
+      for line in log {
+        fmt.println(line)
       }
       return Ok(())
     }
 
-    // The signal watcher: blocks on either a signal or scope cancellation,
-    // then asks the server to shut down with a 10s grace period.
+    // Signal source: run briefly, then request shutdown (stands in for
+    // SIGINT/SIGTERM). Closing the channel broadcasts to the server.
+    spawn {
+      time.sleep(time.milliseconds(30))
+      log.send("signal: shutdown requested")
+      shutdown.close()
+      return Ok(())
+    }
+
+    // Grace clock: starts when the shutdown signal lands, then broadcasts the
+    // window's end by closing `graceExpired`.
     spawn {
       select {
-        case s = <-sigs => {
-          log.println("received", s, "— shutting down")
-        },
-        case <-scope.context.done() => {
-          return Ok(())
-        },
+        case <-shutdown => {},
       }
-      let (ctx, cancel) = context.withTimeout(context.background(), time.seconds(10))
-      defer cancel()
-      return srv.shutdown(ctx)
+      select {
+        case <-time.after(time.milliseconds(200)) => {},
+      }
+      graceExpired.close()
+      return Ok(())
     }
-  }
 
-  match result {
-    Ok(_)  => log.println("clean exit"),
-    Err(e) => {
-      log.println("error:", e)
-      os.exit(1)
-    },
+    // The server: wait for the shutdown signal, then drain the accepted
+    // requests under the grace window — finishing what fits, force-closing the
+    // rest when `graceExpired` closes. It is the sole writer to `log` after the
+    // signal, so the handled/force-closed lines stay in id order; it closes
+    // `log` on the way out so the monitor (and the scope) can finish.
+    spawn {
+      log.send("server: serving, waiting for shutdown")
+      select {
+        case <-shutdown => {},
+      }
+      log.send("server: draining in-flight requests within grace")
+      for r in inbox {
+        if handle(r, graceExpired) {
+          log.send(fmt.sprintf("handled #%d (%dms)", r.id, r.costMs))
+        } else {
+          log.send(fmt.sprintf("force-closed #%d (grace exceeded)", r.id))
+        }
+      }
+      log.send("server: clean exit")
+      log.close()
+      return Ok(())
+    }
+  } {
+    Ok(_)  => {},
+    Err(e) => fmt.println("server error:", e),
   }
 }
