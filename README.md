@@ -63,6 +63,7 @@ Source files use the `.aril` extension.
 | How the compiler is built — pipeline, bindings, concurrency, testing | [`docs/architecture.md`](docs/architecture.md) |
 | The language surface (working draft) | [`docs/language-spec.md`](docs/language-spec.md) |
 | Target spelling of every stdlib call used by the suite | [`docs/binding-surface.md`](docs/binding-surface.md) |
+| Which stdlib packages are bound *today* (vs. the target) | [`docs/stdlib-bindings-status.md`](docs/stdlib-bindings-status.md) |
 | What v1 must be able to do — the acceptance suite | [`examples/README.md`](examples/README.md) |
 
 ## License
