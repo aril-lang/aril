@@ -12,8 +12,8 @@ Snapshot date: 2026-06-30.
 ## How a binding reaches Aril
 
 A stdlib symbol is callable from Aril when it is part of the **builtin-module
-surface** — an `import <pkg>` that the compiler recognises without a
-`tide.toml`, lowering `pkg.method(...)` to the underlying Go call. There are two
+surface** — an `import <pkg>` that the compiler recognises without an
+`aril.toml`, lowering `pkg.method(...)` to the underlying Go call. There are two
 ways a row gets there:
 
 - **Mechanical** — the signature is derived from the Go type checker over a
@@ -41,7 +41,6 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
 | `sort` | `sorted` (comparator, returns a new slice) | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |
-| `io` | `Reader` / `Writer` / `Closer` interfaces (as `implements` targets) | interface |
 
 ## Not yet available
 
@@ -62,6 +61,11 @@ carrying methods — `time.Time` (clock/formatting), `math/big` (`BigInt`
 arithmetic), `bufio.Scanner` (line-by-line input), `regexp.Regexp`. These need
 the binding translator to model a non-pointer struct handle and its method set,
 which it does not do yet.
+
+**Bound interfaces with enforced conformance.** `io.Reader` / `Writer` /
+`Closer` and friends. A class may *write* `implements io.Reader` today, but the
+clause is not method-set-checked and is dropped in lowering — so the interfaces
+are part of the target surface, not yet a wired, enforced binding.
 
 **Synchronisation.** `sync.WaitGroup` / `Mutex` / `Once`. (The uncolored
 `scope` / `spawn` / channel concurrency model covers many cases that would reach
