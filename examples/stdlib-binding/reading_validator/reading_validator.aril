@@ -1,0 +1,57 @@
+// A reading validator that exercises the stdlib bindings added in the
+// STDLIB-COVERAGE epoch: `errors.is` (sentinel classification),
+// `strconv.parseBool` / `strconv.formatFloat`, and `math.max` / `math.min`.
+//
+// Clamp a batch of sensor readings against a range: report the extremes and
+// classify each breach by *which* bound it crossed — distinguishing the two
+// failure modes with `errors.is` against package-level sentinels, rather than
+// re-deriving the condition. `errors.is(e, belowRange)` is `false` for an
+// above-range error and vice-versa, so both the true and false paths of the
+// classification are exercised.
+
+import fmt
+import errors
+import strconv
+import math
+
+let belowRange: error = error("reading below range")
+let aboveRange: error = error("reading above range")
+
+func validate(x: float64, lo: float64, hi: float64): Result<float64, error> {
+  if x < lo { return Err(belowRange) }
+  if x > hi { return Err(aboveRange) }
+  return Ok(x)
+}
+
+func main() {
+  let readings = [2.5, -1.0, 4.0, 11.0, 6.5]
+  let lo = 0.0
+  let hi = 10.0
+
+  // strict mode is a parsed config flag
+  let strict = match strconv.parseBool("true") {
+    Ok(b)  => b,
+    Err(_) => false,
+  }
+  fmt.println("strict:", strict)
+
+  var mx = readings[0]
+  var mn = readings[0]
+  var lows = 0
+  var highs = 0
+  for r in readings {
+    mx = math.max(mx, r)
+    mn = math.min(mn, r)
+    match validate(r, lo, hi) {
+      Ok(_)  => {},
+      Err(e) => {
+        if errors.is(e, belowRange) { lows = lows + 1 }
+        if errors.is(e, aboveRange) { highs = highs + 1 }
+      },
+    }
+  }
+  fmt.println("max:", strconv.formatFloat(mx, 'g', 4, 64))
+  fmt.println("min:", strconv.formatFloat(mn, 'g', 4, 64))
+  fmt.println("below:", lows)
+  fmt.println("above:", highs)
+}

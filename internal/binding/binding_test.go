@@ -20,6 +20,32 @@ func TestLookupKinds(t *testing.T) {
 	}
 }
 
+// TestNewMechanicalRows locks the STDLIB-COVERAGE additions, including the
+// bare-`error` vs `(T, error)` distinction the codegen lift depends on:
+// os.writeFile returns a bare error → Result<unit, error> (lowered via
+// ResultUnit), not a `(T, error)` pair (ResultOf). A regression here would
+// re-introduce the `not enough arguments in call to ResultOf` miscompile.
+func TestNewMechanicalRows(t *testing.T) {
+	cases := []struct {
+		pkg, name, goName, ret string
+		kind                   Kind
+	}{
+		{"errors", "is", "Is", "bool", Rename},
+		{"math", "max", "Max", "float64", Rename},
+		{"math", "min", "Min", "float64", Rename},
+		{"strconv", "parseBool", "ParseBool", "Result<bool, error>", ResultWrap},
+		{"strconv", "formatFloat", "FormatFloat", "string", Rename},
+		// Bare-error effect: lifted to Result<unit, error>, NOT Result<T, error>.
+		{"os", "writeFile", "WriteFile", "Result<unit, error>", ResultWrap},
+	}
+	for _, c := range cases {
+		f, ok := Lookup(c.pkg, c.name)
+		if !ok || f.GoName != c.goName || f.Kind != c.kind || f.Return != c.ret {
+			t.Errorf("%s.%s = %+v, %v; want {%s, kind=%d, %s}", c.pkg, c.name, f, ok, c.goName, c.kind, c.ret)
+		}
+	}
+}
+
 // TestLookupHelpers checks the kind-filtered accessors the consumers use.
 func TestLookupHelpers(t *testing.T) {
 	if g, ok := RenameOf("strings", "split"); !ok || g != "Split" {

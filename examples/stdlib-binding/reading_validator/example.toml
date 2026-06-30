@@ -1,0 +1,10 @@
+description = "Reading validator over errors.is / strconv.parseBool+formatFloat / math.max+min"
+source   = "stdlib-coverage reading_validator"
+category = "stdlib-binding"
+showcase = false
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "reading_validator.aril"
+expected_output = "expected-output.txt"

@@ -22,10 +22,19 @@ package binding
 // "semantic layer needs review" carve-out D6 names). The `Sprint*` variants
 // return a bare `string` and are mechanical, so they are listed.
 var Manifest = map[string][]string{
+	"errors":  {"Is"},
 	"fmt":     {"Sprint", "Sprintf", "Sprintln"},
-	"os":      {"Args", "Exit", "Getenv", "ReadFile"},
+	"os":      {"Args", "Exit", "Getenv", "ReadFile", "WriteFile"},
 	"strings": {"Contains", "Count", "Fields", "HasPrefix", "HasSuffix", "Join", "Replace", "Split", "ToLower", "ToUpper", "TrimPrefix", "TrimSpace", "TrimSuffix"},
-	"strconv": {"Atoi", "FormatBool", "Itoa", "ParseFloat", "ParseInt", "Quote"},
-	"math":    {"Abs", "Ceil", "Floor", "Log", "Log10", "Log2", "Pow", "Sqrt"},
+	"strconv": {"Atoi", "FormatBool", "FormatFloat", "Itoa", "ParseBool", "ParseFloat", "ParseInt", "Quote"},
+	"math":    {"Abs", "Ceil", "Floor", "Log", "Log10", "Log2", "Max", "Min", "Pow", "Sqrt"},
 	"time":    {"After", "Sleep", "Tick"},
 }
+
+// Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed
+// here, though they return a bare `error`. The mechanical deriver lifts a
+// bare-`error` result to `Result<unit, error>` (the failure-signal reading,
+// correct for effects like `os.WriteFile` / `os.Chdir`). But `errors.New` /
+// `fmt.Errorf` are error *constructors* — the returned `error` IS the value, not
+// a failure signal — so they must stay a bare-`error` Rename in the idiom
+// overlay (the codegen `stdlibRenameOverlay`), not a registry ResultWrap row.

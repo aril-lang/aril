@@ -34,13 +34,14 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | Package | Bound symbols | Kind |
 |---|---|---|
 | `fmt` | `println` `print` `printf` (effects) · `sprint` `sprintf` `sprintln` · `scan` `scan2` `scan3` (stdin) | idiom + mechanical |
-| `os` | `args` `exit` `getenv` `readFile` | mechanical |
-| `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` | mechanical + idiom |
-| `strconv` | `atoi` `formatBool` `itoa` `parseFloat` `parseInt` `quote` | mechanical |
-| `math` | `abs` `ceil` `floor` `log` `log10` `log2` `pow` `sqrt` | mechanical |
+| `os` | `args` `exit` `getenv` `readFile` `writeFile` | mechanical |
+| `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
+| `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
+| `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pow` `sqrt` | mechanical |
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
 | `sort` | `sorted` (comparator, returns a new slice) | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |
+| `errors` | `is` (sentinel/chain classification) | mechanical |
 
 ## Not yet available
 
@@ -48,13 +49,14 @@ Grouped by how close each is to landing — the upper rows are mostly small
 additive bindings, the lower rows need translator work or are whole subsystems.
 
 **Small surface gaps (a missing method on an already-bound package).**
-`os.writeFile` / `os.lookupEnv` / the std streams (`os.stdin` / `stdout` /
-`stderr`); `strconv.parseBool` / `formatFloat`; `math.min` / `max` / `pi`;
-`fmt.errorf`; `strings.toBytes`.
+`os.lookupEnv` / the std streams (`os.stdin` / `stdout` / `stderr`); `math.pi`;
+`fmt.errorf`.
 
-**Error inspection.** The `errors` package (`errors.new` / `is` / `as`). Aril
-has the built-in `error(msg)` constructor and `Result<T, error>`, but no way to
-classify or unwrap an error value yet.
+**Error inspection.** `errors.is` is bound; `errors.new` (the `error(msg)`
+built-in already covers construction) and `errors.as<T>` (unwrap to
+`Option<T>`, needs the comma-ok lift) remain. Aril can construct errors, fold
+them into `Result<T, error>`, and now *classify* them with `errors.is`; typed
+*unwrapping* is the remaining gap.
 
 **Value-typed handles and bound methods.** Packages whose surface is a type
 carrying methods — `time.Time` (clock/formatting), `math/big` (`BigInt`

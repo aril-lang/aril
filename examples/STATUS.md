@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 51 / 56 examples build end-to-end** (floor 51).
+- **build_ok — 52 / 57 examples build end-to-end** (floor 52).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 51 / 55 run-pass examples build and run as specified** (floor 51; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 52 / 56 run-pass examples build and run as specified** (floor 52; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 51 |
+| ✅ build (full pipeline) | 52 |
 | emit / codegen fail | 1 |
 | sema fail | 1 |
 | parse fail | 3 |
@@ -68,6 +68,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/vending_machine/vending_machine.aril` | build | — |
 | `examples/stdlib-binding/config_loader/config_loader.aril` | build | — |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | build | — |
+| `examples/stdlib-binding/reading_validator/reading_validator.aril` | build | — |
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | emit | go build failed |
@@ -112,7 +113,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**4 of 55 run-pass examples fall short of run_ok.**
+**4 of 56 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

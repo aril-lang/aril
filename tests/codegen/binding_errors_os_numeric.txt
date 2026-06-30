@@ -1,0 +1,116 @@
+--- TITLE ---
+New mechanical/idiom bindings: errors.is, os.writeFile round-trip, strings.toBytes, math.max/min, strconv.parseBool/formatFloat
+
+--- INPUT ---
+import fmt
+import errors
+import strings
+import strconv
+import os
+import math
+
+func main() {
+  let sentinel: error = error("limit exceeded")
+  let other:    error = error("other")
+  let e: error = sentinel
+  fmt.println("is-sentinel:", errors.is(e, sentinel), "is-other:", errors.is(e, other))
+
+  fmt.println("max:", math.max(2.5, 7.5), "min:", math.min(2.5, 7.5))
+
+  match strconv.parseBool("true") {
+    Ok(b)  => fmt.println("bool:", b),
+    Err(_) => fmt.println("parse fail"),
+  }
+  fmt.println("fmt:", strconv.formatFloat(3.14159, 'g', 3, 64))
+
+  let payload = "hello, aril"
+  match os.writeFile("rt.txt", strings.toBytes(payload), 420) {
+    Ok(_) => {
+      match os.readFile("rt.txt") {
+        Ok(data) => fmt.println("round-trip:", strings.fromBytes(data)),
+        Err(re)  => fmt.println("read err:", re),
+      }
+    },
+    Err(we) => fmt.println("write err:", we),
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"strconv"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func ResultUnit(err error) Result[struct{}, error] {
+	if err != nil {
+		return ResultErr[struct{}, error](err)
+	}
+	return ResultOk[struct{}, error](struct{}{})
+}
+func main() {
+	var sentinel error = errors.New("limit exceeded")
+	var other error = errors.New("other")
+	var e error = sentinel
+	fmt.Println("is-sentinel:", errors.Is(e, sentinel), "is-other:", errors.Is(e, other))
+	fmt.Println("max:", math.Max(2.5, 7.5), "min:", math.Min(2.5, 7.5))
+	__aril_match_1 := ResultOf(strconv.ParseBool("true"))
+	switch __aril_match_1.Tag {
+	case 0:
+		b := __aril_match_1.V
+		fmt.Println("bool:", b)
+	case 1:
+		fmt.Println("parse fail")
+	}
+	fmt.Println("fmt:", strconv.FormatFloat(3.14159, 'g', 3, 64))
+	var payload = "hello, aril"
+	__aril_match_2 := ResultUnit(os.WriteFile("rt.txt", []byte(payload), 420))
+	switch __aril_match_2.Tag {
+	case 0:
+		__aril_match_3 := ResultOf(os.ReadFile("rt.txt"))
+		switch __aril_match_3.Tag {
+		case 0:
+			data := __aril_match_3.V
+			fmt.Println("round-trip:", string(data))
+		case 1:
+			re := __aril_match_3.E
+			fmt.Println("read err:", re)
+		}
+	case 1:
+		we := __aril_match_2.E
+		fmt.Println("write err:", we)
+	}
+}
+
+--- STDOUT ---
+is-sentinel: true is-other: false
+max: 7.5 min: 2.5
+bool: true
+fmt: 3.14
+round-trip: hello, aril
+
+--- EXIT ---
+0

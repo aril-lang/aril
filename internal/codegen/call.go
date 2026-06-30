@@ -105,9 +105,18 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if f, ok := c.Callee.(*ast.Field); ok {
 		if recv, ok := f.Receiver.(*ast.Ident); ok {
 			if goName, ok := stdlibResultWrapOf(recv.Name, f.Name); ok {
-				g.usesResultOf = true
 				g.usesResult = true
-				g.b.WriteString(g.rt("ResultOf") + "(")
+				// A bare-`error` referent (os.writeFile, …) lifts via
+				// ResultUnit (single error arg → Result<unit, error>); a
+				// `(T, error)` referent via ResultOf (two-value spread).
+				helper := "ResultOf"
+				if stdlibResultWrapIsUnit(recv.Name, f.Name) {
+					helper = "ResultUnit"
+					g.usesResultUnit = true
+				} else {
+					g.usesResultOf = true
+				}
+				g.b.WriteString(g.rt(helper) + "(")
 				g.b.WriteString(recv.Name)
 				g.b.WriteByte('.')
 				g.b.WriteString(goName)
@@ -628,7 +637,7 @@ func (g *gen) isBuiltinModule(id *ast.Ident) bool {
 
 func isStdlibNamespaceName(name string) bool {
 	switch name {
-	case "fmt", "os", "strings", "strconv", "bufio", "context",
+	case "errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 		"time", "sync", "io", "log", "net", "encoding", "math", "sort",
 		"json":
 		return true
