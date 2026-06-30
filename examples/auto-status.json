@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 58,
+    "total": 59,
     "parse_fail": 3,
     "sema_fail": 1,
     "emit_fail": 1,
-    "build_ok": 53,
+    "build_ok": 54,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 53,
-    "run_total": 57
+    "run_ok": 54,
+    "run_total": 58
   },
   "files": [
     {
@@ -279,6 +279,11 @@
     },
     {
       "path": "examples/stdlib-binding/counterstack/pentix_agent.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/env_config/env_config.aril",
       "stage": "build",
       "blocker": ""
     },

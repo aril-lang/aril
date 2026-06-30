@@ -128,6 +128,27 @@ func (g *gen) emitCall(c *ast.Call) error {
 			}
 		}
 	}
+	// Comma-ok stdlib binding — `pkg.method(args)` whose Go referent
+	// returns `(T, bool)`, lowered to `OptionOf(pkg.GoName(args))`
+	// (bindings.go §stdlibCommaOk). The Option mirror of the ResultWrap
+	// path above.
+	if f, ok := c.Callee.(*ast.Field); ok {
+		if recv, ok := f.Receiver.(*ast.Ident); ok {
+			if goName, ok := stdlibCommaOkOf(recv.Name, f.Name); ok {
+				g.usesOption = true
+				g.usesOptionOf = true
+				g.b.WriteString(g.rt("OptionOf") + "(")
+				g.b.WriteString(recv.Name)
+				g.b.WriteByte('.')
+				g.b.WriteString(goName)
+				if err := g.emitArgList(c.Args); err != nil {
+					return err
+				}
+				g.b.WriteByte(')')
+				return nil
+			}
+		}
+	}
 	// time.milliseconds(n) / time.seconds(n) — Duration constructors
 	// (bindings.go). Lower to `time.Duration(n) * time.<Unit>`.
 	if f, ok := c.Callee.(*ast.Field); ok {

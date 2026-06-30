@@ -169,6 +169,23 @@ func (g *gen) writePredeclaredSortSorted() {
 `)
 }
 
+// writePredeclaredOptionOf emits the OptionOf helper backing the
+// comma-ok `(T, bool)` → Option<T> stdlib bindings (os.lookupEnv): ok=true
+// becomes Some(v), ok=false becomes None. The Option mirror of ResultOf.
+// Requires Option (usesOption, forced alongside usesOptionOf). Conditional.
+func (g *gen) writePredeclaredOptionOf() {
+	if !g.usesOptionOf {
+		return
+	}
+	g.b.WriteString(`func OptionOf[T any](v T, ok bool) Option[T] {
+	if ok {
+		return OptionSome[T](v)
+	}
+	return OptionNone[T]()
+}
+`)
+}
+
 // writePredeclaredTryRecv emits the inline helper backing
 // `ch.tryRecv()` (lowering-go.md §Channel lowering): a non-blocking
 // receive that returns Some(v) when a value is ready, None when the
@@ -702,6 +719,16 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 						} else {
 							g.usesResultOf = true
 						}
+					}
+				}
+			}
+			// A comma-ok stdlib binding (`os.lookupEnv`) lowers via
+			// the OptionOf helper — pull in Option too.
+			if f, ok := v.Callee.(*ast.Field); ok {
+				if recv, ok := f.Receiver.(*ast.Ident); ok {
+					if _, ok := stdlibCommaOkOf(recv.Name, f.Name); ok {
+						g.usesOption = true
+						g.usesOptionOf = true
 					}
 				}
 			}

@@ -74,6 +74,22 @@ func stdlibConversionOf(recv, name string) (string, bool) {
 	return g, ok
 }
 
+// stdlibCommaOk maps a binding whose Go referent returns a comma-ok
+// `(T, bool)` pair to its Go identifier; the call lowers to
+// `OptionOf(pkg.GoName(args))` (binding-surface.md §os — lookupEnv
+// distinguishes an unset variable from an empty one). These are idiom
+// bindings: the deriver rejects a `(T, bool)` result as non-mechanical.
+var stdlibCommaOk = map[[2]string]string{
+	{"os", "lookupEnv"}: "LookupEnv", // (string, bool) → Option<string>
+}
+
+// stdlibCommaOkOf returns the Go identifier for a comma-ok binding
+// `recv.name`, or ("", false) when the pair is not one.
+func stdlibCommaOkOf(recv, name string) (string, bool) {
+	g, ok := stdlibCommaOk[[2]string{recv, name}]
+	return g, ok
+}
+
 // stdlibRenameOf returns the Go identifier for a value/effect-returning
 // binding `recv.name`, or ("", false) when recv is not a stdlib
 // namespace ident or the pair has no rename entry. Reads the derived

@@ -437,7 +437,11 @@ type gen struct {
 	usesJSON      bool
 	usesJSONParse bool
 	usesTryRecv   bool
-	usesScope     bool
+	// usesOptionOf — a comma-ok `(T, bool)` stdlib binding (os.lookupEnv)
+	// lifts to Option<T> via the OptionOf helper (the Option mirror of
+	// ResultOf's `(T, error)` lift). Forces usesOption.
+	usesOptionOf bool
+	usesScope    bool
 	// usesChanContract — a channel trace contract (RFC-0007) installs the
 	// arilrt monitor (RegisterChan / ChanSend / ChanClose / ChanCheckDrained),
 	// set only under `--contracts=panic` when an enforced clause fires.
@@ -790,6 +794,7 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredMakeSlice()
 	g.writePredeclaredResultOf()
 	g.writePredeclaredResultUnit()
+	g.writePredeclaredOptionOf()
 	g.writePredeclaredJSONParse()
 	g.writeOptionJSONMethods()
 	g.writePredeclaredSortSorted()

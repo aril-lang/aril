@@ -53,5 +53,15 @@ func ResultUnit(err error) Result[struct{}, error] {
 	return ResultOk[struct{}, error](struct{}{})
 }
 
+// OptionOf folds a Go comma-ok (T, ok) pair into Option<T>: ok=true
+// becomes Some(v), ok=false becomes None. The Option mirror of ResultOf;
+// backs the (T, bool) → Option stdlib bindings (os.lookupEnv, …).
+func OptionOf[T any](v T, ok bool) Option[T] {
+	if ok {
+		return OptionSome[T](v)
+	}
+	return OptionNone[T]()
+}
+
 // MakeSlice backs the predeclared make-slice builtin.
 func MakeSlice[T any](n int) []T { return make([]T, n) }

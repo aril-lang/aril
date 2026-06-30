@@ -1,0 +1,24 @@
+// os.lookupEnv distinguishes an *unset* variable (None) from one set to the
+// empty string — unlike os.getenv, which collapses both to "". A config reader
+// uses the distinction to fall back to a default only when the variable is
+// genuinely absent. PATH is read as a reliably-present probe (only its presence
+// is reported, never its value, so the output stays deterministic), and a
+// variable nothing sets exercises the None fallback.
+
+import fmt
+import os
+
+func setting(key: string, fallback: string): string {
+  match os.lookupEnv(key) {
+    Some(v) => v,
+    None    => fallback,
+  }
+}
+
+func main() {
+  match os.lookupEnv("PATH") {
+    Some(_) => fmt.println("PATH: present"),
+    None    => fmt.println("PATH: absent"),
+  }
+  fmt.println("missing ->", setting("ARIL_MISSING_VAR_XYZ", "default-value"))
+}
