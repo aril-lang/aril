@@ -5,9 +5,9 @@
 //
 // The original served `net/http` on :8080. Here the "server" is the actor and
 // the "clients" are goroutines; the showcase is preserved without a live
-// listener: DTO records, the `encoding/json` round-trip, a custom
-// `class implements error` carrying its HTTP status, and Result mapped to
-// status codes. Concurrency is uncolored — five client goroutines submit
+// listener: DTO records, `encoding/json` serialisation of the responses, a
+// custom `class implements error` carrying its HTTP status, and Result mapped
+// to status codes. Concurrency is uncolored — five client goroutines submit
 // creates over a channel, the actor applies them one at a time, so the Store
 // needs no lock (sidestepping the unbound `sync.Mutex`).
 //
