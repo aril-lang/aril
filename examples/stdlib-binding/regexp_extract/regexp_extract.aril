@@ -1,8 +1,7 @@
-// DEMAND SKETCH (build-fails until the `regexp` binding lands) — match and
-// extract digit runs from a batch of strings. `regexp` has no binding-surface
-// entry yet; this example *defines* the intended surface by using it:
-// `regexp.mustCompile(pattern): regexp.Regexp`, `re.matchString(s): bool`,
-// `re.findAll(s, n): []string`. Forces a value-handle type + its method set.
+// Match and extract digit runs from a batch of strings — exercising the
+// `regexp` value-handle binding: `regexp.mustCompile(pattern): regexp.Regexp`,
+// `re.matchString(s): bool`, `re.findAll(s, n): []string`. A value-handle type
+// and its method set surfaced through the builtin-module namespace.
 import fmt
 import regexp
 import strings

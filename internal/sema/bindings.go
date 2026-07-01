@@ -46,6 +46,12 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	case [2]string{"slices", "indexOf"}:
 		return &Builtin{N: "int"}
 	}
+	// Value-handle constructors (binding.handleCtors): a package function that
+	// builds a stdlib struct handle (regexp.mustCompile → regexp.Regexp). The
+	// return spelling is the handle's Aril boundary type (VALUE-HANDLES).
+	if hc, ok := binding.HandleCtorOf(pkg, method); ok {
+		return semaTypeFromSpelling(hc.Return)
+	}
 	// Derived rows (D6): the binding registry carries the Aril return spelling
 	// (e.g. `Result<int, error>`, `RecvChan<time.Time>`, `[]string`). An empty
 	// spelling is a unit/effect binding (e.g. os.exit) — nil, as before.

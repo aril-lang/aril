@@ -65,10 +65,11 @@ the comma-ok→Option lift it needs now exists (`os.lookupEnv` uses it), but
 `errors.As`'s pointer-out protocol is a distinct, harder shape.
 
 **Value-typed handles and bound methods.** Packages whose surface is a type
-carrying methods — `time.Time` (clock/formatting), `math/big` (`BigInt`
-arithmetic), `bufio.Scanner` (line-by-line input), `regexp.Regexp`. These need
-the binding translator to model a non-pointer struct handle and its method set,
-which it does not do yet.
+carrying methods. `regexp.Regexp` (`mustCompile` + `matchString` / `findAll`) is
+**bound** — a value handle surfaced through the builtin-module namespace, its
+method set dispatching on the handle's boundary type. Still on the target
+surface: `time.Duration` arithmetic, `math/big` (`BigInt` arithmetic),
+`bufio.Scanner` (line-by-line input), `time.Time` (clock/formatting).
 
 **Bound interfaces with enforced conformance.** `io.Reader` / `Writer` /
 `Closer` and friends. A class may *write* `implements io.Reader` today, but the

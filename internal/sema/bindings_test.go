@@ -1,6 +1,67 @@
 package sema
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
+)
+
+// TestHandleCtorReturn locks the value-handle constructor row: regexp.mustCompile
+// types as the opaque handle boundary type regexp.Regexp (a *Named), so a `let re
+// = regexp.mustCompile(p)` propagates the handle type to method calls on `re`.
+func TestHandleCtorReturn(t *testing.T) {
+	c := &checker{}
+	got := c.stdlibBindingReturn("regexp", "mustCompile")
+	n, ok := got.(*Named)
+	if !ok || n.N != "regexp.Regexp" {
+		t.Fatalf("stdlibBindingReturn(regexp, mustCompile) = %v; want Named regexp.Regexp", got)
+	}
+}
+
+// TestHandleAnnotationResolvesToNamed locks the C1 fix: a qualified handle
+// annotation (`regexp.Regexp` in a param/field/return) resolves to the same
+// *Named boundary type a locally-constructed handle has, so codegen's handle
+// dispatch fires on either origin (no sema↔codegen split). A non-handle
+// qualified name stays Unknown.
+func TestHandleAnnotationResolvesToNamed(t *testing.T) {
+	c := &checker{}
+	nt := &ast.NamedType{QName: []string{"regexp", "Regexp"}}
+	got := c.namedTypeToType(nt, map[string]bool{})
+	if n, ok := got.(*Named); !ok || n.N != "regexp.Regexp" {
+		t.Fatalf("regexp.Regexp annotation = %v; want Named regexp.Regexp", got)
+	}
+	other := &ast.NamedType{QName: []string{"time", "Time"}}
+	if _, ok := c.namedTypeToType(other, map[string]bool{}).(*Unknown); !ok {
+		t.Errorf("unbound qualified name should stay Unknown, got %T", c.namedTypeToType(other, map[string]bool{}))
+	}
+}
+
+// TestHandleMethodSigType locks the value-handle method rows: a bound handle
+// method builds a Func with the tabled param + return types, so the call is
+// arg-checked and typed rather than Unknown (VALUE-HANDLES).
+func TestHandleMethodSigType(t *testing.T) {
+	hm, ok := binding.HandleMethodOf("regexp.Regexp", "matchString")
+	if !ok {
+		t.Fatal("regexp.Regexp.matchString should be a bound handle method")
+	}
+	fn := handleMethodSigType(hm)
+	if b, ok := fn.Return.(*Builtin); !ok || b.N != "bool" {
+		t.Errorf("matchString return = %v; want Builtin bool", fn.Return)
+	}
+	if len(fn.Params) != 1 {
+		t.Fatalf("matchString params = %d; want 1", len(fn.Params))
+	}
+	if b, ok := fn.Params[0].(*Builtin); !ok || b.N != "string" {
+		t.Errorf("matchString param0 = %v; want Builtin string", fn.Params[0])
+	}
+	find, _ := binding.HandleMethodOf("regexp.Regexp", "findAll")
+	if s, ok := handleMethodSigType(find).Return.(*Slice); !ok {
+		t.Errorf("findAll return = %v; want *Slice", handleMethodSigType(find).Return)
+	} else if b, ok := s.Elem.(*Builtin); !ok || b.N != "string" {
+		t.Errorf("findAll elem = %v; want Builtin string", s.Elem)
+	}
+}
 
 // TestSemaTypeFromSpelling round-trips the binding-registry return spellings
 // through the bridge: spelling → sema Type → String() must reproduce the

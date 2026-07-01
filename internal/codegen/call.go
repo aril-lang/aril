@@ -687,7 +687,7 @@ func isStdlibNamespaceName(name string) bool {
 	switch name {
 	case "errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 		"time", "sync", "io", "log", "net", "encoding", "math", "sort",
-		"json", "unicode", "slices":
+		"json", "unicode", "slices", "regexp":
 		return true
 	}
 	return false

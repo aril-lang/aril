@@ -4,15 +4,15 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 69 / 81 examples build end-to-end** (floor 69).
+- **build_ok — 70 / 81 examples build end-to-end** (floor 70).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 69 / 80 run-pass examples build and run as specified** (floor 69; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 70 / 80 run-pass examples build and run as specified** (floor 70; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 69 |
+| ✅ build (full pipeline) | 70 |
 | emit / codegen fail | 7 |
-| sema fail | 2 |
+| sema fail | 1 |
 | parse fail | 3 |
 
 ## Per-example
@@ -83,6 +83,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/csv_stats/csv_stats.aril` | build | — |
 | `examples/stdlib-binding/env_config/env_config.aril` | build | — |
 | `examples/stdlib-binding/reading_validator/reading_validator.aril` | build | — |
+| `examples/stdlib-binding/regexp_extract/regexp_extract.aril` | build | — |
 | `examples/stdlib-binding/service_config/service_config.aril` | build | — |
 | `examples/stdlib-binding/statistics/statistics.aril` | build | — |
 | `examples/stdlib-binding/struct_dump/struct_dump.aril` | build | — |
@@ -96,7 +97,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/line_numberer/line_numberer.aril` | emit | go build failed |
 | `examples/stdlib-binding/stdin_bytes/stdin_bytes.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
-| `examples/stdlib-binding/regexp_extract/regexp_extract.aril` | sema | error[E0103]: Unknown name regexp |
 | `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
 | `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
 | `examples/core-language/p1133/p1133.aril` | parse | error[E0112]: expected parameter name |
@@ -137,7 +137,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**11 of 80 run-pass examples fall short of run_ok.**
+**10 of 80 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
@@ -150,5 +150,4 @@ Run-pass examples that do not yet reach run_ok — they fail to build (an existi
 | `examples/stdlib-binding/duration_budget` | build-fail | 1 |
 | `examples/stdlib-binding/leveled_log` | build-fail | 1 |
 | `examples/stdlib-binding/line_numberer` | build-fail | 1 |
-| `examples/stdlib-binding/regexp_extract` | build-fail | 1 |
 | `examples/stdlib-binding/stdin_bytes` | build-fail | 1 |

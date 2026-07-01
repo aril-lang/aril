@@ -1,6 +1,10 @@
 package codegen
 
-import "github.com/aril-lang/aril/internal/ast"
+import (
+	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
+	"github.com/aril-lang/aril/internal/sema"
+)
 
 // This file holds the predeclared-runtime layer of codegen: the
 // detection pre-walk (detectPredeclaredUsage) that decides which
@@ -883,6 +887,17 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				// helpers add their own stdlib needs in writeHeader.
 				if !isConversionBinding(recv.Name, v.Name) && !isRuntimeHelperBinding(recv.Name, v.Name) {
 					g.usedGoPkgs[recv.Name] = true
+				}
+			}
+			// A value-handle method call `re.matchString(…)` on a handle-typed
+			// receiver references the handle's Go package (regexp), which no
+			// `pkg.method` reference need mark — the receiver is a local value,
+			// not the namespace (VALUE-HANDLES).
+			if g.info != nil {
+				if named, ok := g.info.Type[v.Receiver].(*sema.Named); ok {
+					if ht, ok := binding.HandleTypeOf(named.N); ok && ht.GoPkg != "" {
+						g.usedGoPkgs[ht.GoPkg] = true
+					}
 				}
 			}
 			walk(v.Receiver)

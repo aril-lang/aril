@@ -1,0 +1,49 @@
+--- TITLE ---
+Value-handle binding: regexp.mustCompile → regexp.Regexp handle; re.matchString/findAll lower to the Go method set
+
+--- INPUT ---
+import fmt
+import strings
+
+import regexp
+
+func main() {
+  let re = regexp.mustCompile("[0-9]+")
+  if re.matchString("a12b3") {
+    fmt.println(strings.join(re.findAll("a12b3", -1), ","))
+  }
+  if re.matchString("none") {
+    fmt.println("has digits")
+  } else {
+    fmt.println("no digits")
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+)
+
+func main() {
+	var re = regexp.MustCompile("[0-9]+")
+	if re.MatchString("a12b3") {
+		fmt.Println(strings.Join(re.FindAllString("a12b3", -1), ","))
+	}
+	if re.MatchString("none") {
+		fmt.Println("has digits")
+	} else {
+		fmt.Println("no digits")
+	}
+}
+
+--- STDOUT ---
+12,3
+no digits
+
+--- EXIT ---
+0
