@@ -235,6 +235,9 @@ time.newTicker(d: time.Duration): time.Ticker            // stoppable
 
 // One-shot timeout signal.
 time.after(d: time.Duration): RecvChan<time.Time>
+
+// Sleep blocks the current goroutine.
+time.sleep(d: time.Duration)
 ```
 
 **Bound today:** the `time.seconds` / `time.milliseconds` constructors and the
@@ -242,12 +245,6 @@ time.after(d: time.Duration): RecvChan<time.Time>
 `Duration` is a scalar) + `string` (Go's `Duration.String`). `time.after` /
 `tick` bind their `RecvChan<time.Time>` returns. Wall-clock `time.Time`, the
 `Ticker`, and `newTicker` remain on the target surface.
-
-```aril
-
-// Sleep blocks the current goroutine.
-time.sleep(d: time.Duration)
-```
 
 ## context
 
