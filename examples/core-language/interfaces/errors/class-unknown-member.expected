@@ -1,0 +1,1 @@
+error[E0214]: Type Bar has no member `nope`

@@ -8,3 +8,10 @@ status   = "running"
 expects  = "run-pass"
 entry    = "regexp_extract.aril"
 expected_output = "expected-output.txt"
+
+[[error]]
+patch   = "errors/unknown-handle-member.patch"   # re.noSuchMethod — absent from the regexp.Regexp handle method set
+expect  = ["E0214"]
+stage   = "sema"
+matches = "errors/unknown-handle-member.expected"
+origin  = "synthetic"

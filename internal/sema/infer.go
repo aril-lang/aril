@@ -455,8 +455,10 @@ func (c *checker) inferCall(call *ast.Call) Type {
 			ret = ct
 		} else if fn, ok := c.info.Type[f].(*Func); ok {
 			// Method call `recv.m(args)`. inferField already typed
-			// the callee as the method's Func when the receiver is
-			// a class.
+			// the callee as the method's Func when the receiver is a
+			// class / extern / interface / value-handle. Check arity
+			// (E0202) then the per-argument types (E0201).
+			c.checkMethodArity(fn, call, f.Name)
 			c.checkArgTypes(fn, args, call.Args, f.Name)
 			ret = fn.Return
 		}
@@ -683,14 +685,14 @@ func (c *checker) inferField(f *ast.Field) Type {
 	if ft := c.recordFieldType(named, f.Name); ft != nil {
 		return ft
 	}
-	// Interface method access — `f.method` gives the method's Func.
+	// Interface method access — `f.method` gives the method's Func,
+	// resolved through the `extends` chain (an interface inherits the
+	// method set of every interface it extends; D14).
 	if id, ok := named.Decl.(*ast.InterfaceDecl); ok {
-		for _, m := range id.Methods {
-			if m.Name == f.Name {
-				return c.interfaceMethodType(m)
-			}
+		if m := c.interfaceMethodSig(id, f.Name); m != nil {
+			return c.interfaceMethodType(m)
 		}
-		return &Unknown{}
+		return c.unknownMember(named, f)
 	}
 	// Opaque-handle member access — a method gives its Func, a field
 	// gives its declared type, both from the `extern impl` (ffi.md).
@@ -707,11 +709,11 @@ func (c *checker) inferField(f *ast.Field) Type {
 				}
 			}
 		}
-		return &Unknown{}
+		return c.unknownMember(named, f)
 	}
 	cd, ok := named.Decl.(*ast.ClassDecl)
 	if !ok {
-		return &Unknown{}
+		return c.unknownMember(named, f)
 	}
 	for _, fld := range cd.Fields {
 		if fld.Name == f.Name {
@@ -723,7 +725,40 @@ func (c *checker) inferField(f *ast.Field) Type {
 			return c.methodSigType(m)
 		}
 	}
+	return c.unknownMember(named, f)
+}
+
+// unknownMember reports an Aril-coordinate diagnostic (E0214) when a
+// member access `recv.name` misses on a *concrete* Named receiver — a
+// user class / record / interface, an opaque `extern` handle, or a bound
+// stdlib value-handle (D37). Without this the miss falls through to
+// Unknown and the go/types backend reports `type … has no field or
+// method …` against generated Go, leaking the Go spelling (a D10
+// violation). Generic type parameters (Decl == nil and not a handle) and
+// receivers of Unknown type stay silent — their member set is not known
+// here. Returns Unknown so inference continues past the reported miss.
+func (c *checker) unknownMember(named *Named, f *ast.Field) Type {
+	if isConcreteNamed(named) {
+		c.report("E0214",
+			"Type "+named.N+" has no member `"+f.Name+"`", f.Span)
+	}
 	return &Unknown{}
+}
+
+// isConcreteNamed reports whether a Named receiver has a fully known
+// member set: a user class / interface / record, an opaque `extern`
+// handle, or a bound stdlib value-handle. A bare type parameter
+// (`&Named{N}` with a nil Decl, resolve.go) is NOT concrete — its member
+// set depends on the instantiation, so a miss there is not a user error.
+func isConcreteNamed(named *Named) bool {
+	switch d := named.Decl.(type) {
+	case *ast.ClassDecl, *ast.InterfaceDecl, *ast.ExternTypeDecl:
+		return true
+	case *ast.TypeDecl:
+		_, isRecord := d.Body.(*ast.RecordTypeBody)
+		return isRecord
+	}
+	return binding.IsHandleType(named.N)
 }
 
 func (c *checker) inferBinary(b *ast.Binary) Type {
@@ -1189,6 +1224,37 @@ func (c *checker) checkCallArity(call *ast.Call) {
 					", got "+strconv.Itoa(got),
 				call.Span)
 		}
+	}
+}
+
+// checkMethodArity fires E0202 when a method / value-handle-method call
+// `recv.m(args)` supplies the wrong number of positional arguments. It
+// mirrors the Ident-callee arity path (checkCallArity) for Field callees,
+// whose arities the go/types backend would otherwise report against the
+// generated Go method — leaking its Go name (a D10 gap). A spread `...xs`
+// makes the literal count indeterminate, so arity is left to
+// checkArgTypes. A bare type-parameter receiver has no modelled method
+// signature (inferField returns Unknown, not a *Func), so it never
+// reaches here.
+func (c *checker) checkMethodArity(fn *Func, call *ast.Call, name string) {
+	for _, a := range call.Args {
+		if _, ok := a.(*ast.SpreadArg); ok {
+			return
+		}
+	}
+	want, got := len(fn.Params), len(call.Args)
+	if fn.Variadic {
+		if nfixed := want - 1; got < nfixed {
+			c.report("E0202",
+				"Wrong arity in call to "+name+": expects at least "+strconv.Itoa(nfixed)+" "+pluralArgs(nfixed)+", got "+strconv.Itoa(got),
+				call.Span)
+		}
+		return
+	}
+	if want != got {
+		c.report("E0202",
+			"Wrong arity in call to "+name+": expects "+strconv.Itoa(want)+" "+pluralArgs(want)+", got "+strconv.Itoa(got),
+			call.Span)
 	}
 }
 

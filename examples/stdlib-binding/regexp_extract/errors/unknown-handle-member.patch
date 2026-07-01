@@ -1,0 +1,11 @@
+--- regexp_extract.aril
++++ regexp_extract.aril
+@@ -10,7 +10,7 @@
+   let re = regexp.mustCompile("[0-9]+")
+   let inputs = ["order-42", "no digits here", "x9y8z7"]
+   for s in inputs {
+-    if re.matchString(s) {
++    if re.noSuchMethod(s) {
+       fmt.println(s + " -> " + strings.join(re.findAll(s, -1), ","))
+     } else {
+       fmt.println(s + " -> (none)")

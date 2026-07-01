@@ -1,0 +1,11 @@
+--- interfaces.aril
++++ interfaces.aril
+@@ -32,7 +32,7 @@
+ }
+ 
+ func checkComposite(c: Composite) {
+-  let _ = c.foo()
++  let _ = c.missing()
+ }
+ 
+ func main() {
