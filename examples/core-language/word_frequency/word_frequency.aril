@@ -49,6 +49,11 @@ func topN(counts: Map<string, int>, n: int): []WordCount {
   return sorted[0:limit]
 }
 
+func minInt(a: int, b: int): int {
+  if a < b { return a }
+  return b
+}
+
 func isSortedDesc(xs: []WordCount): bool {
   var i = 1
   while i < xs.len() {
@@ -73,7 +78,11 @@ func main() {
   }
 }
 
+// Load-bearing: the result holds EXACTLY min(n, #distinct words) entries in the
+// promised order. The length-equality is the coverage half — it rules out a
+// truncating/empty impl (`sorted[0:0]`) that one-sided `len <= n` + sortedness
+// would both still accept (AI/authoring.md §Contracts: the isSorted→[] trap).
 contract topN {
-  ensures result.len() <= n
+  ensures result.len() == minInt(n, counts.len())
   ensures isSortedDesc(result)
 }
