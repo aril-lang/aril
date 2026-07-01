@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 58 / 67 examples build end-to-end** (floor 58).
+- **build_ok — 64 / 73 examples build end-to-end** (floor 64).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 58 / 66 run-pass examples build and run as specified** (floor 58; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 64 / 72 run-pass examples build and run as specified** (floor 64; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 58 |
+| ✅ build (full pipeline) | 64 |
 | emit / codegen fail | 4 |
 | sema fail | 2 |
 | parse fail | 3 |
@@ -27,6 +27,8 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/concurrency/rate_limited/rate_limited.aril` | build | — |
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
 | `examples/concurrency/worker_pool/worker_pool.aril` | build | — |
+| `examples/core-language/balanced_brackets/balanced_brackets.aril` | build | — |
+| `examples/core-language/caesar_cipher/caesar_cipher.aril` | build | — |
 | `examples/core-language/d01/d01.aril` | build | — |
 | `examples/core-language/d02/d02.aril` | build | — |
 | `examples/core-language/d03/d03.aril` | build | — |
@@ -39,6 +41,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/deep_destructure/deep_destructure.aril` | build | — |
 | `examples/core-language/defer_demo/defer_demo.aril` | build | — |
 | `examples/core-language/fizzbuzz/fizzbuzz.aril` | build | — |
+| `examples/core-language/hailstone/hailstone.aril` | build | — |
 | `examples/core-language/hello/hello.aril` | build | — |
 | `examples/core-language/interfaces/interfaces.aril` | build | — |
 | `examples/core-language/invert_binary_tree/invert_binary_tree.aril` | build | — |
@@ -56,7 +59,9 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/p1786/p1786.aril` | build | — |
 | `examples/core-language/p1820/p1820.aril` | build | — |
 | `examples/core-language/reverse_linked_list/reverse_linked_list.aril` | build | — |
+| `examples/core-language/run_length/run_length.aril` | build | — |
 | `examples/core-language/set_algebra/set_algebra.aril` | build | — |
+| `examples/core-language/sieve/sieve.aril` | build | — |
 | `examples/core-language/trebuchet/trebuchet.aril` | build | — |
 | `examples/core-language/two_sum/two_sum.aril` | build | — |
 | `examples/core-language/valid_parentheses/valid_parentheses.aril` | build | — |
@@ -72,6 +77,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/vending_machine/vending_machine.aril` | build | — |
 | `examples/stdlib-binding/config_loader/config_loader.aril` | build | — |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | build | — |
+| `examples/stdlib-binding/csv_stats/csv_stats.aril` | build | — |
 | `examples/stdlib-binding/env_config/env_config.aril` | build | — |
 | `examples/stdlib-binding/reading_validator/reading_validator.aril` | build | — |
 | `examples/stdlib-binding/service_config/service_config.aril` | build | — |
@@ -123,7 +129,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**8 of 66 run-pass examples fall short of run_ok.**
+**8 of 72 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

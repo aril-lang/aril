@@ -1,0 +1,21 @@
+description = "Caesar cipher — shift ASCII letters, wrapping within case"
+source   = "rosetta-code caesar-cipher"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "caesar_cipher.aril"
+
+[[case]]
+args = ["3", "Hello, World!"]
+expected_output = "case1.txt"
+
+[[case]]
+args = ["23", "Khoor, Zruog!"]
+expected_output = "case2.txt"
+
+[[case]]
+args = ["13", "The Quick Brown Fox"]
+expected_output = "case3.txt"

@@ -1,0 +1,21 @@
+description = "Rosetta Code run-length encoding: encode runs then decode back (round-trip involution)"
+source   = "rosetta-code run-length-encoding"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "run_length.aril"
+
+[[case]]
+args            = ["aaaabbbcca"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["WWWWWWWWWWWWBWWWWWWWWWWWWBBB"]
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["abcdef"]
+expected_output = "case3.txt"

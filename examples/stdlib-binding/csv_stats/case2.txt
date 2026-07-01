@@ -1,0 +1,3 @@
+sales: sum=2500 min=200 max=1000
+cost: sum=1530 min=180 max=600
+profit: sum=970 min=20 max=400

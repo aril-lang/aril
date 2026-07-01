@@ -1,0 +1,93 @@
+// Sieve of Eratosthenes — Rosetta Code
+//
+// Reads N from os.args[1] and prints all primes ≤ N, space-separated.
+// Forces: makeSlice, index-assignment, while-loop, for-range, strconv.atoi,
+// strings.join.
+
+import fmt
+import os
+import strconv
+import strings
+import std/pred   // isSorted, allDistinct — contract predicate vocabulary
+
+// isPrime is a slow trial-division check used only in the contract post-condition
+// to validate each returned element independently of the sieve itself.
+func isPrime(n: int): bool {
+  if n < 2 { return false }
+  var d = 2
+  while d * d <= n {
+    if n % d == 0 { return false }
+    d = d + 1
+  }
+  return true
+}
+
+// allPrime reports whether every element of xs is prime — used in the contract.
+func allPrime(xs: []int): bool {
+  for x in xs {
+    if !isPrime(x) { return false }
+  }
+  return true
+}
+
+func sieve(n: int): []int {
+  // composite[i] == true means i is composite; initialised to false (zero value).
+  let composite = makeSlice<bool>(n + 1)
+  // 0 and 1 are not prime
+  composite[0] = true
+  composite[1] = true
+  var i = 2
+  while i * i <= n {
+    if !composite[i] {
+      var j = i * i
+      while j <= n {
+        composite[j] = true
+        j = j + i
+      }
+    }
+    i = i + 1
+  }
+  var primes: []int = []int{}
+  for k in 2..=n {
+    if !composite[k] {
+      primes = primes.push(k)
+    }
+  }
+  return primes
+}
+
+func main() {
+  if os.args.len() != 2 {
+    fmt.println("usage: sieve <N>")
+    os.exit(2)
+  }
+  match strconv.atoi(os.args[1]) {
+    Err(e) => {
+      fmt.println("invalid N:", e)
+      os.exit(1)
+    },
+    Ok(n) => {
+      if n < 2 {
+        fmt.println("2")
+        return
+      }
+      let primes = sieve(n)
+      var parts: []string = []string{}
+      for p in primes {
+        parts = parts.push(strconv.itoa(p))
+      }
+      fmt.println(strings.join(parts, " "))
+    },
+  }
+}
+
+// Load-bearing contract: the sieve result is sorted ascending, contains no
+// duplicates, and every element passes a naive trial-division primality test.
+// A wrong sieve that emits a composite (e.g. includes 4 or 9) fails allPrime;
+// one that re-emits a prime fails allDistinct; one that returns primes in random
+// order fails isSorted. Together they rule out the trivially-wrong impls.
+contract sieve {
+  ensures isSorted(result)
+  ensures allDistinct(result)
+  ensures allPrime(result)
+}

@@ -1,0 +1,127 @@
+// CSV column statistics: for each column in a CSV file, print
+// sum, min, and max of the integer values.
+//
+// Forces: os.readFile, strings.fromBytes/split/trimSpace, strconv.atoi,
+//         strconv.itoa, Result/try, slice mutation, multi-column loop.
+
+import fmt
+import os
+import strings
+import strconv
+
+type ColStats = {
+  name: string
+  sum:  int
+  min:  int
+  max:  int
+  rows: int
+}
+
+// parseRow splits a comma-separated line into integers.
+func parseRow(line: string): Result<[]int, error> {
+  let fields = strings.split(line, ",")
+  var vals: []int = []int{}
+  for f in fields {
+    let trimmed = strings.trimSpace(f)
+    match strconv.atoi(trimmed) {
+      Ok(n)  => { vals = vals.push(n) },
+      Err(e) => return Err(e),
+    }
+  }
+  return Ok(vals)
+}
+
+// initCol creates a ColStats for a column with a single seed value.
+func initCol(name: string, seed: int): ColStats {
+  return ColStats{ name: name, sum: seed, min: seed, max: seed, rows: 1 }
+}
+
+// accumCol folds one more value into an existing ColStats.
+func accumCol(s: ColStats, v: int): ColStats {
+  return ColStats{
+    name: s.name,
+    sum:  s.sum + v,
+    min:  if v < s.min { v } else { s.min },
+    max:  if v > s.max { v } else { s.max },
+    rows: s.rows + 1,
+  }
+}
+
+contract accumCol {
+  ensures result.min <= result.max
+  ensures result.sum >= result.min * result.rows
+}
+
+func main() {
+  if os.args.len() < 2 {
+    fmt.println("usage: csv_stats <file.csv>")
+    os.exit(2)
+  }
+
+  let path = os.args[1]
+  var data = ""
+  match os.readFile(path) {
+    Ok(b)  => { data = strings.fromBytes(b) },
+    Err(e) => {
+      fmt.println("error reading file:", e)
+      os.exit(1)
+    },
+  }
+
+  let lines = strings.split(data, "\n")
+
+  // Collect non-empty lines
+  var nonEmpty: []string = []string{}
+  for ln in lines {
+    let t = strings.trimSpace(ln)
+    if t.len() > 0 {
+      nonEmpty = nonEmpty.push(t)
+    }
+  }
+
+  if nonEmpty.len() < 2 {
+    fmt.println("error: need at least a header and one data row")
+    os.exit(1)
+  }
+
+  let headers = strings.split(nonEmpty[0], ",")
+  let ncols = headers.len()
+
+  // Initialise stats from the first data row
+  var firstRow: []int = []int{}
+  match parseRow(nonEmpty[1]) {
+    Ok(vals) => { firstRow = vals },
+    Err(e)   => {
+      fmt.println("error: bad value in row 1:", e)
+      os.exit(1)
+    },
+  }
+
+  var stats: []ColStats = []ColStats{}
+  for i in 0..ncols {
+    stats = stats.push(initCol(strings.trimSpace(headers[i]), firstRow[i]))
+  }
+
+  // Accumulate remaining rows
+  for ri in 2..nonEmpty.len() {
+    var row: []int = []int{}
+    match parseRow(nonEmpty[ri]) {
+      Ok(vals) => { row = vals },
+      Err(e)   => {
+        fmt.println("error: bad value in row " + strconv.itoa(ri) + ":", e)
+        os.exit(1)
+      },
+    }
+    for i in 0..ncols {
+      stats[i] = accumCol(stats[i], row[i])
+    }
+  }
+
+  for s in stats {
+    fmt.println(
+      s.name + ": sum=" + strconv.itoa(s.sum) +
+      " min=" + strconv.itoa(s.min) +
+      " max=" + strconv.itoa(s.max)
+    )
+  }
+}

@@ -235,9 +235,13 @@ func tomlScalar(line: string): string {
 func tomlCodes(line: string): []string {
   let eq = indexOf(line, "=")
   if eq < 0 { return []string{} }
-  var v = line[eq + 1:]
-  let rb = indexOf(v, "]")
-  if rb >= 0 { v = v[:rb] }
+  let v = line[eq + 1:]
+  // Extract the quoted strings of the array by scanning `"…"` pairs. We do NOT
+  // truncate at the first `]`: an argv value may itself contain `]` (a
+  // bracket-matching example passes `["([{}])"]`), and a `]` inside a quoted
+  // string must be kept. The array-close `]` and commas are non-quote chars and
+  // are naturally skipped. (No corpus `args` line carries a trailing comment, so
+  // there is nothing after the array to guard against.)
   var out = []string{}
   var rest = v
   while true {

@@ -1,0 +1,17 @@
+description = "CSV column statistics: sum/min/max per column over a numeric CSV file"
+source      = "rosetta-code csv-data-manipulation"
+category    = "stdlib-binding"
+showcase    = false
+forces      = []
+since       = "0.1"
+status      = "running"
+expects     = "run-pass"
+entry       = "csv_stats.aril"
+
+[[case]]
+args            = ["data1.csv"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["data2.csv"]
+expected_output = "case2.txt"

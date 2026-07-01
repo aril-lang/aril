@@ -1,0 +1,72 @@
+// Hailstone (Collatz) sequence (Rosetta Code task).
+// For a start value n > 0: repeatedly n → n/2 (even) or 3n+1 (odd) until
+// reaching 1. Prints two lines: the number of terms (length), then the peak
+// (maximum value reached). Source: https://rosettacode.org/wiki/Hailstone_sequence
+
+import fmt
+import os
+import strconv
+
+// hailstoneLen returns the number of terms in the Collatz sequence starting at
+// n (including both n and the final 1). n must be > 0.
+func hailstoneLen(n: int): int {
+  var cur = n
+  var count = 1
+  while cur != 1 {
+    if cur % 2 == 0 {
+      cur = cur / 2
+    } else {
+      cur = cur * 3 + 1
+    }
+    count = count + 1
+  }
+  return count
+}
+
+// hailstonePeak returns the maximum value reached in the sequence starting at n.
+func hailstonePeak(n: int): int {
+  var cur = n
+  var peak = n
+  while cur != 1 {
+    if cur % 2 == 0 {
+      cur = cur / 2
+    } else {
+      cur = cur * 3 + 1
+    }
+    if cur > peak {
+      peak = cur
+    }
+  }
+  return peak
+}
+
+func main() {
+  if os.args.len() != 2 {
+    fmt.println("usage: hailstone <n>")
+    os.exit(2)
+  }
+  match strconv.atoi(os.args[1]) {
+    Err(e) => {
+      fmt.println("bad argument:", e)
+      os.exit(1)
+    },
+    Ok(n) => {
+      if n < 1 {
+        fmt.println("n must be > 0")
+        os.exit(1)
+      }
+      fmt.println(hailstoneLen(n))
+      fmt.println(hailstonePeak(n))
+    },
+  }
+}
+
+contract hailstoneLen {
+  requires n > 0
+  ensures result >= 1
+}
+
+contract hailstonePeak {
+  requires n > 0
+  ensures result >= n
+}

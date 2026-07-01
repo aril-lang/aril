@@ -1,0 +1,21 @@
+description = "Hailstone (Collatz) sequence — length and peak, three oracle-checked inputs"
+source   = "rosetta-code hailstone"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "hailstone.aril"
+
+[[case]]
+args             = ["27"]
+expected_output  = "case1.txt"
+
+[[case]]
+args             = ["6"]
+expected_output  = "case2.txt"
+
+[[case]]
+args             = ["1"]
+expected_output  = "case3.txt"
