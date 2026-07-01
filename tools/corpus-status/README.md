@@ -36,6 +36,13 @@ the repo. It regenerates `examples/auto-status.json` + `examples/STATUS.md`.
   (`args` / `stdin` / `expected_output` / `expected_exit`, all relative to
   the example's own directory); `no-run` examples are excluded. A per-example
   timeout guards against a non-terminating example. **In progress.**
+  - **Multi-input examples** declare one or more `[[case]]` blocks instead of a
+    single top-level invocation: each block carries its own `args` / `stdin` /
+    `expected_output` / `expected_exit`, the example builds once and runs once
+    per case, and any failing case fails the example. Used for deterministic
+    tasks checked against several inputs, each with an oracle-derived expected
+    sidecar. An example with no `[[case]]` block keeps the single top-level
+    invocation.
 
 ### `--no-run` and the run cache
 
