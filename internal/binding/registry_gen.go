@@ -49,4 +49,7 @@ var registry = map[[2]string]Fact{
 	{"time", "after"}:          {Pkg: "time", ArilName: "after", GoName: "After", Kind: Rename, Return: "RecvChan<time.Time>"},
 	{"time", "sleep"}:          {Pkg: "time", ArilName: "sleep", GoName: "Sleep", Kind: Rename, Return: ""},
 	{"time", "tick"}:           {Pkg: "time", ArilName: "tick", GoName: "Tick", Kind: Rename, Return: "RecvChan<time.Time>"},
+	{"unicode", "isDigit"}:     {Pkg: "unicode", ArilName: "isDigit", GoName: "IsDigit", Kind: Rename, Return: "bool"},
+	{"unicode", "isLetter"}:    {Pkg: "unicode", ArilName: "isLetter", GoName: "IsLetter", Kind: Rename, Return: "bool"},
+	{"unicode", "isSpace"}:     {Pkg: "unicode", ArilName: "isSpace", GoName: "IsSpace", Kind: Rename, Return: "bool"},
 }

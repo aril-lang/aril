@@ -1,0 +1,42 @@
+--- TITLE ---
+unicode.isDigit/isLetter/isSpace bindings (→ unicode.Is*) and predeclared min/max (→ Go builtin min/max, generic over Ordered)
+
+--- INPUT ---
+import fmt
+import unicode
+
+func main() {
+  fmt.println(unicode.isDigit('7'), unicode.isLetter('q'), unicode.isSpace(' '))
+  let a = 3
+  let b = 8
+  fmt.println("min", min(a, b), "max", max(a, b))
+  fmt.println("nested", min(min(7, 2), 5))
+  fmt.println("float", max(2.5, 7.0))
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"unicode"
+)
+
+func main() {
+	fmt.Println(unicode.IsDigit('7'), unicode.IsLetter('q'), unicode.IsSpace(' '))
+	var a = 3
+	var b = 8
+	fmt.Println("min", min(a, b), "max", max(a, b))
+	fmt.Println("nested", min(min(7, 2), 5))
+	fmt.Println("float", max(2.5, 7.0))
+}
+
+--- STDOUT ---
+true true true
+min 3 max 8
+nested 2
+float 7
+
+--- EXIT ---
+0
