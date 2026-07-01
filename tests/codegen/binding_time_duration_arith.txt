@@ -1,0 +1,38 @@
+--- TITLE ---
+Value-handle binding: time.Duration arithmetic — d.add/d.mul lower to Go operators, d.string() → d.String()
+
+--- INPUT ---
+import fmt
+import time
+
+func main() {
+  let step  = time.milliseconds(250)
+  let base  = time.seconds(1)
+  let total = base.add(step.mul(4))
+  fmt.println("step:",  step.string())
+  fmt.println("total:", total.string())
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	var step = time.Duration(250) * time.Millisecond
+	var base = time.Duration(1) * time.Second
+	var total = (base + (step * time.Duration(4)))
+	fmt.Println("step:", step.String())
+	fmt.Println("total:", total.String())
+}
+
+--- STDOUT ---
+step: 250ms
+total: 2s
+
+--- EXIT ---
+0

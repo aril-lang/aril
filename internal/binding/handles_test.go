@@ -111,3 +111,25 @@ func TestBufioScannerHandle(t *testing.T) {
 		t.Errorf("bufio.Scanner.text = %+v; want Text → string", text)
 	}
 }
+
+// TestDurationHandle locks the time.Duration handle: a scalar handle whose
+// arithmetic methods (add/mul) return Duration but lower to Go operators (empty
+// GoName), while string is a real method (→ String).
+func TestDurationHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("time.Duration")
+	if !ok || ht.GoType != "time.Duration" || ht.GoPkg != "time" {
+		t.Fatalf("time.Duration lowering = %+v ok=%v; want time.Duration / time", ht, ok)
+	}
+	add, _ := HandleMethodOf("time.Duration", "add")
+	mul, _ := HandleMethodOf("time.Duration", "mul")
+	if add.Return != "time.Duration" || add.GoName != "" {
+		t.Errorf("time.Duration.add = %+v; want empty GoName → time.Duration (operator-lowered)", add)
+	}
+	if mul.Return != "time.Duration" || mul.GoName != "" {
+		t.Errorf("time.Duration.mul = %+v; want empty GoName → time.Duration (operator-lowered)", mul)
+	}
+	s, _ := HandleMethodOf("time.Duration", "string")
+	if s.GoName != "String" || s.Return != "string" {
+		t.Errorf("time.Duration.string = %+v; want String → string", s)
+	}
+}

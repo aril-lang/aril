@@ -1,9 +1,9 @@
-// DEMAND SKETCH (build-fails until the `time.Duration` method bindings land) —
-// compose a time budget from durations and render it. `time.seconds` /
-// `time.milliseconds` already bind (Duration constructors); the unbound part is
-// Duration *arithmetic* + rendering — `d.add(d2)`, `d.mul(n)`, `d.string()`.
-// This is the deterministic (run_ok-able) slice of the time value-handle work,
-// distinct from wall-clock `time.Time`. See docs/binding-surface.md §time.
+// Compose a time budget from durations and render it — exercising the
+// time.Duration arithmetic surface: `d.add(d2)` / `d.mul(n)` (Go operators) and
+// `d.string()` (Go's Duration.String), over the `time.seconds` /
+// `time.milliseconds` constructors. The deterministic slice of the time
+// value-handle work, distinct from wall-clock `time.Time`.
+// See docs/binding-surface.md §time.
 import fmt
 import time
 

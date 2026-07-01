@@ -223,6 +223,7 @@ time.milliseconds(n: int): time.Duration
 // not in scope for the v1 acceptance suite):
 //   d1.add(d2: time.Duration): time.Duration
 //   d.mul(n: int): time.Duration
+//   d.string(): string                                    // Go's Duration.String
 
 // Periodic ticks.
 class time.Ticker {
@@ -234,6 +235,15 @@ time.newTicker(d: time.Duration): time.Ticker            // stoppable
 
 // One-shot timeout signal.
 time.after(d: time.Duration): RecvChan<time.Time>
+```
+
+**Bound today:** the `time.seconds` / `time.milliseconds` constructors and the
+`time.Duration` arithmetic surface — `add` / `mul` (lowered to Go operators, as
+`Duration` is a scalar) + `string` (Go's `Duration.String`). `time.after` /
+`tick` bind their `RecvChan<time.Time>` returns. Wall-clock `time.Time`, the
+`Ticker`, and `newTicker` remain on the target surface.
+
+```aril
 
 // Sleep blocks the current goroutine.
 time.sleep(d: time.Duration)

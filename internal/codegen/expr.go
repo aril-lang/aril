@@ -774,6 +774,16 @@ func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
 	return false
 }
 
+// isDurationReceiver reports whether sema typed receiver as the time.Duration
+// handle — the gate for lowering d.add/d.mul to Go operators (VALUE-HANDLES).
+func (g *gen) isDurationReceiver(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	return ok && named.N == "time.Duration"
+}
+
 // isErrorBuiltinReceiver reports whether sema typed receiver as the
 // predeclared `error` type (the Go-error binding boundary).
 func (g *gen) isErrorBuiltinReceiver(receiver ast.Expr) bool {

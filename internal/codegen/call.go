@@ -168,6 +168,34 @@ func (g *gen) emitCall(c *ast.Call) error {
 			}
 		}
 	}
+	// time.Duration arithmetic methods lower to Go operators — Duration is a
+	// scalar (`type Duration int64`) with no Add/Mul method: d.add(e) → (d + e);
+	// d.mul(n) → (d * time.Duration(n)). Gated on the receiver's sema type being
+	// the time.Duration handle (VALUE-HANDLES). `.string()` is a real method and
+	// takes the ordinary handle-method rename path.
+	if f, ok := c.Callee.(*ast.Field); ok && (f.Name == "add" || f.Name == "mul") && len(c.Args) == 1 {
+		if g.isDurationReceiver(f.Receiver) {
+			g.usedGoPkgs["time"] = true
+			g.b.WriteByte('(')
+			if err := g.emitExpr(f.Receiver); err != nil {
+				return err
+			}
+			if f.Name == "add" {
+				g.b.WriteString(" + ")
+				if err := g.emitExpr(c.Args[0]); err != nil {
+					return err
+				}
+			} else {
+				g.b.WriteString(" * time.Duration(")
+				if err := g.emitExpr(c.Args[0]); err != nil {
+					return err
+				}
+				g.b.WriteByte(')')
+			}
+			g.b.WriteByte(')')
+			return nil
+		}
+	}
 	// sort.sorted(s, less) — comparator sort that returns a NEW slice
 	// (binding-surface.md §sort). Lowers to the inline Sorted helper
 	// (copy + sort.SliceStable), preserving the input's immutability.

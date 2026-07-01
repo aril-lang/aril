@@ -39,6 +39,11 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	// (binding-surface.md §os).
 	case [2]string{"os", "lookupEnv"}:
 		return &Option{T: &Builtin{N: "string"}}
+	// Duration constructors (codegen timeDurationUnit): type the result as the
+	// time.Duration handle so its arithmetic method set (add/mul/string)
+	// resolves (VALUE-HANDLES / binding-surface.md §time).
+	case [2]string{"time", "seconds"}, [2]string{"time", "milliseconds"}:
+		return &Named{N: "time.Duration"}
 	// Fixed-return `slices` helpers (codegen stdlibRenameOverlay); the
 	// element-typed ones (slices.max/min/reverse) stay generic-inferred by Go.
 	case [2]string{"slices", "contains"}:
