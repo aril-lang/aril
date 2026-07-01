@@ -30,6 +30,19 @@ func allPrime(xs: []int): bool {
   return true
 }
 
+// primeCountUpTo counts primes ≤ n by trial division — a DIFFERENT algorithm
+// from the sieve, so using it as the contract's coverage half is a genuine
+// cross-check, not a restatement.
+func primeCountUpTo(n: int): int {
+  var c = 0
+  var k = 2
+  while k <= n {
+    if isPrime(k) { c = c + 1 }
+    k = k + 1
+  }
+  return c
+}
+
 func sieve(n: int): []int {
   // composite[i] == true means i is composite; initialised to false (zero value).
   let composite = makeSlice<bool>(n + 1)
@@ -81,13 +94,15 @@ func main() {
   }
 }
 
-// Load-bearing contract: the sieve result is sorted ascending, contains no
-// duplicates, and every element passes a naive trial-division primality test.
-// A wrong sieve that emits a composite (e.g. includes 4 or 9) fails allPrime;
-// one that re-emits a prime fails allDistinct; one that returns primes in random
-// order fails isSorted. Together they rule out the trivially-wrong impls.
+// Load-bearing contract. isSorted/allDistinct/allPrime are the *soundness* half
+// (no composite, no duplicate, ordered) — but they all pass vacuously on an
+// empty result, so they need a *completeness* half: the count equals the
+// independent trial-division count, which rules out an under-generating or empty
+// sieve (the `isSorted(result)→return []` trap). Soundness + completeness pin
+// the result to exactly the primes ≤ n.
 contract sieve {
   ensures isSorted(result)
   ensures allDistinct(result)
   ensures allPrime(result)
+  ensures result.len() == primeCountUpTo(n)
 }
