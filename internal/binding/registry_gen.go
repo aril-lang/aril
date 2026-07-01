@@ -18,6 +18,7 @@ var registry = map[[2]string]Fact{
 	{"math", "log2"}:           {Pkg: "math", ArilName: "log2", GoName: "Log2", Kind: Rename, Return: "float64"},
 	{"math", "max"}:            {Pkg: "math", ArilName: "max", GoName: "Max", Kind: Rename, Return: "float64"},
 	{"math", "min"}:            {Pkg: "math", ArilName: "min", GoName: "Min", Kind: Rename, Return: "float64"},
+	{"math", "pi"}:             {Pkg: "math", ArilName: "pi", GoName: "Pi", Kind: Rename, Return: "float64"},
 	{"math", "pow"}:            {Pkg: "math", ArilName: "pow", GoName: "Pow", Kind: Rename, Return: "float64"},
 	{"math", "sqrt"}:           {Pkg: "math", ArilName: "sqrt", GoName: "Sqrt", Kind: Rename, Return: "float64"},
 	{"os", "args"}:             {Pkg: "os", ArilName: "args", GoName: "Args", Kind: Rename, Return: "[]string"},

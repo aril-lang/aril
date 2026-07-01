@@ -74,6 +74,15 @@ func (g *generator) deriveFact(pkg, goName string) (binding.Fact, error) {
 			return binding.Fact{}, fmt.Errorf("value type: %s", reason)
 		}
 		f.Kind, f.Return = binding.Rename, ts
+	case *types.Const:
+		// A package-level constant (e.g. math.Pi). Like a value binding — a
+		// Rename referenced as a value, not called. An untyped constant is
+		// translated at its default type (untyped float → float64).
+		ts, ok, reason := g.translate(types.Default(o.Type()))
+		if !ok {
+			return binding.Fact{}, fmt.Errorf("const type: %s", reason)
+		}
+		f.Kind, f.Return = binding.Rename, ts
 	default:
 		return binding.Fact{}, fmt.Errorf("unsupported symbol kind %T (not a func or value)", obj)
 	}

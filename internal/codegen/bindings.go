@@ -39,6 +39,14 @@ var stdlibRenameOverlay = map[[2]string]string{
 	// `error(msg)` built-in; fmt.errorf adds `%w` wrapping.
 	{"errors", "new"}: "New",
 	{"fmt", "errorf"}: "Errorf",
+	// Value-returning `slices` helpers (Go ≥1.21) — generic, so not mechanical
+	// registry rows; they rename to the real Go `slices` package and Go infers
+	// the element type. `slices.reverse` is separate (Go's is in-place/void →
+	// runtime helper). (binding-surface.md §slices.)
+	{"slices", "max"}:      "Max",
+	{"slices", "min"}:      "Min",
+	{"slices", "contains"}: "Contains",
+	{"slices", "indexOf"}:  "Index",
 }
 
 // timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to

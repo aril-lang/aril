@@ -182,6 +182,16 @@ func (g *gen) emitCall(c *ast.Call) error {
 			return g.emitArgList(c.Args)
 		}
 	}
+	// slices.reverse(xs) — returns a NEW reversed slice (Go's slices.Reverse is
+	// in-place), lowered to the SlicesReverse runtime helper. Gated on the sema
+	// `slices` module (like sort.sorted).
+	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 1 && f.Name == "reverse" {
+		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
+			g.usesSlicesReverse = true
+			g.b.WriteString(g.rt("SlicesReverse"))
+			return g.emitArgList(c.Args)
+		}
+	}
 	// Conversion binding — `pkg.method(arg)` that lowers to a Go type
 	// conversion `target(arg)` (e.g. strings.fromBytes → string(b)),
 	// not a package call (bindings.go §stdlibConversion).
@@ -660,7 +670,7 @@ func isStdlibNamespaceName(name string) bool {
 	switch name {
 	case "errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 		"time", "sync", "io", "log", "net", "encoding", "math", "sort",
-		"json", "unicode":
+		"json", "unicode", "slices":
 		return true
 	}
 	return false

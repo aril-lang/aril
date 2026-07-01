@@ -39,6 +39,12 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	// (binding-surface.md §os).
 	case [2]string{"os", "lookupEnv"}:
 		return &Option{T: &Builtin{N: "string"}}
+	// Fixed-return `slices` helpers (codegen stdlibRenameOverlay); the
+	// element-typed ones (slices.max/min/reverse) stay generic-inferred by Go.
+	case [2]string{"slices", "contains"}:
+		return &Builtin{N: "bool"}
+	case [2]string{"slices", "indexOf"}:
+		return &Builtin{N: "int"}
 	}
 	// Derived rows (D6): the binding registry carries the Aril return spelling
 	// (e.g. `Result<int, error>`, `RecvChan<time.Time>`, `[]string`). An empty

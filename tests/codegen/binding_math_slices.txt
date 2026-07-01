@@ -1,0 +1,51 @@
+--- TITLE ---
+math.pi constant (→ math.Pi) and slices helpers: max/min/contains/indexOf (→ Go slices.*) + reverse (→ SlicesReverse runtime helper)
+
+--- INPUT ---
+import fmt
+import math
+import slices
+
+func main() {
+  fmt.println(math.pi > 3.14 && math.pi < 3.15)
+  let xs = [5, 3, 8, 1, 8]
+  fmt.println("max", slices.max(xs), "min", slices.min(xs))
+  fmt.println("has8", slices.contains(xs, 8), "idx8", slices.indexOf(xs, 8), "idx9", slices.indexOf(xs, 9))
+  let r = slices.reverse(xs)
+  fmt.println("rev0", r[0], "orig0", xs[0])
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"math"
+	"slices"
+)
+
+func SlicesReverse[T any](xs []T) []T {
+	out := make([]T, len(xs))
+	for i, v := range xs {
+		out[len(xs)-1-i] = v
+	}
+	return out
+}
+func main() {
+	fmt.Println(math.Pi > 3.14 && math.Pi < 3.15)
+	var xs = []int{5, 3, 8, 1, 8}
+	fmt.Println("max", slices.Max(xs), "min", slices.Min(xs))
+	fmt.Println("has8", slices.Contains(xs, 8), "idx8", slices.Index(xs, 8), "idx9", slices.Index(xs, 9))
+	var r = SlicesReverse(xs)
+	fmt.Println("rev0", r[0], "orig0", xs[0])
+}
+
+--- STDOUT ---
+true
+max 8 min 1
+has8 true idx8 2 idx9 -1
+rev0 8 orig0 5
+
+--- EXIT ---
+0
