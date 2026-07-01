@@ -8,3 +8,10 @@ status   = "running"
 expects  = "run-pass"
 entry    = "env_config.aril"
 expected_output = "expected-output.txt"
+
+[[error]]
+patch   = "errors/compare-option-to-none.patch"   # `v == None` — an Option is inspected with match, not compared
+expect  = ["E0401"]
+stage   = "sema"
+matches = "errors/compare-option-to-none.expected"
+origin  = "synthetic"

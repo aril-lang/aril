@@ -289,6 +289,17 @@ func equal(a, b Type) bool {
 	}
 }
 
+// isOptionOrResult reports whether t is an Option or Result — the sum
+// types that are inspected with `match`, not compared with `==` (E0401
+// tailors its fix-hint on this; diagnostics.md E0401).
+func isOptionOrResult(t Type) bool {
+	switch t.(type) {
+	case *Option, *Result:
+		return true
+	}
+	return false
+}
+
 // comparable reports whether `==` / `!=` is admissible on t
 // (type-system.md T-Cmp / builtins.md §Comparable). Primitives and
 // sum (nominal non-class) types are comparable; class types route

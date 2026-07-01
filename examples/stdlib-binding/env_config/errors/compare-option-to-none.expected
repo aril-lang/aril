@@ -1,0 +1,1 @@
+error[E0401]: `==` cannot compare Option / Result values — use `match` to inspect the case (e.g. `match o { Some(v) => ..., None => ... }`)
