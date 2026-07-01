@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 67,
+    "total": 73,
     "parse_fail": 3,
     "sema_fail": 2,
     "emit_fail": 4,
-    "build_ok": 58,
+    "build_ok": 64,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 58,
-    "run_total": 66
+    "run_ok": 64,
+    "run_total": 72
   },
   "files": [
     {
@@ -64,6 +64,16 @@
     },
     {
       "path": "examples/concurrency/worker_pool/worker_pool.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/balanced_brackets/balanced_brackets.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/caesar_cipher/caesar_cipher.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -124,6 +134,11 @@
     },
     {
       "path": "examples/core-language/fizzbuzz/fizzbuzz.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/hailstone/hailstone.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -223,7 +238,17 @@
       "blocker": ""
     },
     {
+      "path": "examples/core-language/run_length/run_length.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
       "path": "examples/core-language/set_algebra/set_algebra.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/sieve/sieve.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -299,6 +324,11 @@
     },
     {
       "path": "examples/stdlib-binding/counterstack/pentix_agent.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/csv_stats/csv_stats.aril",
       "stage": "build",
       "blocker": ""
     },

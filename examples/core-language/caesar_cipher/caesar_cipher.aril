@@ -1,0 +1,54 @@
+// Rosetta Code: Caesar cipher — shift each ASCII letter forward by K
+// (wrapping within its case A-Z / a-z); non-letters are unchanged.
+// Usage: aril run caesar_cipher.aril <shift> <text>
+
+import fmt
+import os
+import strings
+import strconv
+
+// shiftChar shifts a single byte c by k positions within its letter range,
+// wrapping at 26. Non-letter bytes are returned unchanged.
+func shiftChar(c: byte, k: int): byte {
+  if c >= byte('A') && c <= byte('Z') {
+    return byte((int(c) - int(byte('A')) + k) % 26 + int(byte('A')))
+  }
+  if c >= byte('a') && c <= byte('z') {
+    return byte((int(c) - int(byte('a')) + k) % 26 + int(byte('a')))
+  }
+  return c
+}
+
+// cipher shifts every ASCII letter in text by shift positions.
+func cipher(text: string, shift: int): string {
+  let bs = text.bytes()
+  let out = makeSlice<byte>(bs.len())
+  for i in 0..bs.len() {
+    out[i] = shiftChar(bs[i], shift)
+  }
+  return strings.fromBytes(out)
+}
+
+// decipher is the inverse: shift by 26-shift (used only inside the contract).
+func decipher(text: string, shift: int): string {
+  return cipher(text, (26 - shift) % 26)
+}
+
+func main() {
+  let args = os.args
+  if args.len() < 3 {
+    fmt.println("usage: caesar_cipher <shift> <text>")
+    os.exit(1)
+  }
+  let shift = match strconv.atoi(args[1]) {
+    Ok(n)  => n,
+    Err(e) => { fmt.println("bad shift:", e); os.exit(1); 0 },
+  }
+  fmt.println(cipher(args[2], shift))
+}
+
+// Load-bearing contract: encrypt then decrypt restores the original text.
+// A wrong modular-wrap (e.g. shift by 26 without mod) would break this.
+contract cipher {
+  ensures decipher(result, shift) == text
+}

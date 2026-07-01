@@ -1,0 +1,21 @@
+description = "Sieve of Eratosthenes — read N from args, print primes ≤ N space-separated"
+source   = "rosetta-code sieve"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "sieve.aril"
+
+[[case]]
+args = ["10"]
+expected_output = "case10.txt"
+
+[[case]]
+args = ["30"]
+expected_output = "case30.txt"
+
+[[case]]
+args = ["2"]
+expected_output = "case2.txt"

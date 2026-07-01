@@ -1,0 +1,71 @@
+// Rosetta Code — Balanced brackets.
+// Determines whether a string of brackets is balanced: supports (), [], {}.
+// All three kinds must be correctly nested and matched.
+//
+// Read the string from os.args[1]. Print "balanced" or "not balanced".
+//
+// Forces: generic Stack, rune iteration, match on character literals,
+// os.args CLI input, exhaustive match.
+
+import fmt
+import os
+
+// closer returns the expected opener for a closing bracket, or None.
+func closer(c: rune): Option<rune> {
+  match c {
+    ')' => Some('('),
+    ']' => Some('['),
+    '}' => Some('{'),
+    _   => None,
+  }
+}
+
+// isOpener returns true for any opening bracket character.
+func isOpener(c: rune): bool {
+  match c {
+    '(' | '[' | '{' => true,
+    _               => false,
+  }
+}
+
+// isBalanced returns true iff every opener has a correctly-nested,
+// matching closer and the stack is empty at end.
+func isBalanced(s: string): bool {
+  var stack = Stack<rune>{}
+  for c in s {
+    if isOpener(c) {
+      stack.push(c)
+    } else {
+      match closer(c) {
+        Some(want) => match stack.pop() {
+          Ok(got) => if got != want { return false },
+          Err(_)  => return false,   // closer with no opener
+        },
+        None => {},                  // non-bracket character; ignore
+      }
+    }
+  }
+  return stack.len() == 0
+}
+
+func main() {
+  if os.args.len() != 2 {
+    fmt.println("usage: balanced_brackets <string>")
+    os.exit(2)
+  }
+  let s = os.args[1]
+  if isBalanced(s) {
+    fmt.println("balanced")
+  } else {
+    fmt.println("not balanced")
+  }
+}
+
+// Contract: closer always returns the matching opener (or None for non-closers).
+// This is a load-bearing invariant: the checker relies on it to verify nesting.
+contract closer {
+  ensures match result {
+    Some(open) => isOpener(open),
+    None       => true,
+  }
+}

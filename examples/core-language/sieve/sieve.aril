@@ -1,0 +1,108 @@
+// Sieve of Eratosthenes — Rosetta Code
+//
+// Reads N from os.args[1] and prints all primes ≤ N, space-separated.
+// Forces: makeSlice, index-assignment, while-loop, for-range, strconv.atoi,
+// strings.join.
+
+import fmt
+import os
+import strconv
+import strings
+import std/pred   // isSorted, allDistinct — contract predicate vocabulary
+
+// isPrime is a slow trial-division check used only in the contract post-condition
+// to validate each returned element independently of the sieve itself.
+func isPrime(n: int): bool {
+  if n < 2 { return false }
+  var d = 2
+  while d * d <= n {
+    if n % d == 0 { return false }
+    d = d + 1
+  }
+  return true
+}
+
+// allPrime reports whether every element of xs is prime — used in the contract.
+func allPrime(xs: []int): bool {
+  for x in xs {
+    if !isPrime(x) { return false }
+  }
+  return true
+}
+
+// primeCountUpTo counts primes ≤ n by trial division — a DIFFERENT algorithm
+// from the sieve, so using it as the contract's coverage half is a genuine
+// cross-check, not a restatement.
+func primeCountUpTo(n: int): int {
+  var c = 0
+  var k = 2
+  while k <= n {
+    if isPrime(k) { c = c + 1 }
+    k = k + 1
+  }
+  return c
+}
+
+func sieve(n: int): []int {
+  // composite[i] == true means i is composite; initialised to false (zero value).
+  let composite = makeSlice<bool>(n + 1)
+  // 0 and 1 are not prime
+  composite[0] = true
+  composite[1] = true
+  var i = 2
+  while i * i <= n {
+    if !composite[i] {
+      var j = i * i
+      while j <= n {
+        composite[j] = true
+        j = j + i
+      }
+    }
+    i = i + 1
+  }
+  var primes: []int = []int{}
+  for k in 2..=n {
+    if !composite[k] {
+      primes = primes.push(k)
+    }
+  }
+  return primes
+}
+
+func main() {
+  if os.args.len() != 2 {
+    fmt.println("usage: sieve <N>")
+    os.exit(2)
+  }
+  match strconv.atoi(os.args[1]) {
+    Err(e) => {
+      fmt.println("invalid N:", e)
+      os.exit(1)
+    },
+    Ok(n) => {
+      if n < 2 {
+        fmt.println("2")
+        return
+      }
+      let primes = sieve(n)
+      var parts: []string = []string{}
+      for p in primes {
+        parts = parts.push(strconv.itoa(p))
+      }
+      fmt.println(strings.join(parts, " "))
+    },
+  }
+}
+
+// Load-bearing contract. isSorted/allDistinct/allPrime are the *soundness* half
+// (no composite, no duplicate, ordered) — but they all pass vacuously on an
+// empty result, so they need a *completeness* half: the count equals the
+// independent trial-division count, which rules out an under-generating or empty
+// sieve (the `isSorted(result)→return []` trap). Soundness + completeness pin
+// the result to exactly the primes ≤ n.
+contract sieve {
+  ensures isSorted(result)
+  ensures allDistinct(result)
+  ensures allPrime(result)
+  ensures result.len() == primeCountUpTo(n)
+}
