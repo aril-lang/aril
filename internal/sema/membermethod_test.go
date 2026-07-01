@@ -110,3 +110,32 @@ func use(): bool { return go() == Ok(1) }`
 		t.Errorf("expected E0401 (Result equality), got %v", codes)
 	}
 }
+
+// E0215 — a slice `push` whose result is discarded is a silent no-op
+// (append semantics: `push` returns a new slice, never mutates in place).
+// Go would leak `append(xs, e) … is not used` against the lowered form.
+
+func TestDiscardedSlicePushFiresE0215(t *testing.T) {
+	// Statement position (a bare push followed by more code) — the
+	// unambiguously-discarded case the check targets.
+	src := "import fmt\nfunc use() {\n  var xs = [1, 2, 3]\n  xs.push(4)\n  fmt.println(xs.len())\n}"
+	if codes := runCheck(t, src); !contains(codes, "E0215") {
+		t.Errorf("expected E0215 (discarded slice push), got %v", codes)
+	}
+}
+
+func TestAssignedSlicePushNoE0215(t *testing.T) {
+	src := "func use() {\n  var xs = [1, 2, 3]\n  xs = xs.push(4)\n}"
+	if codes := runCheck(t, src); contains(codes, "E0215") {
+		t.Errorf("assigned-back slice push must not fire E0215, got %v", codes)
+	}
+}
+
+// Stack `push` mutates in place, so a bare statement is legitimate — the
+// no-op diagnostic must not fire on it (gates on a slice receiver).
+func TestDiscardedStackPushNoE0215(t *testing.T) {
+	src := "func use() {\n  var st = Stack<int>{}\n  st.push(4)\n}"
+	if codes := runCheck(t, src); contains(codes, "E0215") {
+		t.Errorf("Stack push statement must not fire E0215, got %v", codes)
+	}
+}

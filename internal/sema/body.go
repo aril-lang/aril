@@ -84,10 +84,37 @@ func (c *checker) checkBlock(b *ast.Block) {
 	c.inferBlock(b)
 }
 
+// checkDiscardedSliceBuilder reports E0215 when a slice `push` appears in
+// statement position (a non-trailing block statement), discarding its
+// result. `push` has append semantics — it returns a *new* slice and does
+// not mutate in place — so a discarded `xs.push(e)` is a silent no-op (the
+// intended growth never happens). Go would surface `append(xs, e) … is not
+// used` against the lowered form, leaking the codegen shape (D10); this
+// catches it in Aril terms. Stack `push` mutates and is a legitimate
+// statement, so the check gates on a slice receiver only. A push in a
+// block's *trailing* (value) position is the block's result, not a
+// discard, and is not diagnosed here. (diagnostics.md E0215)
+func (c *checker) checkDiscardedSliceBuilder(e ast.Expr) {
+	call, ok := e.(*ast.Call)
+	if !ok {
+		return
+	}
+	f, ok := call.Callee.(*ast.Field)
+	if !ok || f.Name != "push" {
+		return
+	}
+	if _, isSlice := c.info.Type[f.Receiver].(*Slice); isSlice {
+		c.report("E0215",
+			"the result of `push` is discarded — `push` returns a new slice (it does not mutate in place); assign it back, e.g. `xs = xs.push(...)`",
+			call.Span)
+	}
+}
+
 func (c *checker) checkStmt(s ast.Stmt) {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
 		c.inferExpr(v.Expr)
+		c.checkDiscardedSliceBuilder(v.Expr)
 	case *ast.LetStmt:
 		c.checkBinding(v, v.Pattern, v.DeclType, v.Value)
 	case *ast.VarStmt:
