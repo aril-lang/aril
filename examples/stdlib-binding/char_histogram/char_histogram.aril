@@ -1,0 +1,86 @@
+// Character-category histogram: count letters, digits, whitespace, and
+// other (punctuation/symbols) in a string from os.args[1].
+//
+// PROBE RESULT: unicode.isLetter / unicode.isDigit / unicode.isSpace are
+// not bound. The import passes through to Go (the module name is forwarded)
+// but no Aril-side wrappers exist, so all three calls produce:
+//   undefined: unicode.isLetter
+//   undefined: unicode.isDigit
+//   undefined: unicode.isSpace
+//
+// FALLBACK: ASCII range checks (c >= 'a' && c <= 'z' etc.) for the
+// working implementation.  Unicode letters/digits outside ASCII are
+// counted as "other" — a known limitation of the fallback.
+//
+// DEMAND: unicode.isLetter(c: rune): bool
+//         unicode.isDigit(c: rune): bool
+//         unicode.isSpace(c: rune): bool
+//
+// Forces: os.args, for-rune iteration, rune comparison with char literals,
+//         int arithmetic, fmt.println.
+
+import fmt
+import os
+
+// isLetter returns true for ASCII letters a-z / A-Z.
+// DEMAND: replace with unicode.isLetter(c) once bound.
+func isLetter(c: rune): bool {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// isDigit returns true for ASCII digits 0-9.
+// DEMAND: replace with unicode.isDigit(c) once bound.
+func isDigit(c: rune): bool {
+  return c >= '0' && c <= '9'
+}
+
+// isSpace returns true for common ASCII whitespace.
+// DEMAND: replace with unicode.isSpace(c) once bound.
+func isSpace(c: rune): bool {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+contract isDigit {
+  ensures result == (c >= '0' && c <= '9')
+}
+
+func classify(s: string): (int, int, int, int) {
+  var letters = 0
+  var digits  = 0
+  var spaces  = 0
+  var other   = 0
+
+  for c in s {
+    if isLetter(c) {
+      letters = letters + 1
+    } else if isDigit(c) {
+      digits = digits + 1
+    } else if isSpace(c) {
+      spaces = spaces + 1
+    } else {
+      other = other + 1
+    }
+  }
+
+  return (letters, digits, spaces, other)
+}
+
+// Every character must fall into exactly one category.
+contract classify {
+  ensures (result.0 + result.1 + result.2 + result.3) == s.len()
+}
+
+func main() {
+  if os.args.len() < 2 {
+    fmt.println("usage: char_histogram <string>")
+    os.exit(2)
+  }
+
+  let s = os.args[1]
+  let (letters, digits, spaces, other) = classify(s)
+
+  fmt.println("letters:", letters)
+  fmt.println("digits:", digits)
+  fmt.println("spaces:", spaces)
+  fmt.println("other:", other)
+}

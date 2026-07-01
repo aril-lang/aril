@@ -1,0 +1,26 @@
+description = "Character-category histogram: count letters, digits, whitespace, and other in a CLI string argument"
+source      = "ux-demand-study unicode"
+category    = "stdlib-binding"
+showcase    = false
+forces      = []
+since       = "0.1"
+status      = "running"
+expects     = "run-pass"
+entry       = "char_histogram.aril"
+
+# Note: the implementation uses ASCII range checks (c >= 'a' && c <= 'z' etc.)
+# as a fallback because unicode.isLetter / unicode.isDigit / unicode.isSpace
+# are not yet bound.  All three test cases are pure ASCII so oracle and
+# implementation agree.
+
+[[case]]
+args            = ["Hello, World! 123"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["abc123  !?"]
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["The quick brown fox 42!"]
+expected_output = "case3.txt"

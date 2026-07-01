@@ -1,0 +1,5 @@
+sorted: 7 7 7
+unique: 7
+reversed: 7 7 7
+max: 7
+min: 7

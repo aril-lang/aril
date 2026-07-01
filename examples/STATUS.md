@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 64 / 73 examples build end-to-end** (floor 64).
+- **build_ok — 68 / 77 examples build end-to-end** (floor 68).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 64 / 72 run-pass examples build and run as specified** (floor 64; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 68 / 76 run-pass examples build and run as specified** (floor 68; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 64 |
+| ✅ build (full pipeline) | 68 |
 | emit / codegen fail | 4 |
 | sema fail | 2 |
 | parse fail | 3 |
@@ -62,6 +62,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/run_length/run_length.aril` | build | — |
 | `examples/core-language/set_algebra/set_algebra.aril` | build | — |
 | `examples/core-language/sieve/sieve.aril` | build | — |
+| `examples/core-language/slice_toolkit/slice_toolkit.aril` | build | — |
 | `examples/core-language/trebuchet/trebuchet.aril` | build | — |
 | `examples/core-language/two_sum/two_sum.aril` | build | — |
 | `examples/core-language/valid_parentheses/valid_parentheses.aril` | build | — |
@@ -75,12 +76,15 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/rpn_calculator/rpn_calculator.aril` | build | — |
 | `examples/modeling-errors/safe_divide/safe_divide.aril` | build | — |
 | `examples/modeling-errors/vending_machine/vending_machine.aril` | build | — |
+| `examples/stdlib-binding/char_histogram/char_histogram.aril` | build | — |
 | `examples/stdlib-binding/config_loader/config_loader.aril` | build | — |
 | `examples/stdlib-binding/counterstack/pentix_agent.aril` | build | — |
 | `examples/stdlib-binding/csv_stats/csv_stats.aril` | build | — |
 | `examples/stdlib-binding/env_config/env_config.aril` | build | — |
 | `examples/stdlib-binding/reading_validator/reading_validator.aril` | build | — |
 | `examples/stdlib-binding/service_config/service_config.aril` | build | — |
+| `examples/stdlib-binding/statistics/statistics.aril` | build | — |
+| `examples/stdlib-binding/struct_dump/struct_dump.aril` | build | — |
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/concurrency/mutex_counter/mutex_counter.aril` | emit | go build failed |
@@ -129,7 +133,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**8 of 72 run-pass examples fall short of run_ok.**
+**8 of 76 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

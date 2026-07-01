@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 73,
+    "total": 77,
     "parse_fail": 3,
     "sema_fail": 2,
     "emit_fail": 4,
-    "build_ok": 64,
+    "build_ok": 68,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 64,
-    "run_total": 72
+    "run_ok": 68,
+    "run_total": 76
   },
   "files": [
     {
@@ -253,6 +253,11 @@
       "blocker": ""
     },
     {
+      "path": "examples/core-language/slice_toolkit/slice_toolkit.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
       "path": "examples/core-language/trebuchet/trebuchet.aril",
       "stage": "build",
       "blocker": ""
@@ -318,6 +323,11 @@
       "blocker": ""
     },
     {
+      "path": "examples/stdlib-binding/char_histogram/char_histogram.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
       "path": "examples/stdlib-binding/config_loader/config_loader.aril",
       "stage": "build",
       "blocker": ""
@@ -364,6 +374,16 @@
     },
     {
       "path": "examples/stdlib-binding/service_config/service_config.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/statistics/statistics.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/struct_dump/struct_dump.aril",
       "stage": "build",
       "blocker": ""
     },
