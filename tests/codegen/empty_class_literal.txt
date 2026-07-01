@@ -1,0 +1,51 @@
+--- TITLE ---
+Empty fieldless-class literal — `AlwaysZero{}` (a behaviour-only interface implementor) lowers to `&AlwaysZero{}`
+
+--- INPUT ---
+import fmt
+
+interface Strategy {
+  decide(): int
+}
+
+class AlwaysZero implements Strategy {
+  decide(): int { return 0 }
+}
+
+func run(s: Strategy): int {
+  return s.decide()
+}
+
+func main() {
+  let s = AlwaysZero{}
+  fmt.println(run(s))
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Strategy interface {
+	decide() int
+}
+type AlwaysZero struct {
+}
+
+func (t *AlwaysZero) decide() int {
+	return 0
+}
+func run(s Strategy) int {
+	return s.decide()
+}
+func main() {
+	var s = &AlwaysZero{}
+	fmt.Println(run(s))
+}
+
+--- STDOUT ---
+0
+
+--- EXIT ---
+0

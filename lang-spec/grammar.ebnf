@@ -394,7 +394,7 @@ InterfaceMember = Ident "(" ParamList? ")" ReturnAnnot? Newline+ ;
 // =============================================================
 
 FuncDecl     = "func" Ident TypeParams? "(" ParamList? ")" ReturnAnnot? Block ;
-ParamList    = Param ( "," Param )* ;
+ParamList    = Param ( "," Param )* ","? ;   (* optional trailing comma *)
 Param        = ( Ident | "_" ) ":" "..."? TypeExpr ;
                           // a leading "..." marks a variadic parameter:
                           // TypeExpr is the element type T, the parameter

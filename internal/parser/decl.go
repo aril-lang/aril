@@ -670,6 +670,12 @@ func (p *parser) parseParamList() ([]*ast.Param, *Diag) {
 			return nil, p.diag("E0115", "A variadic parameter must be the last parameter", t.Line, t.Col)
 		}
 		p.advance() // consume ','
+		// A trailing comma before `)` is allowed (idiomatic in a multi-line
+		// signature) — stop rather than demand another parameter.
+		p.skipNewlines()
+		if p.at(lexer.KindPunct, ")") {
+			break
+		}
 	}
 	return out, nil
 }
