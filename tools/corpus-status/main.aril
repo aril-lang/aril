@@ -476,6 +476,19 @@ func runTimeoutMs(): int {
   return 10000
 }
 
+// A RunCase is one (input → expected-output) test of a multi-input example.
+// The example builds ONCE, then runs once per case. Each case carries its own
+// argv / stdin / expected-stdout / exit, all relative to the example's dir —
+// so a single deterministic program can be checked against several inputs, each
+// with an oracle-derived expected sidecar. Parsed from `[[case]]` blocks; an
+// example without them keeps the single top-level invocation (byte-identical).
+type RunCase = {
+  args: []string
+  stdin: string
+  expectedOutput: string
+  expectedExit: int
+}
+
 type RunSpec = {
   dir: string
   entry: string
@@ -486,6 +499,7 @@ type RunSpec = {
   expectedPatterns: string
   forbiddenPatterns: string
   expectedExit: int
+  cases: []RunCase
 }
 
 type RunEval = {
@@ -504,30 +518,75 @@ func parseRunSpec(manifest: string, text: string): RunSpec {
   var expectedPatterns = ""
   var forbiddenPatterns = ""
   var expectedExit = 0
+  // Top-level fields precede any `[[table]]` header (TOML rule). Once a `[`
+  // line is seen, stop reading top-level fields so a `[[case]]` block's own
+  // args/stdin/expected_output are not mistaken for the top-level ones.
+  var inBlock = false
   for raw in strings.split(text, "\n") {
     let line = strings.trimSpace(raw)
-    if strings.hasPrefix(line, "entry") {
-      entry = tomlScalar(line)
-    } else if strings.hasPrefix(line, "expects") {
-      expects = tomlScalar(line)
-    } else if strings.hasPrefix(line, "args") {
-      args = tomlCodes(line)
-    } else if strings.hasPrefix(line, "stdin") {
-      stdin = tomlScalar(line)
-    } else if strings.hasPrefix(line, "expected_output") {
-      expectedOutput = tomlScalar(line)
-    } else if strings.hasPrefix(line, "expected_patterns") {
-      expectedPatterns = tomlScalar(line)
-    } else if strings.hasPrefix(line, "forbidden_patterns") {
-      forbiddenPatterns = tomlScalar(line)
-    } else if strings.hasPrefix(line, "expected_exit") {
-      match atoiSafe(tomlScalar(line)) {
-        Ok(n) => expectedExit = n,
-        Err(_) => expectedExit = 0,
+    if strings.hasPrefix(line, "[") {
+      inBlock = true
+    }
+    if !inBlock {
+      if strings.hasPrefix(line, "entry") {
+        entry = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expects") {
+        expects = tomlScalar(line)
+      } else if strings.hasPrefix(line, "args") {
+        args = tomlCodes(line)
+      } else if strings.hasPrefix(line, "stdin") {
+        stdin = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expected_output") {
+        expectedOutput = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expected_patterns") {
+        expectedPatterns = tomlScalar(line)
+      } else if strings.hasPrefix(line, "forbidden_patterns") {
+        forbiddenPatterns = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expected_exit") {
+        match atoiSafe(tomlScalar(line)) {
+          Ok(n) => expectedExit = n,
+          Err(_) => expectedExit = 0,
+        }
       }
     }
   }
-  return RunSpec{ dir: pathDir(manifest), entry: entry, expects: expects, args: args, stdin: stdin, expectedOutput: expectedOutput, expectedPatterns: expectedPatterns, forbiddenPatterns: forbiddenPatterns, expectedExit: expectedExit }
+  return RunSpec{ dir: pathDir(manifest), entry: entry, expects: expects, args: args, stdin: stdin, expectedOutput: expectedOutput, expectedPatterns: expectedPatterns, forbiddenPatterns: forbiddenPatterns, expectedExit: expectedExit, cases: parseRunCases(text) }
+}
+
+// parseRunCases extracts the `[[case]]` blocks of one example.toml — each an
+// independent (argv, stdin, expected_output, expected_exit) invocation of the
+// already-built binary. Mirrors parseNegCases's block scan. Empty when the
+// manifest has no `[[case]]` blocks (the single-invocation default).
+func parseRunCases(text: string): []RunCase {
+  var cases = []RunCase{}
+  var cur = RunCase{ args: []string{}, stdin: "", expectedOutput: "", expectedExit: 0 }
+  var inCase = false
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if line == "[[case]]" {
+      if inCase { cases = cases.push(cur) }
+      cur = RunCase{ args: []string{}, stdin: "", expectedOutput: "", expectedExit: 0 }
+      inCase = true
+    } else if strings.hasPrefix(line, "[") {
+      if inCase { cases = cases.push(cur) }
+      inCase = false
+    } else if inCase {
+      if strings.hasPrefix(line, "args") {
+        cur.args = tomlCodes(line)
+      } else if strings.hasPrefix(line, "stdin") {
+        cur.stdin = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expected_output") {
+        cur.expectedOutput = tomlScalar(line)
+      } else if strings.hasPrefix(line, "expected_exit") {
+        match atoiSafe(tomlScalar(line)) {
+          Ok(n) => cur.expectedExit = n,
+          Err(_) => cur.expectedExit = 0,
+        }
+      }
+    }
+  }
+  if inCase { cases = cases.push(cur) }
+  return cases
 }
 
 func lessRunRow(a: RunRow, b: RunRow): bool {
@@ -584,6 +643,28 @@ func firstForbidden(stdout: string, forbiddenText: string): string {
   return ""
 }
 
+// runOneCase runs an already-built binary for one `[[case]]` and compares its
+// exit + stdout against the case's oracle-derived expected sidecar. Returns an
+// "ok" RunRow on match, else the failure kind. Mirrors the single-run checks in
+// runOutcome (timeout / exit / output-diff), scoped to a case's own input.
+func runOneCase(outBin: string, dir: string, c: RunCase): RunRow {
+  var stdinData = ""
+  if c.stdin != "" {
+    stdinData = readFileOrEmpty(pathJoin(dir, c.stdin))
+  }
+  let r = runExample(outBin, c.args, stdinData, dir, runTimeoutMs())
+  if r.code() == 124 {
+    return RunRow{ path: dir, status: "timeout", code: r.code() }
+  }
+  if r.code() != c.expectedExit {
+    return RunRow{ path: dir, status: "run-fail", code: r.code() }
+  }
+  if c.expectedOutput != "" && chomp(r.stdout()) != chomp(readFileOrEmpty(pathJoin(dir, c.expectedOutput))) {
+    return RunRow{ path: dir, status: "output-diff", code: r.code() }
+  }
+  return RunRow{ path: dir, status: "ok", code: 0 }
+}
+
 // runOutcome builds and runs one example, returning its RunRow outcome
 // ("ok" on success). This is the cache-miss path — the slow part. outBin must
 // be unique per concurrent caller (the worker pool passes a per-job path).
@@ -597,6 +678,19 @@ func runOutcome(aril: string, outBin: string, spec: RunSpec): RunRow {
   let b = run(aril, ["build", "-o", outBin, "--contracts=panic", entryPath])
   if b.code() != 0 {
     return RunRow{ path: spec.dir, status: "build-fail", code: b.code() }
+  }
+  // Multi-input example: run the built binary once per `[[case]]`, comparing
+  // each against its own oracle-derived expected sidecar. The first failing
+  // case is the outcome; all-pass is "ok". Falls through to the single-run
+  // path below when there are no cases (byte-identical to the pre-case tool).
+  if spec.cases.len() > 0 {
+    for c in spec.cases {
+      let row = runOneCase(outBin, spec.dir, c)
+      if row.status != "ok" {
+        return row
+      }
+    }
+    return RunRow{ path: spec.dir, status: "ok", code: 0 }
   }
   var stdinData = ""
   if spec.stdin != "" {
@@ -707,6 +801,24 @@ func runKey(aril: string, spec: RunSpec): string {
     inv = inv + "forbidpat\n" + readFileOrEmpty(pathJoin(spec.dir, spec.forbiddenPatterns)) + "\n"
   }
   inv = inv + "expexit\n" + strconv.itoa(spec.expectedExit)
+  // Fold every `[[case]]` invocation + its expected sidecar only when present,
+  // so single-invocation examples keep their existing key (no cache churn).
+  if spec.cases.len() > 0 {
+    inv = inv + "\ncases\n"
+    for c in spec.cases {
+      inv = inv + "cargs\n"
+      for a in c.args {
+        inv = inv + a + "\n" + readFileOrEmpty(pathJoin(spec.dir, a)) + "\ncargend\n"
+      }
+      if c.stdin != "" {
+        inv = inv + "cstdin\n" + readFileOrEmpty(pathJoin(spec.dir, c.stdin)) + "\n"
+      }
+      if c.expectedOutput != "" {
+        inv = inv + "cexpout\n" + readFileOrEmpty(pathJoin(spec.dir, c.expectedOutput)) + "\n"
+      }
+      inv = inv + "cexpexit\n" + strconv.itoa(c.expectedExit) + "\ncaseend\n"
+    }
+  }
   return sha256hex(em.stdout() + "\n--invocation--\n" + inv)
 }
 
