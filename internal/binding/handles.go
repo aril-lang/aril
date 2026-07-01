@@ -26,6 +26,32 @@ type HandleBinding struct {
 	Return string
 }
 
+// HandleType describes how a handle's Aril boundary type (spelled `pkg.Type`)
+// lowers: the Go type spelling used in *type positions* (a pointer handle like
+// `*regexp.Regexp`, or a value wrapper like `arilrt.BigInt`) and the Go import
+// path the type + its methods reference (`""` when the type needs no import
+// beyond the always-present runtime — e.g. an arilrt wrapper). The Go type may
+// differ from the Aril spelling both in pointer-ness and package, so it is
+// modelled explicitly rather than derived from the Aril name.
+type HandleType struct {
+	GoType string
+	GoPkg  string
+}
+
+// handleTypes registers every bound handle type. IsHandleType / HandleTypeOf
+// read it; a type must be here for an annotation `pkg.Type` to resolve (sema)
+// and to lower to the right Go type (codegen).
+var handleTypes = map[string]HandleType{
+	"regexp.Regexp": {GoType: "*regexp.Regexp", GoPkg: "regexp"},
+}
+
+// HandleTypeOf returns the lowering of the handle type spelled `spelled`
+// (`pkg.Type`), or ok=false when it is not a bound handle type.
+func HandleTypeOf(spelled string) (HandleType, bool) {
+	ht, ok := handleTypes[spelled]
+	return ht, ok
+}
+
 // handleCtors maps a package-qualified constructor `(pkg, arilName)` to the Go
 // function that builds the handle and the handle's Aril type spelling.
 var handleCtors = map[[2]string]HandleBinding{
@@ -61,6 +87,6 @@ func HandleMethodOf(handle, arilName string) (HandleBinding, bool) {
 
 // IsHandleType reports whether `spelled` names a bound stdlib handle type.
 func IsHandleType(spelled string) bool {
-	_, ok := handleMethods[spelled]
+	_, ok := handleTypes[spelled]
 	return ok
 }

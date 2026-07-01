@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"strings"
+
 	"github.com/aril-lang/aril/internal/ast"
 	"github.com/aril-lang/aril/internal/binding"
 )
@@ -65,9 +67,16 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 	if len(v.QName) == 0 {
 		return &Unknown{}
 	}
-	// Qualified names (`pkg.Type`) are stdlib-binding surface in
-	// v1 — not modelled by sema yet.
+	// Qualified names (`pkg.Type`): a bound value-handle type (regexp.Regexp,
+	// …) resolves to its Named boundary type so an annotated parameter / field
+	// / return types the same as a locally-constructed handle — otherwise the
+	// receiver would type Unknown and codegen's handle dispatch would miss,
+	// re-introducing the sema↔codegen split (VALUE-HANDLES). Other qualified
+	// names are not modelled by sema yet.
 	if len(v.QName) > 1 {
+		if spelled := strings.Join(v.QName, "."); binding.IsHandleType(spelled) {
+			return &Named{N: spelled}
+		}
 		return &Unknown{}
 	}
 	head := v.QName[0]

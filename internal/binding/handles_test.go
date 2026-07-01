@@ -42,3 +42,22 @@ func TestHandleMethodLookup(t *testing.T) {
 		t.Error("time.Time is not (yet) a bound handle type")
 	}
 }
+
+// TestHandleType locks the handle-type lowering: the Go type spelling is
+// pointer-correct (regexp.MustCompile returns *regexp.Regexp) and carries the
+// Go import package, both of which differ from the Aril spelling.
+func TestHandleType(t *testing.T) {
+	ht, ok := HandleTypeOf("regexp.Regexp")
+	if !ok {
+		t.Fatal("regexp.Regexp should be a handle type")
+	}
+	if ht.GoType != "*regexp.Regexp" {
+		t.Errorf("regexp.Regexp GoType = %q; want *regexp.Regexp", ht.GoType)
+	}
+	if ht.GoPkg != "regexp" {
+		t.Errorf("regexp.Regexp GoPkg = %q; want regexp", ht.GoPkg)
+	}
+	if _, ok := HandleTypeOf("time.Time"); ok {
+		t.Error("time.Time is not (yet) a bound handle type")
+	}
+}

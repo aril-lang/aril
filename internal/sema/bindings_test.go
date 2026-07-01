@@ -3,6 +3,7 @@ package sema
 import (
 	"testing"
 
+	"github.com/aril-lang/aril/internal/ast"
 	"github.com/aril-lang/aril/internal/binding"
 )
 
@@ -15,6 +16,24 @@ func TestHandleCtorReturn(t *testing.T) {
 	n, ok := got.(*Named)
 	if !ok || n.N != "regexp.Regexp" {
 		t.Fatalf("stdlibBindingReturn(regexp, mustCompile) = %v; want Named regexp.Regexp", got)
+	}
+}
+
+// TestHandleAnnotationResolvesToNamed locks the C1 fix: a qualified handle
+// annotation (`regexp.Regexp` in a param/field/return) resolves to the same
+// *Named boundary type a locally-constructed handle has, so codegen's handle
+// dispatch fires on either origin (no sema↔codegen split). A non-handle
+// qualified name stays Unknown.
+func TestHandleAnnotationResolvesToNamed(t *testing.T) {
+	c := &checker{}
+	nt := &ast.NamedType{QName: []string{"regexp", "Regexp"}}
+	got := c.namedTypeToType(nt, map[string]bool{})
+	if n, ok := got.(*Named); !ok || n.N != "regexp.Regexp" {
+		t.Fatalf("regexp.Regexp annotation = %v; want Named regexp.Regexp", got)
+	}
+	other := &ast.NamedType{QName: []string{"time", "Time"}}
+	if _, ok := c.namedTypeToType(other, map[string]bool{}).(*Unknown); !ok {
+		t.Errorf("unbound qualified name should stay Unknown, got %T", c.namedTypeToType(other, map[string]bool{}))
 	}
 }
 
