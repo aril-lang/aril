@@ -1,0 +1,9 @@
+--- interfaces.aril
++++ interfaces.aril
+@@ -37,5 +37,5 @@
+ 
+ func main() {
+   let b = Bar{ x: 6 }
+-  fmt.println(baz(b))                                 // 10
++  fmt.println(b.foo(9))
+ }

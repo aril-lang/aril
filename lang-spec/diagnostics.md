@@ -86,6 +86,7 @@ severity column.
 | E0211 | E | `Dynamic` in inferred type-parameter position | `type-system.md` §Dynamic (generic flow side condition) | Unification would set a user type parameter to `Dynamic` — rewrite the call so `T` is a concrete type, and pass the dynamic value through `reflect.box` / `reflect.unbox` explicitly. |
 | E0212 | E | `Any` and `Dynamic` cannot be implicitly converted | `type-system.md` §Dynamic (cross-reference) / `builtins.md` §Special types | These are deliberately separate types — to go from one to the other, narrow to a concrete `T` first and then re-box. |
 | E0213 | E | Spread argument `...` requires a variadic parameter | `type-system.md` T-Spread / `ffi.md` §Variadic | Use `...e` only as the final argument of a call whose last parameter is `...T`; otherwise pass the slice's elements individually. |
+| E0214 | E | Type has no member `name` | `type-system.md` T-Field, T-Call (member access / method call over a Named receiver) | Access only a declared field or method of the receiver's type — a user class / interface / record, an opaque `extern` handle, or a bound stdlib value-handle. A bare type parameter has no known member set, so it is not diagnosed here. |
 
 ### E03xx — Pattern matching
 

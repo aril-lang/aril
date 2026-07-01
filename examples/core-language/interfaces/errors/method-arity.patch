@@ -1,0 +1,11 @@
+--- interfaces.aril
++++ interfaces.aril
+@@ -28,7 +28,7 @@
+ interface Composite extends Foo { }
+ 
+ func baz(f: Foo): int {
+-  return f.foo() + 4
++  return f.foo(1) + 4
+ }
+ 
+ func checkComposite(c: Composite) {

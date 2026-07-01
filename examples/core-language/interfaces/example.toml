@@ -28,3 +28,31 @@ expect  = ["E0113"]
 stage   = "sema"
 matches = "errors/dup-baz.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/unknown-interface-member.patch"   # c.missing() — member absent from Composite (and its extends chain)
+expect  = ["E0214"]
+stage   = "sema"
+matches = "errors/unknown-interface-member.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/method-arity.patch"   # f.foo() takes no args, called with one
+expect  = ["E0202"]
+stage   = "sema"
+matches = "errors/method-arity.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/class-unknown-member.patch"   # b.nope() — member absent from class Bar
+expect  = ["E0214"]
+stage   = "sema"
+matches = "errors/class-unknown-member.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/class-method-arity.patch"   # b.foo(9) — Bar.foo takes no args
+expect  = ["E0202"]
+stage   = "sema"
+matches = "errors/class-method-arity.expected"
+origin  = "synthetic"

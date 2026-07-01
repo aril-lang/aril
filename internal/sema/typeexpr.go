@@ -304,6 +304,34 @@ func (c *checker) namesInterface(t ast.TypeExpr, name string) bool {
 	return false
 }
 
+// interfaceMethodSig looks up method `name` on interface `id`, following
+// the `extends` chain transitively (D14). Returns nil when no interface
+// in the chain declares it. Shares the extends-walk shape with
+// namesInterface / satisfiesInterface.
+func (c *checker) interfaceMethodSig(id *ast.InterfaceDecl, name string) *ast.InterfaceMethodSig {
+	for _, m := range id.Methods {
+		if m.Name == name {
+			return m
+		}
+	}
+	for _, ext := range id.Extends {
+		nt, ok := ext.(*ast.NamedType)
+		if !ok {
+			continue
+		}
+		sym := c.info.Symbol[nt]
+		if sym == nil {
+			continue
+		}
+		if eid, ok := sym.Decl.(*ast.InterfaceDecl); ok {
+			if m := c.interfaceMethodSig(eid, name); m != nil {
+				return m
+			}
+		}
+	}
+	return nil
+}
+
 func (c *checker) interfaceMethodType(m *ast.InterfaceMethodSig) *Func {
 	params, variadic := c.paramTypes(m.Params)
 	return &Func{Params: params, Return: c.typeFromExpr(m.ReturnType), Variadic: variadic}
