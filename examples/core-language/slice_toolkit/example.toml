@@ -1,0 +1,21 @@
+description = "Slice toolkit UX study: sorted/unique/reversed/max/min over a list of ints"
+source   = "ux-study"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "slice_toolkit.aril"
+
+[[case]]
+args = ["5 3 8 3 1 8 5"]
+expected_output = "case1.txt"
+
+[[case]]
+args = ["10 1 5"]
+expected_output = "case2.txt"
+
+[[case]]
+args = ["7 7 7"]
+expected_output = "case3.txt"

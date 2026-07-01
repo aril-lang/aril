@@ -1,0 +1,165 @@
+// UX study: slice utilities over a list of ints.
+//
+// Reads space-separated ints from os.args[1] and prints:
+//   sorted:   ascending order (sort.sorted)
+//   unique:   sorted, deduplicated (sort.sorted + Set<int>)
+//   reversed: original order reversed (manual loop — no slices.reverse)
+//   max:      integer maximum (manual fold — math.max is float64-only)
+//   min:      integer minimum (manual fold — math.min is float64-only)
+//
+// Friction notes:
+//   - slices.reverse/slices.dedup/slices.max/slices.min do NOT exist.
+//   - sort.sortedBy is in the binding-surface spec but may not be bound yet.
+//   - math.min/max are float64; int min/max require a manual fold helper.
+//   - No string interpolation: must build strings with + and strconv.itoa.
+
+import fmt
+import os
+import sort
+import strconv
+import strings
+import std/pred   // isSorted, allDistinct — contract predicate vocabulary
+
+// ---- integer min/max helpers (math.min/max are float64) ----------------
+
+func intMin(a: int, b: int): int {
+  if a < b { return a }
+  return b
+}
+
+func intMax(a: int, b: int): int {
+  if a > b { return a }
+  return b
+}
+
+// ---- fold-based min/max over a slice ------------------------------------
+// WISH: slices.min<T> / slices.max<T> — saves writing these every time.
+
+func sliceMax(xs: []int): int {
+  var m = xs[0]
+  for x in xs {
+    m = intMax(m, x)
+  }
+  return m
+}
+
+func sliceMin(xs: []int): int {
+  var m = xs[0]
+  for x in xs {
+    m = intMin(m, x)
+  }
+  return m
+}
+
+// ---- reverse (manual loop) ---------------------------------------------
+// WISH: slices.reverse<T>([]T):[]T — saves writing this every single time.
+
+func reverseInts(xs: []int): []int {
+  var out: []int = []int{}
+  var i = xs.len() - 1
+  while i >= 0 {
+    out = out.push(xs[i])
+    i = i - 1
+  }
+  return out
+}
+
+// ---- unique (sort + dedup via Set) -------------------------------------
+// WISH: slices.dedup<T>(sorted []T):[]T — saves the Set allocation.
+
+func uniqueSorted(xs: []int): []int {
+  let sorted = sort.sorted(xs, (a, b) => a < b)
+  let seen = Set<int>{}
+  var out: []int = []int{}
+  for x in sorted {
+    if !seen.has(x) {
+      seen.add(x)
+      out = out.push(x)
+    }
+  }
+  return out
+}
+
+// ---- predicate helpers for the contract --------------------------------
+
+// allIn reports whether every element of sub appears in super.
+// Used to check: every element of uniqueSorted(xs) is in xs.
+func allIn(sub: []int, sup: []int): bool {
+  let supSet = Set<int>{}
+  for x in sup { supSet.add(x) }
+  for x in sub {
+    if !supSet.has(x) { return false }
+  }
+  return true
+}
+
+// allPresent checks coverage: every element of xs appears in result.
+// Pairs with allDistinct+isSorted to give soundness+completeness.
+func allPresent(xs: []int, result: []int): bool {
+  let rSet = Set<int>{}
+  for x in result { rSet.add(x) }
+  for x in xs {
+    if !rSet.has(x) { return false }
+  }
+  return true
+}
+
+// ---- output helpers ----------------------------------------------------
+
+func joinInts(xs: []int): string {
+  var parts: []string = []string{}
+  for x in xs {
+    parts = parts.push(strconv.itoa(x))
+  }
+  return strings.join(parts, " ")
+}
+
+// ---- main --------------------------------------------------------------
+
+func main() {
+  if os.args.len() != 2 {
+    fmt.println("usage: slice_toolkit <space-separated-ints>")
+    os.exit(2)
+  }
+
+  let raw = strings.split(os.args[1], " ")
+  var nums: []int = []int{}
+  for s in raw {
+    match strconv.atoi(s) {
+      Err(e) => {
+        fmt.println("invalid int:", s, e)
+        os.exit(1)
+      },
+      Ok(n) => {
+        nums = nums.push(n)
+      },
+    }
+  }
+
+  if nums.len() == 0 {
+    fmt.println("empty input")
+    os.exit(1)
+  }
+
+  let sorted   = sort.sorted(nums, (a, b) => a < b)
+  let unique   = uniqueSorted(nums)
+  let reversed = reverseInts(nums)
+  let maxVal   = sliceMax(nums)
+  let minVal   = sliceMin(nums)
+
+  fmt.println("sorted:", joinInts(sorted))
+  fmt.println("unique:", joinInts(unique))
+  fmt.println("reversed:", joinInts(reversed))
+  fmt.println("max:", maxVal)
+  fmt.println("min:", minVal)
+}
+
+// Load-bearing contract on uniqueSorted: soundness (isSorted + allDistinct)
+// AND completeness (every input element present in result). The completeness
+// clause rules out the "return []" trap that isSorted alone passes vacuously.
+contract uniqueSorted {
+  ensures isSorted(result)
+  ensures allDistinct(result)
+  ensures allPresent(xs, result)
+  ensures allIn(result, xs)
+}

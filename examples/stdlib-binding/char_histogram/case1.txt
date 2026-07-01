@@ -1,0 +1,4 @@
+letters: 10
+digits: 3
+spaces: 2
+other: 2

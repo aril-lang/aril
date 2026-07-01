@@ -1,0 +1,10 @@
+description = "reflect.typeOf / reflect.typeName / reflect.fields — generic class field dump"
+source   = "stdlib-coverage reflect"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "struct_dump.aril"
+expected_output = "expected-output.txt"

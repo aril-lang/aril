@@ -1,0 +1,41 @@
+// struct_dump — generic field dump via Aril's reflect module.
+//
+// Defines two class types (Point and Person), then for each instance
+// prints its type name and all field names using reflect.typeOf,
+// reflect.typeName, and reflect.fields.
+//
+// Key finding: reflect field introspection works on *class* types only.
+// Record types (type T = {f: t}) report Kind=Primitive and return no
+// fields; classes (class T { let f: type }) report Kind=Class and
+// expose full FieldInfo slices. Explicit reflect.box is required at
+// user-function call sites — implicit widening only fires at direct
+// reflect.* calls.
+
+import fmt
+import reflect
+
+class Point {
+  let x: int
+  let y: int
+}
+
+class Person {
+  let name: string
+  let age: int
+}
+
+func dumpFields(d: Dynamic) {
+  let t = reflect.typeOf(d)
+  var line = reflect.typeName(t) + ":"
+  for f in reflect.fields(t) {
+    line = line + " " + f.name
+  }
+  fmt.println(line)
+}
+
+func main() {
+  let p = Point  { x: 1, y: 2 }
+  let q = Person { name: "Alice", age: 30 }
+  dumpFields(reflect.box(p))
+  dumpFields(reflect.box(q))
+}

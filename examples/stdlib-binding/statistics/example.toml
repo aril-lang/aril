@@ -1,0 +1,21 @@
+description = "Summary statistics (mean/stddev/min/max/median) over a space-separated list of floats"
+source      = "original"
+category    = "stdlib-binding"
+showcase    = false
+forces      = ["strings.fields", "strconv.parseFloat", "strconv.formatFloat", "math.sqrt", "sort.sorted", "float64 cast", "contract"]
+since       = "0.1"
+status      = "running"
+expects     = "run-pass"
+entry       = "statistics.aril"
+
+[[case]]
+args            = ["2 4 4 4 5 5 7 9"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["1 2 3"]
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["10 20 30 40"]
+expected_output = "case3.txt"

@@ -1,0 +1,85 @@
+// Summary statistics over a space-separated list of numbers from os.args[1].
+// Computes: mean, population stddev, min, max, median — all printed to 4 d.p.
+//
+// Forces: strings.fields, strconv.parseFloat, math.sqrt, sort.sorted,
+//         strconv.formatFloat ('f', 4 decimal places), float64 cast,
+//         slice iteration, contract.
+
+import fmt
+import os
+import math
+import sort
+import strconv
+import strings
+
+func fmt4(x: float64): string {
+  return strconv.formatFloat(x, 'f', 4, 64)
+}
+
+func computeMean(xs: []float64): float64 {
+  var s = 0.0
+  for x in xs {
+    s = s + x
+  }
+  return s / float64(xs.len())
+}
+
+func computePopStddev(xs: []float64, m: float64): float64 {
+  var sumSq = 0.0
+  for x in xs {
+    let d = x - m
+    sumSq = sumSq + d * d
+  }
+  return math.sqrt(sumSq / float64(xs.len()))
+}
+
+func computeMedian(xs: []float64): float64 {
+  let n = xs.len()
+  var mid = n / 2
+  if n % 2 == 0 {
+    return (xs[mid - 1] + xs[mid]) / 2.0
+  }
+  return xs[mid]
+}
+
+contract computePopStddev {
+  ensures result >= 0.0
+}
+
+func main() {
+  if os.args.len() < 2 {
+    fmt.println("usage: statistics '<space-separated numbers>'")
+    os.exit(2)
+  }
+
+  let tokens = strings.fields(os.args[1])
+  if tokens.len() == 0 {
+    fmt.println("error: no numbers provided")
+    os.exit(1)
+  }
+
+  var nums: []float64 = []float64{}
+  for tok in tokens {
+    match strconv.parseFloat(tok, 64) {
+      Ok(f)  => { nums = nums.push(f) },
+      Err(e) => {
+        fmt.println("error: bad number:", e)
+        os.exit(1)
+      },
+    }
+  }
+
+  let sorted = sort.sorted(nums, (a, b) => a < b)
+  let n = sorted.len()
+  let m = computeMean(sorted)
+  let sd = computePopStddev(sorted, m)
+  let med = computeMedian(sorted)
+  let mn = sorted[0]
+  let mx = sorted[n - 1]
+
+  fmt.println("mean: " + fmt4(m))
+  fmt.println("stddev: " + fmt4(sd))
+  fmt.println("min: " + fmt4(mn))
+  fmt.println("max: " + fmt4(mx))
+  fmt.println("median: " + fmt4(med))
+}
