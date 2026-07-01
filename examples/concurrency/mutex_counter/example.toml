@@ -1,0 +1,9 @@
+description = "DEMAND: mutex-guarded shared counter under scope fan-out (forces sync.Mutex construction)"
+source   = "stdlib-coverage demand: sync.Mutex"
+category = "concurrency"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "mutex_counter.aril"

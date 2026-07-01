@@ -1,0 +1,85 @@
+// Real-world: parse + validate a JSON service config, distinguishing parse
+// errors from validation errors (errors.is over sentinels). Authored by a
+// TypeScript-developer agent as a UX study; its friction (no Option.unwrapOr,
+// no else-if, the encoding/json error string leaking through) is in the
+// diagnostic backlog.
+
+import fmt
+import json
+import strings
+import errors
+
+type ServiceConfig = {
+  name:     string
+  port:     int
+  tags:     []string
+  replicas: Option<int>
+}
+
+type ValidConfig = {
+  name:     string
+  port:     int
+  tags:     []string
+  replicas: int
+}
+
+let errEmptyName: error = errors.new("name must not be empty")
+let errBadPort:   error = errors.new("port out of range (1..65535)")
+let errEmptyTags: error = errors.new("tags must not be empty")
+
+func validate(raw: ServiceConfig): Result<ValidConfig, error> {
+  if raw.name.len() == 0 {
+    return Err(fmt.errorf("validation: %w", errEmptyName))
+  }
+  if raw.port < 1 || raw.port > 65535 {
+    return Err(fmt.errorf("validation: port=%v: %w", raw.port, errBadPort))
+  }
+  if raw.tags.len() == 0 {
+    return Err(fmt.errorf("validation: %w", errEmptyTags))
+  }
+  let reps = match raw.replicas {
+    Some(r) => r,
+    None    => 1,
+  }
+  return Ok(ValidConfig{ name: raw.name, port: raw.port, tags: raw.tags, replicas: reps })
+}
+
+func runConfig(label: string, jsonStr: string) {
+  fmt.println("--- " + label + " ---")
+  match json.parse<ServiceConfig>(strings.toBytes(jsonStr)) {
+    Err(e) => fmt.println("parse error:", e),
+    Ok(raw) => {
+      match validate(raw) {
+        Ok(cfg) => {
+          fmt.println(cfg.name + " on port " + fmt.sprintf("%v", cfg.port) +
+            ", " + fmt.sprintf("%v", cfg.replicas) + " replicas, tags: " + strings.join(cfg.tags, ","))
+        },
+        Err(e) => {
+          if errors.is(e, errEmptyName) {
+            fmt.println("validation error [empty-name]:", e)
+          } else {
+            if errors.is(e, errBadPort) {
+              fmt.println("validation error [bad-port]:", e)
+            } else {
+              fmt.println("validation error:", e)
+            }
+          }
+        },
+      }
+    },
+  }
+}
+
+contract validate {
+  ensures match result {
+    Ok(cfg) => cfg.port >= 1 && cfg.port <= 65535 && cfg.name.len() > 0 && cfg.tags.len() > 0 && cfg.replicas >= 1,
+    Err(_)  => true,
+  }
+}
+
+func main() {
+  runConfig("valid config", "{\"name\":\"auth-service\",\"port\":8080,\"tags\":[\"prod\",\"v2\"]}")
+  runConfig("bad port", "{\"name\":\"auth-service\",\"port\":0,\"tags\":[\"prod\"]}")
+  runConfig("empty name", "{\"name\":\"\",\"port\":443,\"tags\":[\"staging\"]}")
+  runConfig("with replicas", "{\"name\":\"cache\",\"port\":6379,\"tags\":[\"infra\",\"redis\"],\"replicas\":3}")
+}

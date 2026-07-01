@@ -1,0 +1,9 @@
+description = "DEMAND: time.Duration arithmetic + rendering (forces d.add/d.mul/d.string)"
+source   = "stdlib-coverage demand: time.Duration"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "duration_budget.aril"

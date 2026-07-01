@@ -1,0 +1,9 @@
+description = "DEMAND: line-numbering filter over stdin (forces bufio.Scanner + os.stdin)"
+source   = "stdlib-coverage demand: bufio"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "line_numberer.aril"

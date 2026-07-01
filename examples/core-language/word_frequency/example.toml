@@ -1,0 +1,10 @@
+description = "Rosetta word frequency — top-5 by count then alphabetical (agent-authored)"
+source   = "rosetta-code word-frequency"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "word_frequency.aril"
+expected_output = "expected-output.txt"

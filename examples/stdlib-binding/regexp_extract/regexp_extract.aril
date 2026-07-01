@@ -1,0 +1,20 @@
+// DEMAND SKETCH (build-fails until the `regexp` binding lands) — match and
+// extract digit runs from a batch of strings. `regexp` has no binding-surface
+// entry yet; this example *defines* the intended surface by using it:
+// `regexp.mustCompile(pattern): regexp.Regexp`, `re.matchString(s): bool`,
+// `re.findAll(s, n): []string`. Forces a value-handle type + its method set.
+import fmt
+import regexp
+import strings
+
+func main() {
+  let re = regexp.mustCompile("[0-9]+")
+  let inputs = ["order-42", "no digits here", "x9y8z7"]
+  for s in inputs {
+    if re.matchString(s) {
+      fmt.println(s + " -> " + strings.join(re.findAll(s, -1), ","))
+    } else {
+      fmt.println(s + " -> (none)")
+    }
+  }
+}

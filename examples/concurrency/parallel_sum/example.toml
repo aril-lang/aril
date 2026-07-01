@@ -1,0 +1,10 @@
+description = "Parallel sum of squares across 4 workers via scope/spawn/channels (agent-authored)"
+source   = "concurrency parallel-sum"
+category = "concurrency"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "parallel_sum.aril"
+expected_output = "expected-output.txt"
