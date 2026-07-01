@@ -38,6 +38,8 @@ func TestNewMechanicalRows(t *testing.T) {
 		// Bare-error effect: lifted to Result<unit, error>, NOT Result<T, error>.
 		{"os", "writeFile", "WriteFile", "Result<unit, error>", ResultWrap},
 		// unicode char classification: func(rune) bool → Rename, bool.
+		{"strings", "index", "Index", "int", Rename},
+		{"strings", "splitN", "SplitN", "[]string", Rename},
 		// math.pi: a package const (deriver *types.Const support), value Rename.
 		{"math", "pi", "Pi", "float64", Rename},
 		{"unicode", "isDigit", "IsDigit", "bool", Rename},

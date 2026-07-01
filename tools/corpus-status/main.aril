@@ -90,9 +90,9 @@ func runOk(name: string, args: []string): string {
 
 // diagPos returns the index of a aril diagnostic marker in line, or -1.
 func diagPos(line: string): int {
-  let i = indexOf(line, "error[")
+  let i = strings.index(line, "error[")
   if i >= 0 { return i }
-  return indexOf(line, "internal[")
+  return strings.index(line, "internal[")
 }
 
 // firstDiagLine returns the first diagnostic line sliced from its marker
@@ -111,10 +111,10 @@ func errorCode(line: string): string {
   let i = diagPos(line)
   if i < 0 { return "" }
   let rest0 = line[i:]
-  let lb = indexOf(rest0, "[")
+  let lb = strings.index(rest0, "[")
   if lb < 0 { return "" }
   let rest = rest0[lb + 1:]
-  let rb = indexOf(rest, "]")
+  let rb = strings.index(rest, "]")
   if rb < 0 { return "" }
   return rest[:rb]
 }
@@ -217,15 +217,15 @@ func trimQuotes(s: string): string {
 // `=`, the inner of a leading quoted run if present, else the pre-`#` text
 // with surrounding quotes stripped.
 func tomlScalar(line: string): string {
-  let eq = indexOf(line, "=")
+  let eq = strings.index(line, "=")
   if eq < 0 { return "" }
   var v = strings.trimSpace(line[eq + 1:])
   if strings.hasPrefix(v, "\"") {
     let rest = v[1:]
-    let j = indexOf(rest, "\"")
+    let j = strings.index(rest, "\"")
     if j >= 0 { return rest[:j] }
   }
-  let h = indexOf(v, "#")
+  let h = strings.index(v, "#")
   if h >= 0 { v = v[:h] }
   return trimQuotes(strings.trimSpace(v))
 }
@@ -233,7 +233,7 @@ func tomlScalar(line: string): string {
 // tomlCodes extracts the quoted strings of an array value: everything after
 // `=` up to the first `]`, then each `"..."`.
 func tomlCodes(line: string): []string {
-  let eq = indexOf(line, "=")
+  let eq = strings.index(line, "=")
   if eq < 0 { return []string{} }
   let v = line[eq + 1:]
   // Extract the quoted strings of the array by scanning `"…"` pairs. We do NOT
@@ -245,10 +245,10 @@ func tomlCodes(line: string): []string {
   var out = []string{}
   var rest = v
   while true {
-    let q1 = indexOf(rest, "\"")
+    let q1 = strings.index(rest, "\"")
     if q1 < 0 { break }
     rest = rest[q1 + 1:]
-    let q2 = indexOf(rest, "\"")
+    let q2 = strings.index(rest, "\"")
     if q2 < 0 { break }
     out = out.push(rest[:q2])
     rest = rest[q2 + 1:]
@@ -319,7 +319,7 @@ func emittedCodes(re: Regexp, combined: string): []string {
 func copyFile(src: string, dst: string) {
   match os.readFile(src) {
     Ok(data) => {
-      match writeFile(dst, data, 420) {
+      match os.writeFile(dst, data, 420) {
         Ok(_) => fmt.print(""),
         Err(e) => {
           fmt.println("corpus-status: stage write failed:", dst, e)
@@ -620,7 +620,7 @@ func matchPatterns(stdout: string, patternsText: string): bool {
     if pat == "" {
       continue
     }
-    let rel = indexOf(stdout[cursor:], pat)
+    let rel = strings.index(stdout[cursor:], pat)
     if rel < 0 {
       return false
     }
@@ -640,7 +640,7 @@ func firstForbidden(stdout: string, forbiddenText: string): string {
     if pat == "" {
       continue
     }
-    if indexOf(stdout, pat) >= 0 {
+    if strings.index(stdout, pat) >= 0 {
       return pat
     }
   }
@@ -752,7 +752,7 @@ func lessCache(a: CacheEntry, b: CacheEntry): bool {
 }
 
 func loadCache(): []CacheEntry {
-  match json.parse<RunCache>(toBytes(readFileOrEmpty(cachePath()))) {
+  match json.parse<RunCache>(strings.toBytes(readFileOrEmpty(cachePath()))) {
     Ok(c) => return c.entries,
     Err(_) => return []CacheEntry{},
   }
@@ -1034,7 +1034,7 @@ func parseFloorLine(line: string, key: string): int {
   if !strings.hasPrefix(t, key) {
     return -1
   }
-  let parts = splitN(t, "=", 2)
+  let parts = strings.splitN(t, "=", 2)
   if parts.len() < 2 {
     return -1
   }
@@ -1174,7 +1174,7 @@ func writeArtifacts(s: Status) {
 }
 
 func writeOrDie(path: string, content: string) {
-  match writeFile(path, toBytes(content), 420) {
+  match os.writeFile(path, strings.toBytes(content), 420) {
     Ok(_) => fmt.print(""),
     Err(e) => {
       fmt.println("corpus-status: write", path, "failed:", e)
@@ -1279,7 +1279,7 @@ func cmdHistory() {
   for ln in strings.split(log, "\n") {
     let line = strings.trimSpace(ln)
     if line == "" { continue }
-    let parts = splitN(line, "\t", 3)
+    let parts = strings.splitN(line, "\t", 3)
     if parts.len() < 3 { continue }
     let sha = parts[0]
     let blob = run("git", ["show", sha + ":" + jsonPath()])
@@ -1289,7 +1289,7 @@ func cmdHistory() {
       totals: HistTotals{ total: 0, build_ok: 0, diag_ok: 0, diag_total: 0, emit_fail: 0, sema_fail: 0, parse_fail: 0, run_ok: 0, run_total: 0 },
     }
     var parsed = false
-    match json.parse<HistStatus>(toBytes(blob.out())) {
+    match json.parse<HistStatus>(strings.toBytes(blob.out())) {
       Ok(s) => {
         hs = s
         parsed = true

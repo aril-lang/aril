@@ -25,7 +25,7 @@ var Manifest = map[string][]string{
 	"errors":  {"Is"},
 	"fmt":     {"Sprint", "Sprintf", "Sprintln"},
 	"os":      {"Args", "Exit", "Getenv", "ReadFile", "WriteFile"},
-	"strings": {"Contains", "Count", "Fields", "HasPrefix", "HasSuffix", "Join", "Replace", "Split", "ToLower", "ToUpper", "TrimPrefix", "TrimSpace", "TrimSuffix"},
+	"strings": {"Contains", "Count", "Fields", "HasPrefix", "HasSuffix", "Index", "Join", "Replace", "Split", "SplitN", "ToLower", "ToUpper", "TrimPrefix", "TrimSpace", "TrimSuffix"},
 	"strconv": {"Atoi", "FormatBool", "FormatFloat", "Itoa", "ParseBool", "ParseFloat", "ParseInt", "Quote"},
 	"math":    {"Abs", "Ceil", "Floor", "Log", "Log10", "Log2", "Max", "Min", "Pi", "Pow", "Sqrt"},
 	"time":    {"After", "Sleep", "Tick"},
