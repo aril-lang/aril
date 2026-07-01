@@ -3,58 +3,25 @@
 // Reads space-separated ints from os.args[1] and prints:
 //   sorted:   ascending order (sort.sorted)
 //   unique:   sorted, deduplicated (sort.sorted + Set<int>)
-//   reversed: original order reversed (manual loop — no slices.reverse)
-//   max:      integer maximum (manual fold — math.max is float64-only)
-//   min:      integer minimum (manual fold — math.min is float64-only)
+//   reversed: original order reversed (slices.reverse)
+//   max:      slice maximum (slices.max)
+//   min:      slice minimum (slices.min)
 //
-// Friction notes:
-//   - slices.reverse/slices.dedup/slices.max/slices.min do NOT exist.
-//   - sort.sortedBy is in the binding-surface spec but may not be bound yet.
-//   - math.min/max are float64; int min/max require a manual fold helper.
-//   - No string interpolation: must build strings with + and strconv.itoa.
+// Remaining gaps: slices.dedup (full, not adjacent) is still hand-rolled via
+// sort + Set; sort.sortedBy (key extractor) is spec'd but unbound; no string
+// interpolation (build with + and strconv.itoa).
 
 import fmt
 import os
 import sort
+import slices
 import strconv
 import strings
 import std/pred   // isSorted, allDistinct — contract predicate vocabulary
 
-// ---- integer min/max helpers (math.min/max are float64) ----------------
-
-// ---- fold-based min/max over a slice ------------------------------------
-// Uses the predeclared `min`/`max` (generic over Ordered — the int-extremum
-// gap math.min/max left; they lower to Go's builtin min/max). A slices.min<T> /
-// slices.max<T> over a whole slice would still save the fold.
-
-func sliceMax(xs: []int): int {
-  var m = xs[0]
-  for x in xs {
-    m = max(m, x)
-  }
-  return m
-}
-
-func sliceMin(xs: []int): int {
-  var m = xs[0]
-  for x in xs {
-    m = min(m, x)
-  }
-  return m
-}
-
-// ---- reverse (manual loop) ---------------------------------------------
-// WISH: slices.reverse<T>([]T):[]T — saves writing this every single time.
-
-func reverseInts(xs: []int): []int {
-  var out: []int = []int{}
-  var i = xs.len() - 1
-  while i >= 0 {
-    out = out.push(xs[i])
-    i = i - 1
-  }
-  return out
-}
+// Slice-level extremum + reverse now come from the `slices` bindings
+// (slices.max / slices.min / slices.reverse — see main); the earlier hand
+// folds and reverse loop are gone.
 
 // ---- unique (sort + dedup via Set) -------------------------------------
 // WISH: slices.dedup<T>(sorted []T):[]T — saves the Set allocation.
@@ -135,9 +102,9 @@ func main() {
 
   let sorted   = sort.sorted(nums, (a, b) => a < b)
   let unique   = uniqueSorted(nums)
-  let reversed = reverseInts(nums)
-  let maxVal   = sliceMax(nums)
-  let minVal   = sliceMin(nums)
+  let reversed = slices.reverse(nums)
+  let maxVal   = slices.max(nums)
+  let minVal   = slices.min(nums)
 
   fmt.println("sorted:", joinInts(sorted))
   fmt.println("unique:", joinInts(unique))

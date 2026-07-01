@@ -450,6 +450,20 @@ sort.sortedBy<T, K>(s: []T, key: (T) => K): []T
 sort.slice<T>(s: []T, less: (int, int) => bool)
 ```
 
+## slices
+
+```aril
+// Slice-level helpers over Go's `slices` package (Go ≥1.21). The
+// value-returning ones rename to the real package (Go infers the element
+// type). `reverse` returns a NEW slice — Aril inverts Go's in-place
+// slices.Reverse to keep `let` semantics.
+slices.max<T: Ordered>(s: []T):        T        // Go slices.Max (panics if empty)
+slices.min<T: Ordered>(s: []T):        T        // Go slices.Min
+slices.contains<T>(s: []T, v: T):      bool      // Go slices.Contains
+slices.indexOf<T>(s: []T, v: T):       int       // Go slices.Index (-1 if absent)
+slices.reverse<T>(s: []T):             []T       // new reversed copy
+```
+
 ## errors
 
 ```aril

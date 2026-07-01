@@ -37,8 +37,9 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `os` | `args` `exit` `getenv` `readFile` `writeFile` · `lookupEnv` (→ `Option`) | mechanical + idiom |
 | `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
-| `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pow` `sqrt` | mechanical |
+| `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pi` `pow` `sqrt` | mechanical |
 | `unicode` | `isDigit` `isLetter` `isSpace` | mechanical |
+| `slices` | `max` `min` `contains` `indexOf` (→ Go `slices.*`) · `reverse` (new copy) | idiom |
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
 | `sort` | `sorted` (comparator, returns a new slice) | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |

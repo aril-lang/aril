@@ -63,5 +63,16 @@ func OptionOf[T any](v T, ok bool) Option[T] {
 	return OptionNone[T]()
 }
 
+// SlicesReverse backs slices.reverse(xs): a NEW slice with the elements in
+// reverse order (Aril preserves the input's immutability; Go's slices.Reverse
+// mutates in place). binding-surface.md §slices.
+func SlicesReverse[T any](xs []T) []T {
+	out := make([]T, len(xs))
+	for i, v := range xs {
+		out[len(xs)-1-i] = v
+	}
+	return out
+}
+
 // MakeSlice backs the predeclared make-slice builtin.
 func MakeSlice[T any](n int) []T { return make([]T, n) }

@@ -152,6 +152,23 @@ func (g *gen) writePredeclaredResultUnit() {
 `)
 }
 
+// writePredeclaredSlicesReverse emits the SlicesReverse helper backing
+// slices.reverse(xs) — a NEW reversed slice (Go's slices.Reverse is in-place).
+// Conditional on use; no import.
+func (g *gen) writePredeclaredSlicesReverse() {
+	if !g.usesSlicesReverse {
+		return
+	}
+	g.b.WriteString(`func SlicesReverse[T any](xs []T) []T {
+	out := make([]T, len(xs))
+	for i, v := range xs {
+		out[len(xs)-1-i] = v
+	}
+	return out
+}
+`)
+}
+
 // writePredeclaredSortSorted emits the Sorted helper backing
 // `sort.sorted(s, less)` (binding-surface.md §sort): a comparator sort
 // that returns a NEW slice (Aril preserves the input's immutability),
@@ -748,6 +765,11 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "sorted" {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
 					g.usesSortSorted = true
+				}
+			}
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "reverse" {
+				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
+					g.usesSlicesReverse = true
 				}
 			}
 			// json.* bindings (binding-surface.md §encoding/json). Gated

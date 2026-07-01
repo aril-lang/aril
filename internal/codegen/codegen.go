@@ -450,6 +450,8 @@ type gen struct {
 	// Sorted helper (copy + sort.SliceStable) and Go's "sort"
 	// import are needed.
 	usesSortSorted bool
+	// usesSlicesReverse — slices.reverse(xs) lowers to the SlicesReverse helper.
+	usesSlicesReverse bool
 	// usesErrorCtor — the `error(msg)` free constructor (builtins.md)
 	// is used, so its lowering `errors.New(msg)` needs Go's "errors".
 	usesErrorCtor bool
@@ -651,7 +653,7 @@ func (g *gen) usesRuntime() bool {
 	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
-		g.usesScope || g.usesSortSorted || g.usesChanContract
+		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesChanContract
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -798,6 +800,7 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredJSONParse()
 	g.writeOptionJSONMethods()
 	g.writePredeclaredSortSorted()
+	g.writePredeclaredSlicesReverse()
 	g.writePredeclaredTryRecv()
 	g.writePredeclaredGroup()
 	g.writePredeclaredChanContract()
