@@ -1,0 +1,10 @@
+description = "String interpolation — ${expr} holes lower to fmt.Sprintf (arithmetic / field / method holes)"
+source   = "SURFACE-ERGONOMICS PR2"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.4"
+status   = "running"
+expects  = "run-pass"
+entry    = "receipt_formatter.aril"
+expected_output = "expected-output.txt"

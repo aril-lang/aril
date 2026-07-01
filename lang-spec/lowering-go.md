@@ -167,7 +167,26 @@ fields, and no v1 program serialises a tuple to JSON.
 package-level variable of type `struct{}` — so `unit`-typed
 expressions are non-empty Go expressions.
 
-## TopLevelLet
+## String interpolation
+
+A `StringInterpExpr` (`"a ${e1} b ${e2} c"`) lowers to a single
+`fmt.Sprintf` call: the literal segments become the format
+string with one `%v` verb per hole, and the holes become the
+trailing arguments in order.
+
+```
+"a ${e1} b ${e2} c"   →   fmt.Sprintf("a %v b %v c", e1, e2)
+```
+
+A literal `%` in a segment is doubled to `%%` so `Sprintf`
+reads it verbatim; escapes in the segments are already decoded
+by the parser (the format string is emitted via `strconv.Quote`
+of the assembled value). The lowering pulls `fmt` into the
+import set. `%v` is the universal verb — every Aril value type
+(including sums / records / handles, via their Go `String()` or
+struct printing) has a `%v` rendering, so interpolation is total
+over any hole type. A hole may not contain a nested string
+literal in v1 (lexer E0120, see `diagnostics.md`).
 
 A module-level `let Name [: T] = Value` (ast.md §TopLevelLet) lowers
 to a Go **package-level `var`**:
