@@ -1,0 +1,10 @@
+description = "Rank players by score (sort.sortedBy) + distinct teams (slices.dedup)"
+source   = "stdlib-coverage leaderboard"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "leaderboard.aril"
+expected_output = "expected-output.txt"

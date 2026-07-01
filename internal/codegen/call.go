@@ -182,6 +182,15 @@ func (g *gen) emitCall(c *ast.Call) error {
 			return g.emitArgList(c.Args)
 		}
 	}
+	// sort.sortedBy(s, key) — stable sort by an Ordered key extractor, returns a
+	// NEW slice. Lowers to the SortedBy helper.
+	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 2 && f.Name == "sortedBy" {
+		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
+			g.usesSortedBy = true
+			g.b.WriteString(g.rt("SortedBy"))
+			return g.emitArgList(c.Args)
+		}
+	}
 	// slices.reverse(xs) — returns a NEW reversed slice (Go's slices.Reverse is
 	// in-place), lowered to the SlicesReverse runtime helper. Gated on the sema
 	// `slices` module (like sort.sorted).
@@ -189,6 +198,14 @@ func (g *gen) emitCall(c *ast.Call) error {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
 			g.usesSlicesReverse = true
 			g.b.WriteString(g.rt("SlicesReverse"))
+			return g.emitArgList(c.Args)
+		}
+	}
+	// slices.dedup(xs) — NEW slice, duplicates removed (first-occurrence order).
+	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 1 && f.Name == "dedup" {
+		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
+			g.usesSlicesDedup = true
+			g.b.WriteString(g.rt("SlicesDedup"))
 			return g.emitArgList(c.Args)
 		}
 	}
@@ -700,7 +717,11 @@ func isConversionBinding(pkg, method string) bool {
 func isRuntimeHelperBinding(pkg, method string) bool {
 	switch pkg {
 	case "sort":
-		return method == "sorted"
+		return method == "sorted" || method == "sortedBy"
+	case "slices":
+		// reverse/dedup lower to arilrt helpers; max/min/contains/indexOf are
+		// direct renames to Go's slices pkg and DO need the import.
+		return method == "reverse" || method == "dedup"
 	case "fmt":
 		return method == "scan" || method == "scan2" || method == "scan3"
 	case "json":

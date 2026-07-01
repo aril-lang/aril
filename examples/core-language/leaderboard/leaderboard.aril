@@ -1,0 +1,48 @@
+// sort.sortedBy (rank by a key extractor) + slices.dedup (distinct in
+// first-appearance order) — the slice helpers that replace the hand folds
+// agents kept writing. Ranks players by score ascending and lists the distinct
+// teams in appearance order.
+
+import fmt
+import sort
+import slices
+
+type Player = { name: string, team: string, score: int }
+
+func rankByScore(players: []Player): []Player {
+  return sort.sortedBy(players, (p) => p.score)
+}
+
+func nonDescendingByScore(ps: []Player): bool {
+  var i = 1
+  while i < ps.len() {
+    if ps[i - 1].score > ps[i].score { return false }
+    i = i + 1
+  }
+  return true
+}
+
+func main() {
+  let players = [
+    Player{ name: "ada", team: "red",  score: 30 },
+    Player{ name: "bo",  team: "blue", score: 50 },
+    Player{ name: "cy",  team: "red",  score: 50 },
+    Player{ name: "di",  team: "blue", score: 20 },
+  ]
+  for p in rankByScore(players) {
+    fmt.println(p.name, p.score)
+  }
+  var teams = []string{}
+  for p in players {
+    teams = teams.push(p.team)
+  }
+  fmt.println("teams:", slices.dedup(teams).len())
+}
+
+// Load-bearing: ranking is non-descending by score AND preserves the roster size
+// (a dropped/duplicated player would fail the length half) — the sort's
+// soundness + completeness.
+contract rankByScore {
+  ensures nonDescendingByScore(result)
+  ensures result.len() == players.len()
+}

@@ -39,9 +39,9 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
 | `math` | `abs` `ceil` `cos` `exp` `floor` `hypot` `log` `log10` `log2` `max` `min` `mod` `pi` `pow` `round` `sin` `sqrt` `tan` `trunc` | mechanical |
 | `unicode` | `isDigit` `isLetter` `isSpace` | mechanical |
-| `slices` | `max` `min` `contains` `indexOf` (→ Go `slices.*`) · `reverse` (new copy) | idiom |
+| `slices` | `max` `min` `contains` `indexOf` (→ Go `slices.*`) · `reverse` `dedup` (new copy) | idiom |
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
-| `sort` | `sorted` (comparator, returns a new slice) | idiom |
+| `sort` | `sorted` (comparator) · `sortedBy` (key extractor) — return a new slice | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |
 | `errors` | `is` (sentinel/chain classification) · `new` (constructor) | mechanical + idiom |
 
