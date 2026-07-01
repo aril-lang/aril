@@ -461,7 +461,7 @@ func (c *checker) inferClosureBinding(call *ast.Call) (Type, bool) {
 	if sym := c.info.Symbol[recv]; sym == nil || sym.Kind != SymBuiltinModule || recv.Name != "sort" {
 		return nil, false
 	}
-	if f.Name != "sorted" || len(call.Args) != 2 {
+	if (f.Name != "sorted" && f.Name != "sortedBy") || len(call.Args) != 2 {
 		return nil, false
 	}
 	sliceT := c.inferExpr(call.Args[0])
@@ -470,7 +470,13 @@ func (c *checker) inferClosureBinding(call *ast.Call) (Type, bool) {
 		elem = s.Elem
 	}
 	if cl, ok := call.Args[1].(*ast.ClosureLit); ok {
-		c.closureExpect[cl] = &Func{Params: []Type{elem, elem}, Return: &Builtin{N: "bool"}}
+		// sorted: `(T, T) => bool` comparator. sortedBy: `(T) => K` key
+		// extractor (one param, K inferred from the body).
+		if f.Name == "sorted" {
+			c.closureExpect[cl] = &Func{Params: []Type{elem, elem}, Return: &Builtin{N: "bool"}}
+		} else {
+			c.closureExpect[cl] = &Func{Params: []Type{elem}, Return: &Unknown{}}
+		}
 	}
 	c.inferExpr(call.Args[1])
 	// The result preserves the input slice type — `sorted` returns a

@@ -169,6 +169,41 @@ func (g *gen) writePredeclaredSlicesReverse() {
 `)
 }
 
+// writePredeclaredSortedBy emits the SortedBy helper backing sort.sortedBy(s,
+// key) — a stable sort by an Ordered key extractor, returning a NEW slice.
+func (g *gen) writePredeclaredSortedBy() {
+	if !g.usesSortedBy {
+		return
+	}
+	g.b.WriteString(`func SortedBy[T any, K cmp.Ordered](s []T, key func(T) K) []T {
+	out := make([]T, len(s))
+	copy(out, s)
+	sort.SliceStable(out, func(i, j int) bool { return key(out[i]) < key(out[j]) })
+	return out
+}
+`)
+}
+
+// writePredeclaredSlicesDedup emits the SlicesDedup helper backing
+// slices.dedup(xs) — a NEW slice with duplicates removed, first-occurrence order.
+func (g *gen) writePredeclaredSlicesDedup() {
+	if !g.usesSlicesDedup {
+		return
+	}
+	g.b.WriteString(`func SlicesDedup[T comparable](xs []T) []T {
+	seen := make(map[T]bool, len(xs))
+	out := make([]T, 0, len(xs))
+	for _, v := range xs {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+`)
+}
+
 // writePredeclaredSortSorted emits the Sorted helper backing
 // `sort.sorted(s, less)` (binding-surface.md §sort): a comparator sort
 // that returns a NEW slice (Aril preserves the input's immutability),
@@ -765,6 +800,16 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "sorted" {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
 					g.usesSortSorted = true
+				}
+			}
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "sortedBy" {
+				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "sort" && g.isBuiltinModule(recv) {
+					g.usesSortedBy = true
+				}
+			}
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "dedup" {
+				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
+					g.usesSlicesDedup = true
 				}
 			}
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "reverse" {

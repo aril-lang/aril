@@ -452,6 +452,10 @@ type gen struct {
 	usesSortSorted bool
 	// usesSlicesReverse — slices.reverse(xs) lowers to the SlicesReverse helper.
 	usesSlicesReverse bool
+	// usesSortedBy — sort.sortedBy(s, key) lowers to the SortedBy helper.
+	usesSortedBy bool
+	// usesSlicesDedup — slices.dedup(xs) lowers to the SlicesDedup helper.
+	usesSlicesDedup bool
 	// usesErrorCtor — the `error(msg)` free constructor (builtins.md)
 	// is used, so its lowering `errors.New(msg)` needs Go's "errors".
 	usesErrorCtor bool
@@ -653,7 +657,7 @@ func (g *gen) usesRuntime() bool {
 	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
-		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesChanContract
+		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -730,6 +734,12 @@ func (g *gen) writeHeader(f *ast.File) {
 		// which lives in arilrt under vendored mode — no sort in main.
 		add("sort")
 	}
+	if g.usesSortedBy && !g.vendored() {
+		// sort.sortedBy → the SortedBy helper (sort.SliceStable + a cmp.Ordered
+		// key); inline mode needs both imports (vendored carries them in arilrt).
+		add("sort")
+		add("cmp")
+	}
 	// The scan helpers (fmt.scan* → Scan*) are emitted inline in main in
 	// both modes (their anonymous tuple-payload struct must be declared
 	// in main so the user's `Ok((a, b))` destructure can read its
@@ -801,6 +811,8 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writeOptionJSONMethods()
 	g.writePredeclaredSortSorted()
 	g.writePredeclaredSlicesReverse()
+	g.writePredeclaredSortedBy()
+	g.writePredeclaredSlicesDedup()
 	g.writePredeclaredTryRecv()
 	g.writePredeclaredGroup()
 	g.writePredeclaredChanContract()

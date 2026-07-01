@@ -462,6 +462,7 @@ slices.min<T: Ordered>(s: []T):        T        // Go slices.Min
 slices.contains<T>(s: []T, v: T):      bool      // Go slices.Contains
 slices.indexOf<T>(s: []T, v: T):       int       // Go slices.Index (-1 if absent)
 slices.reverse<T>(s: []T):             []T       // new reversed copy
+slices.dedup<T>(s: []T):               []T       // new slice, duplicates removed (first-occurrence order; T comparable)
 ```
 
 ## errors

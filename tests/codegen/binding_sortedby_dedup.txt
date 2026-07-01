@@ -1,0 +1,71 @@
+--- TITLE ---
+sort.sortedBy (→ SortedBy helper, key extractor) and slices.dedup (→ SlicesDedup helper, first-occurrence)
+
+--- INPUT ---
+import fmt
+import sort
+import slices
+
+type P = { name: string, age: int }
+
+func main() {
+  let ppl = [P{name: "c", age: 30}, P{name: "a", age: 20}, P{name: "b", age: 20}]
+  for p in sort.sortedBy(ppl, (x) => x.age) {
+    fmt.println(p.name, p.age)
+  }
+  let xs = [3, 1, 3, 2, 1, 2, 5]
+  fmt.println(slices.dedup(xs).len())
+}
+
+--- GO ---
+
+package main
+
+import (
+	"cmp"
+	"fmt"
+	"sort"
+)
+
+func SortedBy[T any, K cmp.Ordered](s []T, key func(T) K) []T {
+	out := make([]T, len(s))
+	copy(out, s)
+	sort.SliceStable(out, func(i, j int) bool { return key(out[i]) < key(out[j]) })
+	return out
+}
+func SlicesDedup[T comparable](xs []T) []T {
+	seen := make(map[T]bool, len(xs))
+	out := make([]T, 0, len(xs))
+	for _, v := range xs {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+type P struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+func main() {
+	var ppl = []P{P{Name: "c", Age: 30}, P{Name: "a", Age: 20}, P{Name: "b", Age: 20}}
+	for _, p := range SortedBy(ppl, func(x P) int {
+		return x.Age
+	}) {
+		fmt.Println(p.Name, p.Age)
+	}
+	var xs = []int{3, 1, 3, 2, 1, 2, 5}
+	fmt.Println(len(SlicesDedup(xs)))
+}
+
+--- STDOUT ---
+a 20
+b 20
+c 30
+4
+
+--- EXIT ---
+0

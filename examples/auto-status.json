@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 80,
+    "total": 81,
     "parse_fail": 3,
     "sema_fail": 2,
     "emit_fail": 7,
-    "build_ok": 68,
+    "build_ok": 69,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 68,
-    "run_total": 79
+    "run_ok": 69,
+    "run_total": 80
   },
   "files": [
     {
@@ -154,6 +154,11 @@
     },
     {
       "path": "examples/core-language/invert_binary_tree/invert_binary_tree.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/leaderboard/leaderboard.aril",
       "stage": "build",
       "blocker": ""
     },

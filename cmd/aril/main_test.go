@@ -134,6 +134,7 @@ func TestRuntimeModeEquivalence(t *testing.T) {
 		"examples/stdlib-binding/config_loader/config_loader.aril",          // json.parse → arilrt.JSONParse
 		"examples/stdlib-binding/env_config/env_config.aril",                // os.lookupEnv → arilrt.OptionOf (comma-ok lift)
 		"examples/core-language/slice_toolkit/slice_toolkit.aril",           // slices.reverse → arilrt.SlicesReverse
+		"examples/core-language/leaderboard/leaderboard.aril",               // sort.sortedBy + slices.dedup → arilrt helpers
 		"examples/core-language/p1820/p1820.aril",                           // fmt.scan2 — the inline tuple-payload exception
 	}
 	for _, ex := range examples {
