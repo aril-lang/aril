@@ -780,7 +780,14 @@ func (c *checker) inferBinary(b *ast.Binary) Type {
 		// operands route to refEq, collections / funcs are not
 		// comparable at all.
 		if (concrete(lt) && !comparable(lt)) || (concrete(rt) && !comparable(rt)) {
-			c.report("E0401", "`"+b.Op+"` on non-comparable type — compare field-wise, or use `refEq` for class identity", b.Span)
+			if isOptionOrResult(lt) || isOptionOrResult(rt) {
+				// An Option / Result is inspected with `match`, never
+				// compared with `==` (the natural TS `x === null` instinct
+				// on an Option, or `refEq` — both wrong here). D10 / E0401.
+				c.report("E0401", "`"+b.Op+"` cannot compare Option / Result values — use `match` to inspect the case (e.g. `match o { Some(v) => ..., None => ... }`)", b.Span)
+			} else {
+				c.report("E0401", "`"+b.Op+"` on non-comparable type — compare field-wise, or use `refEq` for class identity", b.Span)
+			}
 		} else {
 			c.expectSame(lt, rt, b, "comparison")
 		}

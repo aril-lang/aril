@@ -90,3 +90,23 @@ func use(b: Bar): int { return b.foo() }`
 		t.Errorf("correct method arity must not fire E0202, got %v", codes)
 	}
 }
+
+// E0401 — comparing an Option / Result with `==` is rejected (they are
+// inspected with `match`, not compared). The tailored fix-hint is checked
+// by the corpus negative case; here we lock that the code fires.
+
+func TestOptionEqualityFiresE0401(t *testing.T) {
+	src := `func find(): Option<int> { return None }
+func use(): bool { return find() == None }`
+	if codes := runCheck(t, src); !contains(codes, "E0401") {
+		t.Errorf("expected E0401 (Option == None), got %v", codes)
+	}
+}
+
+func TestResultEqualityFiresE0401(t *testing.T) {
+	src := `func go(): Result<int, error> { return Ok(1) }
+func use(): bool { return go() == Ok(1) }`
+	if codes := runCheck(t, src); !contains(codes, "E0401") {
+		t.Errorf("expected E0401 (Result equality), got %v", codes)
+	}
+}

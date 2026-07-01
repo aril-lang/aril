@@ -295,6 +295,17 @@ func equal(a, b Type) bool {
 // to refEq, and slices / maps / sets / stacks / funcs are not
 // comparable. Unknown is reported comparable so a half-typed
 // operand never trips E0401 — callers also gate on concrete().
+// isOptionOrResult reports whether t is an Option or Result — the sum
+// types that are inspected with `match`, not compared with `==` (E0401
+// tailors its fix-hint on this; diagnostics.md E0401).
+func isOptionOrResult(t Type) bool {
+	switch t.(type) {
+	case *Option, *Result:
+		return true
+	}
+	return false
+}
+
 func comparable(t Type) bool {
 	switch x := t.(type) {
 	case *Builtin, *Unit, *Unknown, *Dynamic, *Any, *Generic:

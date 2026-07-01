@@ -1,0 +1,17 @@
+--- env_config.aril
++++ env_config.aril
+@@ -9,10 +9,11 @@
+ import os
+ 
+ func setting(key: string, fallback: string): string {
+-  match os.lookupEnv(key) {
+-    Some(v) => v,
+-    None    => fallback,
++  let v = os.lookupEnv(key)
++  if v == None {
++    return fallback
+   }
++  return fallback
+ }
+ 
+ func main() {
