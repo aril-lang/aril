@@ -1,9 +1,10 @@
-description = "DEMAND: regexp match/extract (defines + forces the regexp surface)"
+description = "regexp match/extract via the regexp.Regexp value handle"
 source   = "stdlib-coverage demand: regexp"
 category = "stdlib-binding"
 showcase = false
 forces   = []
 since    = "0.1"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "regexp_extract.aril"
+expected_output = "expected-output.txt"

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
 	"github.com/aril-lang/aril/internal/sema"
 )
 
@@ -730,7 +731,31 @@ func (g *gen) goMethodName(receiver ast.Expr, name string) string {
 	if g.isContainerTypedExpr(receiver) {
 		return exportFieldName(name)
 	}
+	// Value-handle method (`re.matchString` → `re.MatchString`): the receiver's
+	// sema type is a bound stdlib handle Named, and the Go method name comes
+	// from the shared binding table (VALUE-HANDLES), not the verbatim Aril name.
+	if goName, ok := g.handleMethodGoName(receiver, name); ok {
+		return goName
+	}
 	return mapFieldName(receiver, name)
+}
+
+// handleMethodGoName returns the Go method name for `receiver.name` when
+// sema typed receiver as a bound stdlib value-handle (regexp.Regexp, …),
+// reading the shared binding.handleMethods table.
+func (g *gen) handleMethodGoName(receiver ast.Expr, name string) (string, bool) {
+	if g.info == nil {
+		return "", false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	if !ok {
+		return "", false
+	}
+	hm, ok := binding.HandleMethodOf(named.N, name)
+	if !ok {
+		return "", false
+	}
+	return hm.GoName, true
 }
 
 // isContainerTypedExpr reports whether sema typed receiver as one of the

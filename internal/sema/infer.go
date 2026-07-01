@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
 )
 
 // inferExpr returns the type of e, recording it in Info.Type and
@@ -648,6 +649,14 @@ func (c *checker) inferField(f *ast.Field) Type {
 	named, ok := recv.(*Named)
 	if !ok {
 		return &Unknown{}
+	}
+	// Value-handle method access — `re.matchString(s)` on a stdlib handle
+	// type (regexp.Regexp, …). The method set is a hand-curated binding
+	// table (binding.handleMethods) shared with codegen, keyed on the
+	// handle's Aril type spelling (VALUE-HANDLES). Give the method its Func
+	// so the call is arg-checked and typed.
+	if hm, ok := binding.HandleMethodOf(named.N, f.Name); ok {
+		return handleMethodSigType(hm)
 	}
 	// Record field access — `p.x` on a record type.
 	if ft := c.recordFieldType(named, f.Name); ft != nil {

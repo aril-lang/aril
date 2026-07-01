@@ -109,8 +109,15 @@ func stdlibRenameOf(recv, name string) (string, bool) {
 	if g, ok := binding.RenameOf(recv, name); ok {
 		return g, true
 	}
-	g, ok := stdlibRenameOverlay[[2]string{recv, name}]
-	return g, ok
+	if g, ok := stdlibRenameOverlay[[2]string{recv, name}]; ok {
+		return g, true
+	}
+	// Value-handle constructor (binding.handleCtors): a package function that
+	// builds a stdlib struct handle (regexp.mustCompile → regexp.MustCompile).
+	if hc, ok := binding.HandleCtorOf(recv, name); ok {
+		return hc.GoName, true
+	}
+	return "", false
 }
 
 // stdlibResultWrapOf returns the Go identifier for a `(T, error)`

@@ -473,6 +473,22 @@ errors.is(err: error, target: error): bool
 errors.as<T>(err: error): Option<T>                    // generic As
 ```
 
+## regexp
+
+A value-handle type surfaced through the builtin-module namespace: the
+constructor returns an opaque `regexp.Regexp` and the method set dispatches on
+that boundary type (mechanical — each maps 1:1 to a Go method). The
+capture-group / submatch surface is deferred.
+
+```aril
+regexp.mustCompile(expr: string): regexp.Regexp   // panics on a bad pattern
+
+class regexp.Regexp {
+  matchString(s: string): bool
+  findAll(s: string, n: int): []string            // Go FindAllString; n<0 = all
+}
+```
+
 ## What is **not** in v1
 
 These bindings exist in Go but are out of scope until later:
@@ -481,7 +497,5 @@ These bindings exist in Go but are out of scope until later:
   lifecycle, `context`). Tracked as an open problem.
 - `reflect`, `unsafe`, `runtime`, `syscall` — unportable in principle;
   bindgen owns them, no Aril-side surface is planned.
-- `regexp` — useful but not forced by the v1 suite; will land when AoC
-  / real-world examples demand it.
 - `crypto/*`, `compress/*`, `image/*`, `text/template`, `html/template` —
   out of scope until cold-start strategy decides.
