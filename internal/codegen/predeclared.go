@@ -929,7 +929,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			// handle-typed receiver references either the handle's Go package
 			// (regexp) or its runtime wrapper (BigInt) — the receiver is a local
 			// value, not the namespace, so no `pkg.method` reference marks it
-			// (VALUE-HANDLES).
+			// (D37).
 			if g.info != nil {
 				if named, ok := g.info.Type[v.Receiver].(*sema.Named); ok {
 					if ht, ok := binding.HandleTypeOf(named.N); ok {

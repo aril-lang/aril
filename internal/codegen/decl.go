@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/aril-lang/aril/internal/ast"
-	"github.com/aril-lang/aril/internal/binding"
 )
 
 // This file holds declaration-level emission: lowering Aril type,
@@ -563,18 +562,11 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 		}
 		// A bound value-handle type (regexp.Regexp → *regexp.Regexp, …) lowers
 		// to its Go type spelling, which may differ from the Aril spelling in
-		// both pointer-ness and package (VALUE-HANDLES). The package's import is
+		// both pointer-ness and package (D37). The package's import is
 		// kept by the pre-walk (markHandlePkgs), which runs before writeHeader.
 		if len(v.QName) > 1 {
-			if ht, ok := binding.HandleTypeOf(strings.Join(v.QName, ".")); ok {
-				// A runtime-backed handle (big.BigInt → arilrt.BigInt / BigInt)
-				// takes the vendored/inline package selector; an external one
-				// (regexp.Regexp → *regexp.Regexp) emits its Go spelling verbatim.
-				if ht.Runtime {
-					g.b.WriteString(g.rt(ht.GoType))
-				} else {
-					g.b.WriteString(ht.GoType)
-				}
+			if goType, ok := g.handleGoType(strings.Join(v.QName, ".")); ok {
+				g.b.WriteString(goType)
 				return nil
 			}
 		}

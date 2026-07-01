@@ -71,7 +71,7 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 	// …) resolves to its Named boundary type so an annotated parameter / field
 	// / return types the same as a locally-constructed handle — otherwise the
 	// receiver would type Unknown and codegen's handle dispatch would miss,
-	// re-introducing the sema↔codegen split (VALUE-HANDLES). Other qualified
+	// re-introducing the sema↔codegen split (D37). Other qualified
 	// names are not modelled by sema yet.
 	if len(v.QName) > 1 {
 		if spelled := strings.Join(v.QName, "."); binding.IsHandleType(spelled) {
@@ -236,7 +236,7 @@ func (c *checker) externMethodSigType(m *ast.ExternMethod) *Func {
 
 // handleMethodSigType builds the Func type of a value-handle method
 // (binding.handleMethods) from its Aril param / return spellings, so a
-// `re.matchString(s)` call is arg-checked and typed (VALUE-HANDLES).
+// `re.matchString(s)` call is arg-checked and typed (D37).
 func handleMethodSigType(hm binding.HandleBinding) *Func {
 	params := make([]Type, len(hm.Params))
 	for i, p := range hm.Params {

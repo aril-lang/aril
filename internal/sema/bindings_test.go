@@ -39,7 +39,7 @@ func TestHandleAnnotationResolvesToNamed(t *testing.T) {
 
 // TestHandleMethodSigType locks the value-handle method rows: a bound handle
 // method builds a Func with the tabled param + return types, so the call is
-// arg-checked and typed rather than Unknown (VALUE-HANDLES).
+// arg-checked and typed rather than Unknown (D37).
 func TestHandleMethodSigType(t *testing.T) {
 	hm, ok := binding.HandleMethodOf("regexp.Regexp", "matchString")
 	if !ok {

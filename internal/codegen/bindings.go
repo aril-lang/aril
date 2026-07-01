@@ -50,7 +50,7 @@ var stdlibRenameOverlay = map[[2]string]string{
 	// os.stdin — the standard-input stream (Go's os.Stdin, a *os.File that
 	// satisfies io.Reader), the reader `bufio.newScanner` consumes. A value
 	// reference, not a call; sema leaves it Unknown (module field access), which
-	// fits the reader parameter (VALUE-HANDLES).
+	// fits the reader parameter (D37).
 	{"os", "stdin"}: "Stdin",
 }
 
