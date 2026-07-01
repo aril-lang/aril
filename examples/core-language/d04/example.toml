@@ -23,3 +23,10 @@ expect  = ["E0215"]
 stage   = "sema"
 matches = "errors/discarded-push.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/let-reassigned.patch"   # `let rows` then reassigned in the loop — `let` is immutable
+expect  = ["E0216"]
+stage   = "sema"
+matches = "errors/let-reassigned.expected"
+origin  = "synthetic"

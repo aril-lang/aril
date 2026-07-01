@@ -110,6 +110,29 @@ func (c *checker) checkDiscardedSliceBuilder(e ast.Expr) {
 	}
 }
 
+// checkLetReassign reports E0216 when an assignment targets an immutable
+// `let` binding (a local `let` or a top-level `let` constant). `let` is a
+// single-assignment binding; a mutable local is spelled `var`. Only a
+// bare-identifier LValue is a rebind — `obj.field = …` / `xs[i] = …`
+// mutate *through* the binding and are governed elsewhere
+// (checkExternalFieldWrite / E1106). (diagnostics.md E0216)
+func (c *checker) checkLetReassign(a *ast.AssignStmt) {
+	id, ok := a.LValue.(*ast.Ident)
+	if !ok {
+		return
+	}
+	sym := c.info.Symbol[id]
+	if sym == nil {
+		return
+	}
+	_, isLet := sym.Decl.(*ast.LetStmt)
+	if isLet || sym.Kind == SymTopLevelLet {
+		c.report("E0216",
+			"cannot assign to `"+id.Name+"` — `let` is an immutable binding; declare it with `var` for a mutable local",
+			a.Span)
+	}
+}
+
 func (c *checker) checkStmt(s ast.Stmt) {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
@@ -121,6 +144,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 		c.checkBinding(v, nil, v.DeclType, v.Value)
 	case *ast.AssignStmt:
 		c.checkExternalFieldWrite(v)
+		c.checkLetReassign(v)
 		lt := c.inferExpr(v.LValue)
 		vt := c.inferExpr(v.Value)
 		if !c.fits(lt, v.Value, vt) {

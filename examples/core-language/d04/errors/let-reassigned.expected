@@ -1,0 +1,1 @@
+error[E0216]: cannot assign to `rows` — `let` is an immutable binding; declare it with `var` for a mutable local

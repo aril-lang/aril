@@ -1,0 +1,11 @@
+--- d04.aril
++++ d04.aril
+@@ -15,7 +15,7 @@
+ func readData(path: string): Result<[][]byte, error> {
+   let data = try os.readFile(path)
+   let text = strings.fromBytes(data)
+-  var rows: [][]byte = [][]byte{}
++  let rows: [][]byte = [][]byte{}
+   for ln in strings.split(text, "\n") {
+     let s = strings.trimSpace(ln)
+     if s.len() == 0 { continue }
