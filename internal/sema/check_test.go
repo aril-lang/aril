@@ -72,6 +72,28 @@ func main() {
 	}
 }
 
+// TestEmptyClassLiteralTyped — an empty `T{}` zero-construction literal on a
+// class types as T (not Unknown), so a mismatch is caught in .aril terms
+// (E0201) rather than leaking a go/types error at build (D10).
+func TestEmptyClassLiteralTyped(t *testing.T) {
+	mismatch := `interface S { d(): int }
+class Z implements S { d(): int { return 0 } }
+func main() { let n: int = Z{} }
+`
+	if codes := runCheck(t, mismatch); !contains(codes, "E0201") {
+		t.Errorf("expected E0201 for `let n: int = Z{}`, got %v", codes)
+	}
+	// The matching case types clean — no spurious diagnostic on the empty literal.
+	ok := `interface S { d(): int }
+class Z implements S { d(): int { return 0 } }
+func run(s: S): int { return s.d() }
+func main() { let z = Z{}; run(z) }
+`
+	if codes := runCheck(t, ok); contains(codes, "E0201") {
+		t.Errorf("empty class literal assigned to its own type should not fire E0201, got %v", codes)
+	}
+}
+
 // Note: E0107 (reserved `_aril_` prefix) is caught by the
 // lexer before sema sees the AST. The defensive check in
 // builtins.go is unreachable via the public path today; it

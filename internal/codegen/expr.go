@@ -31,7 +31,13 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 			return g.emitStackBraceLit(b)
 		}
 	}
-	if b.Kind != ast.BraceRecord {
+	// An empty `T{}` parses as BraceUnknown (no entries to commit a kind). The
+	// Map/Set/Stack names were dispatched above, so a remaining empty literal on
+	// a named type is an empty struct literal — a fieldless class is a valid
+	// behaviour-only interface implementor (the strategy/visitor pattern). It
+	// takes the record/class path, emitting `&T{}` (class) or `T{}` (record).
+	emptyStruct := b.Kind == ast.BraceUnknown && len(b.Entries) == 0
+	if b.Kind != ast.BraceRecord && !emptyStruct {
 		return fmt.Errorf("codegen: %s brace literal not yet supported — use the container constructor / `.new()`", b.Kind)
 	}
 	if len(b.TypeName.QName) != 1 {

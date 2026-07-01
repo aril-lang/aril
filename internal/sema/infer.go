@@ -284,7 +284,28 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 	if b.Kind == ast.BraceRecord {
 		return rt
 	}
+	// An empty `T{}` (no entries → BraceUnknown) on a class/record is
+	// zero-construction: type it as T so a mismatch is caught in .aril terms
+	// (E0201) instead of leaking a go/types error at build (D10). Consistent
+	// with partial record literals, which already zero-fill omitted fields
+	// (codegen lowers to `&T{}` / `T{}`; see lowering-go.md §Brace literals).
+	if len(b.Entries) == 0 && isClassOrRecordNamed(rt) {
+		return rt
+	}
 	return &Unknown{}
+}
+
+// isClassOrRecordNamed reports whether t is a Named type whose decl is a class
+// or a record — the empty-literal `T{}` zero-construction targets.
+func isClassOrRecordNamed(t Type) bool {
+	named, ok := t.(*Named)
+	if !ok {
+		return false
+	}
+	if _, ok := named.Decl.(*ast.ClassDecl); ok {
+		return true
+	}
+	return isRecordType(t)
 }
 
 // isRecordType reports whether t is a nominal record (a Named whose
