@@ -567,7 +567,14 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 		// kept by the pre-walk (markHandlePkgs), which runs before writeHeader.
 		if len(v.QName) > 1 {
 			if ht, ok := binding.HandleTypeOf(strings.Join(v.QName, ".")); ok {
-				g.b.WriteString(ht.GoType)
+				// A runtime-backed handle (big.BigInt → arilrt.BigInt / BigInt)
+				// takes the vendored/inline package selector; an external one
+				// (regexp.Regexp → *regexp.Regexp) emits its Go spelling verbatim.
+				if ht.Runtime {
+					g.b.WriteString(g.rt(ht.GoType))
+				} else {
+					g.b.WriteString(ht.GoType)
+				}
 				return nil
 			}
 		}

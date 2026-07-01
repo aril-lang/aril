@@ -1,9 +1,11 @@
-description = "p1133"
+description = "p1133 — generalised Fibonacci over Z via big-int Cramer solve"
 source   = "timus p1133"
 category = "core-language"
 showcase = false
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "p1133.aril"
+stdin           = "input.txt"
+expected_output = "expected-output.txt"

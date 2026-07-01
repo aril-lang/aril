@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
 	"github.com/aril-lang/aril/internal/sema"
 )
 
@@ -207,6 +208,22 @@ func (g *gen) emitCall(c *ast.Call) error {
 			g.usesSlicesDedup = true
 			g.b.WriteString(g.rt("SlicesDedup"))
 			return g.emitArgList(c.Args)
+		}
+	}
+	// Runtime-backed value-handle constructor — `big.fromInt(n)` lowers to the
+	// arilrt helper `BigFromInt(n)` (rt() picks the vendored/inline spelling),
+	// not a `big.*` package call, since the handle is an arilrt wrapper
+	// (VALUE-HANDLES). External-package handle ctors (regexp.mustCompile) take
+	// the ordinary rename path below.
+	if f, ok := c.Callee.(*ast.Field); ok {
+		if recv, ok := f.Receiver.(*ast.Ident); ok && g.isBuiltinModule(recv) {
+			if hc, ok := binding.HandleCtorOf(recv.Name, f.Name); ok {
+				if ht, ok := binding.HandleTypeOf(hc.Return); ok && ht.Runtime {
+					g.usesBigInt = true
+					g.b.WriteString(g.rt(hc.GoName))
+					return g.emitArgList(c.Args)
+				}
+			}
 		}
 	}
 	// Conversion binding — `pkg.method(arg)` that lowers to a Go type
@@ -687,7 +704,7 @@ func isStdlibNamespaceName(name string) bool {
 	switch name {
 	case "errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 		"time", "sync", "io", "log", "net", "encoding", "math", "sort",
-		"json", "unicode", "slices", "regexp":
+		"json", "unicode", "slices", "regexp", "big":
 		return true
 	}
 	return false
@@ -726,6 +743,11 @@ func isRuntimeHelperBinding(pkg, method string) bool {
 		return method == "scan" || method == "scan2" || method == "scan3"
 	case "json":
 		return method == "parse"
+	case "big":
+		// big.fromInt / fromInt64 lower to arilrt runtime helpers (BigFromInt*),
+		// and the `big` namespace maps to the runtime, not a Go `big` package —
+		// so it must never mark `import "big"` (VALUE-HANDLES).
+		return method == "fromInt" || method == "fromInt64"
 	}
 	return false
 }
