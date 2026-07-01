@@ -1,0 +1,1 @@
+error[E0112]: a newline ends the expression here — wrap the whole expression in parentheses `(...)` to continue it across lines
