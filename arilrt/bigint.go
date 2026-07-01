@@ -40,5 +40,6 @@ func (a BigInt) Div(b BigInt) BigInt { return BigInt{new(big.Int).Quo(a.int(), b
 // math/big's Int64) — used to land a result back in a machine integer.
 func (a BigInt) ToInt64() int64 { return a.int().Int64() }
 
-// String renders the decimal representation (`d.string()`).
+// String renders the decimal representation; it also makes BigInt an
+// fmt.Stringer, so `fmt.println(big.fromInt(42))` prints `42`, not a struct.
 func (a BigInt) String() string { return a.int().String() }
