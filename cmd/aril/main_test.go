@@ -198,6 +198,53 @@ func main() {
 	}
 }
 
+// TestBigIntModeEquivalence extends the Block R divergence guard to the `big`
+// value-handle runtime wrapper (VALUE-HANDLES): the inline BigInt prelude
+// (writePredeclaredBigInt) must behave identically to the vendored arilrt.BigInt.
+// The program spans construction, every arithmetic method, and the int64 narrow,
+// and it computes a value that overflows int64 (fib(100)) so the arbitrary-
+// precision path is genuinely exercised. Self-contained (no stdin).
+func TestBigIntModeEquivalence(t *testing.T) {
+	src := `import fmt
+import big
+
+func fib(n: int): big.BigInt {
+  var a = big.fromInt(0)
+  var b = big.fromInt(1)
+  for _ in 0..n {
+    let next = a.add(b)
+    a = b
+    b = next
+  }
+  return a
+}
+
+func main() {
+  fmt.println(fib(100).toInt64())
+  let x = big.fromInt64(1000000)
+  fmt.println(x.mul(big.fromInt(7)).sub(big.fromInt(1)).div(big.fromInt(3)).toInt64())
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "big.aril")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write temp source: %v", err)
+	}
+	vOut, vErr, vExit := runAril(t, "run", path)
+	iOut, _, iExit := runAril(t, "run", "--inline-runtime", path)
+	if vExit != iExit {
+		t.Errorf("big: exit differs — vendored %d, inline %d (stderr: %s)", vExit, iExit, vErr)
+	}
+	if vOut != iOut {
+		t.Errorf("big: stdout differs between modes\n--- vendored ---\n%s\n--- inline ---\n%s", vOut, iOut)
+	}
+	// Guard against both modes being silently broken: fib(100) narrowed to
+	// int64 is a fixed, arbitrary-precision-dependent value.
+	if !strings.Contains(vOut, "3736710778780434371") {
+		t.Errorf("big: vendored output missing the expected fib(100) narrow; got:\n%s", vOut)
+	}
+}
+
 // TestChannelContractModeEquivalence extends the Block R divergence guard to the
 // RFC-0007 channel-contract monitor, which only emits under --contracts=panic
 // (so the other equivalence guards, running the default off mode, never exercise

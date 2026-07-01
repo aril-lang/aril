@@ -184,6 +184,11 @@ big.fromInt64(n: int64):   big.BigInt
 big.fromString(s: string): Result<big.BigInt, error>
 ```
 
+**Bound today:** `fromInt` / `fromInt64` and the `add` / `sub` / `mul` / `div`
+(truncated) / `toInt64` method set — a runtime-backed value handle (the arilrt
+`BigInt` wrapper, dual-mode). `mod` / `neg` / `cmp` / `string` / `fromString`
+remain on the target surface.
+
 ## math
 
 ```aril

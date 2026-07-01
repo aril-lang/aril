@@ -456,6 +456,11 @@ type gen struct {
 	usesSortedBy bool
 	// usesSlicesDedup — slices.dedup(xs) lowers to the SlicesDedup helper.
 	usesSlicesDedup bool
+	// usesBigInt — the `big` value-handle (BigInt) is used, so its runtime
+	// wrapper is emitted (inline prelude in single-file mode, arilrt import in
+	// vendored mode). Set by the pre-walk (a big.fromInt* constructor or a
+	// method on a big.BigInt-typed receiver).
+	usesBigInt bool
 	// usesErrorCtor — the `error(msg)` free constructor (builtins.md)
 	// is used, so its lowering `errors.New(msg)` needs Go's "errors".
 	usesErrorCtor bool
@@ -657,7 +662,8 @@ func (g *gen) usesRuntime() bool {
 	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
-		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract
+		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract ||
+		g.usesBigInt
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -681,8 +687,11 @@ func (g *gen) writeHeader(f *ast.File) {
 		paths = append(paths, p)
 	}
 	for _, im := range f.Imports {
-		if im.Path == "reflect" {
-			continue // Aril-internal
+		if im.Path == "reflect" || im.Path == "big" {
+			// Aril-internal / runtime-backed: `big` maps to the arilrt BigInt
+			// wrapper (usesBigInt drives its import / inline prelude), not a Go
+			// `big` package (VALUE-HANDLES).
+			continue
 		}
 		// Drop a stdlib import the generated Go never references —
 		// e.g. a program whose only `strings` use is the
@@ -753,6 +762,11 @@ func (g *gen) writeHeader(f *ast.File) {
 	if g.usesJSONParse && !g.vendored() {
 		add("encoding/json")
 	}
+	if g.usesBigInt && !g.vendored() {
+		// The inline BigInt wrapper (writePredeclaredBigInt) is built on
+		// math/big; vendored mode carries it in arilrt.
+		add("math/big")
+	}
 	if g.vendored() && g.usesRuntime() {
 		// The runtime is the imported arilrt package, not inline defs.
 		// Only import it when the program actually references a runtime
@@ -816,4 +830,5 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredTryRecv()
 	g.writePredeclaredGroup()
 	g.writePredeclaredChanContract()
+	g.writePredeclaredBigInt()
 }

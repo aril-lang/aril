@@ -61,3 +61,28 @@ func TestHandleType(t *testing.T) {
 		t.Error("time.Time is not (yet) a bound handle type")
 	}
 }
+
+// TestRuntimeBackedHandle locks the big handle: it is runtime-backed (an arilrt
+// BigInt wrapper, not a Go `big` package), its constructors lower to runtime
+// helpers, and its method set is the functional arithmetic surface.
+func TestRuntimeBackedHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("big.BigInt")
+	if !ok || !ht.Runtime {
+		t.Fatalf("big.BigInt should be a Runtime handle; got %+v ok=%v", ht, ok)
+	}
+	if ht.GoType != "BigInt" || ht.GoPkg != "" {
+		t.Errorf("big.BigInt lowering = %+v; want GoType BigInt, no GoPkg", ht)
+	}
+	ctor, ok := HandleCtorOf("big", "fromInt")
+	if !ok || ctor.GoName != "BigFromInt" || ctor.Return != "big.BigInt" {
+		t.Errorf("big.fromInt = %+v; want BigFromInt → big.BigInt", ctor)
+	}
+	add, ok := HandleMethodOf("big.BigInt", "add")
+	if !ok || add.GoName != "Add" || add.Return != "big.BigInt" {
+		t.Errorf("big.BigInt.add = %+v; want Add → big.BigInt", add)
+	}
+	toI, _ := HandleMethodOf("big.BigInt", "toInt64")
+	if toI.Return != "int64" {
+		t.Errorf("big.BigInt.toInt64 return = %q; want int64", toI.Return)
+	}
+}

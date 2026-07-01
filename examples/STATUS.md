@@ -4,16 +4,16 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 70 / 81 examples build end-to-end** (floor 70).
+- **build_ok — 71 / 81 examples build end-to-end** (floor 71).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 70 / 80 run-pass examples build and run as specified** (floor 70; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 71 / 80 run-pass examples build and run as specified** (floor 71; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 70 |
+| ✅ build (full pipeline) | 71 |
 | emit / codegen fail | 7 |
 | sema fail | 1 |
-| parse fail | 3 |
+| parse fail | 2 |
 
 ## Per-example
 
@@ -50,6 +50,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/match_on_tuples/match_on_tuples.aril` | build | — |
 | `examples/core-language/merge_intervals/merge_intervals.aril` | build | — |
 | `examples/core-language/p1033/p1033.aril` | build | — |
+| `examples/core-language/p1133/p1133.aril` | build | — |
 | `examples/core-language/p1242/p1242.aril` | build | — |
 | `examples/core-language/p1335/p1335.aril` | build | — |
 | `examples/core-language/p1349/p1349.aril` | build | — |
@@ -99,7 +100,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
 | `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
-| `examples/core-language/p1133/p1133.aril` | parse | error[E0112]: expected parameter name |
 
 ## Diagnostic-quality gaps
 
@@ -137,7 +137,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**10 of 80 run-pass examples fall short of run_ok.**
+**9 of 80 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
@@ -145,7 +145,6 @@ Run-pass examples that do not yet reach run_ok — they fail to build (an existi
 | `examples/concurrency/nested_scopes` | build-fail | 1 |
 | `examples/concurrency/pubsub` | build-fail | 1 |
 | `examples/core-language/lru_cache` | build-fail | 1 |
-| `examples/core-language/p1133` | build-fail | 1 |
 | `examples/modeling-errors/errors_as` | build-fail | 1 |
 | `examples/stdlib-binding/duration_budget` | build-fail | 1 |
 | `examples/stdlib-binding/leveled_log` | build-fail | 1 |

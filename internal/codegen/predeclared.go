@@ -208,6 +208,35 @@ func (g *gen) writePredeclaredSlicesDedup() {
 `)
 }
 
+// writePredeclaredBigInt emits the BigInt runtime wrapper backing the `big`
+// value-handle (binding-surface.md §math/big) in inline mode — the immutable,
+// functional wrapper over math/big's pointer-mutation API. Mirrors
+// arilrt/bigint.go (kept byte-identical modulo the package clause). Vendored
+// mode carries it in arilrt.
+func (g *gen) writePredeclaredBigInt() {
+	if !g.usesBigInt {
+		return
+	}
+	g.b.WriteString(`type BigInt struct{ v *big.Int }
+
+func BigFromInt(n int) BigInt     { return BigInt{big.NewInt(int64(n))} }
+func BigFromInt64(n int64) BigInt { return BigInt{big.NewInt(n)} }
+
+func (a BigInt) int() *big.Int {
+	if a.v == nil {
+		return new(big.Int)
+	}
+	return a.v
+}
+func (a BigInt) Add(b BigInt) BigInt { return BigInt{new(big.Int).Add(a.int(), b.int())} }
+func (a BigInt) Sub(b BigInt) BigInt { return BigInt{new(big.Int).Sub(a.int(), b.int())} }
+func (a BigInt) Mul(b BigInt) BigInt { return BigInt{new(big.Int).Mul(a.int(), b.int())} }
+func (a BigInt) Div(b BigInt) BigInt { return BigInt{new(big.Int).Quo(a.int(), b.int())} }
+func (a BigInt) ToInt64() int64      { return a.int().Int64() }
+func (a BigInt) String() string      { return a.int().String() }
+`)
+}
+
 // writePredeclaredSortSorted emits the Sorted helper backing
 // `sort.sorted(s, less)` (binding-surface.md §sort): a comparator sort
 // that returns a NEW slice (Aril preserves the input's immutability),
@@ -889,14 +918,27 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 					g.usedGoPkgs[recv.Name] = true
 				}
 			}
-			// A value-handle method call `re.matchString(…)` on a handle-typed
-			// receiver references the handle's Go package (regexp), which no
-			// `pkg.method` reference need mark — the receiver is a local value,
-			// not the namespace (VALUE-HANDLES).
+			// A runtime-backed value-handle constructor (`big.fromInt`) pulls the
+			// BigInt runtime wrapper into the binary; the namespace itself marks
+			// no Go import (it maps to arilrt, not a `big` package).
+			if recv, ok := v.Receiver.(*ast.Ident); ok && recv.Name == "big" &&
+				(v.Name == "fromInt" || v.Name == "fromInt64") {
+				g.usesBigInt = true
+			}
+			// A value-handle method call `re.matchString(…)` / `a.add(…)` on a
+			// handle-typed receiver references either the handle's Go package
+			// (regexp) or its runtime wrapper (BigInt) — the receiver is a local
+			// value, not the namespace, so no `pkg.method` reference marks it
+			// (VALUE-HANDLES).
 			if g.info != nil {
 				if named, ok := g.info.Type[v.Receiver].(*sema.Named); ok {
-					if ht, ok := binding.HandleTypeOf(named.N); ok && ht.GoPkg != "" {
-						g.usedGoPkgs[ht.GoPkg] = true
+					if ht, ok := binding.HandleTypeOf(named.N); ok {
+						if ht.GoPkg != "" {
+							g.usedGoPkgs[ht.GoPkg] = true
+						}
+						if ht.Runtime {
+							g.usesBigInt = true
+						}
 					}
 				}
 			}

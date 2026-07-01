@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
 	"github.com/aril-lang/aril/internal/sema"
 )
 
@@ -680,6 +681,17 @@ func (g *gen) goTypeFromSema(t sema.Type) (string, bool) {
 	case *sema.Named:
 		if _, isClass := g.class[v.N]; isClass {
 			return "*" + goIdent(v.N), true
+		}
+		// A value-handle type (big.BigInt, regexp.Regexp) in a sema-derived
+		// position (tuple component, inferred binding) takes its Go type
+		// spelling — the runtime selector for a runtime-backed handle, the Go
+		// package spelling for an external one (VALUE-HANDLES). Without this the
+		// raw Aril spelling `big.BigInt` would leak into the Go (undefined).
+		if ht, ok := binding.HandleTypeOf(v.N); ok {
+			if ht.Runtime {
+				return g.rt(ht.GoType), true
+			}
+			return ht.GoType, true
 		}
 		return goIdent(v.N), true
 	case *sema.Slice:

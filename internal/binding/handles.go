@@ -27,15 +27,21 @@ type HandleBinding struct {
 }
 
 // HandleType describes how a handle's Aril boundary type (spelled `pkg.Type`)
-// lowers: the Go type spelling used in *type positions* (a pointer handle like
-// `*regexp.Regexp`, or a value wrapper like `arilrt.BigInt`) and the Go import
-// path the type + its methods reference (`""` when the type needs no import
-// beyond the always-present runtime — e.g. an arilrt wrapper). The Go type may
-// differ from the Aril spelling both in pointer-ness and package, so it is
-// modelled explicitly rather than derived from the Aril name.
+// lowers. Two flavours:
+//   - an *external* Go package handle (regexp.Regexp): GoType is the Go type
+//     spelling (a pointer handle `*regexp.Regexp`), GoPkg its import path.
+//   - a *runtime-backed* handle (big.BigInt): the type is an arilrt wrapper, so
+//     Runtime is set and GoType is the bare runtime type name (`BigInt`) that
+//     codegen qualifies via the vendored/inline package selector (`rt`); it
+//     needs no external import (GoPkg ""). The `big` namespace maps to the
+//     runtime like `reflect` does, not to a Go package of the same name.
+//
+// The Go type may differ from the Aril spelling in pointer-ness and package, so
+// it is modelled explicitly rather than derived from the Aril name.
 type HandleType struct {
-	GoType string
-	GoPkg  string
+	GoType  string
+	GoPkg   string
+	Runtime bool
 }
 
 // handleTypes registers every bound handle type. IsHandleType / HandleTypeOf
@@ -43,6 +49,7 @@ type HandleType struct {
 // and to lower to the right Go type (codegen).
 var handleTypes = map[string]HandleType{
 	"regexp.Regexp": {GoType: "*regexp.Regexp", GoPkg: "regexp"},
+	"big.BigInt":    {GoType: "BigInt", Runtime: true},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -56,6 +63,10 @@ func HandleTypeOf(spelled string) (HandleType, bool) {
 // function that builds the handle and the handle's Aril type spelling.
 var handleCtors = map[[2]string]HandleBinding{
 	{"regexp", "mustCompile"}: {GoName: "MustCompile", Params: []string{"string"}, Return: "regexp.Regexp"},
+	// big constructors lower to arilrt runtime helpers (BigFromInt / BigFromInt64),
+	// not a `big.*` package call — the handle is runtime-backed.
+	{"big", "fromInt"}:   {GoName: "BigFromInt", Params: []string{"int"}, Return: "big.BigInt"},
+	{"big", "fromInt64"}: {GoName: "BigFromInt64", Params: []string{"int64"}, Return: "big.BigInt"},
 }
 
 // handleMethods maps a handle type spelling (`pkg.Type`) to its bound method
@@ -64,6 +75,13 @@ var handleMethods = map[string]map[string]HandleBinding{
 	"regexp.Regexp": {
 		"matchString": {GoName: "MatchString", Params: []string{"string"}, Return: "bool"},
 		"findAll":     {GoName: "FindAllString", Params: []string{"string", "int"}, Return: "[]string"},
+	},
+	"big.BigInt": {
+		"add":     {GoName: "Add", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
+		"sub":     {GoName: "Sub", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
+		"mul":     {GoName: "Mul", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
+		"div":     {GoName: "Div", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
+		"toInt64": {GoName: "ToInt64", Params: nil, Return: "int64"},
 	},
 }
 

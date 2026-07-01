@@ -45,8 +45,7 @@ func fibCoeff(k: int): (big.BigInt, big.BigInt) {
 // Cramer's rule. Assumes a non-singular system.
 func solveLinear(
   a1: big.BigInt, b1: big.BigInt, c1: big.BigInt,
-  a2: big.BigInt, b2: big.BigInt, c2: big.BigInt,
-): (int64, int64) {
+  a2: big.BigInt, b2: big.BigInt, c2: big.BigInt): (int64, int64) {
   let det  = a1.mul(b2).sub(a2.mul(b1))
   let detY = a1.mul(c2).sub(a2.mul(c1))
   let detX = c1.mul(b2).sub(c2.mul(b1))
