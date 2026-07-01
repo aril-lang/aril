@@ -1,0 +1,9 @@
+description = "DEMAND: typed error unwrap via errors.as<T> (counterpart to errors.is)"
+source   = "stdlib-coverage demand: errors.as"
+category = "modeling-errors"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "errors_as.aril"

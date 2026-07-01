@@ -52,6 +52,11 @@
       "code": 0
     },
     {
+      "key": "221d59fdb4369ce6d71e9543cf5d1b36dda004bd16143cad786a68beda79e29b",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
       "key": "2f761bddf45d2af148733218c87aac454c8c1c3f4d847cc6cc51a27569b4ff67",
       "status": "ok",
       "code": 0
@@ -70,6 +75,11 @@
       "key": "38938cf5df4d34363a2a529718181f8b8bf92be87a4c86261ae90aeedb8f680a",
       "status": "ok",
       "code": 0
+    },
+    {
+      "key": "393fab92748eaac099d0c264a73c791d7eb61114667658d968f7e7aff792b0a2",
+      "status": "build-fail",
+      "code": 1
     },
     {
       "key": "3a97fbe25c75ed791f2f3762a7bc4d0334b6b736df864141163abc0327aec759",
@@ -225,6 +235,11 @@
       "key": "9450d014fad1abbee994704a0bddce383c67ec120ec1b45dd1468b0704b9c42e",
       "status": "ok",
       "code": 0
+    },
+    {
+      "key": "9f3fa7527a3293fd80217130616655667b432a48839fc6cfaae39ed6bbaa56bc",
+      "status": "build-fail",
+      "code": 1
     },
     {
       "key": "a1ce4104b4b199754f48abbf05092305a50798f08f4dd9d934d1ae464f8c2630",
