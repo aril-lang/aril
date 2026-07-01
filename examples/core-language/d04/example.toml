@@ -16,3 +16,10 @@ expect  = ["E0201"]
 stage   = "sema"
 matches = "errors/annot-mismatch.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/discarded-push.patch"   # `rows.push(...)` without assigning back — a silent no-op (append semantics)
+expect  = ["E0215"]
+stage   = "sema"
+matches = "errors/discarded-push.expected"
+origin  = "synthetic"

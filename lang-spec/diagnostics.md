@@ -87,6 +87,7 @@ severity column.
 | E0212 | E | `Any` and `Dynamic` cannot be implicitly converted | `type-system.md` §Dynamic (cross-reference) / `builtins.md` §Special types | These are deliberately separate types — to go from one to the other, narrow to a concrete `T` first and then re-box. |
 | E0213 | E | Spread argument `...` requires a variadic parameter | `type-system.md` T-Spread / `ffi.md` §Variadic | Use `...e` only as the final argument of a call whose last parameter is `...T`; otherwise pass the slice's elements individually. |
 | E0214 | E | Type has no member `name` | `type-system.md` T-Field, T-Call (member access / method call over a Named receiver) | Access only a declared field or method of the receiver's type — a user class / interface / record, an opaque `extern` handle, or a bound stdlib value-handle. A bare type parameter has no known member set, so it is not diagnosed here. |
+| E0215 | E | Result of a slice `push` is discarded | `builtins.md` §Slice methods (`push` — append semantics) | `push` returns a *new* slice and does not mutate in place; assign it back — `xs = xs.push(...)`. (A `Stack` `push` mutates, so a bare `st.push(...)` statement is fine and not diagnosed.) |
 
 ### E03xx — Pattern matching
 
