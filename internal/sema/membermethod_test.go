@@ -139,3 +139,29 @@ func TestDiscardedStackPushNoE0215(t *testing.T) {
 		t.Errorf("Stack push statement must not fire E0215, got %v", codes)
 	}
 }
+
+// E0216 — a `let` is an immutable single-assignment binding; reassigning
+// it is rejected (a mutable local is spelled `var`).
+
+func TestLetReassignFiresE0216(t *testing.T) {
+	src := "func use() {\n  let i = 2\n  i = i + 1\n}"
+	if codes := runCheck(t, src); !contains(codes, "E0216") {
+		t.Errorf("expected E0216 (let reassignment), got %v", codes)
+	}
+}
+
+func TestVarReassignNoE0216(t *testing.T) {
+	src := "func use() {\n  var i = 2\n  i = i + 1\n}"
+	if codes := runCheck(t, src); contains(codes, "E0216") {
+		t.Errorf("var reassignment must not fire E0216, got %v", codes)
+	}
+}
+
+// Mutating *through* a `let` binding (a field or element write) is not a
+// rebind of the binding, so E0216 must not fire.
+func TestLetElementWriteNoE0216(t *testing.T) {
+	src := "func use() {\n  let xs = [1, 2, 3]\n  xs[0] = 9\n}"
+	if codes := runCheck(t, src); contains(codes, "E0216") {
+		t.Errorf("element write through a let must not fire E0216, got %v", codes)
+	}
+}
