@@ -154,6 +154,10 @@ shadow each other.
   string, `None` for `Option`, etc.). Matches Go's `make([]T, n)`.
   Useful when the length is known up-front and individual elements
   will be assigned via `s[i] = v`.
+- Predeclared `min<T: Ordered>(a, b, …): T` / `max<T: Ordered>(a, b, …): T`
+  return the least / greatest argument over any ordered type (int, float,
+  string) — the general-purpose extremum builtins (`math.min` / `math.max` are
+  float64-only). They lower to Go's builtin `min` / `max`.
 - `s.len(): int`.
 - `s.push(v): []T` — returns a new slice header (may grow underlying
   storage). Idiomatic re-assignment: `s = s.push(v)` when `s` is `var`.

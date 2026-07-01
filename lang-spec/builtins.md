@@ -487,6 +487,11 @@ fn refEq<C>(a: C, b: C): bool          [C must be a class type or an
 fn makeChannel<T>(): Channel<T>
 fn makeChannel<T>(cap: int): Channel<T>
 fn makeSlice<T>(n: int): []T           [n >= 0; runtime panic if n < 0]
+fn min<T: Ordered>(a: T, b: T, ...): T [the least argument; T any Ordered
+                                        type (int/float/string). Lowers to
+                                        Go's builtin min. Fills the int gap
+                                        math.min/max (float64) leave.]
+fn max<T: Ordered>(a: T, b: T, ...): T [the greatest argument; dual of min]
 fn error(msg: string): error          [free constructor for the error
                                         interface, equivalent to a tiny
                                         anonymous-class instance with
