@@ -279,7 +279,12 @@ type Event =
 - Pattern: same positional shape — `Node(v, l, r)`, `Leaf`,
   `InsertCoin(n)`, `_` (wildcard).
 - `Result<T, E>` (`Ok(T) | Err(E)`) and `Option<T>` (`Some(T) | None`)
-  are built-in sum types using the same machinery.
+  are built-in sum types using the same machinery. Beyond `match` / `try`,
+  both carry total query/defaulting methods: `opt.isSome()` / `opt.isNone()`
+  and `res.isOk()` / `res.isErr()` return `bool`, and `unwrapOr(fallback)`
+  returns the held value (the `Some` payload / the `Ok` payload of type `T`)
+  or `fallback` — the ergonomic default that avoids a full `match` for the
+  common cases. No partial `unwrap` and no `map` in v1.
 
 Named-payload variants (e.g. `Node{value: T, left: Tree<T>}`) are park
 material; positional is the one obvious form for the typical small

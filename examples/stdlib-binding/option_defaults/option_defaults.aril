@@ -1,0 +1,38 @@
+// Option / Result query + defaulting methods (builtins.md §Option/§Result
+// methods): `unwrapOr` supplies a fallback without a full `match`, and the
+// `isOk` / `isSome` / `isNone` predicates branch on the tag. Here a run of
+// tokens is summed, treating unparseable entries as 0 (`atoi(...).unwrapOr(0)`)
+// while counting the valid ones (`.isOk()`), then a lookup defaults its
+// missing index with `.unwrapOr(-1)`.
+import fmt
+import strconv
+
+func find(xs: []string, target: string): Option<int> {
+  for (i, x) in xs {
+    if x == target {
+      return Some(i)
+    }
+  }
+  return None
+}
+
+func main() {
+  let tokens = ["10", "x", "20", "y", "30"]
+  var sum = 0
+  var valid = 0
+  for t in tokens {
+    let parsed = strconv.atoi(t)
+    if parsed.isOk() {
+      valid = valid + 1
+    }
+    sum = sum + parsed.unwrapOr(0)
+  }
+  fmt.println("sum", sum)
+  fmt.println("valid", valid)
+
+  let hit = find(tokens, "20")
+  fmt.println("index", hit.unwrapOr(-1), "found", hit.isSome())
+
+  let miss = find(tokens, "99")
+  fmt.println("missing", miss.unwrapOr(-1), "none", miss.isNone())
+}

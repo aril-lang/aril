@@ -116,9 +116,21 @@ type Option<T> =
 ```
 
 Sum type with two variants. The exhaustive forms in the corpus
-are `match` on `Some(x) | None`. Option has **no methods** in
-v1 (no `.unwrap`, `.unwrapOr`, `.map`) — consumption is by
-pattern match or `try` (see `T-Try-Option`).
+are `match` on `Some(x) | None`; the predeclared scope also
+attaches the following total query/defaulting methods (the
+common non-`match` consumptions):
+
+```
+Option<T>:
+  isSome(): bool                     [Tag == Some]
+  isNone(): bool                     [Tag == None]
+  unwrapOr(fallback: T): T           [the Some payload, else fallback]
+```
+
+`unwrapOr` is the total defaulting form — no `.unwrap` (partial,
+panicking) and no `.map` in v1; richer consumption stays
+`match`/`try` (see `T-Try-Option`). The methods lower to the
+exported arilrt method set (`lowering-go.md` §Container types).
 
 The constructors `Some` and `None` are predeclared variants;
 they are usable unqualified.
@@ -132,7 +144,18 @@ type Result<T, E> =
 ```
 
 Sum type. Consumed by pattern match or `try` (see
-`T-Try-Result`). E is conventionally bound to `error` but any
+`T-Try-Result`), or the following total query/defaulting
+methods:
+
+```
+Result<T, E>:
+  isOk(): bool                       [Tag == Ok]
+  isErr(): bool                      [Tag == Err]
+  unwrapOr(fallback: T): T           [the Ok payload, else fallback]
+```
+
+`unwrapOr` defaults to the **Ok** payload type `T` (the fallback
+is a `T`, not an `E`). E is conventionally bound to `error` but any
 type is admissible — `try` requires the inner `E` to equal the
 enclosing function's declared error type (no implicit
 conversion).

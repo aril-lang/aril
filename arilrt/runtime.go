@@ -20,6 +20,20 @@ func OptionSome[T any](value T) Option[T] { return Option[T]{Tag: 1, V: value} }
 // OptionNone builds None.
 func OptionNone[T any]() Option[T] { return Option[T]{Tag: 0} }
 
+// IsSome reports whether the option holds a value (builtins.md §Option methods).
+func (o Option[T]) IsSome() bool { return o.Tag == 1 }
+
+// IsNone reports whether the option is empty (builtins.md §Option methods).
+func (o Option[T]) IsNone() bool { return o.Tag == 0 }
+
+// UnwrapOr returns the held value, or fallback when None (builtins.md §Option methods).
+func (o Option[T]) UnwrapOr(fallback T) T {
+	if o.Tag == 1 {
+		return o.V
+	}
+	return fallback
+}
+
 // Result is the predeclared fallible sum: Tag 0 = Ok(V), Tag 1 = Err(E).
 type Result[T any, E any] struct {
 	Tag uint8
@@ -32,6 +46,20 @@ func ResultOk[T any, E any](value T) Result[T, E] { return Result[T, E]{Tag: 0, 
 
 // ResultErr builds Err(err).
 func ResultErr[T any, E any](err E) Result[T, E] { return Result[T, E]{Tag: 1, E: err} }
+
+// IsOk reports whether the result is Ok (builtins.md §Result methods).
+func (r Result[T, E]) IsOk() bool { return r.Tag == 0 }
+
+// IsErr reports whether the result is Err (builtins.md §Result methods).
+func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }
+
+// UnwrapOr returns the Ok value, or fallback when Err (builtins.md §Result methods).
+func (r Result[T, E]) UnwrapOr(fallback T) T {
+	if r.Tag == 0 {
+		return r.V
+	}
+	return fallback
+}
 
 // ResultOf folds a Go (T, error) pair into Result<T, error>: a non-nil
 // error becomes Err, a successful value becomes Ok. Backs the

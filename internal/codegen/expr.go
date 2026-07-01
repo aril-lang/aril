@@ -734,7 +734,7 @@ func (g *gen) goMethodName(receiver ast.Expr, name string) string {
 	if name == "error" && g.isErrorBuiltinReceiver(receiver) {
 		return "Error"
 	}
-	if g.isContainerTypedExpr(receiver) {
+	if g.isContainerTypedExpr(receiver) || g.isOptionResultTypedExpr(receiver) {
 		return exportFieldName(name)
 	}
 	// Value-handle method (`re.matchString` → `re.MatchString`): the receiver's
@@ -792,6 +792,21 @@ func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
 	}
 	switch g.info.Type[receiver].(type) {
 	case *sema.Map, *sema.Set, *sema.Stack:
+		return true
+	}
+	return false
+}
+
+// isOptionResultTypedExpr reports whether sema typed receiver as Option or
+// Result, whose query/defaulting methods (isSome/isNone/unwrapOr, isOk/isErr)
+// carry the exported Go spelling of the arilrt method set (builtins.md
+// §Option methods / §Result methods).
+func (g *gen) isOptionResultTypedExpr(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	switch g.info.Type[receiver].(type) {
+	case *sema.Option, *sema.Result:
 		return true
 	}
 	return false

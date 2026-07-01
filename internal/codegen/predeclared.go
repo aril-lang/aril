@@ -38,11 +38,22 @@ func (g *gen) writePredeclaredSums() {
 		g.b.WriteString("type Option[T any] struct {\n\tTag uint8\n\tV   T\n}\n")
 		g.b.WriteString("func OptionSome[T any](value T) Option[T] {\n\treturn Option[T]{Tag: 1, V: value}\n}\n")
 		g.b.WriteString("func OptionNone[T any]() Option[T] {\n\treturn Option[T]{Tag: 0}\n}\n")
+		if g.usesOptionMethods {
+			// Query/defaulting methods, mirroring arilrt's exported set.
+			g.b.WriteString("func (o Option[T]) IsSome() bool { return o.Tag == 1 }\n")
+			g.b.WriteString("func (o Option[T]) IsNone() bool { return o.Tag == 0 }\n")
+			g.b.WriteString("func (o Option[T]) UnwrapOr(fallback T) T {\n\tif o.Tag == 1 {\n\t\treturn o.V\n\t}\n\treturn fallback\n}\n")
+		}
 	}
 	if g.usesResult {
 		g.b.WriteString("type Result[T any, E any] struct {\n\tTag uint8\n\tV   T\n\tE   E\n}\n")
 		g.b.WriteString("func ResultOk[T any, E any](value T) Result[T, E] {\n\treturn Result[T, E]{Tag: 0, V: value}\n}\n")
 		g.b.WriteString("func ResultErr[T any, E any](err E) Result[T, E] {\n\treturn Result[T, E]{Tag: 1, E: err}\n}\n")
+		if g.usesResultMethods {
+			g.b.WriteString("func (r Result[T, E]) IsOk() bool { return r.Tag == 0 }\n")
+			g.b.WriteString("func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }\n")
+			g.b.WriteString("func (r Result[T, E]) UnwrapOr(fallback T) T {\n\tif r.Tag == 0 {\n\t\treturn r.V\n\t}\n\treturn fallback\n}\n")
+		}
 	}
 }
 
@@ -872,6 +883,23 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "tryRecv" {
 				g.usesTryRecv = true
 				g.usesOption = true
+			}
+			// Option/Result query/defaulting methods pull their inline
+			// method set into the prelude. Keyed on the method name (the
+			// receiver's Option/Result type is a sema fact); a same-named
+			// user method over-pulls only dead code. Emission is further
+			// gated by usesOption/usesResult, so a program with no Option
+			// value emits nothing.
+			if f, ok := v.Callee.(*ast.Field); ok {
+				switch f.Name {
+				case "isSome", "isNone":
+					g.usesOptionMethods = true
+				case "isOk", "isErr":
+					g.usesResultMethods = true
+				case "unwrapOr":
+					g.usesOptionMethods = true
+					g.usesResultMethods = true
+				}
 			}
 			// Foreign bindings (ffi.md): an extern func call pulls its
 			// `@go` package into the import block, and a `Result<…>`
