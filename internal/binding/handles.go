@@ -69,7 +69,8 @@ var handleCtors = map[[2]string]HandleBinding{
 	{"big", "fromInt"}:   {GoName: "BigFromInt", Params: []string{"int"}, Return: "big.BigInt"},
 	{"big", "fromInt64"}: {GoName: "BigFromInt64", Params: []string{"int64"}, Return: "big.BigInt"},
 	// bufio.newScanner(r) wraps an io.Reader (os.stdin is *os.File, which Go
-	// accepts as io.Reader); the reader arg types Unknown in v1 and so fits.
+	// accepts as io.Reader); handle-ctor args aren't type-verified in v1, so the
+	// Unknown-typed reader draws no diagnostic (the Params spelling is documentary).
 	{"bufio", "newScanner"}: {GoName: "NewScanner", Params: []string{"io.Reader"}, Return: "bufio.Scanner"},
 }
 
