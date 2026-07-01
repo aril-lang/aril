@@ -263,6 +263,11 @@ form share one Go representation:
   — keeping the literal a single Go expression.
 - `Stack<T>{}` → `stackNew[T]()`. A `Stack` literal is always empty
   (`ast.md §BraceLit`); entries are a sema error.
+- An empty `T{}` where `T` names a **class or record** is zero-value
+  construction: `&T{}` (class — reference type) / `T{}` (record). A
+  fieldless class is the canonical behaviour-only interface implementor
+  (strategy/visitor); a field-bearing `T{}` zero-fills, like a partial
+  record literal.
 
 **Constructor type-argument stamping.** A constructor call
 (`Ok`/`Err`/`Some`/`None`) constrains only the type parameter its
