@@ -50,6 +50,7 @@ type HandleType struct {
 var handleTypes = map[string]HandleType{
 	"regexp.Regexp": {GoType: "*regexp.Regexp", GoPkg: "regexp"},
 	"big.BigInt":    {GoType: "BigInt", Runtime: true},
+	"bufio.Scanner": {GoType: "*bufio.Scanner", GoPkg: "bufio"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -67,6 +68,9 @@ var handleCtors = map[[2]string]HandleBinding{
 	// not a `big.*` package call — the handle is runtime-backed.
 	{"big", "fromInt"}:   {GoName: "BigFromInt", Params: []string{"int"}, Return: "big.BigInt"},
 	{"big", "fromInt64"}: {GoName: "BigFromInt64", Params: []string{"int64"}, Return: "big.BigInt"},
+	// bufio.newScanner(r) wraps an io.Reader (os.stdin is *os.File, which Go
+	// accepts as io.Reader); the reader arg types Unknown in v1 and so fits.
+	{"bufio", "newScanner"}: {GoName: "NewScanner", Params: []string{"io.Reader"}, Return: "bufio.Scanner"},
 }
 
 // handleMethods maps a handle type spelling (`pkg.Type`) to its bound method
@@ -82,6 +86,10 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"mul":     {GoName: "Mul", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
 		"div":     {GoName: "Div", Params: []string{"big.BigInt"}, Return: "big.BigInt"},
 		"toInt64": {GoName: "ToInt64", Params: nil, Return: "int64"},
+	},
+	"bufio.Scanner": {
+		"scan": {GoName: "Scan", Params: nil, Return: "bool"},
+		"text": {GoName: "Text", Params: nil, Return: "string"},
 	},
 }
 

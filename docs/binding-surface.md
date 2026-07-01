@@ -310,6 +310,11 @@ class bufio.Writer {
 bufio.newWriter(w: io.Writer): bufio.Writer
 ```
 
+**Bound today:** `bufio.newScanner(r)` + the `scan` / `text` method set — an
+external value handle; its reader is `os.stdin` (bound, → Go's `os.Stdin`). The
+rest of `Scanner` (`bytes` / `err`) and all of `bufio.Writer` remain on the
+target surface.
+
 ## net/url
 
 ```aril

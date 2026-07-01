@@ -47,6 +47,11 @@ var stdlibRenameOverlay = map[[2]string]string{
 	{"slices", "min"}:      "Min",
 	{"slices", "contains"}: "Contains",
 	{"slices", "indexOf"}:  "Index",
+	// os.stdin — the standard-input stream (Go's os.Stdin, a *os.File that
+	// satisfies io.Reader), the reader `bufio.newScanner` consumes. A value
+	// reference, not a call; sema leaves it Unknown (module field access), which
+	// fits the reader parameter (VALUE-HANDLES).
+	{"os", "stdin"}: "Stdin",
 }
 
 // timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to
