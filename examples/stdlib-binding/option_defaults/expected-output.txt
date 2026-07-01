@@ -1,0 +1,4 @@
+sum 60
+valid 3
+index 2 found true
+missing -1 none true

@@ -67,3 +67,55 @@ func TestSlicePushReturnsSlice(t *testing.T) {
 		t.Errorf("expected clean (push:[]int), got %v", codes)
 	}
 }
+
+// Option/Result query + defaulting methods (builtins.md §Option/§Result
+// methods): the predicates type bool, unwrapOr types the payload/Ok type.
+func TestOptionMethodsType(t *testing.T) {
+	src := `func f(o: Option<int>): int {
+  if o.isSome() { return o.unwrapOr(0) }
+  if o.isNone() { return -1 }
+  return o.unwrapOr(0)
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (isSome/isNone:bool, unwrapOr:int), got %v", codes)
+	}
+}
+
+func TestOptionUnwrapOrTypesPayload(t *testing.T) {
+	src := `func f(o: Option<string>) {
+  let s = o.unwrapOr("x")
+  let n = s.len()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "s"); got == nil || got.String() != "string" {
+		t.Errorf("unwrapOr payload = %v; want string", got)
+	}
+}
+
+func TestResultMethodsType(t *testing.T) {
+	src := `func f(r: Result<int, string>): int {
+  if r.isOk() { return r.unwrapOr(0) }
+  if r.isErr() { return -1 }
+  return r.unwrapOr(0)
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (isOk/isErr:bool, unwrapOr:int), got %v", codes)
+	}
+}
+
+// unwrapOr defaults to the Ok payload type — the fallback must be that
+// type, not the Err type. A mismatched fallback is an arg-type error.
+func TestResultUnwrapOrTypesOkPayload(t *testing.T) {
+	src := `func f(r: Result<int, string>) {
+  let v = r.unwrapOr(0)
+  let w = v + 1
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "v"); got == nil || got.String() != "int" {
+		t.Errorf("unwrapOr payload = %v; want int", got)
+	}
+}

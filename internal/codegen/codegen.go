@@ -411,15 +411,24 @@ type gen struct {
 	// sum type, either by NamedType ("Option"/"Result") or by
 	// variant constructor / pattern (Some/None/Ok/Err). The
 	// header emits the Go-side definitions only when set.
-	usesOption    bool
-	usesResult    bool
-	usesMap       bool
-	usesSet       bool
-	usesStack     bool
-	usesReflect   bool
-	usesCmp       bool // an `Ordered` type-param bound → import "cmp" (G3b)
-	usesMakeSlice bool
-	usesScan      bool
+	usesOption bool
+	usesResult bool
+	// usesOptionMethods / usesResultMethods — a query/defaulting method
+	// (isSome/isNone/unwrapOr, isOk/isErr) is called, so the inline prelude
+	// emits the method set (builtins.md §Option methods / §Result methods).
+	// Gated separately from the type flag so existing programs that never
+	// call a method keep their prelude (and goldens) unchanged; vendored
+	// mode always has the methods on arilrt. Over-detection (a same-named
+	// user method) only emits dead code — never a miscompile.
+	usesOptionMethods bool
+	usesResultMethods bool
+	usesMap           bool
+	usesSet           bool
+	usesStack         bool
+	usesReflect       bool
+	usesCmp           bool // an `Ordered` type-param bound → import "cmp" (G3b)
+	usesMakeSlice     bool
+	usesScan          bool
 	// usesScan2 / usesScan3 — the multi-value stdin bindings
 	// `fmt.scan2<A,B>()` / `fmt.scan3<A,B,C>()`, lowered to the
 	// Scan2 / Scan3 helpers (Result<(A,B[,C]), error>).

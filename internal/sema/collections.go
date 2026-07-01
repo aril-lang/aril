@@ -331,6 +331,25 @@ func containerMethodType(recv Type, name string) *Func {
 		case "copy":
 			return &Func{Return: &Slice{Elem: r.Elem}}
 		}
+	case *Option:
+		// Option query / defaulting methods (builtins.md §Option methods).
+		// `unwrapOr(d)` defaults the payload; the predicates avoid a full
+		// `match` for the common None-check.
+		switch name {
+		case "isSome", "isNone":
+			return &Func{Return: &Builtin{N: "bool"}}
+		case "unwrapOr":
+			return &Func{Params: []Type{r.T}, Return: r.T}
+		}
+	case *Result:
+		// Result query / defaulting methods (builtins.md §Result methods).
+		// `unwrapOr(d)` defaults to the Ok payload type on the Err path.
+		switch name {
+		case "isOk", "isErr":
+			return &Func{Return: &Builtin{N: "bool"}}
+		case "unwrapOr":
+			return &Func{Params: []Type{r.T}, Return: r.T}
+		}
 	}
 	return nil
 }

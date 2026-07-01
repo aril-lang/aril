@@ -1,0 +1,10 @@
+description = "Option/Result query + defaulting methods (unwrapOr / isOk / isSome / isNone)"
+source   = "SURFACE-ERGONOMICS PR1"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.4"
+status   = "running"
+expects  = "run-pass"
+entry    = "option_defaults.aril"
+expected_output = "expected-output.txt"

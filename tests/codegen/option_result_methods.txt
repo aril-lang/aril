@@ -1,0 +1,108 @@
+--- TITLE ---
+Option/Result query + defaulting methods: isSome/isNone/unwrapOr, isOk/isErr/unwrapOr
+
+--- INPUT ---
+import fmt
+
+func lookup(k: string): Option<int> {
+  if k == "a" {
+    return Some(1)
+  }
+  return None
+}
+
+func div(a: int, b: int): Result<int, string> {
+  if b == 0 {
+    return Err("div by zero")
+  }
+  return Ok(a / b)
+}
+
+func main() {
+  let some = lookup("a")
+  let none = lookup("z")
+  fmt.println(some.isSome(), some.isNone(), some.unwrapOr(-1))
+  fmt.println(none.isSome(), none.isNone(), none.unwrapOr(-1))
+  let ok = div(10, 2)
+  let err = div(1, 0)
+  fmt.println(ok.isOk(), ok.isErr(), ok.unwrapOr(0))
+  fmt.println(err.isOk(), err.isErr(), err.unwrapOr(0))
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+func (o Option[T]) IsSome() bool { return o.Tag == 1 }
+func (o Option[T]) IsNone() bool { return o.Tag == 0 }
+func (o Option[T]) UnwrapOr(fallback T) T {
+	if o.Tag == 1 {
+		return o.V
+	}
+	return fallback
+}
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func (r Result[T, E]) IsOk() bool  { return r.Tag == 0 }
+func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }
+func (r Result[T, E]) UnwrapOr(fallback T) T {
+	if r.Tag == 0 {
+		return r.V
+	}
+	return fallback
+}
+func lookup(k string) Option[int] {
+	if k == "a" {
+		return OptionSome[int](1)
+	}
+	return OptionNone[int]()
+}
+func div(a int, b int) Result[int, string] {
+	if b == 0 {
+		return ResultErr[int, string]("div by zero")
+	}
+	return ResultOk[int, string](a / b)
+}
+func main() {
+	var some = lookup("a")
+	var none = lookup("z")
+	fmt.Println(some.IsSome(), some.IsNone(), some.UnwrapOr(-1))
+	fmt.Println(none.IsSome(), none.IsNone(), none.UnwrapOr(-1))
+	var ok = div(10, 2)
+	var err = div(1, 0)
+	fmt.Println(ok.IsOk(), ok.IsErr(), ok.UnwrapOr(0))
+	fmt.Println(err.IsOk(), err.IsErr(), err.UnwrapOr(0))
+}
+
+--- STDOUT ---
+true false 1
+false true -1
+true false 5
+false true 0
+
+--- EXIT ---
+0
