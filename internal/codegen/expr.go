@@ -739,11 +739,28 @@ func (g *gen) goMethodName(receiver ast.Expr, name string) string {
 	}
 	// Value-handle method (`re.matchString` → `re.MatchString`): the receiver's
 	// sema type is a bound stdlib handle Named, and the Go method name comes
-	// from the shared binding table (VALUE-HANDLES), not the verbatim Aril name.
+	// from the shared binding table (D37), not the verbatim Aril name.
 	if goName, ok := g.handleMethodGoName(receiver, name); ok {
 		return goName
 	}
 	return mapFieldName(receiver, name)
+}
+
+// handleGoType returns the Go type spelling for a bound value-handle type
+// (D37): the vendored/inline runtime selector for a runtime-backed
+// handle (big.BigInt → arilrt.BigInt / BigInt), the verbatim Go spelling for an
+// external one (regexp.Regexp → *regexp.Regexp). ok=false when `spelled` is not
+// a bound handle type. Shared by the two type-emission sites (emitTypeExpr for
+// annotations, goTypeFromSema for sema-derived positions).
+func (g *gen) handleGoType(spelled string) (string, bool) {
+	ht, ok := binding.HandleTypeOf(spelled)
+	if !ok {
+		return "", false
+	}
+	if ht.Runtime {
+		return g.rt(ht.GoType), true
+	}
+	return ht.GoType, true
 }
 
 // handleMethodGoName returns the Go method name for `receiver.name` when
@@ -781,7 +798,7 @@ func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
 }
 
 // isDurationReceiver reports whether sema typed receiver as the time.Duration
-// handle — the gate for lowering d.add/d.mul to Go operators (VALUE-HANDLES).
+// handle — the gate for lowering d.add/d.mul to Go operators (D37).
 func (g *gen) isDurationReceiver(receiver ast.Expr) bool {
 	if g.info == nil {
 		return false

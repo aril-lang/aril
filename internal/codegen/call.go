@@ -171,7 +171,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// time.Duration arithmetic methods lower to Go operators — Duration is a
 	// scalar (`type Duration int64`) with no Add/Mul method: d.add(e) → (d + e);
 	// d.mul(n) → (d * time.Duration(n)). Gated on the receiver's sema type being
-	// the time.Duration handle (VALUE-HANDLES). `.string()` is a real method and
+	// the time.Duration handle (D37). `.string()` is a real method and
 	// takes the ordinary handle-method rename path.
 	if f, ok := c.Callee.(*ast.Field); ok && (f.Name == "add" || f.Name == "mul") && len(c.Args) == 1 {
 		if g.isDurationReceiver(f.Receiver) {
@@ -241,7 +241,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// Runtime-backed value-handle constructor — `big.fromInt(n)` lowers to the
 	// arilrt helper `BigFromInt(n)` (rt() picks the vendored/inline spelling),
 	// not a `big.*` package call, since the handle is an arilrt wrapper
-	// (VALUE-HANDLES). External-package handle ctors (regexp.mustCompile) take
+	// (D37). External-package handle ctors (regexp.mustCompile) take
 	// the ordinary rename path below.
 	if f, ok := c.Callee.(*ast.Field); ok {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && g.isBuiltinModule(recv) {
@@ -774,7 +774,7 @@ func isRuntimeHelperBinding(pkg, method string) bool {
 	case "big":
 		// big.fromInt / fromInt64 lower to arilrt runtime helpers (BigFromInt*),
 		// and the `big` namespace maps to the runtime, not a Go `big` package —
-		// so it must never mark `import "big"` (VALUE-HANDLES).
+		// so it must never mark `import "big"` (D37).
 		return method == "fromInt" || method == "fromInt64"
 	}
 	return false

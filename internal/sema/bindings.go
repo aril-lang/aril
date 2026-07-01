@@ -41,7 +41,7 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 		return &Option{T: &Builtin{N: "string"}}
 	// Duration constructors (codegen timeDurationUnit): type the result as the
 	// time.Duration handle so its arithmetic method set (add/mul/string)
-	// resolves (VALUE-HANDLES / binding-surface.md §time).
+	// resolves (D37; binding-surface.md §time).
 	case [2]string{"time", "seconds"}, [2]string{"time", "milliseconds"}:
 		return &Named{N: "time.Duration"}
 	// Fixed-return `slices` helpers (codegen stdlibRenameOverlay); the
@@ -53,7 +53,7 @@ func (c *checker) stdlibBindingReturn(pkg, method string) Type {
 	}
 	// Value-handle constructors (binding.handleCtors): a package function that
 	// builds a stdlib struct handle (regexp.mustCompile → regexp.Regexp). The
-	// return spelling is the handle's Aril boundary type (VALUE-HANDLES).
+	// return spelling is the handle's Aril boundary type (D37).
 	if hc, ok := binding.HandleCtorOf(pkg, method); ok {
 		return semaTypeFromSpelling(hc.Return)
 	}

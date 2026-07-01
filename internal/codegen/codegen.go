@@ -690,7 +690,7 @@ func (g *gen) writeHeader(f *ast.File) {
 		if im.Path == "reflect" || im.Path == "big" {
 			// Aril-internal / runtime-backed: `big` maps to the arilrt BigInt
 			// wrapper (usesBigInt drives its import / inline prelude), not a Go
-			// `big` package (VALUE-HANDLES).
+			// `big` package (D37).
 			continue
 		}
 		// Drop a stdlib import the generated Go never references —

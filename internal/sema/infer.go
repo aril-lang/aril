@@ -674,7 +674,7 @@ func (c *checker) inferField(f *ast.Field) Type {
 	// Value-handle method access — `re.matchString(s)` on a stdlib handle
 	// type (regexp.Regexp, …). The method set is a hand-curated binding
 	// table (binding.handleMethods) shared with codegen, keyed on the
-	// handle's Aril type spelling (VALUE-HANDLES). Give the method its Func
+	// handle's Aril type spelling (D37). Give the method its Func
 	// so the call is arg-checked and typed.
 	if hm, ok := binding.HandleMethodOf(named.N, f.Name); ok {
 		return handleMethodSigType(hm)

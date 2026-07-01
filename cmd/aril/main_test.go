@@ -199,7 +199,7 @@ func main() {
 }
 
 // TestBigIntModeEquivalence extends the Block R divergence guard to the `big`
-// value-handle runtime wrapper (VALUE-HANDLES): the inline BigInt prelude
+// value-handle runtime wrapper (D37): the inline BigInt prelude
 // (writePredeclaredBigInt) must behave identically to the vendored arilrt.BigInt.
 // The program spans construction, every arithmetic method, and the int64 narrow,
 // and it computes a value that overflows int64 (fib(100)) so the arbitrary-
