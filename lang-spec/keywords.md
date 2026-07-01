@@ -120,7 +120,7 @@ style) and is governed separately by the shadow diagnostics.
 - Generic types: `Result`, `Option`, `Map`, `Set`, `Stack`,
   `Channel`, `SendChan`, `RecvChan`.
 - Variant constructors: `Ok`, `Err`, `Some`, `None`.
-- Functions: `panic`, `error`, `refEq`, `makeChannel`, `makeSlice`.
+- Functions: `panic`, `error`, `refEq`, `makeChannel`, `makeSlice`, `min`, `max`.
 - Conversion: `int`, `int64`, ..., `float64`, `byte`, `rune`, `string`
   also act as conversion functions (`int(x)`, `float64(n)`, ...).
 

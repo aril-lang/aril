@@ -42,7 +42,11 @@ func predeclaredSymbols() map[string]*Symbol {
 	for _, v := range []string{"None", "Some", "Ok", "Err"} {
 		addVar(v)
 	}
-	for _, fn := range []string{"panic", "refEq", "makeChannel", "makeSlice"} {
+	// `min`/`max` are predeclared free functions over any Ordered type (int,
+	// float, string) — they lower to Go's builtin `min`/`max` (Go ≥1.21), the
+	// Aril spelling matching the Go spelling, so no rename is needed. They fill
+	// the int-extremum gap `math.min`/`max` (float64-only) leave.
+	for _, fn := range []string{"panic", "refEq", "makeChannel", "makeSlice", "min", "max"} {
 		addFunc(fn)
 	}
 	for _, m := range []string{

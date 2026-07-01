@@ -37,6 +37,10 @@ func TestNewMechanicalRows(t *testing.T) {
 		{"strconv", "formatFloat", "FormatFloat", "string", Rename},
 		// Bare-error effect: lifted to Result<unit, error>, NOT Result<T, error>.
 		{"os", "writeFile", "WriteFile", "Result<unit, error>", ResultWrap},
+		// unicode char classification: func(rune) bool → Rename, bool.
+		{"unicode", "isDigit", "IsDigit", "bool", Rename},
+		{"unicode", "isLetter", "IsLetter", "bool", Rename},
+		{"unicode", "isSpace", "IsSpace", "bool", Rename},
 	}
 	for _, c := range cases {
 		f, ok := Lookup(c.pkg, c.name)

@@ -220,6 +220,17 @@ func (c *checker) inferBuiltinFuncCall(name string, call *ast.Call, args []Type)
 			c.report("E0206", "`refEq` requires two operands of the same class or opaque foreign handle", call.Span)
 		}
 		return &Builtin{N: "bool"}
+	case "min", "max":
+		// `min`/`max` over any Ordered type are homogeneous — the result is the
+		// argument type (int / float / string). Type as the first concrete
+		// argument (an Unknown arg stays conservative). Lower to Go's builtin
+		// min/max. (builtins.md §Free functions.)
+		for _, a := range args {
+			if concrete(a) {
+				return a
+			}
+		}
+		return &Unknown{}
 	case "makeSlice":
 		if len(call.TypeArgs) == 1 {
 			return &Slice{Elem: c.typeFromExpr(call.TypeArgs[0])}

@@ -29,6 +29,7 @@ var Manifest = map[string][]string{
 	"strconv": {"Atoi", "FormatBool", "FormatFloat", "Itoa", "ParseBool", "ParseFloat", "ParseInt", "Quote"},
 	"math":    {"Abs", "Ceil", "Floor", "Log", "Log10", "Log2", "Max", "Min", "Pow", "Sqrt"},
 	"time":    {"After", "Sleep", "Tick"},
+	"unicode": {"IsDigit", "IsLetter", "IsSpace"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed

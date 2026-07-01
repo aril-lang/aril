@@ -8,10 +8,9 @@ status      = "running"
 expects     = "run-pass"
 entry       = "char_histogram.aril"
 
-# Note: the implementation uses ASCII range checks (c >= 'a' && c <= 'z' etc.)
-# as a fallback because unicode.isLetter / unicode.isDigit / unicode.isSpace
-# are not yet bound.  All three test cases are pure ASCII so oracle and
-# implementation agree.
+# The implementation uses the unicode.isLetter / isDigit / isSpace bindings.
+# All three test cases are pure ASCII, where unicode.Is* agrees with the
+# Python oracle's str.isalpha/isdigit/isspace.
 
 [[case]]
 args            = ["Hello, World! 123"]

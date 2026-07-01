@@ -38,10 +38,15 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `join` `replace` `split` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
 | `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pow` `sqrt` | mechanical |
+| `unicode` | `isDigit` `isLetter` `isSpace` | mechanical |
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |
 | `sort` | `sorted` (comparator, returns a new slice) | idiom |
 | `json` | `parse<T>` `serialize` `serializeIndent` (+ `Option` ⇄ `null` round-trip) | idiom |
 | `errors` | `is` (sentinel/chain classification) · `new` (constructor) | mechanical + idiom |
+
+Predeclared free functions `min` / `max` (generic over any ordered type — int,
+float, string) fill the int-extremum gap `math.min` / `math.max` (float64-only)
+leave; they lower to Go's builtin `min` / `max`.
 
 ## Not yet available
 
