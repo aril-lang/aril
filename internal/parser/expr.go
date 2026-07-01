@@ -971,6 +971,16 @@ func (p *parser) parsePrimary() (ast.Expr, *Diag) {
 			return p.parseValueBlock()
 		}
 	}
+	if t.Kind == lexer.KindNewline {
+		// The commonest form of this error: an expression split across
+		// lines (a `&&`/`||`/`+` chain, a multi-line `if` condition or
+		// match arm). A newline outside brackets ends the expression, so
+		// a trailing binary operator has no right operand. Point at the
+		// fix rather than the raw token (diagnostics.md E0112).
+		return nil, p.diag("E0112",
+			"a newline ends the expression here — wrap the whole expression in parentheses `(...)` to continue it across lines",
+			t.Line, t.Col)
+	}
 	return nil, p.diag("E0112",
 		fmt.Sprintf("expected expression, got %s %q", t.Kind, t.Lexeme),
 		t.Line, t.Col)

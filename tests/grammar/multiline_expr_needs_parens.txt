@@ -1,0 +1,11 @@
+--- TITLE ---
+E0112: an expression split across lines by a trailing operator needs parentheses
+
+--- INPUT ---
+func main() {
+  let ok = true &&
+    false
+}
+
+--- ERRORS ---
+src.aril:2:19: error[E0112]: a newline ends the expression here — wrap the whole expression in parentheses `(...)` to continue it across lines

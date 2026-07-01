@@ -1,0 +1,12 @@
+--- fizzbuzz.aril
++++ fizzbuzz.aril
+@@ -4,7 +4,8 @@
+ 
+ func main() {
+   for i in 1..=100 {
+-    if i % 15 == 0 {
++    if i % 15 ==
++       0 {
+       fmt.println("FizzBuzz")
+     } else if i % 3 == 0 {
+       fmt.println("Fizz")

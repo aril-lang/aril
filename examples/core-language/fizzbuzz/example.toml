@@ -35,3 +35,10 @@ expect  = ["E0404"]
 stage   = "sema"
 matches = "errors/stray-break.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/split-condition.patch"   # `if i % 15 ==` split before its operand — trailing operator ends the line
+expect  = ["E0112"]
+stage   = "parse"
+matches = "errors/split-condition.expected"
+origin  = "synthetic"
