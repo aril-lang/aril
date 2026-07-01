@@ -1,0 +1,27 @@
+// DEMAND SKETCH (build-fails until `errors.as<T>` binds) — recover a concrete
+// error type from a wrapped chain (the typed-unwrap counterpart to the bound
+// `errors.is`). Forces `errors.as<T>(err): Option<T>` (binding-surface.md
+// §errors) — its pointer-out protocol is a distinct shape from a comma-ok lift.
+import fmt
+import errors
+
+class NotFound implements error {
+  let key: string
+  error(): string { return "not found: " + key }
+}
+
+func lookup(k: string): Result<string, error> {
+  return Err(fmt.errorf("lookup %v: %w", k, NotFound{ key: k }))
+}
+
+func main() {
+  match lookup("user-42") {
+    Ok(v)  => fmt.println("ok", v),
+    Err(e) => {
+      match errors.as<NotFound>(e) {
+        Some(nf) => fmt.println("missing key:", nf.key),
+        None     => fmt.println("other error:", e),
+      }
+    },
+  }
+}

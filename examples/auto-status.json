@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 77,
+    "total": 80,
     "parse_fail": 3,
     "sema_fail": 2,
-    "emit_fail": 4,
+    "emit_fail": 7,
     "build_ok": 68,
     "diag_ok": 82,
     "diag_total": 105,
     "run_ok": 68,
-    "run_total": 76
+    "run_total": 79
   },
   "files": [
     {
@@ -298,6 +298,11 @@
       "blocker": ""
     },
     {
+      "path": "examples/modeling-errors/errors_as/errors_as.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
+    },
+    {
       "path": "examples/modeling-errors/errors_as_types/errors_as_types.aril",
       "stage": "build",
       "blocker": ""
@@ -358,6 +363,11 @@
       "blocker": "error[E0103]: Unknown name http"
     },
     {
+      "path": "examples/stdlib-binding/leveled_log/leveled_log.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
+    },
+    {
       "path": "examples/stdlib-binding/line_numberer/line_numberer.aril",
       "stage": "emit",
       "blocker": "go build failed"
@@ -381,6 +391,11 @@
       "path": "examples/stdlib-binding/statistics/statistics.aril",
       "stage": "build",
       "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/stdin_bytes/stdin_bytes.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
     },
     {
       "path": "examples/stdlib-binding/struct_dump/struct_dump.aril",
@@ -542,7 +557,17 @@
       "code": 1
     },
     {
+      "path": "examples/modeling-errors/errors_as",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
       "path": "examples/stdlib-binding/duration_budget",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
+      "path": "examples/stdlib-binding/leveled_log",
       "status": "build-fail",
       "code": 1
     },
@@ -553,6 +578,11 @@
     },
     {
       "path": "examples/stdlib-binding/regexp_extract",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
+      "path": "examples/stdlib-binding/stdin_bytes",
       "status": "build-fail",
       "code": 1
     }

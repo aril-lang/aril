@@ -1,0 +1,11 @@
+// DEMAND SKETCH (build-fails until the `log` package binds) — leveled logging
+// with a prefix. `log` is a recognised namespace but no functions are bound yet.
+// Forces `log.setPrefix(s)`, `log.printf(fmt, ...)`, `log.println(...)`
+// (binding-surface.md §log).
+import log
+
+func main() {
+  log.setPrefix("[svc] ")
+  log.println("starting up")
+  log.printf("listening on port %d", 8080)
+}

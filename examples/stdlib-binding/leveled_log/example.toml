@@ -1,0 +1,9 @@
+description = "DEMAND: leveled logging with a prefix (forces the log package)"
+source   = "stdlib-coverage demand: log"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "leveled_log.aril"

@@ -1,0 +1,9 @@
+description = "DEMAND: slurp stdin via io.Reader, count bytes (forces io.readAll + os.stdin)"
+source   = "stdlib-coverage demand: io"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "stdin_bytes.aril"

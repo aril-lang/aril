@@ -4,14 +4,14 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 68 / 77 examples build end-to-end** (floor 68).
+- **build_ok — 68 / 80 examples build end-to-end** (floor 68).
 - **diag_ok — 82 / 105 negative cases produce their expected diagnostic** (floor 70).
-- **run_ok — 68 / 76 run-pass examples build and run as specified** (floor 68; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 68 / 79 run-pass examples build and run as specified** (floor 68; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
 | ✅ build (full pipeline) | 68 |
-| emit / codegen fail | 4 |
+| emit / codegen fail | 7 |
 | sema fail | 2 |
 | parse fail | 3 |
 
@@ -89,8 +89,11 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/concurrency/mutex_counter/mutex_counter.aril` | emit | go build failed |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | emit | go build failed |
+| `examples/modeling-errors/errors_as/errors_as.aril` | emit | go build failed |
 | `examples/stdlib-binding/duration_budget/duration_budget.aril` | emit | go build failed |
+| `examples/stdlib-binding/leveled_log/leveled_log.aril` | emit | go build failed |
 | `examples/stdlib-binding/line_numberer/line_numberer.aril` | emit | go build failed |
+| `examples/stdlib-binding/stdin_bytes/stdin_bytes.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/stdlib-binding/regexp_extract/regexp_extract.aril` | sema | error[E0103]: Unknown name regexp |
 | `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
@@ -133,7 +136,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**8 of 76 run-pass examples fall short of run_ok.**
+**11 of 79 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
@@ -142,6 +145,9 @@ Run-pass examples that do not yet reach run_ok — they fail to build (an existi
 | `examples/concurrency/pubsub` | build-fail | 1 |
 | `examples/core-language/lru_cache` | build-fail | 1 |
 | `examples/core-language/p1133` | build-fail | 1 |
+| `examples/modeling-errors/errors_as` | build-fail | 1 |
 | `examples/stdlib-binding/duration_budget` | build-fail | 1 |
+| `examples/stdlib-binding/leveled_log` | build-fail | 1 |
 | `examples/stdlib-binding/line_numberer` | build-fail | 1 |
 | `examples/stdlib-binding/regexp_extract` | build-fail | 1 |
+| `examples/stdlib-binding/stdin_bytes` | build-fail | 1 |
