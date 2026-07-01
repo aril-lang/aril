@@ -51,6 +51,10 @@ var handleTypes = map[string]HandleType{
 	"regexp.Regexp": {GoType: "*regexp.Regexp", GoPkg: "regexp"},
 	"big.BigInt":    {GoType: "BigInt", Runtime: true},
 	"bufio.Scanner": {GoType: "*bufio.Scanner", GoPkg: "bufio"},
+	// time.Duration is a Go scalar (`type Duration int64`), not a struct handle:
+	// `string` is a real method (→ String()), but `add`/`mul` lower to Go
+	// operators (codegen intercept), since Duration has no Add/Mul method.
+	"time.Duration": {GoType: "time.Duration", GoPkg: "time"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -91,6 +95,13 @@ var handleMethods = map[string]map[string]HandleBinding{
 	"bufio.Scanner": {
 		"scan": {GoName: "Scan", Params: nil, Return: "bool"},
 		"text": {GoName: "Text", Params: nil, Return: "string"},
+	},
+	"time.Duration": {
+		// add/mul lower to Go operators (codegen durationOpMethod intercept);
+		// GoName is unused for them. string is a genuine Duration method.
+		"add":    {GoName: "", Params: []string{"time.Duration"}, Return: "time.Duration"},
+		"mul":    {GoName: "", Params: []string{"int"}, Return: "time.Duration"},
+		"string": {GoName: "String", Params: nil, Return: "string"},
 	},
 }
 

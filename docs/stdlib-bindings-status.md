@@ -71,10 +71,13 @@ carrying methods. **Bound:** `regexp.Regexp` (`mustCompile` + `matchString` /
 `fromInt64` + `add` / `sub` / `mul` / `div` / `toInt64`) — a runtime-backed
 functional wrapper over `math/big`'s pointer-mutation API (each op returns a
 fresh value). And `bufio.Scanner` (`newScanner(os.stdin)` + `scan` / `text`) — another external
-handle, the line-by-line stdin reader. All surface through the builtin-module
-namespace, their method sets dispatching on the handle's boundary type. Still on
-the target surface: `time.Duration` arithmetic, `time.Time` (clock/formatting),
-`bufio.Writer`, and the wider `big` surface (`mod` / `cmp` / `string`).
+handle, the line-by-line stdin reader. And `time.Duration` arithmetic
+(`add` / `mul`, lowered to Go operators since `Duration` is a scalar, +
+`string`) over the existing `time.seconds` / `time.milliseconds` constructors.
+All surface through the builtin-module namespace, their method sets dispatching
+on the handle's boundary type. Still on the target surface: `time.Time`
+(clock/formatting), `bufio.Writer`, and the wider `big` surface
+(`mod` / `cmp` / `string`).
 
 **Bound interfaces with enforced conformance.** `io.Reader` / `Writer` /
 `Closer` and friends. A class may *write* `implements io.Reader` today, but the
