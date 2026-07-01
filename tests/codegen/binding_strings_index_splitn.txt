@@ -1,0 +1,37 @@
+--- TITLE ---
+strings.index / strings.splitN bindings (→ strings.Index / strings.SplitN)
+
+--- INPUT ---
+import fmt
+import strings
+
+func main() {
+  fmt.println(strings.index("hello world", "world"), strings.index("abc", "z"))
+  for p in strings.splitN("a:b:c:d", ":", 2) {
+    fmt.println(p)
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	fmt.Println(strings.Index("hello world", "world"), strings.Index("abc", "z"))
+	for _, p := range strings.SplitN("a:b:c:d", ":", 2) {
+		fmt.Println(p)
+	}
+}
+
+--- STDOUT ---
+6 -1
+a
+b:c:d
+
+--- EXIT ---
+0
