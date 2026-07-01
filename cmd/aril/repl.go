@@ -34,6 +34,11 @@ func cmdRepl(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril repl: takes no positional arguments")
 		return 2
 	}
+	// The REPL compiles + runs each snippet — require a supported Go toolchain.
+	if err := requireGoToolchain(); err != nil {
+		fmt.Fprintf(os.Stderr, "aril repl: %v\n", err)
+		return 1
+	}
 	// TTY → go-prompt path with up-arrow history and a coloured
 	// prompt; non-TTY (pipe / test harness) → bufio.Scanner
 	// fallback so input from stdin pipes still works for tests.
@@ -46,8 +51,12 @@ func cmdRepl(args []string) int {
 const (
 	replPrompt     = "aril> "
 	replContPrompt = "... > "
-	replBanner     = "aril repl 0.2 — type :help for commands, :quit to exit."
 )
+
+// replBanner derives from the real compiler version so it never drifts.
+func replBanner() string {
+	return "aril repl " + versionString() + " — type :help for commands, :quit to exit."
+}
 
 // replSession holds the accumulated session source. Each
 // successful input is appended; on the next turn the whole
@@ -111,7 +120,7 @@ type replStmt struct {
 // Stdout / Stderr` out of the loop lets cmd/aril/main_test.go
 // drive the prompt without spawning a subprocess.
 func runRepl(stdin io.Reader, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stdout, replBanner)
+	fmt.Fprintln(stdout, replBanner())
 	sess := &replSession{}
 	scanner := bufio.NewScanner(stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

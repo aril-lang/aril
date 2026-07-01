@@ -27,7 +27,7 @@ import (
 // with single-colour user text for now and revisit once we bump
 // the toolchain.
 func runReplPrompt() int {
-	fmt.Println(replBanner)
+	fmt.Println(replBanner())
 	state := &promptState{sess: &replSession{}}
 	p := prompt.New(
 		state.execute,

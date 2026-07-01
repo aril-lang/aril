@@ -28,7 +28,11 @@ import (
 	"github.com/aril-lang/aril/internal/sema"
 )
 
-const version = "0.0.0-dev"
+// version is the human-curated semver base — bump the minor at each milestone
+// that changes the compiler surface. Each build additionally self-stamps its
+// git revision + commit date via runtime/debug build info (versionString), so
+// the reported version advances on every merged PR without a manual edit.
+const version = "0.1.0-dev"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -38,7 +42,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "version", "-v", "--version":
-		fmt.Printf("aril %s\n", version)
+		printVersion()
 	case "emit":
 		os.Exit(cmdEmit(os.Args[2:]))
 	case "build":
@@ -157,6 +161,11 @@ func cmdBuild(args []string) int {
 	if err := checkContractsMode(*contracts); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
+	}
+	// build compiles the generated Go — require a supported Go toolchain up front.
+	if err := requireGoToolchain(); err != nil {
+		fmt.Fprintf(os.Stderr, "aril build: %v\n", err)
+		return 1
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "aril build: expected exactly one <file.aril>")
@@ -427,6 +436,11 @@ func cmdRun(args []string) int {
 	if err := checkContractsMode(*contracts); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
+	}
+	// run compiles + executes the generated Go — require a supported Go toolchain.
+	if err := requireGoToolchain(); err != nil {
+		fmt.Fprintf(os.Stderr, "aril run: %v\n", err)
+		return 1
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "aril run: expected exactly one <file.aril>")
