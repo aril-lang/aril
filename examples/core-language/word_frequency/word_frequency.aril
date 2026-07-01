@@ -1,0 +1,88 @@
+// Rosetta Code "Word frequency": count words (case-insensitive, punctuation
+// stripped), print the top 5 by descending count, ties alphabetical. Authored
+// by a TypeScript-developer agent as a UX study — its friction (no
+// trim-any-char, single-expression comparators, multi-line continuation) is
+// recorded in the diagnostic backlog.
+
+import fmt
+import strings
+import sort
+
+func stripPunct(s: string): string {
+  var r = s
+  while r.len() > 0 {
+    let first = r[0]
+    let isPunct = (first == byte('.') || first == byte(',') || first == byte('!') || first == byte('?') || first == byte(';') || first == byte(':'))
+    if isPunct { r = r[1:] } else { break }
+  }
+  while r.len() > 0 {
+    let last = r[r.len() - 1]
+    let isPunct = (last == byte('.') || last == byte(',') || last == byte('!') || last == byte('?') || last == byte(';') || last == byte(':'))
+    if isPunct { r = r[:(r.len() - 1)] } else { break }
+  }
+  return r
+}
+
+type WordCount = { word: string, count: int }
+
+func countWords(text: string): Map<string, int> {
+  let words = strings.fields(text)
+  var counts = Map<string, int>{}
+  for w in words {
+    let clean = stripPunct(strings.toLower(w))
+    if clean.len() == 0 { continue }
+    match counts.get(clean) {
+      Some(n) => counts.set(clean, n + 1),
+      None    => counts.set(clean, 1),
+    }
+  }
+  return counts
+}
+
+func topN(counts: Map<string, int>, n: int): []WordCount {
+  var pairs: []WordCount = []WordCount{}
+  for (k, v) in counts {
+    pairs = pairs.push(WordCount{ word: k, count: v })
+  }
+  let sorted = sort.sorted(pairs, (a, b) => (a.count > b.count || (a.count == b.count && a.word < b.word)))
+  let limit = if sorted.len() < n { sorted.len() } else { n }
+  return sorted[0:limit]
+}
+
+func minInt(a: int, b: int): int {
+  if a < b { return a }
+  return b
+}
+
+func isSortedDesc(xs: []WordCount): bool {
+  var i = 1
+  while i < xs.len() {
+    let prev = xs[i - 1]
+    let cur  = xs[i]
+    if prev.count < cur.count { return false }
+    if prev.count == cur.count && prev.word > cur.word { return false }
+    i = i + 1
+  }
+  return true
+}
+
+func main() {
+  let text = ("To be or not to be that is the question. " +
+             "Whether tis nobler in the mind to suffer the slings " +
+             "and arrows of outrageous fortune or to take arms against " +
+             "a sea of troubles and by opposing end them. To die to sleep " +
+             "no more and by a sleep to say we end the heartache and the " +
+             "thousand natural shocks that flesh is heir to.")
+  for wc in topN(countWords(text), 5) {
+    fmt.println(wc.count, wc.word)
+  }
+}
+
+// Load-bearing: the result holds EXACTLY min(n, #distinct words) entries in the
+// promised order. The length-equality is the coverage half — it rules out a
+// truncating/empty impl (`sorted[0:0]`) that one-sided `len <= n` + sortedness
+// would both still accept (AI/authoring.md §Contracts: the isSorted→[] trap).
+contract topN {
+  ensures result.len() == minInt(n, counts.len())
+  ensures isSortedDesc(result)
+}

@@ -1,0 +1,10 @@
+description = "JSON service-config validation; parse vs validation errors via errors.is (agent-authored)"
+source   = "real-world service-config"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "service_config.aril"
+expected_output = "expected-output.txt"

@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 59,
+    "total": 67,
     "parse_fail": 3,
-    "sema_fail": 1,
-    "emit_fail": 1,
-    "build_ok": 54,
+    "sema_fail": 2,
+    "emit_fail": 4,
+    "build_ok": 58,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 54,
-    "run_total": 58
+    "run_ok": 58,
+    "run_total": 66
   },
   "files": [
     {
@@ -23,12 +23,22 @@
       "blocker": ""
     },
     {
+      "path": "examples/concurrency/mutex_counter/mutex_counter.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
+    },
+    {
       "path": "examples/concurrency/nested_scopes/nested_scopes.aril",
       "stage": "emit",
       "blocker": "go build failed"
     },
     {
       "path": "examples/concurrency/parallel_fetcher/parallel_fetcher.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/concurrency/parallel_sum/parallel_sum.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -218,12 +228,22 @@
       "blocker": ""
     },
     {
+      "path": "examples/core-language/trebuchet/trebuchet.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
       "path": "examples/core-language/two_sum/two_sum.aril",
       "stage": "build",
       "blocker": ""
     },
     {
       "path": "examples/core-language/valid_parentheses/valid_parentheses.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/word_frequency/word_frequency.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -283,6 +303,11 @@
       "blocker": ""
     },
     {
+      "path": "examples/stdlib-binding/duration_budget/duration_budget.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
+    },
+    {
       "path": "examples/stdlib-binding/env_config/env_config.aril",
       "stage": "build",
       "blocker": ""
@@ -293,7 +318,22 @@
       "blocker": "error[E0103]: Unknown name http"
     },
     {
+      "path": "examples/stdlib-binding/line_numberer/line_numberer.aril",
+      "stage": "emit",
+      "blocker": "go build failed"
+    },
+    {
       "path": "examples/stdlib-binding/reading_validator/reading_validator.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/regexp_extract/regexp_extract.aril",
+      "stage": "sema",
+      "blocker": "error[E0103]: Unknown name regexp"
+    },
+    {
+      "path": "examples/stdlib-binding/service_config/service_config.aril",
       "stage": "build",
       "blocker": ""
     },
@@ -427,6 +467,11 @@
   ],
   "run_fails": [
     {
+      "path": "examples/concurrency/mutex_counter",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
       "path": "examples/concurrency/nested_scopes",
       "status": "build-fail",
       "code": 1
@@ -443,6 +488,21 @@
     },
     {
       "path": "examples/core-language/p1133",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
+      "path": "examples/stdlib-binding/duration_budget",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
+      "path": "examples/stdlib-binding/line_numberer",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
+      "path": "examples/stdlib-binding/regexp_extract",
       "status": "build-fail",
       "code": 1
     }

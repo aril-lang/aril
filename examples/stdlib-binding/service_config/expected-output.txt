@@ -1,0 +1,8 @@
+--- valid config ---
+auth-service on port 8080, 1 replicas, tags: prod,v2
+--- bad port ---
+validation error [bad-port]: validation: port=0: port out of range (1..65535)
+--- empty name ---
+validation error [empty-name]: validation: name must not be empty
+--- with replicas ---
+cache on port 6379, 3 replicas, tags: infra,redis

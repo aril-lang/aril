@@ -1,0 +1,16 @@
+// DEMAND SKETCH (build-fails until the `time.Duration` method bindings land) —
+// compose a time budget from durations and render it. `time.seconds` /
+// `time.milliseconds` already bind (Duration constructors); the unbound part is
+// Duration *arithmetic* + rendering — `d.add(d2)`, `d.mul(n)`, `d.string()`.
+// This is the deterministic (run_ok-able) slice of the time value-handle work,
+// distinct from wall-clock `time.Time`. See docs/binding-surface.md §time.
+import fmt
+import time
+
+func main() {
+  let step  = time.milliseconds(250)
+  let base  = time.seconds(1)
+  let total = base.add(step.mul(4))
+  fmt.println("step:",  step.string())
+  fmt.println("total:", total.string())
+}

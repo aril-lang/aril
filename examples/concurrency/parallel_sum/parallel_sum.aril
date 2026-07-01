@@ -1,0 +1,69 @@
+// Parallel sum of squares 1²+…+N² across 4 workers via structured concurrency
+// (scope/spawn/channels) — the uncolored replacement for Go's WaitGroup.
+// Authored by a TypeScript-developer agent as a UX study; its friction (the
+// `spawn { … return Ok(()) }` requirement, manual channel buffer sizing, no
+// scope-result collection primitive) is recorded in the diagnostic backlog.
+
+import fmt
+
+func sequentialSumOfSquares(n: int): int {
+  var total = 0
+  var i = 1
+  while i <= n {
+    total = total + i * i
+    i = i + 1
+  }
+  return total
+}
+
+func worker(start: int, end: int, results: SendChan<int>) {
+  var partial = 0
+  var i = start
+  while i <= end {
+    partial = partial + i * i
+    i = i + 1
+  }
+  results.send(partial)
+}
+
+func parallelSumOfSquares(n: int, numWorkers: int): Result<int, error> {
+  let resultCh = makeChannel<int>(numWorkers)
+  let chunkSize = (n + numWorkers - 1) / numWorkers
+  try scope<unit, error> {
+    var w = 0
+    while w < numWorkers {
+      let start = w * chunkSize + 1
+      var end = start + chunkSize - 1
+      if end > n { end = n }
+      if start <= n {
+        spawn {
+          worker(start, end, resultCh)
+          return Ok(())
+        }
+      }
+      w = w + 1
+    }
+  }
+  resultCh.close()
+  var total = 0
+  for partial in resultCh {
+    total = total + partial
+  }
+  return Ok(total)
+}
+
+func main() {
+  match parallelSumOfSquares(20, 4) {
+    Ok(total) => fmt.println(total),
+    Err(e)    => fmt.println("error:", e),
+  }
+}
+
+// The parallel result must equal the sequential closed form — rules out
+// partial-sum loss, chunk-boundary off-by-one, and double-counting.
+contract parallelSumOfSquares {
+  ensures match result {
+    Ok(total) => total == sequentialSumOfSquares(n),
+    Err(_)    => false,
+  }
+}

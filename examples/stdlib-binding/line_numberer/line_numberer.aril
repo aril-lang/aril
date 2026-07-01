@@ -1,0 +1,17 @@
+// DEMAND SKETCH (build-fails until the `bufio` binding lands) — number each
+// line read from stdin. Forces `bufio.newScanner(os.stdin)` + the
+// `bufio.Scanner` value-handle method set (`scan`/`text`), and surfaces that a
+// line reader depends on `os.stdin` (also an unbound std stream). See the
+// target spelling in docs/binding-surface.md §bufio.
+import fmt
+import bufio
+import os
+
+func main() {
+  let sc = bufio.newScanner(os.stdin)
+  var n = 0
+  while sc.scan() {
+    n = n + 1
+    fmt.println(n, sc.text())
+  }
+}

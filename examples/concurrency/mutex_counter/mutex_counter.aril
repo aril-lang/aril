@@ -1,0 +1,31 @@
+// DEMAND SKETCH (build-fails until `sync.Mutex` construction is bound) — a
+// structured-concurrent fan-out whose workers increment a shared counter under
+// a `sync.Mutex`. Aril's `scope` replaces Go's WaitGroup (it joins the workers),
+// so the only sync primitive forced here is the Mutex guarding the shared cell —
+// currently unconstructable (`sync.Mutex{}` fails sema). See
+// docs/binding-surface.md §sync.
+import fmt
+import sync
+
+func accumulate(): Result<int, error> {
+  let mu = sync.Mutex{}
+  var total = 0
+  try scope<unit, error> {
+    for i in [1, 2, 3, 4, 5] {
+      spawn {
+        mu.lock()
+        total = total + i
+        mu.unlock()
+        return Ok(())
+      }
+    }
+  }
+  return Ok(total)
+}
+
+func main() {
+  match accumulate() {
+    Ok(t)  => fmt.println("total:", t),
+    Err(e) => fmt.println("err:", e),
+  }
+}

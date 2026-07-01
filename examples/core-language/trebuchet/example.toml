@@ -1,0 +1,10 @@
+description = "AoC 2023 Day 1 Trebuchet — first/last digit calibration sum (agent-authored)"
+source   = "advent-of-code 2023 day1"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.1"
+status   = "running"
+expects  = "run-pass"
+entry    = "trebuchet.aril"
+expected_output = "expected-output.txt"
