@@ -86,3 +86,28 @@ func TestRuntimeBackedHandle(t *testing.T) {
 		t.Errorf("big.BigInt.toInt64 return = %q; want int64", toI.Return)
 	}
 }
+
+// TestBufioScannerHandle locks the bufio.Scanner handle: an external Go-package
+// handle (like regexp) — the constructor consumes a reader and the method set
+// is the line-by-line scan surface.
+func TestBufioScannerHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("bufio.Scanner")
+	if !ok || ht.Runtime {
+		t.Fatalf("bufio.Scanner should be an external handle; got %+v ok=%v", ht, ok)
+	}
+	if ht.GoType != "*bufio.Scanner" || ht.GoPkg != "bufio" {
+		t.Errorf("bufio.Scanner lowering = %+v; want *bufio.Scanner / bufio", ht)
+	}
+	ctor, ok := HandleCtorOf("bufio", "newScanner")
+	if !ok || ctor.GoName != "NewScanner" || ctor.Return != "bufio.Scanner" {
+		t.Errorf("bufio.newScanner = %+v; want NewScanner → bufio.Scanner", ctor)
+	}
+	scan, _ := HandleMethodOf("bufio.Scanner", "scan")
+	text, _ := HandleMethodOf("bufio.Scanner", "text")
+	if scan.GoName != "Scan" || scan.Return != "bool" {
+		t.Errorf("bufio.Scanner.scan = %+v; want Scan → bool", scan)
+	}
+	if text.GoName != "Text" || text.Return != "string" {
+		t.Errorf("bufio.Scanner.text = %+v; want Text → string", text)
+	}
+}

@@ -1,8 +1,6 @@
-// DEMAND SKETCH (build-fails until the `bufio` binding lands) — number each
-// line read from stdin. Forces `bufio.newScanner(os.stdin)` + the
-// `bufio.Scanner` value-handle method set (`scan`/`text`), and surfaces that a
-// line reader depends on `os.stdin` (also an unbound std stream). See the
-// target spelling in docs/binding-surface.md §bufio.
+// Number each line read from stdin — exercising the `bufio.Scanner` value
+// handle (`bufio.newScanner(os.stdin)` + the `scan`/`text` method set) and the
+// `os.stdin` standard-input stream. See docs/binding-surface.md §bufio.
 import fmt
 import bufio
 import os

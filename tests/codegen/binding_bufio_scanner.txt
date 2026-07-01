@@ -1,0 +1,35 @@
+--- TITLE ---
+Value-handle binding: bufio.newScanner(os.stdin) → bufio.NewScanner(os.Stdin); sc.scan()/text() lower to the Go method set (GO-only; the corpus line_numberer execs it over stdin)
+
+--- INPUT ---
+import fmt
+import bufio
+import os
+
+func main() {
+  let sc = bufio.newScanner(os.stdin)
+  var n = 0
+  while sc.scan() {
+    n = n + 1
+    fmt.println(n, sc.text())
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	var sc = bufio.NewScanner(os.Stdin)
+	var n = 0
+	for sc.Scan() {
+		n = n + 1
+		fmt.Println(n, sc.Text())
+	}
+}

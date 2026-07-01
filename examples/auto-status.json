@@ -4,11 +4,11 @@
     "total": 81,
     "parse_fail": 2,
     "sema_fail": 1,
-    "emit_fail": 7,
-    "build_ok": 71,
+    "emit_fail": 6,
+    "build_ok": 72,
     "diag_ok": 82,
     "diag_total": 105,
-    "run_ok": 71,
+    "run_ok": 72,
     "run_total": 80
   },
   "files": [
@@ -374,8 +374,8 @@
     },
     {
       "path": "examples/stdlib-binding/line_numberer/line_numberer.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/reading_validator/reading_validator.aril",
@@ -568,11 +568,6 @@
     },
     {
       "path": "examples/stdlib-binding/leveled_log",
-      "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/stdlib-binding/line_numberer",
       "status": "build-fail",
       "code": 1
     },
