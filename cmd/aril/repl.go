@@ -34,6 +34,11 @@ func cmdRepl(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril repl: takes no positional arguments")
 		return 2
 	}
+	// The REPL compiles + runs each snippet — require a supported Go toolchain.
+	if err := requireGoToolchain(); err != nil {
+		fmt.Fprintf(os.Stderr, "aril repl: %v\n", err)
+		return 1
+	}
 	// TTY → go-prompt path with up-arrow history and a coloured
 	// prompt; non-TTY (pipe / test harness) → bufio.Scanner
 	// fallback so input from stdin pipes still works for tests.
