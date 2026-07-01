@@ -1,0 +1,8 @@
+--- TITLE ---
+E0120: a nested string literal inside a `${…}` interpolation hole is rejected
+
+--- INPUT ---
+"x ${f("y")}"
+
+--- ERRORS ---
+src.aril:1:8: error[E0120]: string literal not allowed inside an interpolation hole

@@ -63,8 +63,8 @@ Kind<lexeme>  line:col
 Where:
 
 - `Kind` is the token kind name from `grammar.ebnf` (`Keyword`,
-  `Ident`, `IntLit`, `FloatLit`, `StringLit`, `RuneLit`, `Op`,
-  `Punct`, `Newline`, `EOF`).
+  `Ident`, `IntLit`, `FloatLit`, `StringLit`, `StringInterp`,
+  `RuneLit`, `Op`, `Punct`, `Newline`, `EOF`).
 - `<lexeme>` is the source text the token covers, wrapped in angle
   brackets. Empty for `Newline` and `EOF` (write `<>`).
 - `line:col` is the 1-indexed character (not byte) position of the

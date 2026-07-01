@@ -407,6 +407,7 @@ Expr =
   | IntLitExpr      { value: int64 }
   | FloatLitExpr    { value: float64 }
   | StringLitExpr   { value: string }                   // decoded (escapes resolved)
+  | StringInterpExpr { parts: []string, holes: []Expr } // `"a ${e} b"`; len(parts)==len(holes)+1
   | RuneLitExpr     { value: int32 }                    // Unicode code point
   | BoolLitExpr     { value: bool }
   | ThisExpr

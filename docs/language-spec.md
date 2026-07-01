@@ -27,6 +27,11 @@
 - String literals: `"..."`. Escapes: `\n`, `\t`, `\r`, `\\`, `\"`,
   `\'`, `\0`, `\xNN`, `\uNNNN`. No raw CR or LF inside a literal —
   multi-line strings are not in v1.
+- String interpolation: a string may embed `${ expr }` holes —
+  `"hello ${name}, ${count + 1} left"` — which evaluate each hole and
+  splice its value in (lowering to `fmt.Sprintf` with a `%v` per hole, so
+  any value type interpolates). A bare `$` not followed by `{` is literal;
+  a hole may not itself contain a string literal in v1.
 - Rune literals: single-quoted character: `'a'`, `'('`, `'\n'`, `'ÿ'`.
   A rune literal is of type `rune`. Same escape set as strings.
 - Integer literals: `42`, `0xFF`, `0o755`, `0b1010`, with `_` separators

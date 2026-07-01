@@ -373,6 +373,8 @@ func (g *gen) emitExpr(e ast.Expr) error {
 	case *ast.StringLitExpr:
 		g.b.WriteString(strconv.Quote(v.Value))
 		return nil
+	case *ast.StringInterpExpr:
+		return g.emitStringInterp(v)
 	case *ast.RuneLitExpr:
 		// Re-emit the source text; Go accepts the same `'a'`
 		// rune-literal syntax for its rune (int32) type.
@@ -830,4 +832,30 @@ func (g *gen) isErrorBuiltinReceiver(receiver ast.Expr) bool {
 	}
 	b, ok := g.info.Type[receiver].(*sema.Builtin)
 	return ok && b.N == "error"
+}
+
+// emitStringInterp lowers an interpolated string to a Go fmt.Sprintf call:
+// the literal segments become the format string (each hole a `%v`, and a
+// literal `%` doubled to `%%`), and the holes become the trailing
+// arguments (lowering-go.md §String interpolation). A hole-free interp
+// token never reaches here (the lexer only tags `${…}` strings).
+func (g *gen) emitStringInterp(v *ast.StringInterpExpr) error {
+	g.usedGoPkgs["fmt"] = true
+	var format strings.Builder
+	for i, part := range v.Parts {
+		if i > 0 {
+			format.WriteString("%v")
+		}
+		format.WriteString(strings.ReplaceAll(part, "%", "%%"))
+	}
+	g.b.WriteString("fmt.Sprintf(")
+	g.b.WriteString(strconv.Quote(format.String()))
+	for _, hole := range v.Holes {
+		g.b.WriteString(", ")
+		if err := g.emitExpr(hole); err != nil {
+			return err
+		}
+	}
+	g.b.WriteByte(')')
+	return nil
 }

@@ -1,0 +1,28 @@
+// String interpolation (lowering-go.md §String interpolation): each
+// `${ expr }` hole evaluates and splices its value via fmt.Sprintf, so a
+// formatted line is one readable template instead of a positional
+// `fmt.sprintf("%d. %s x%d ...", ...)`. Holes here carry arithmetic
+// (`${i + 1}`), record fields (`${it.name}`), a bound value (`${lt}`), and
+// a method call (`${items.len()}`), alongside `for (i, x)` enumerate.
+import fmt
+
+type Item = { name: string, qty: int, price: int }
+
+func lineTotal(it: Item): int {
+  return it.qty * it.price
+}
+
+func main() {
+  let items = [
+    Item{ name: "apple", qty: 3, price: 40 },
+    Item{ name: "bread", qty: 2, price: 150 },
+    Item{ name: "milk", qty: 1, price: 90 },
+  ]
+  var total = 0
+  for (i, it) in items {
+    let lt = lineTotal(it)
+    total = total + lt
+    fmt.println("${i + 1}. ${it.name} x${it.qty} @ ${it.price} = ${lt}")
+  }
+  fmt.println("total: ${total} across ${items.len()} lines")
+}
