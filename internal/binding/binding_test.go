@@ -40,6 +40,8 @@ func TestNewMechanicalRows(t *testing.T) {
 		// strings.Index/SplitN — value Renames (int / []string).
 		{"strings", "index", "Index", "int", Rename},
 		{"strings", "splitN", "SplitN", "[]string", Rename},
+		{"math", "round", "Round", "float64", Rename},
+		{"math", "hypot", "Hypot", "float64", Rename},
 		// math.pi: a package const (deriver *types.Const support), value Rename.
 		{"math", "pi", "Pi", "float64", Rename},
 		// unicode char classification: func(rune) bool → Rename, bool.

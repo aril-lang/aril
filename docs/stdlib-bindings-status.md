@@ -37,7 +37,7 @@ explicit `extern` FFI layer are a separate path, not covered here.)
 | `os` | `args` `exit` `getenv` `readFile` `writeFile` · `lookupEnv` (→ `Option`) | mechanical + idiom |
 | `strings` | `contains` `count` `fields` `hasPrefix` `hasSuffix` `index` `join` `replace` `split` `splitN` `toLower` `toUpper` `trimPrefix` `trimSpace` `trimSuffix` · `fromBytes` `toBytes` | mechanical + idiom |
 | `strconv` | `atoi` `formatBool` `formatFloat` `itoa` `parseBool` `parseFloat` `parseInt` `quote` | mechanical |
-| `math` | `abs` `ceil` `floor` `log` `log10` `log2` `max` `min` `pi` `pow` `sqrt` | mechanical |
+| `math` | `abs` `ceil` `cos` `exp` `floor` `hypot` `log` `log10` `log2` `max` `min` `mod` `pi` `pow` `round` `sin` `sqrt` `tan` `trunc` | mechanical |
 | `unicode` | `isDigit` `isLetter` `isSpace` | mechanical |
 | `slices` | `max` `min` `contains` `indexOf` (→ Go `slices.*`) · `reverse` (new copy) | idiom |
 | `time` | `after` `sleep` `tick` · `seconds` `milliseconds` (duration ctors) | mechanical + idiom |

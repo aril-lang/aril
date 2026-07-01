@@ -1,0 +1,32 @@
+--- TITLE ---
+Extended math bindings: round/trunc/hypot/mod/exp/sin/cos/tan (→ math.Round/Trunc/Hypot/Mod/Exp/Sin/Cos/Tan)
+
+--- INPUT ---
+import fmt
+import math
+
+func main() {
+  fmt.println(math.round(2.6), math.trunc(2.9), math.hypot(3.0, 4.0), math.mod(10.0, 3.0))
+  fmt.println(math.exp(0.0), math.sin(0.0), math.cos(0.0), math.tan(0.0))
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"math"
+)
+
+func main() {
+	fmt.Println(math.Round(2.6), math.Trunc(2.9), math.Hypot(3.0, 4.0), math.Mod(10.0, 3.0))
+	fmt.Println(math.Exp(0.0), math.Sin(0.0), math.Cos(0.0), math.Tan(0.0))
+}
+
+--- STDOUT ---
+3 2 5 1
+1 0 1 0
+
+--- EXIT ---
+0
