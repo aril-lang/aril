@@ -28,10 +28,12 @@ import (
 	"github.com/aril-lang/aril/internal/sema"
 )
 
-// version is the human-curated semver base — bump the minor at each milestone
-// that changes the compiler surface. Each build additionally self-stamps its
-// git revision + commit date via runtime/debug build info (versionString), so
-// the reported version advances on every merged PR without a manual edit.
+// version is the human-curated semver base — bumped once per epoch at its close
+// (minor for an epoch that changed the compiler/language surface or capability,
+// patch for a strictly-internal fixes/refactor epoch). Each build additionally
+// self-stamps its git revision + commit date via runtime/debug build info
+// (versionString), so the reported version advances on every merged PR between
+// bumps without a manual edit.
 const version = "0.1.0-dev"
 
 func main() {
