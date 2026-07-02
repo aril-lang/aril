@@ -62,7 +62,13 @@ func decodeStringLit(s string) (string, error) {
 	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
 		return "", fmt.Errorf("not a string literal")
 	}
-	inner := s[1 : len(s)-1]
+	return decodeStringSegment(s[1 : len(s)-1])
+}
+
+// decodeStringSegment resolves the v1 escape sequences in an unquoted
+// string body — shared by whole string literals and the literal segments
+// of an interpolated string (grammar.ebnf §EscapeChar / §StringInterp).
+func decodeStringSegment(inner string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(inner); {
 		c := inner[i]

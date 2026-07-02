@@ -18,6 +18,7 @@ const (
 	KindIntLit
 	KindFloatLit
 	KindStringLit
+	KindStringInterp
 	KindRuneLit
 	KindOp
 	KindPunct
@@ -25,16 +26,17 @@ const (
 )
 
 var kindName = map[Kind]string{
-	KindNewline:   "Newline",
-	KindIdent:     "Ident",
-	KindKeyword:   "Keyword",
-	KindIntLit:    "IntLit",
-	KindFloatLit:  "FloatLit",
-	KindStringLit: "StringLit",
-	KindRuneLit:   "RuneLit",
-	KindOp:        "Op",
-	KindPunct:     "Punct",
-	KindEOF:       "EOF",
+	KindNewline:      "Newline",
+	KindIdent:        "Ident",
+	KindKeyword:      "Keyword",
+	KindIntLit:       "IntLit",
+	KindFloatLit:     "FloatLit",
+	KindStringLit:    "StringLit",
+	KindStringInterp: "StringInterp",
+	KindRuneLit:      "RuneLit",
+	KindOp:           "Op",
+	KindPunct:        "Punct",
+	KindEOF:          "EOF",
 }
 
 // String returns the canonical token-kind name (per test-contract.md).
@@ -446,6 +448,14 @@ func (l *lexer) intLitRadix(
 
 func (l *lexer) stringLit(startLine, startCol, startOffset int) *Diag {
 	l.advance(1) // consume opening '"'
+	// holeDepth tracks brace nesting inside a `${ … }` interpolation hole
+	// (grammar.ebnf §StringInterp). Outside a hole (depth 0) a `"` closes
+	// the string and escapes apply; inside a hole braces nest and a bare
+	// `"` (a nested string literal) is rejected for v1. A `${` anywhere
+	// upgrades the token to KindStringInterp — the parser sub-lexes the
+	// holes.
+	holeDepth := 0
+	sawInterp := false
 	for {
 		if l.eof() {
 			return l.diag("E0102", "Unterminated literal", startLine, startCol)
@@ -454,9 +464,34 @@ func (l *lexer) stringLit(startLine, startCol, startOffset int) *Diag {
 		if r == '\n' || r == '\r' {
 			return l.diag("E0102", "Unterminated literal", startLine, startCol)
 		}
+		if r == '$' && holeDepth == 0 && l.peekAtIs(sz, '{') {
+			sawInterp = true
+			holeDepth++
+			l.advance(sz) // consume '$'
+			l.advance(1)  // consume '{'
+			continue
+		}
+		if holeDepth > 0 {
+			switch r {
+			case '{':
+				holeDepth++
+			case '}':
+				holeDepth--
+			case '"':
+				// A nested string literal inside a hole is not supported
+				// in v1 — the hole's expression must not contain a string.
+				return l.diag("E0120", "string literal not allowed inside an interpolation hole", l.line, l.col)
+			}
+			l.advance(sz)
+			continue
+		}
 		if r == '"' {
 			l.advance(sz)
-			l.emit(KindStringLit, l.src[startOffset:l.offset], startLine, startCol)
+			kind := KindStringLit
+			if sawInterp {
+				kind = KindStringInterp
+			}
+			l.emit(kind, l.src[startOffset:l.offset], startLine, startCol)
 			return nil
 		}
 		if r == '\\' {

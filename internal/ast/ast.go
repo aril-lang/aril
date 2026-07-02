@@ -953,6 +953,20 @@ func (n *StringLitExpr) NodeSpan() Span   { return n.Span }
 func (n *StringLitExpr) NodeKind() string { return "StringLitExpr" }
 func (n *StringLitExpr) exprMarker()      {}
 
+// StringInterpExpr is an interpolated string `"a ${e1} b ${e2} c"`
+// (grammar.ebnf §StringInterp). Parts are the literal segments with
+// escapes already decoded (len == len(Holes)+1); Holes are the parsed
+// hole expressions. It lowers to `fmt.Sprintf` with a `%v` per hole.
+type StringInterpExpr struct {
+	Span  Span
+	Parts []string
+	Holes []Expr
+}
+
+func (n *StringInterpExpr) NodeSpan() Span   { return n.Span }
+func (n *StringInterpExpr) NodeKind() string { return "StringInterpExpr" }
+func (n *StringInterpExpr) exprMarker()      {}
+
 // BoolLitExpr is the literal `true` or `false`.
 type BoolLitExpr struct {
 	Span  Span

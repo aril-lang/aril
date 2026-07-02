@@ -815,6 +815,9 @@ func (p *parser) parsePrimary() (ast.Expr, *Diag) {
 			RawText: t.Lexeme,
 			Value:   val,
 		}, nil
+	case lexer.KindStringInterp:
+		p.advance()
+		return p.parseStringInterp(t)
 	case lexer.KindRuneLit:
 		p.advance()
 		val, err := decodeRuneLit(t.Lexeme)
@@ -1130,4 +1133,114 @@ func (p *parser) parseSliceLit() (*ast.SliceLit, *Diag) {
 		},
 		Items: items,
 	}, nil
+}
+
+// parseStringInterp turns a KindStringInterp token `"a ${e} b"` into a
+// StringInterpExpr (grammar.ebnf §StringInterp): it splits the raw lexeme
+// into literal segments and hole sources (brace-depth aware — the lexer
+// guaranteed each `${` has a matching `}`), decodes the escapes in the
+// literals, and sub-parses each hole as one expression. Parts has one
+// more element than Holes (the segments around the holes).
+func (p *parser) parseStringInterp(t lexer.Token) (ast.Expr, *Diag) {
+	s := t.Lexeme
+	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+		return nil, p.diag("E0110", "Malformed string literal", t.Line, t.Col)
+	}
+	inner := s[1 : len(s)-1]
+	var parts []string
+	var holes []ast.Expr
+	var lit strings.Builder
+	flushLit := func() *Diag {
+		dec, err := decodeStringSegment(lit.String())
+		if err != nil {
+			return p.diag("E0110", "Malformed escape sequence", t.Line, t.Col)
+		}
+		parts = append(parts, dec)
+		lit.Reset()
+		return nil
+	}
+	for i := 0; i < len(inner); {
+		if inner[i] == '$' && i+1 < len(inner) && inner[i+1] == '{' {
+			if d := flushLit(); d != nil {
+				return nil, d
+			}
+			i += 2
+			depth := 1
+			start := i
+			for i < len(inner) && depth > 0 {
+				switch inner[i] {
+				case '{':
+					depth++
+				case '}':
+					depth--
+				}
+				if depth == 0 {
+					break
+				}
+				i++
+			}
+			hole, d := p.parseHoleExpr(inner[start:i], start, t)
+			if d != nil {
+				return nil, d
+			}
+			holes = append(holes, hole)
+			i++ // consume the closing '}'
+			continue
+		}
+		// Preserve an escape pair verbatim so the decoder resolves it.
+		if inner[i] == '\\' && i+1 < len(inner) {
+			lit.WriteByte(inner[i])
+			lit.WriteByte(inner[i+1])
+			i += 2
+			continue
+		}
+		lit.WriteByte(inner[i])
+		i++
+	}
+	if d := flushLit(); d != nil {
+		return nil, d
+	}
+	return &ast.StringInterpExpr{
+		Span:  spanFromToken(t),
+		Parts: parts,
+		Holes: holes,
+	}, nil
+}
+
+// parseHoleExpr sub-lexes and parses one interpolation hole source as a
+// single expression; an empty hole or one that leaves trailing tokens is
+// an E0112. holeByteOff is the hole source's byte offset within the
+// string body, used to shift the sub-lexed token coordinates back onto
+// the enclosing `.aril` line/column so a later sema diagnostic on a hole
+// node points at the real source (D10). A hole never spans a newline (the
+// lexer rejects a raw newline in a string), so every hole token is on the
+// string token's line.
+func (p *parser) parseHoleExpr(src string, holeByteOff int, t lexer.Token) (ast.Expr, *Diag) {
+	toks, lerr := lexer.Lex(src)
+	if lerr != nil {
+		return nil, p.diag("E0112", "malformed expression in interpolation hole", t.Line, t.Col)
+	}
+	// The hole's first source char sits at column t.Col+1 (past the opening
+	// quote) + holeByteOff; a sub-token at its own 1-based column c maps to
+	// baseCol+(c-1). ASCII-column approximation, adequate for v1.
+	baseCol := t.Col + 1 + holeByteOff
+	for i := range toks {
+		if toks[i].Kind == lexer.KindEOF {
+			continue
+		}
+		toks[i].Line = t.Line
+		toks[i].Col = baseCol + (toks[i].Col - 1)
+	}
+	sub := &parser{toks: suppressBracketNewlines(toks), file: p.file}
+	e, err := sub.parseExpr()
+	if err != nil {
+		return nil, p.diag("E0112", "an interpolation hole must contain a single expression", t.Line, t.Col)
+	}
+	for sub.peek().Kind == lexer.KindNewline {
+		sub.advance()
+	}
+	if sub.peek().Kind != lexer.KindEOF {
+		return nil, p.diag("E0112", "an interpolation hole must contain a single expression", t.Line, t.Col)
+	}
+	return e, nil
 }

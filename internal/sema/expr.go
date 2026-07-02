@@ -32,6 +32,13 @@ func (c *checker) resolveExpr(e ast.Expr, scope *Scope) {
 		}
 	case *ast.SpreadArg:
 		c.resolveExpr(v.Inner, scope)
+	case *ast.StringInterpExpr:
+		// Each `${ … }` hole is an ordinary expression — resolve its
+		// names so undefined bindings surface as E0103 in `.aril`
+		// coordinates rather than leaking a raw Go `undefined:` (D10).
+		for _, h := range v.Holes {
+			c.resolveExpr(h, scope)
+		}
 	case *ast.Field:
 		// Only the receiver is resolved here; v.Name (the field
 		// or method spelling) is dispatched by codegen against

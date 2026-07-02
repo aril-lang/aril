@@ -68,6 +68,7 @@ severity column.
 | E0117 | E | Unknown import path | `manifest.md` §Resolution / `name-resolution.md` §Cross-package imports | The import is neither a local user package (a directory under the project name) nor a known stdlib / `[bindings]` namespace. Fix the path, create the package directory, or add the Go package to `[bindings] extra`. |
 | E0118 | E | Redeclaration of a built-in type | `name-resolution.md` §Reserved type names / `keywords.md` §Built-in identifiers | A `type` / `class` / `interface` / `extern type` reuses a built-in type name — a primitive (`int`, `string`, …), `error`, `Any` / `Dynamic` / `unit` / `Never`, or a built-in generic (`Result`, `Option`, `Map`, …). Those names are reserved; rename the declaration (e.g. `Result` → `JobResult`). |
 | E0119 | E | Unknown type-parameter constraint | `grammar.ebnf` §Constraint / `type-system.md` §Generic constraints | A `<T: Bound>` names a constraint that is not a built-in. v1 has two: `Ordered` (→ Go `cmp.Ordered`, admits `< <= > >=`) and `Comparable` (→ Go `comparable`, admits `== !=`). Use one of those, or drop the bound (defaults to `any`). |
+| E0120 | E | String literal not allowed inside an interpolation hole | `grammar.ebnf` §StringInterp | A `${ … }` interpolation hole reached a `"` — a nested string literal inside a hole is not supported in v1 (the hole's expression must not contain a string; the same message fires when a `${` is never closed before the string ends). Bind the string to a variable outside and interpolate that: `let q = "y"; "x ${f(q)}"`. |
 
 ### E02xx — Type system
 

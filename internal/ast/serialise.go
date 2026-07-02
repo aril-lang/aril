@@ -723,6 +723,19 @@ func write(b *strings.Builder, n Node, depth int) {
 		b.WriteByte(' ')
 		writeQuoted(b, v.Value)
 		writeSpan(b, v.Span)
+	case *StringInterpExpr:
+		writeSpan(b, v.Span)
+		for i, part := range v.Parts {
+			b.WriteByte('\n')
+			writeIndent(b, depth+1)
+			b.WriteString("(part ")
+			writeQuoted(b, part)
+			b.WriteByte(')')
+			if i < len(v.Holes) {
+				b.WriteByte('\n')
+				write(b, v.Holes[i], depth+1)
+			}
+		}
 	case *BoolLitExpr:
 		b.WriteByte(' ')
 		if v.Value {

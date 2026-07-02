@@ -1,0 +1,39 @@
+--- TITLE ---
+string interpolation — `"…${expr}…"` lowers to fmt.Sprintf with a %v per hole (literal % doubled)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let name = "world"
+  let count = 3
+  let xs = [10, 20, 30]
+  fmt.println("hello ${name}, you have ${count + 1} messages")
+  fmt.println("progress: ${count * 10}% (first=${xs[0]}, len=${xs.len()})")
+  let msg = "value=${name}"
+  fmt.println(msg)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func main() {
+	var name = "world"
+	var count = 3
+	var xs = []int{10, 20, 30}
+	fmt.Println(fmt.Sprintf("hello %v, you have %v messages", name, count+1))
+	fmt.Println(fmt.Sprintf("progress: %v%% (first=%v, len=%v)", count*10, xs[0], len(xs)))
+	var msg = fmt.Sprintf("value=%v", name)
+	fmt.Println(msg)
+}
+
+--- STDOUT ---
+hello world, you have 4 messages
+progress: 30% (first=10, len=3)
+value=world
+
+--- EXIT ---
+0
