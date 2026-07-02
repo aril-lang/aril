@@ -40,3 +40,16 @@ func TestClosureBlockMixedReturnAndTrailing(t *testing.T) {
 		t.Errorf("expected clean (mixed return + trailing), got %v", codes)
 	}
 }
+
+// Inconsistent inferred returns in an un-annotated block-body closure are
+// rejected in Aril coordinates (E0203), not left for Go's checker to
+// reject the emitted signature (D10).
+func TestClosureBlockInconsistentReturnsFiresE0203(t *testing.T) {
+	src := `func use() {
+  let f = (x: int) => { if x > 0 { return 1 } return "s" }
+  let _ = f(3)
+}`
+	if codes := runCheck(t, src); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 (inconsistent closure returns), got %v", codes)
+	}
+}

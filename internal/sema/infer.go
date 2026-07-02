@@ -1197,8 +1197,17 @@ func (c *checker) checkReturn(r *ast.ReturnExpr) {
 	}
 	// Inferring an un-annotated closure return: record the value type so a
 	// block-body closure that yields via `return` (no trailing expression)
-	// types from its returns (T-Closure-Block).
+	// types from its returns (T-Closure-Block). The returns must agree —
+	// an un-annotated closure has no declared type to widen to, so an
+	// inconsistent set is reported in `.aril` coordinates (E0203) rather
+	// than left for Go's checker to reject the emitted signature (D10).
 	if c.returnAcc != nil && concrete(got) {
+		if len(*c.returnAcc) > 0 {
+			first := (*c.returnAcc)[0]
+			if !assignable(first, got) && !assignable(got, first) {
+				c.report("E0203", "Inconsistent closure return types — an earlier branch returns "+first.String()+", this returns "+got.String()+"; annotate the return type `(…): T => …`", r.Span)
+			}
+		}
 		*c.returnAcc = append(*c.returnAcc, got)
 	}
 }
