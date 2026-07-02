@@ -748,6 +748,12 @@ only place where the pattern shape influences `IterElem`.
                ─────────────────────────────────────────────
                   Γ ⊢ (x_i: T_i) => body : func(T_1, ..., T_n): R
 
+(T-Closure-Block)  body is a Block yielding no trailing value (unit/Never)
+                   but every path leaves via `return e_j`,  Γ ⊢ e_j : R
+                 ─────────────────────────────────────────────
+                   the un-annotated closure return R is that return type
+                   (not unit) — `(x) => { if c { return a } return b }`
+
 (T-Call)       Γ ⊢ f : func(T_1, ..., T_n): R    for each i: Γ ⊢ arg_i : S_i
                                                               S_i = T_i, or S_i <: T_i
                                                               via T-Chan-Widen

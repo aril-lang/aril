@@ -134,6 +134,16 @@ func (c *checker) inferExpr(e ast.Expr) Type {
 // from annotations (Unknown when omitted in the short form); the body
 // is checked with the closure's return type in scope, then the return
 // type is the annotation, or the body's value type when omitted.
+// isUnitOrNever reports whether t is the value-less unit type or the
+// bottom Never — the two "no trailing value" outcomes of a block body.
+func isUnitOrNever(t Type) bool {
+	switch t.(type) {
+	case *Unit, *Never:
+		return true
+	}
+	return false
+}
+
 func (c *checker) inferClosure(cl *ast.ClosureLit) Type {
 	expect := c.closureExpect[cl]
 	params := make([]Type, len(cl.Params))
@@ -160,20 +170,31 @@ func (c *checker) inferClosure(cl *ast.ClosureLit) Type {
 	// body is not registered on the scope's group (E0405 applies).
 	savedScopeDepth := c.scopeDepth
 	c.scopeDepth = 0
+	savedAcc := c.returnAcc
+	var acc []Type
 	var ret Type
 	if cl.ReturnType != nil {
 		ret = c.typeFromExpr(cl.ReturnType)
 		c.curReturn = ret
 		c.curTryForbidden = c.definitelyNotTryable(cl.ReturnType)
+		c.returnAcc = nil // annotated: the type is fixed, don't accumulate
 	} else {
 		c.curReturn = &Unknown{}
 		c.curTryForbidden = false
+		c.returnAcc = &acc // un-annotated: collect `return` value types
 	}
 	bodyVal := c.inferBlock(cl.Body)
 	c.curReturn, c.curThis, c.curTryForbidden = savedReturn, savedThis, savedForbidden
 	c.scopeDepth = savedScopeDepth
+	c.returnAcc = savedAcc
 	if ret == nil {
 		ret = bodyVal
+		// A block body that yields only via `return` has no trailing value
+		// (bodyVal is unit/Never); recover the real result from the
+		// collected return types (T-Closure-Block).
+		if len(acc) > 0 && isUnitOrNever(bodyVal) {
+			ret = acc[0]
+		}
 	}
 	return &Func{Params: params, Return: ret}
 }
@@ -1173,6 +1194,12 @@ func (c *checker) checkReturn(r *ast.ReturnExpr) {
 	}
 	if !c.fits(want, r.Value, got) {
 		c.report("E0203", "Wrong return type — function returns "+want.String()+", got "+got.String(), r.Span)
+	}
+	// Inferring an un-annotated closure return: record the value type so a
+	// block-body closure that yields via `return` (no trailing expression)
+	// types from its returns (T-Closure-Block).
+	if c.returnAcc != nil && concrete(got) {
+		*c.returnAcc = append(*c.returnAcc, got)
 	}
 }
 

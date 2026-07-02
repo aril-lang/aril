@@ -31,6 +31,45 @@ func isDivergingExpr(e ast.Expr) bool {
 	return false
 }
 
+// blockAlwaysReturns reports whether every control path through the block
+// leaves via a diverging statement (a `return`/`break`/`continue`,
+// `panic`, or `os.exit`) — so the block yields a value without a trailing
+// expression. Used to admit a value-position block body that ends in
+// returns (a block-body closure `=> { …; return x }`, T-Closure-Block).
+func blockAlwaysReturns(b *ast.Block) bool {
+	if b.Trailing != nil {
+		return isDivergingExpr(b.Trailing)
+	}
+	if len(b.Stmts) == 0 {
+		return false
+	}
+	return stmtDiverges(b.Stmts[len(b.Stmts)-1])
+}
+
+// stmtDiverges reports whether s guarantees control leaves the enclosing
+// block — a diverging expression statement, or an `if`/`else` whose every
+// branch diverges.
+func stmtDiverges(s ast.Stmt) bool {
+	switch v := s.(type) {
+	case *ast.ExprStmt:
+		return isDivergingExpr(v.Expr)
+	case *ast.IfStmt:
+		if v.Else == nil {
+			return false
+		}
+		if !blockAlwaysReturns(v.ThenBlock) {
+			return false
+		}
+		switch e := v.Else.(type) {
+		case *ast.Block:
+			return blockAlwaysReturns(e)
+		case *ast.IfStmt:
+			return stmtDiverges(e)
+		}
+	}
+	return false
+}
+
 // emitBlockAsExpr lowers a block in value position to an IIFE
 // `func() T { stmts; return trailing }()`. T comes from the trailing
 // expression's shallow type peek. A block with no trailing value has
@@ -566,7 +605,19 @@ func (g *gen) emitClosure(cl *ast.ClosureLit) error {
 	if cl.Short {
 		// Short form: the trailing value is the result — `return` it
 		// unless the closure is unit-typed (then it's a bare stmt).
-		if cl.Body.Trailing != nil {
+		if blk, ok := cl.Body.Trailing.(*ast.Block); ok && blk.Trailing == nil && !isUnit && blockAlwaysReturns(blk) {
+			// `=> { …; return x }` — a block body that returns on every
+			// path. A value-position IIFE can't express a trailing-less
+			// block, so emit the block's statements directly: the inner
+			// `return`s are the closure's own returns (T-Closure-Block).
+			// The Go return type is already emitted on the signature, so
+			// the returned values need no expected-type context here.
+			for _, s := range blk.Stmts {
+				if err := g.emitStmt(s); err != nil {
+					return err
+				}
+			}
+		} else if cl.Body.Trailing != nil {
 			g.writeIndent()
 			if !isUnit {
 				g.b.WriteString("return ")

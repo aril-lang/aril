@@ -61,7 +61,12 @@ type checker struct {
 	// body in Barrier C. v1 is single-threaded so plain fields are
 	// safe; the parallel-per-body story (sema.md §8) would thread
 	// these instead.
-	curReturn       Type // declared return type of the body being checked
+	curReturn Type // declared return type of the body being checked
+	// returnAcc, when non-nil, collects the value types of `return`
+	// statements while inferring an un-annotated closure return (the
+	// short `=> { … return x }` form); used to type a block-body closure
+	// that yields via `return` rather than a trailing expression.
+	returnAcc       *[]Type
 	curThis         Type // receiver type inside an instance method, else nil
 	curTryForbidden bool // body returns a type that is definitely not Result/Option
 	curSpawnFrame   bool // body is a spawn body — a Result<unit, error> frame (E0408)

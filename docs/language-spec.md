@@ -387,7 +387,10 @@ Top-level functions use the `func` keyword. Methods inside a `class` or an
   (e.g. the second element of `context.withTimeout(...)`).
 - Closure literal: `func(a: T, b: U): R { body }` — same shape, anonymous.
 - Short closure: `(a, b) => a < b` — when parameter types are inferable
-  from context (e.g. a comparator argument).
+  from context (e.g. a comparator argument). The body may be a block:
+  `(a, b) => { if a > b { return a } return b }` — a block that yields via
+  `return` on every path infers its result type from those returns (no
+  trailing expression required), like a named function body.
 - Variadic: a trailing `name: ...T` parameter accepts zero or more
   arguments of element type `T`, and is in scope as the slice `[]T`.
   Only the final parameter may be variadic. A call passes the tail
