@@ -1,0 +1,51 @@
+--- TITLE ---
+string interpolation in a value position — a match arm typed string (not Unknown)
+
+--- INPUT ---
+import fmt
+
+func describe(n: int): string {
+  return match n {
+    0 => "zero",
+    1 => "one ${n}",
+    _ => "many (${n})",
+  }
+}
+
+func main() {
+  fmt.println(describe(0))
+  fmt.println(describe(1))
+  fmt.println(describe(7))
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func describe(n int) string {
+	return func() string {
+		switch n {
+		case 0:
+			return "zero"
+		case 1:
+			return fmt.Sprintf("one %v", n)
+		default:
+			return fmt.Sprintf("many (%v)", n)
+		}
+	}()
+}
+func main() {
+	fmt.Println(describe(0))
+	fmt.Println(describe(1))
+	fmt.Println(describe(7))
+}
+
+--- STDOUT ---
+zero
+one 1
+many (7)
+
+--- EXIT ---
+0

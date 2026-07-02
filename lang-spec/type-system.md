@@ -129,7 +129,17 @@ Aril-level instantiation diagnostic is future work.
 (T-RuneLit)    Γ ⊢ RuneLitExpr    : rune
 (T-BoolLit)    Γ ⊢ BoolLitExpr    : bool
 (T-UnitLit)    Γ ⊢ UnitLit        : unit
+
+(T-StringInterp)   Γ ⊢ eᵢ : τᵢ  (each hole)
+                   ─────────────────────────
+                   Γ ⊢ StringInterpExpr : string
 ```
+
+An interpolated string is always `string`: each `${ eᵢ }` hole is
+type-checked in the enclosing environment (so an undefined name or
+unknown member surfaces in `.aril` coordinates — E0103 / E0214 — not
+as a raw Go leak, D10), and every hole type has a `%v` rendering, so
+no constraint is imposed on `τᵢ` (lowering-go.md §String interpolation).
 
 Integer literals default to `int`; a literal in a context that
 expects `int8..int64`/`uint..uint64`/`byte`/`rune` is narrowed

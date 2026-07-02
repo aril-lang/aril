@@ -22,9 +22,9 @@ func greet(x: int, y: int): string {
         (ReturnExpr @2:3-2:29
           (StringInterpExpr @2:10-2:29
             (part "a ")
-            (Ident "x" @1:1-1:2)
+            (Ident "x" @2:15-2:16)
             (part " b ")
-            (Binary "+" @1:1-1:6
-              (Ident "y" @1:1-1:2)
-              (IntLitExpr 1 @1:5-1:6))
+            (Binary "+" @2:22-2:27
+              (Ident "y" @2:22-2:23)
+              (IntLitExpr 1 @2:26-2:27))
             (part "")))))))

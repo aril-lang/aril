@@ -1179,7 +1179,7 @@ func (p *parser) parseStringInterp(t lexer.Token) (ast.Expr, *Diag) {
 				}
 				i++
 			}
-			hole, d := p.parseHoleExpr(inner[start:i], t)
+			hole, d := p.parseHoleExpr(inner[start:i], start, t)
 			if d != nil {
 				return nil, d
 			}
@@ -1209,12 +1209,27 @@ func (p *parser) parseStringInterp(t lexer.Token) (ast.Expr, *Diag) {
 
 // parseHoleExpr sub-lexes and parses one interpolation hole source as a
 // single expression; an empty hole or one that leaves trailing tokens is
-// an E0112. Diagnostics are pinned to the enclosing string token — v1
-// does not re-map coordinates into the hole.
-func (p *parser) parseHoleExpr(src string, t lexer.Token) (ast.Expr, *Diag) {
+// an E0112. holeByteOff is the hole source's byte offset within the
+// string body, used to shift the sub-lexed token coordinates back onto
+// the enclosing `.aril` line/column so a later sema diagnostic on a hole
+// node points at the real source (D10). A hole never spans a newline (the
+// lexer rejects a raw newline in a string), so every hole token is on the
+// string token's line.
+func (p *parser) parseHoleExpr(src string, holeByteOff int, t lexer.Token) (ast.Expr, *Diag) {
 	toks, lerr := lexer.Lex(src)
 	if lerr != nil {
 		return nil, p.diag("E0112", "malformed expression in interpolation hole", t.Line, t.Col)
+	}
+	// The hole's first source char sits at column t.Col+1 (past the opening
+	// quote) + holeByteOff; a sub-token at its own 1-based column c maps to
+	// baseCol+(c-1). ASCII-column approximation, adequate for v1.
+	baseCol := t.Col + 1 + holeByteOff
+	for i := range toks {
+		if toks[i].Kind == lexer.KindEOF {
+			continue
+		}
+		toks[i].Line = t.Line
+		toks[i].Col = baseCol + (toks[i].Col - 1)
 	}
 	sub := &parser{toks: suppressBracketNewlines(toks), file: p.file}
 	e, err := sub.parseExpr()

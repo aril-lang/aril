@@ -22,6 +22,15 @@ func (c *checker) inferExpr(e ast.Expr) Type {
 		t = &Builtin{N: "float64"} // T-FloatLit
 	case *ast.StringLitExpr:
 		t = &Builtin{N: "string"}
+	case *ast.StringInterpExpr:
+		// Type each hole so its own member/arity checks fire (E0214 /
+		// E0202 …) and the node is a concrete `string` — otherwise it
+		// stays Unknown and a value-position interp (a match arm, an
+		// if-branch) fails Go type inference (T-StringInterp).
+		for _, h := range v.Holes {
+			c.inferExpr(h)
+		}
+		t = &Builtin{N: "string"}
 	case *ast.BoolLitExpr:
 		t = &Builtin{N: "bool"}
 	case *ast.RuneLitExpr:
