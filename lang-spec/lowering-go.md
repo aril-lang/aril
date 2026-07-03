@@ -532,6 +532,28 @@ multiple `case` arms over a chain of `if`. For an
 `UnreachableIR` leaf, codegen emits
 `panic("unreachable: non-exhaustive match")`.
 
+### Bind-and-ignore guard
+
+Go rejects a local that is declared and never used, but a pattern
+that binds a payload it does not consume (`Err(e) => { os.exit(1) }`)
+is idiomatic in every match-bearing language. So when the arm body
+holds no value reference to a payload binding `b`, codegen follows
+`b := <subject>.<field>` with a blank read:
+
+```
+  case <subject>.Tag == <tag>:
+    b := <subject>.<field>
+    _ = b                       // only when the arm body ignores b
+    <lowering of body>
+```
+
+Used-ness is decided by sema (a binding's `Symbol` records whether a
+value reference resolved to it, respecting shadowing), so a binding the
+body *does* use emits no guard and the lowering is unchanged. The same
+guard covers the index/value binders of a `for (i, x) in …` loop
+(§For-loops) — a component the body ignores is blank-read — except a
+numeric range-counter, which the generated `i++` clause already uses.
+
 ### Tuple value-switch — boolean decision tree
 
 A `match` whose subject is a tuple `(s_1, ..., s_k)` cannot switch

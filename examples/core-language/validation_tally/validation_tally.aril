@@ -1,0 +1,26 @@
+import fmt
+
+func lookup(k: int): Result<string, string> {
+  if k == 1 { return Ok("one") }
+  if k == 2 { return Ok("two") }
+  return Err("unknown key")
+}
+
+func main() {
+  let keys = [1, 5, 2, 9]
+  var found = 0
+  var missing = 0
+  for (i, k) in keys {
+    match lookup(k) {
+      Ok(name) => {
+        fmt.println(name)
+        found = found + 1
+      },
+      Err(e) => {
+        missing = missing + 1
+      }
+    }
+  }
+  fmt.println("found", found)
+  fmt.println("missing", missing)
+}

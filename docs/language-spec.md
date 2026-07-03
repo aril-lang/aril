@@ -319,7 +319,9 @@ Patterns support:
   `Dispensing(_, change)`). A payload binding takes the variant's
   component type — `Ok(v)` binds `v` at the `Result`'s value type,
   `Err(e)` at its error type, and a user variant's bindings at the
-  declared field types.
+  declared field types. A binding the arm body does not use is allowed
+  (`Err(e) => os.exit(1)`), as is an unused index or value in a
+  `for (i, x) in …` loop — no "declared and not used" error.
 - Tuples (`(Idle, InsertCoin(n))`, `(s, e)`). Note that `()` is the
   unit-literal *pattern*, not a tuple — tuples are arity ≥ 2.
 - Records by name (`User{ id, name }`) — punning omitted in v1.
