@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -27,6 +28,37 @@ import (
 // exceeds its deadline (mirrors coreutils `timeout`). It is non-zero, so the
 // caller's "any non-zero is failure" rule already rejects a hung example.
 const TimeoutCode = 124
+
+// maxCaptureBytes bounds how much stdout/stderr RunExample retains from one
+// run. A non-terminating example that floods its output would otherwise grow
+// the capture buffer without limit — the harness process accumulates
+// gigabytes before the wall-clock deadline fires, and that giant string then
+// flows back out through the tool boundary (a corpus-harness memory blow-up,
+// 2026-07). 8 MiB dwarfs any real corpus output (all hand-traced, well under a
+// KiB) yet caps the bomb; a run truncated here already fails its output diff.
+const maxCaptureBytes = 8 << 20
+
+// cappedBuffer is an io.Writer retaining at most cap bytes and silently
+// discarding the rest, so a runaway writer cannot exhaust memory. It keeps
+// reporting writes fully consumed (never a short write) so the child is not
+// perturbed by back-pressure; the wall-clock deadline still bounds its life.
+type cappedBuffer struct {
+	buf bytes.Buffer
+	cap int
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	if room := c.cap - c.buf.Len(); room > 0 {
+		if len(p) > room {
+			c.buf.Write(p[:room])
+		} else {
+			c.buf.Write(p)
+		}
+	}
+	return len(p), nil
+}
+
+func (c *cappedBuffer) String() string { return c.buf.String() }
 
 // Result is the opaque handle a run carries: the subprocess's combined
 // stdout+stderr (for diagnostics), its stdout alone (for the run_ok output
@@ -72,10 +104,23 @@ func RunExample(name string, args []string, stdin string, dir string, timeoutMs 
 
 	c := exec.CommandContext(ctx, name, args...)
 	c.Dir = dir
+	// Run the example in its own process group and, on cancel/timeout, kill the
+	// whole group — not just the direct child — so a runaway example that
+	// spawned helpers dies completely rather than leaking spinning orphans.
+	// WaitDelay bounds Wait() itself in case a child holds the output pipe open.
+	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	c.Cancel = func() error {
+		if c.Process == nil {
+			return nil
+		}
+		return syscall.Kill(-c.Process.Pid, syscall.SIGKILL)
+	}
+	c.WaitDelay = 2 * time.Second
 	if stdin != "" {
 		c.Stdin = strings.NewReader(stdin)
 	}
-	var outBuf, errBuf bytes.Buffer
+	outBuf := cappedBuffer{cap: maxCaptureBytes}
+	errBuf := cappedBuffer{cap: maxCaptureBytes}
 	c.Stdout = &outBuf
 	c.Stderr = &errBuf
 	err := c.Run()
