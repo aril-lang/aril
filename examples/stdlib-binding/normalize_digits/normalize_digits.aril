@@ -1,0 +1,17 @@
+import fmt
+import strings
+
+func stripLeadingZeros(s: string): string {
+  let t = strings.trimLeft(s, "0")
+  if t == "" {
+    return "0"
+  }
+  return t
+}
+
+func main() {
+  let nums = ["007", "00042", "0", "100", "000"]
+  for n in nums {
+    fmt.println(stripLeadingZeros(n))
+  }
+}

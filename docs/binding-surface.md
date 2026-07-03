@@ -117,6 +117,9 @@ strings.join(parts: []string, sep: string): string
 strings.trimSpace(s: string): string
 strings.trimPrefix(s: string, p: string): string
 strings.trimSuffix(s: string, suf: string): string
+strings.trim(s: string, cutset: string): string
+strings.trimLeft(s: string, cutset: string): string
+strings.trimRight(s: string, cutset: string): string
 strings.hasPrefix(s: string, p: string): bool
 strings.hasSuffix(s: string, suf: string): bool
 strings.contains(s: string, sub: string): bool

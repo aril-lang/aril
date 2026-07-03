@@ -48,6 +48,10 @@ func TestNewMechanicalRows(t *testing.T) {
 		{"unicode", "isDigit", "IsDigit", "bool", Rename},
 		{"unicode", "isLetter", "IsLetter", "bool", Rename},
 		{"unicode", "isSpace", "IsSpace", "bool", Rename},
+		// set-trim family: cutset trim on both/left/right ends (string, string) → string.
+		{"strings", "trim", "Trim", "string", Rename},
+		{"strings", "trimLeft", "TrimLeft", "string", Rename},
+		{"strings", "trimRight", "TrimRight", "string", Rename},
 	}
 	for _, c := range cases {
 		f, ok := Lookup(c.pkg, c.name)

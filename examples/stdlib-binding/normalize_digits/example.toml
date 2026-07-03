@@ -1,0 +1,10 @@
+description = "strings.trimLeft cutset-trim — strip insignificant leading zeros (set-trim, vs fixed-substring trimPrefix)"
+source   = "SURFACE-ERGONOMICS PR5"
+category = "stdlib-binding"
+showcase = false
+forces   = []
+since    = "0.4"
+status   = "running"
+expects  = "run-pass"
+entry    = "normalize_digits.aril"
+expected_output = "expected-output.txt"
