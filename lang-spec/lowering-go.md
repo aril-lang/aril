@@ -674,6 +674,14 @@ body keeps the statement-position discard (the trailing
 expression is evaluated for side effects only); a body ending in
 explicit `return`s has no trailing and emits nothing extra.
 
+A short closure whose body is a block that yields **only** via
+`return` — `(a, b) => { if a > b { return a } return b }` — is
+lowered the same way: the block's statements become the func
+literal's body directly (the inner `return`s are the closure's
+returns), not a value-position IIFE (which cannot express a
+trailing-less block). The closure's Go return type comes from the
+collected `return` types (`type-system.md` §T-Closure-Block).
+
 ## Implicit receiver / Field
 
 `Field { receiver: This{type: C}, name: n }` lowers to the Go

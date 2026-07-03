@@ -1,0 +1,58 @@
+--- TITLE ---
+value-position block-body closure `=> { … return x }` — a diverging block needs no trailing expression
+
+--- INPUT ---
+import fmt
+
+func apply(x: int, f: (int) => int): int {
+  return f(x)
+}
+
+func main() {
+  let clamp = (n: int) => {
+    if n < 0 {
+      return 0
+    }
+    if n > 100 {
+      return 100
+    }
+    return n
+  }
+  fmt.println(clamp(-5), clamp(50), clamp(250))
+  fmt.println(apply(7, (n: int) => { if n > 3 { return n * 10 } return n }))
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func apply(x int, f func(int) int) int {
+	return f(x)
+}
+func main() {
+	var clamp = func(n int) int {
+		if n < 0 {
+			return 0
+		}
+		if n > 100 {
+			return 100
+		}
+		return n
+	}
+	fmt.Println(clamp(-5), clamp(50), clamp(250))
+	fmt.Println(apply(7, func(n int) int {
+		if n > 3 {
+			return n * 10
+		}
+		return n
+	}))
+}
+
+--- STDOUT ---
+0 50 100
+70
+
+--- EXIT ---
+0

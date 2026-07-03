@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 75 / 83 examples build end-to-end** (floor 75).
+- **build_ok — 76 / 84 examples build end-to-end** (floor 76).
 - **diag_ok — 91 / 114 negative cases produce their expected diagnostic** (floor 79).
-- **run_ok — 75 / 82 run-pass examples build and run as specified** (floor 75; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 76 / 83 run-pass examples build and run as specified** (floor 76; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 75 |
+| ✅ build (full pipeline) | 76 |
 | emit / codegen fail | 5 |
 | sema fail | 1 |
 | parse fail | 2 |
@@ -41,6 +41,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/deep_destructure/deep_destructure.aril` | build | — |
 | `examples/core-language/defer_demo/defer_demo.aril` | build | — |
 | `examples/core-language/fizzbuzz/fizzbuzz.aril` | build | — |
+| `examples/core-language/grade_classifier/grade_classifier.aril` | build | — |
 | `examples/core-language/hailstone/hailstone.aril` | build | — |
 | `examples/core-language/hello/hello.aril` | build | — |
 | `examples/core-language/interfaces/interfaces.aril` | build | — |
@@ -139,7 +140,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**7 of 82 run-pass examples fall short of run_ok.**
+**7 of 83 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

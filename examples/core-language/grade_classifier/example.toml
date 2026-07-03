@@ -1,0 +1,10 @@
+description = "Block-body short closure — early-return cascade classifier (T-Closure-Block)"
+source   = "SURFACE-ERGONOMICS PR3"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.4"
+status   = "running"
+expects  = "run-pass"
+entry    = "grade_classifier.aril"
+expected_output = "expected-output.txt"

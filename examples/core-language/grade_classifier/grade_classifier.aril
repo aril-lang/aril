@@ -1,0 +1,37 @@
+// Block-body short closure (type-system.md §T-Closure-Block): a `=> { … }`
+// lambda whose body returns on every path infers its result type from those
+// `return`s — no trailing expression needed, like a named function. Here the
+// classifier's early-return cascade reads far cleaner than a nested-ternary
+// single expression. (Also exercises `for (i, x)` enumerate + interpolation.)
+import fmt
+
+func mapEach(xs: []int, f: (int) => string): []string {
+  var out = makeSlice<string>(0)
+  for x in xs {
+    out = out.push(f(x))
+  }
+  return out
+}
+
+func main() {
+  let scores = [95, 82, 67, 40, 100]
+  let grade = (s: int) => {
+    if s >= 90 {
+      return "A"
+    }
+    if s >= 80 {
+      return "B"
+    }
+    if s >= 70 {
+      return "C"
+    }
+    if s >= 60 {
+      return "D"
+    }
+    return "F"
+  }
+  let grades = mapEach(scores, grade)
+  for (i, g) in grades {
+    fmt.println("${scores[i]} -> ${g}")
+  }
+}
