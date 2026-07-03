@@ -832,13 +832,9 @@ func (g *gen) bindSubPattern(sub ast.Pattern, valueExpr string) error {
 	return nil
 }
 
-// emitUnusedBindingGuard writes `_ = name` after a pattern binding that
-// its arm body never references, so a bind-and-ignore arm (`Err(e) => { … }`
-// that ignores `e`) does not leak Go's "declared and not used" — match
-// binding ergonomics follow every other language's (§MatchIR). The binding's
-// used-ness comes from sema (Symbol.Used, set on each resolved value
-// reference); when sema info is absent (info-less tooling runs) the guard is
-// conservatively skipped, leaving the prior lowering byte-identical.
+// emitUnusedBindingGuard writes `_ = name` for a pattern binding the body
+// never references (lowering-go.md §MatchIR). Skipped when sema info is
+// absent, so info-less tooling runs stay byte-identical.
 func (g *gen) emitUnusedBindingGuard(sp *ast.IdentPat) {
 	if g.info == nil {
 		return
@@ -853,9 +849,8 @@ func (g *gen) emitUnusedBindingGuard(sp *ast.IdentPat) {
 	g.b.WriteByte('\n')
 }
 
-// guardUnusedPat emits the unused-binding guard for p when it is a plain
-// ident binding (wildcards and non-ident sub-patterns bind nothing to
-// guard). Used by for-tuple lowering, where each component is a pattern.
+// guardUnusedPat guards p when it is a plain ident binding (for-tuple
+// components are patterns; wildcards/literals bind nothing). See §MatchIR.
 func (g *gen) guardUnusedPat(p ast.Pattern) {
 	if ip, ok := p.(*ast.IdentPat); ok {
 		g.emitUnusedBindingGuard(ip)

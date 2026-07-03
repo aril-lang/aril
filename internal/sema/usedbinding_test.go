@@ -55,3 +55,47 @@ func main() {
 		}
 	}
 }
+
+// A loop var referenced only by a loop-invariant predicate is NOT counted
+// Used — codegen elides the invariant in off-mode, so the binding still needs
+// the guard (lowering-go.md §MatchIR exemptions).
+func TestLoopInvariantRefDoesNotCountUsed(t *testing.T) {
+	src := `import fmt
+func run() {
+  let xs = [10, 20, 30]
+  for (i, x) in xs loop scan {
+    fmt.println(x)
+  }
+}
+contract run {
+  loop scan {
+    invariant i >= 0
+  }
+}`
+	toks, lerr := lexer.LexFile(src, "test.aril")
+	if lerr != nil {
+		t.Fatalf("lex: %v", lerr)
+	}
+	f, perr := parser.ParseFile(toks, "test.aril")
+	if perr != nil {
+		t.Fatalf("parse: %v", perr)
+	}
+	info, diags := Check(f, "test.aril")
+	if len(diags) != 0 {
+		t.Fatalf("expected clean, got %d diagnostics", len(diags))
+	}
+	used := map[string]bool{}
+	for node, sym := range info.Def {
+		if _, ok := node.(*ast.IdentPat); ok {
+			used[sym.Name] = sym.Used
+		}
+	}
+	// x is used by the body; i is referenced only by the invariant, so it
+	// must stay unused (→ guarded).
+	if !used["x"] {
+		t.Errorf("loop value x: Used = false, want true (body references it)")
+	}
+	if used["i"] {
+		t.Errorf("loop index i: Used = true, want false (only the invariant references it)")
+	}
+}

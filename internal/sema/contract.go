@@ -104,9 +104,12 @@ func (c *checker) resolveLoopInvariants(label string, scope *Scope) {
 	for _, cl := range c.curContract.Clauses {
 		if cl.Kind == "loop" && cl.Label == label {
 			c.matchedLoopLabels[label] = true
+			prev := c.invariantResolve
+			c.invariantResolve = true
 			for _, inv := range cl.Loop {
 				c.resolveExpr(inv.Pred, scope)
 			}
+			c.invariantResolve = prev
 		}
 	}
 }

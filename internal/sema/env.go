@@ -29,11 +29,8 @@ type Symbol struct {
 	Kind SymKind
 	Type Type // Unknown until Sema-2 fills it
 	Decl any  // *ast.TypeDecl / *ast.ClassDecl / *ast.FuncDecl / *ast.LetStmt / *ast.Param / *ast.Variant / nil
-	// Used records that a value reference to this binding was resolved.
-	// Set on every successful expr-position name lookup (respecting
-	// shadowing — lookup returns the innermost binding), so codegen can
-	// tell a bind-and-ignore pattern binding from a used one and suppress
-	// Go's "declared and not used" for the former (§MatchIR).
+	// Used: a value reference resolved to this binding. Drives the
+	// bind-and-ignore guard (lowering-go.md §MatchIR).
 	Used bool
 }
 

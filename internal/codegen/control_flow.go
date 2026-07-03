@@ -353,9 +353,8 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		}
 		g.b.WriteString(".Keys() {\n")
 		g.indent++
-		// When the value is bound, `.At(keyVar)` below uses the key, so it
-		// never leaks unused. When the value is discarded (`_`), the key is
-		// the range var and an ignored key would leak (§MatchIR) — guard it.
+		// Key exempt when the value binds (`.At(keyVar)` below uses it);
+		// guard it only when the value is discarded (§MatchIR exemptions).
 		if b == "_" {
 			g.guardUnusedPat(tp.Sub[0])
 		}
@@ -393,8 +392,7 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	}
 	g.b.WriteString(" {\n")
 	g.indent++
-	// Index and value are Go range vars used only by the body; a component
-	// the body ignores would leak "declared and not used" (§MatchIR).
+	// Guard an index/value the body ignores (lowering-go.md §MatchIR).
 	g.guardUnusedPat(tp.Sub[0])
 	g.guardUnusedPat(tp.Sub[1])
 	if err := g.emitBlockBody(s.Body); err != nil {
@@ -525,9 +523,8 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 		g.b.WriteString(" {\n")
 	}
 	g.indent++
-	// A collection/channel loop var the body ignores would leak "declared
-	// and not used". A range-counter is used by the `i++` loop clause
-	// itself, so it never leaks and must not be guarded (§MatchIR).
+	// Guard an ignored collection/channel loop var; a range-counter is
+	// exempt (used by the emitted `i++`) — §MatchIR exemptions.
 	if _, isRange := s.Iterable.(*ast.RangeExpr); !isRange {
 		g.guardUnusedPat(s.Pattern)
 	}
