@@ -9,7 +9,7 @@ import (
 // cappedBuffer must retain at most cap bytes and report every write fully
 // consumed, so a flooding writer can never grow it past the cap.
 func TestCappedBufferCaps(t *testing.T) {
-	b := cappedBuffer{cap: 16}
+	b := cappedBuffer{limit: 16}
 	n, err := b.Write([]byte(strings.Repeat("a", 100)))
 	if err != nil || n != 100 {
 		t.Fatalf("Write reported (%d, %v), want (100, nil)", n, err)

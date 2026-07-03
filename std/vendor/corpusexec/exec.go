@@ -43,12 +43,12 @@ const maxCaptureBytes = 8 << 20
 // reporting writes fully consumed (never a short write) so the child is not
 // perturbed by back-pressure; the wall-clock deadline still bounds its life.
 type cappedBuffer struct {
-	buf bytes.Buffer
-	cap int
+	buf   bytes.Buffer
+	limit int
 }
 
 func (c *cappedBuffer) Write(p []byte) (int, error) {
-	if room := c.cap - c.buf.Len(); room > 0 {
+	if room := c.limit - c.buf.Len(); room > 0 {
 		if len(p) > room {
 			c.buf.Write(p[:room])
 		} else {
@@ -119,8 +119,8 @@ func RunExample(name string, args []string, stdin string, dir string, timeoutMs 
 	if stdin != "" {
 		c.Stdin = strings.NewReader(stdin)
 	}
-	outBuf := cappedBuffer{cap: maxCaptureBytes}
-	errBuf := cappedBuffer{cap: maxCaptureBytes}
+	outBuf := cappedBuffer{limit: maxCaptureBytes}
+	errBuf := cappedBuffer{limit: maxCaptureBytes}
 	c.Stdout = &outBuf
 	c.Stderr = &errBuf
 	err := c.Run()
