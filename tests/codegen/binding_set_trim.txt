@@ -1,0 +1,38 @@
+--- TITLE ---
+strings set-trim family — trim / trimLeft / trimRight lower to strings.Trim / TrimLeft / TrimRight (cutset, not fixed-substring)
+
+--- INPUT ---
+import fmt
+import strings
+
+func main() {
+  fmt.println(strings.trim("xxhelloxx", "x"))
+  fmt.println(strings.trimLeft("--value", "-"))
+  fmt.println(strings.trimRight("value//", "/"))
+  fmt.println(strings.trim("[a,b]", "[]"))
+}
+
+--- GO ---
+
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	fmt.Println(strings.Trim("xxhelloxx", "x"))
+	fmt.Println(strings.TrimLeft("--value", "-"))
+	fmt.Println(strings.TrimRight("value//", "/"))
+	fmt.Println(strings.Trim("[a,b]", "[]"))
+}
+
+--- STDOUT ---
+hello
+value
+value
+a,b
+
+--- EXIT ---
+0
