@@ -19,6 +19,9 @@ func (c *checker) resolveExpr(e ast.Expr, scope *Scope) {
 		}
 		if sym := scope.lookup(v.Name); sym != nil {
 			c.info.Symbol[v] = sym
+			if !c.invariantResolve {
+				sym.Used = true // marks the resolved binding referenced (§MatchIR unused-binding)
+			}
 		} else {
 			c.report("E0103", "Unknown name "+v.Name, v.Span)
 		}

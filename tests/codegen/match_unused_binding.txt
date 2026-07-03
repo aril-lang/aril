@@ -1,0 +1,73 @@
+--- TITLE ---
+bind-and-ignore: a match payload / for-tuple component the arm body ignores gets a `_ = b` guard (no Go "declared and not used")
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let r: Result<int, string> = Err("boom")
+  match r {
+    Ok(v) => fmt.println("ok", v),
+    Err(e) => fmt.println("err")
+  }
+  let xs = [1, 2, 3]
+  for (i, x) in xs {
+    fmt.println(i)
+  }
+  for (i, x) in xs {
+    fmt.println(x)
+  }
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func main() {
+	var r Result[int, string] = ResultErr[int, string]("boom")
+	__aril_match_1 := r
+	switch __aril_match_1.Tag {
+	case 0:
+		v := __aril_match_1.V
+		fmt.Println("ok", v)
+	case 1:
+		e := __aril_match_1.E
+		_ = e
+		fmt.Println("err")
+	}
+	var xs = []int{1, 2, 3}
+	for i, x := range xs {
+		_ = x
+		fmt.Println(i)
+	}
+	for i, x := range xs {
+		_ = i
+		fmt.Println(x)
+	}
+}
+
+--- STDOUT ---
+err
+0
+1
+2
+1
+2
+3
+
+--- EXIT ---
+0

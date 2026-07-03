@@ -29,6 +29,9 @@ type Symbol struct {
 	Kind SymKind
 	Type Type // Unknown until Sema-2 fills it
 	Decl any  // *ast.TypeDecl / *ast.ClassDecl / *ast.FuncDecl / *ast.LetStmt / *ast.Param / *ast.Variant / nil
+	// Used: a value reference resolved to this binding. Drives the
+	// bind-and-ignore guard (lowering-go.md §MatchIR).
+	Used bool
 }
 
 // Scope is one frame in the lexical-scope chain.

@@ -1,0 +1,10 @@
+description = "Bind-and-ignore: tally Ok/Err over an enumerated list, ignoring the error detail and the index (§MatchIR)"
+source   = "SURFACE-ERGONOMICS PR4"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.4"
+status   = "running"
+expects  = "run-pass"
+entry    = "validation_tally.aril"
+expected_output = "expected-output.txt"

@@ -806,6 +806,7 @@ func (g *gen) bindSubPattern(sub ast.Pattern, valueExpr string) error {
 		g.b.WriteString(" := ")
 		g.b.WriteString(valueExpr)
 		g.b.WriteByte('\n')
+		g.emitUnusedBindingGuard(sp)
 	case *ast.WildcardPat:
 		// Nothing to bind.
 	case *ast.TuplePat:
@@ -829,6 +830,31 @@ func (g *gen) bindSubPattern(sub ast.Pattern, valueExpr string) error {
 		return fmt.Errorf("codegen: nested sub-pattern %T in variant payload not supported in v1", sub)
 	}
 	return nil
+}
+
+// emitUnusedBindingGuard writes `_ = name` for a pattern binding the body
+// never references (lowering-go.md §MatchIR). Skipped when sema info is
+// absent, so info-less tooling runs stay byte-identical.
+func (g *gen) emitUnusedBindingGuard(sp *ast.IdentPat) {
+	if g.info == nil {
+		return
+	}
+	sym := g.info.Def[sp]
+	if sym == nil || sym.Used {
+		return
+	}
+	g.writeIndent()
+	g.b.WriteString("_ = ")
+	g.b.WriteString(goIdent(sp.Name))
+	g.b.WriteByte('\n')
+}
+
+// guardUnusedPat guards p when it is a plain ident binding (for-tuple
+// components are patterns; wildcards/literals bind nothing). See §MatchIR.
+func (g *gen) guardUnusedPat(p ast.Pattern) {
+	if ip, ok := p.(*ast.IdentPat); ok {
+		g.emitUnusedBindingGuard(ip)
+	}
 }
 
 // nextMatchTemp returns a fresh Go identifier reserved for the

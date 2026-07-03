@@ -353,6 +353,11 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		}
 		g.b.WriteString(".Keys() {\n")
 		g.indent++
+		// Key exempt when the value binds (`.At(keyVar)` below uses it);
+		// guard it only when the value is discarded (§MatchIR exemptions).
+		if b == "_" {
+			g.guardUnusedPat(tp.Sub[0])
+		}
 		if b != "_" {
 			g.writeIndent()
 			g.b.WriteString(b)
@@ -363,6 +368,7 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 			g.b.WriteString(".At(")
 			g.b.WriteString(keyVar)
 			g.b.WriteString(")\n")
+			g.guardUnusedPat(tp.Sub[1])
 		}
 		if err := g.emitBlockBody(s.Body); err != nil {
 			return err
@@ -386,6 +392,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	}
 	g.b.WriteString(" {\n")
 	g.indent++
+	// Guard an index/value the body ignores (lowering-go.md §MatchIR).
+	g.guardUnusedPat(tp.Sub[0])
+	g.guardUnusedPat(tp.Sub[1])
 	if err := g.emitBlockBody(s.Body); err != nil {
 		return err
 	}
@@ -514,6 +523,11 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 		g.b.WriteString(" {\n")
 	}
 	g.indent++
+	// Guard an ignored collection/channel loop var; a range-counter is
+	// exempt (used by the emitted `i++`) — §MatchIR exemptions.
+	if _, isRange := s.Iterable.(*ast.RangeExpr); !isRange {
+		g.guardUnusedPat(s.Pattern)
+	}
 	if err := g.emitBlockBody(s.Body); err != nil {
 		return err
 	}
