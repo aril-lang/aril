@@ -635,6 +635,11 @@ under-report (miss a non-exhaustive match), never over-report.
                ──────────────────────────────────────
                           Γ ⊢ try e : T
 
+(T-Catch)      Γ ⊢ e : Result<T, E>
+               Γ, x:E ⊢ block : Never          (the handler must diverge)
+               ─────────────────────────────────────────────────────────
+                          Γ ⊢ e catch x { block } : T
+
 (T-Return)     Γ ⊢ e : T    enclosing function declared return-type T (or unit)
                ────────────────────────────────────────────────────────────────
                           Γ ⊢ return e : Never
@@ -671,6 +676,21 @@ v1 (codegen has no scope-frame bail), so it is rejected with **E0402**;
 wrap the work in a `spawn`. `break`/`continue` outside a loop
 fires **E0404**. `spawn` outside a `scope` block fires
 **E0405** (see also T-Spawn below).
+
+**`catch` (T-Catch).** The postfix `e catch x { block }` is `try`'s sibling
+for the case where there is *no propagation target* — the enclosing function
+does not return `Result` — so instead of the implicit `return Err(e)` it runs
+a user handler. It unwraps `e`'s `Ok` payload to `T`; on `Err` it binds the
+error to `x` and runs `block`, which is **required to diverge** (`Γ, x:E ⊢
+block : Never`). A handler that could fall through with a value fires **E0409**
+— recovering-and-continuing with a substitute is `unwrapOr`'s role, not
+`catch`'s; this keeps every error path one the programmer wrote explicitly. A
+subject that is not a `Result` fires **E0410**. Divergence is judged
+structurally (a trailing `return` / `os.exit` / `panic`, or an `if`/`else`
+whose every branch diverges), matching codegen's lowering (`desugaring.md`
+§Catch). `catch` desugars to a `FromCatch` two-arm match but is *not* lowered
+through the value-position match IIFE, so the handler's `return` returns from
+the enclosing function.
 
 ### Defer
 

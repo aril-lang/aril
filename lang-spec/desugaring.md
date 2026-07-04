@@ -244,6 +244,49 @@ E0402 / E0403 have fired already if it didn't hold. Desugaring
 asserts the invariant — if it fails here, that's E0701 (internal
 compiler error).
 
+## Stage 4b — `catch` expansion
+
+The postfix `subject catch e { block }` (grammar.ebnf §CatchExpr) is `try`'s
+sibling: it unwraps the `Ok` value and keeps the flow going, but on `Err` runs
+a **custom, mandatorily-diverging** handler instead of the implicit
+`return Err(e)`. It desugars — in the parser — to a two-arm match tagged
+`FromCatch`:
+
+```
+[[ CatchExpr { subject: e, binder: x, handler: block } ]]
+  where typeof(e) = Result<T, E>
+                                                      ⟿
+  MatchExpr {
+    from_catch: true,
+    subject: e,
+    arms: [
+      Arm { pat: VariantPat{ tag: Ok,  sub: [IdentPat fresh_v] },
+            body: Var fresh_v },                       // unwrap
+      Arm { pat: VariantPat{ tag: Err, sub: [IdentPat x] },
+            body: block },                             // must diverge
+    ],
+  }
+```
+
+The `FromCatch` tag carries two catch-specific obligations a plain `match` does
+not (checked by sema, T-Catch): the subject must be a `Result` (E0410), and the
+handler `block` must **diverge** — `return` / `os.exit` / `panic` (E0409). It
+may **not** fall through with a value; recovering-and-continuing with a
+substitute is `unwrapOr`'s role (the *visible* substitution). This is the
+"no error path the programmer did not consciously write" invariant made
+structural.
+
+**Lowering note (why the tag survives to codegen).** Unlike `try`, a `catch`
+handler's `return` must return from the *enclosing function*, not from a
+value-position match's IIFE (`func() T { … }()`) — that IIFE would trap it.
+So codegen does **not** lower a `FromCatch` match through the value-position
+match path; it emits the `try`-style statement preamble instead
+(`lowering-go.md` §try lowering — an unwrap temp + an `if <tmp>.Tag == Err {
+<handler> }` block whose statements run in the function's own frame), reading
+the value as `<tmp>.V`. The `Ok` arm's `fresh_v` unwrap and the tag are the
+shared shape; the divergence is what makes catch a control-flow form rather
+than an expression.
+
 ## Stage 5 — `match` decision tree
 
 `match` with N arms and possibly nested patterns rewrites into

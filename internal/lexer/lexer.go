@@ -95,7 +95,7 @@ var keywordSet = map[string]bool{
 	"func": true, "let": true, "const": true, "var": true,
 	"if": true, "else": true,
 	"for": true, "in": true, "while": true, "return": true,
-	"match": true, "try": true, "defer": true,
+	"match": true, "try": true, "catch": true, "defer": true,
 	"spawn": true, "scope": true, "select": true,
 	"break": true, "continue": true,
 	"true": true, "false": true, "unit": true,

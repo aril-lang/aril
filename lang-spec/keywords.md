@@ -23,7 +23,7 @@ import    type      class      interface
 implements          extends    static
 func      let       const      var        if         else
 for       in        while      return
-match     try       defer      spawn      scope      select
+match     try       catch      defer      spawn      scope      select
 break     continue  extern
 ```
 
@@ -234,7 +234,7 @@ ordinary identifiers in Aril; user code is free to shadow them
 (though bad style):
 
 - `goto`, `do`, `enum`, `struct`, `pub`, `fn`, `async`, `await`,
-  `yield`, `throw`, `catch`, `finally`, `with`, `assert`, `nil`,
+  `yield`, `throw`, `finally`, `with`, `assert`, `nil`,
   `null`, `undefined`, `new`, `delete`, `self`, `super`.
 
 `async`/`await`/`yield` are explicitly cut by D7. `nil`/`null`/

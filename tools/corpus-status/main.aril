@@ -317,20 +317,17 @@ func emittedCodes(re: Regexp, combined: string): []string {
 }
 
 func copyFile(src: string, dst: string) {
-  match os.readFile(src) {
-    Ok(data) => {
-      match os.writeFile(dst, data, 420) {
-        Ok(_) => fmt.print(""),
-        Err(e) => {
-          fmt.println("corpus-status: stage write failed:", dst, e)
-          os.exit(1)
-        },
-      }
-    },
-    Err(e) => {
-      fmt.println("corpus-status: stage read failed:", src, e)
-      os.exit(1)
-    },
+  // `catch` unwraps the Ok value and keeps going; on Err the handler runs
+  // and must diverge — here it reports and `os.exit`s. No propagation target
+  // (this returns unit), so `try` doesn't apply; `catch` is `try` with a
+  // custom bail. Replaces a nested double-`match` + `os.exit`.
+  let data = os.readFile(src) catch e {
+    fmt.println("corpus-status: stage read failed:", src, e)
+    os.exit(1)
+  }
+  os.writeFile(dst, data, 420) catch e {
+    fmt.println("corpus-status: stage write failed:", dst, e)
+    os.exit(1)
   }
 }
 

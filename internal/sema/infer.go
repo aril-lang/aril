@@ -974,6 +974,9 @@ func (c *checker) inferUnary(u *ast.Unary) Type {
 func (c *checker) inferMatch(m *ast.MatchExpr) Type {
 	subjectType := c.inferExpr(m.Subject)
 	c.checkExhaustive(m, subjectType)
+	// A parser-desugared `catch` carries extra invariants a plain match does
+	// not (Result subject + diverging handler); catch.go §checkCatch.
+	c.checkCatch(m, subjectType)
 	var result Type = &Unknown{}
 	for _, arm := range m.Arms {
 		c.checkNoFloatPat(arm.Pattern)
