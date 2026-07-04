@@ -7,3 +7,12 @@ since    = "0.1"
 status   = "running"
 expects  = "run-pass"
 entry    = "mutex_counter.aril"
+
+# E0218 — a constructable stdlib handle takes no fields; `sync.Mutex{n: 1}` is
+# rejected in Aril coordinates, not a codegen bail string (D10).
+[[error]]
+patch   = "errors/mutex-takes-no-fields.patch"
+expect  = ["E0218"]
+stage   = "sema"
+matches = "errors/mutex-takes-no-fields.expected"
+origin  = "synthetic"

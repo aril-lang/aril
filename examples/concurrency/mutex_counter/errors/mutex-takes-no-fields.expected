@@ -1,0 +1,1 @@
+error[E0218]: Stdlib handle `sync.Mutex` takes no fields — construct it as `sync.Mutex{}`

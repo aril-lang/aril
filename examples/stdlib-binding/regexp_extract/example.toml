@@ -15,3 +15,12 @@ expect  = ["E0214"]
 stage   = "sema"
 matches = "errors/unknown-handle-member.expected"
 origin  = "synthetic"
+
+# E0218 — an obtain-only stdlib handle is never a `{}` literal; get it from the
+# constructor (regexp.mustCompile). Diagnosed in Aril coordinates (D10).
+[[error]]
+patch   = "errors/obtain-only-handle.patch"
+expect  = ["E0218"]
+stage   = "sema"
+matches = "errors/obtain-only-handle.expected"
+origin  = "synthetic"
