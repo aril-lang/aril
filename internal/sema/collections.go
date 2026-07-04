@@ -334,12 +334,13 @@ func containerMethodType(recv Type, name string) *Func {
 			return &Func{Return: &Slice{Elem: r.Elem}}
 		}
 	case *Builtin:
-		// String methods (builtins.md §Lowering pointers): the view/length
-		// helpers codegen lowers via `len(s)` / `[]byte(s)` / `[]rune(s)`
-		// (call.go). Kept in lockstep with codegen — without these a string
-		// method call types Unknown, which then breaks closure-return
-		// inference over it (e.g. `(s) => s.len()`).
-		if r.N == "string" {
+		switch r.N {
+		case "string":
+			// String methods (builtins.md §Lowering pointers): the view/length
+			// helpers codegen lowers via `len(s)` / `[]byte(s)` / `[]rune(s)`
+			// (call.go). Kept in lockstep with codegen — without these a string
+			// method call types Unknown, which then breaks closure-return
+			// inference over it (e.g. `(s) => s.len()`).
 			switch name {
 			case "len":
 				return &Func{Return: &Builtin{N: "int"}}
@@ -347,6 +348,13 @@ func containerMethodType(recv Type, name string) *Func {
 				return &Func{Return: &Slice{Elem: &Builtin{N: "byte"}}}
 			case "runes":
 				return &Func{Return: &Slice{Elem: &Builtin{N: "rune"}}}
+			}
+		case "error":
+			// The `error` interface's sole method (builtins.md §error) —
+			// codegen lowers `e.error()` to Go's `e.Error()`. Typed here so it
+			// resolves (not Unknown) and is spared the unknown-member check.
+			if name == "error" {
+				return &Func{Return: &Builtin{N: "string"}}
 			}
 		}
 	case *Option:
@@ -372,28 +380,45 @@ func containerMethodType(recv Type, name string) *Func {
 	return nil
 }
 
-// hasKnownBuiltinMethodSet reports whether recv is a builtin-generic type whose
-// method set is fully enumerated by containerMethodType / channelMethodType — a
-// container (`Map`/`Set`/`Stack`/`[]T`), a sum (`Option`/`Result`), or a channel
-// kind. For these an unresolved method name is a genuine unknown-member error
-// (E0214), not an incomplete-model abstention. A `*Named`, a bare type
-// parameter, `Unknown`, or a primitive `*Builtin` is NOT in this set (their
-// member miss is handled — or deliberately not — elsewhere).
-func hasKnownBuiltinMethodSet(recv Type) bool {
-	switch recv.(type) {
-	case *Map, *Set, *Stack, *Slice, *Option, *Result, *Channel, *SendChan, *RecvChan:
+// builtinMemberMiss reports whether recv is a builtin type with a fully-known
+// method set and `name` resolves to none of its methods — a genuine unknown-
+// member error (E0214) rather than an incomplete-model abstention. Every valid
+// method is resolved by channelMethodType / containerMethodType *before* the
+// caller reaches here, so any name landing here is a real miss. Covered kinds:
+//   - containers / sums / channels (Map/Set/Stack/[]T/Option/Result/channel);
+//   - a primitive `*Builtin` with a closed method set (numeric/bool: no methods;
+//     string: len/bytes/runes; error: error() — the last two resolved above).
+//
+// `mapErr` on a Result is spared: it is a real method typed in inferCall (its E2
+// result is dynamic), not in containerMethodType. A `*Named`, a bare type
+// parameter, `Unknown`, `Any`, or `Dynamic` is NOT covered — its member set is
+// not fully known here (sound over complete, D38).
+func builtinMemberMiss(recv Type, name string) bool {
+	switch r := recv.(type) {
+	case *Map, *Set, *Stack, *Slice, *Option, *Channel, *SendChan, *RecvChan:
 		return true
+	case *Result:
+		return name != "mapErr"
+	case *Builtin:
+		return isClosedMethodSetPrimitive(r.N)
 	}
 	return false
 }
 
-// isResultMapErr reports whether recv.name is the `mapErr` combinator on a
-// Result — the one Result method absent from containerMethodType (its E2 result
-// type is read from the handler, so it is typed in inferCall, not as a fixed
-// Func). Callers use it to spare `mapErr` from the unknown-member check.
-func isResultMapErr(recv Type, name string) bool {
-	_, ok := recv.(*Result)
-	return ok && name == "mapErr"
+// isClosedMethodSetPrimitive reports whether a primitive builtin type has a
+// fixed, fully-enumerated method set, so an unresolved method on it is a real
+// unknown-member error. Numeric types and bool have no methods; string has
+// len/bytes/runes; error has error(). Any/Dynamic are separate types (not
+// *Builtin) and so are deliberately excluded — their member set is an escape
+// hatch, not a closed set. `unit`/`Never` are likewise not listed.
+func isClosedMethodSetPrimitive(name string) bool {
+	switch name {
+	case "bool", "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "byte", "rune", "string", "error":
+		return true
+	}
+	return false
 }
 
 // channelMethodType returns the Func type of a channel method

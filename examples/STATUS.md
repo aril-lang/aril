@@ -5,7 +5,7 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 79 / 87 examples build end-to-end** (floor 79).
-- **diag_ok — 93 / 116 negative cases produce their expected diagnostic** (floor 79).
+- **diag_ok — 94 / 117 negative cases produce their expected diagnostic** (floor 79).
 - **run_ok — 79 / 86 run-pass examples build and run as specified** (floor 79; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
@@ -111,7 +111,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.
 
-**23 of 116 cases fall short of the ideal.**
+**23 of 117 cases fall short of the ideal.**
 
 | Case | Ideal (`.expected`) | Actual |
 |---|---|---|
