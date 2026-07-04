@@ -690,38 +690,25 @@ func importSilencesFor(imports []string) []string {
 	return out
 }
 
-// importSilenceRef maps a Aril-side package name to a Aril
-// expression that references an exported symbol from the
-// corresponding Go-side package. The expression is referenced
-// (not called) inside the synthetic `let _ = …` line, which is
-// enough to mark the import as used in Go.
-//
-// The symbol is spelt with its Go-side capitalisation (e.g.
-// `strings.Split`, not `strings.split`) because PR-C's binding
-// shortcut (`mapFieldName` in `internal/codegen/codegen.go`)
-// only normalises a handful of `fmt.*` names; for every other
-// package the field name is passed through verbatim. Using the
-// Go spelling avoids depending on the binding layer.
-//
-// Source for this list is the stdlib namespace set recognised
-// by codegen (`isStdlibNamespace`); when that set widens, this
-// map should track it. `reflect` is Aril-internal but a user
-// still spells the import, so it lives here too.
+// importSilenceRef maps an imported stdlib namespace to a bound Aril member
+// referenced (not called) in a synthetic `let _ = …` line so the Go import is
+// marked used. The ref MUST be a real Aril binding that lowers cleanly as a
+// bare value reference (E0217 now rejects an unbound member, and a ResultWrap /
+// generic binding does not lower as a value) — so this uses the Aril spelling
+// (`strings.split`), not the Go one, and only the namespaces with such a member
+// appear. The rest (net/io/reflect/context/sync/encoding — Result/handle/
+// intercept surfaces with no value-referenceable member) rely on codegen's
+// unused-Go-import elision instead: an aril `import` that nothing references is
+// simply not emitted, so it cannot trip "imported and not used".
 var importSilenceRef = map[string]string{
-	"fmt":      "fmt.Println",
-	"os":       "os.Stdin",
-	"strings":  "strings.Split",
-	"strconv":  "strconv.Itoa",
-	"bufio":    "bufio.NewScanner",
-	"context":  "context.Background",
-	"time":     "time.Now",
-	"sync":     "sync.WaitGroup",
-	"io":       "io.Copy",
-	"log":      "log.Println",
-	"net":      "net.Listen",
-	"encoding": "encoding.BinaryMarshaler",
-	"math":     "math.Pi",
-	"reflect":  "reflect.TypeOf",
+	"fmt":     "fmt.println",
+	"os":      "os.stdin",
+	"strings": "strings.split",
+	"strconv": "strconv.itoa",
+	"bufio":   "bufio.newScanner",
+	"time":    "time.sleep",
+	"log":     "log.println",
+	"math":    "math.pi",
 }
 
 // runSession compiles and executes the current session source.

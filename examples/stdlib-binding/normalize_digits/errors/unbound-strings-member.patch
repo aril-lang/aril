@@ -1,0 +1,11 @@
+--- normalize_digits.aril
++++ normalize_digits.aril
+@@ -2,7 +2,7 @@
+ import strings
+ 
+ func stripLeadingZeros(s: string): string {
+-  let t = strings.trimLeft(s, "0")
++  let t = strings.stripZeros(s)
+   if t == "" {
+     return "0"
+   }
