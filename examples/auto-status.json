@@ -3,11 +3,11 @@
   "totals": {
     "total": 89,
     "parse_fail": 0,
-    "sema_fail": 1,
+    "sema_fail": 0,
     "emit_fail": 1,
-    "build_ok": 87,
-    "diag_ok": 97,
-    "diag_total": 120,
+    "build_ok": 88,
+    "diag_ok": 98,
+    "diag_total": 121,
     "run_ok": 86,
     "run_total": 88
   },
@@ -384,8 +384,8 @@
     },
     {
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
-      "stage": "sema",
-      "blocker": "error[E0217]: Module `http` has no bound member `listenAndServe`"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/http_by_hand/http_by_hand.aril",

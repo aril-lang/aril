@@ -16,6 +16,7 @@ import (
 	"go/importer"
 	"go/token"
 	"go/types"
+	"path"
 	"sort"
 	"strings"
 
@@ -57,7 +58,12 @@ func (g *generator) deriveFact(pkg, goName string) (binding.Fact, error) {
 	if obj == nil || !obj.Exported() {
 		return binding.Fact{}, fmt.Errorf("not an exported symbol of the package")
 	}
-	f := binding.Fact{Pkg: pkg, ArilName: arilName(goName), GoName: goName}
+	// The registry namespace is the Aril import name — the last path segment of
+	// the Go import path, which is also Go's default package selector
+	// (`net/http` → `http`, `encoding/json` → `json`). It equals the import path
+	// for a single-segment package (`net`, `io`, …), so existing rows are
+	// unchanged; a multi-segment package (`net/http`) keys on its base.
+	f := binding.Fact{Pkg: path.Base(pkg), ArilName: arilName(goName), GoName: goName}
 	switch o := obj.(type) {
 	case *types.Func:
 		kind, ret, err := g.deriveResults(o.Type().(*types.Signature))

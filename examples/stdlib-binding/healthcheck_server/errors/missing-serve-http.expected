@@ -1,0 +1,1 @@
+error[E0219]: Class HealthHandler does not implement http.Handler — missing method `serveHTTP`

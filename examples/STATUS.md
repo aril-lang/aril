@@ -4,15 +4,15 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 87 / 89 examples build end-to-end** (floor 87).
-- **diag_ok — 97 / 120 negative cases produce their expected diagnostic** (floor 88).
+- **build_ok — 88 / 89 examples build end-to-end** (floor 88).
+- **diag_ok — 98 / 121 negative cases produce their expected diagnostic** (floor 88).
 - **run_ok — 86 / 88 run-pass examples build and run as specified** (floor 86; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 87 |
+| ✅ build (full pipeline) | 88 |
 | emit / codegen fail | 1 |
-| sema fail | 1 |
+| sema fail | 0 |
 | parse fail | 0 |
 
 ## Per-example
@@ -92,6 +92,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/csv_stats/csv_stats.aril` | build | — |
 | `examples/stdlib-binding/duration_budget/duration_budget.aril` | build | — |
 | `examples/stdlib-binding/env_config/env_config.aril` | build | — |
+| `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | build | — |
 | `examples/stdlib-binding/http_by_hand/http_by_hand.aril` | build | — |
 | `examples/stdlib-binding/leveled_log/leveled_log.aril` | build | — |
 | `examples/stdlib-binding/line_numberer/line_numberer.aril` | build | — |
@@ -107,13 +108,12 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/core-language/lru_cache/lru_cache.aril` | emit | go build failed |
-| `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0217]: Module `http` has no bound member `listenAndServe` |
 
 ## Diagnostic-quality gaps
 
 Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.
 
-**23 of 120 cases fall short of the ideal.**
+**23 of 121 cases fall short of the ideal.**
 
 | Case | Ideal (`.expected`) | Actual |
 |---|---|---|

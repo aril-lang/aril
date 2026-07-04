@@ -38,6 +38,13 @@ var Manifest = map[string][]string{
 	// Named (bindgen translate → localName), and those handle types + their method
 	// sets are registered in handles.go.
 	"net": {"Dial", "Listen"},
+	// net/http server entry point (HTTP-SERVER epoch). ListenAndServe returns a
+	// bare `error` (a failure signal, like os.WriteFile) → mechanical
+	// Result<unit, error> row. Its `handler Handler` param is satisfied by an
+	// Aril class `implements http.Handler` (E0219 conformance, D14). The registry
+	// namespace derives as `http` (path.Base of "net/http"), so sema/codegen key
+	// on `http.listenAndServe`.
+	"net/http": {"ListenAndServe"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed

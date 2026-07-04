@@ -75,9 +75,12 @@ var handleTypes = map[string]HandleType{
 	// net/http server-path handles (HTTP-SERVER epoch). ResponseWriter is a Go
 	// interface (bare spelling, like net.Conn); Request is a pointer handle
 	// (*http.Request). Both obtain-only — a handler receives them, never
-	// constructs them. GoPkg "net/http", whose Go selector is `http`.
-	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "net/http"},
-	"http.Request":        {GoType: "*http.Request", GoPkg: "net/http"},
+	// constructs them. GoPkg is the *Aril import name* `http` (the key codegen
+	// marks used against the `import http` statement), not the import path
+	// `net/http`; the two differ only for a multi-segment package, and the Go
+	// selector in GoType (`http.`) is already correct.
+	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "http"},
+	"http.Request":        {GoType: "*http.Request", GoPkg: "http"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`

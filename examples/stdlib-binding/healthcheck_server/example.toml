@@ -7,3 +7,14 @@ since    = "0.1"
 status   = "compiling"
 expects  = "no-run"
 entry    = "healthcheck_server.aril"
+
+# E0219 — an Aril class declaring `implements http.Handler` must structurally
+# provide `serveHTTP`; renaming it (so the method set no longer matches) is a
+# conformance failure reported in Aril coordinates, not a raw `go build` "does
+# not implement http.Handler" leak (D10, the first structural conformance check).
+[[error]]
+patch   = "errors/missing-serve-http.patch"
+expect  = ["E0219"]
+stage   = "sema"
+matches = "errors/missing-serve-http.expected"
+origin  = "synthetic"

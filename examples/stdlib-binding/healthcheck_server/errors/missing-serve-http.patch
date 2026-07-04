@@ -1,0 +1,10 @@
+--- healthcheck_server.aril
++++ healthcheck_server.aril
+@@ -7,7 +7,7 @@
+ 
+ class HealthHandler implements http.Handler {
+-  serveHTTP(w: http.ResponseWriter, r: http.Request) {
++  serve(w: http.ResponseWriter, r: http.Request) {
+     w.writeString("ok\n")
+   }
+ }
