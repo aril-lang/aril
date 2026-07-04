@@ -97,3 +97,21 @@ func TestTimeDurationUnitNotRename(t *testing.T) {
 		t.Errorf(`time.milliseconds must not be a rename binding`)
 	}
 }
+
+// TestStdlibNamespaceMachinerySet locks codegen's binding-machinery namespace
+// predicate to binding's Go-backed stdlib set (the importable union minus the
+// arilrt runtime modules), so a drift back to a hand-copied list is caught.
+func TestStdlibNamespaceMachinerySet(t *testing.T) {
+	for _, n := range binding.BuiltinModules() {
+		want := binding.IsStdlibNamespace(n)
+		if got := isStdlibNamespaceName(n); got != want {
+			t.Errorf("isStdlibNamespaceName(%q) = %v; want %v", n, got, want)
+		}
+	}
+	// The arilrt runtime modules are importable but not Go-machinery.
+	for _, n := range []string{"reflect", "big"} {
+		if isStdlibNamespaceName(n) {
+			t.Errorf("isStdlibNamespaceName(%q) should be false (arilrt runtime module)", n)
+		}
+	}
+}

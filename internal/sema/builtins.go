@@ -1,7 +1,9 @@
 package sema
 
+import "github.com/aril-lang/aril/internal/binding"
+
 // predeclaredSymbols seeds the bottom scope.
-// Source: lang-spec/keywords.md §Built-in identifiers + codegen.isStdlibNamespace.
+// Source: lang-spec/keywords.md §Built-in identifiers + binding.BuiltinModules.
 func predeclaredSymbols() map[string]*Symbol {
 	out := map[string]*Symbol{}
 
@@ -49,11 +51,7 @@ func predeclaredSymbols() map[string]*Symbol {
 	for _, fn := range []string{"panic", "refEq", "makeChannel", "makeSlice", "min", "max"} {
 		addFunc(fn)
 	}
-	for _, m := range []string{
-		"errors", "fmt", "os", "strings", "strconv", "bufio", "context",
-		"time", "sync", "io", "log", "net", "encoding", "math",
-		"reflect", "unicode", "sort", "json", "slices", "regexp", "big",
-	} {
+	for _, m := range binding.BuiltinModules() {
 		addMod(m)
 	}
 	return out

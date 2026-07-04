@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aril-lang/aril/internal/codegen"
+	"github.com/aril-lang/aril/internal/binding"
 	"github.com/aril-lang/aril/internal/lexer"
 	"github.com/aril-lang/aril/internal/parser"
 )
@@ -119,7 +119,7 @@ func classifyImport(p string, m *projectManifest) (importKind, string) {
 		rest := strings.TrimPrefix(strings.TrimPrefix(p, m.name), "/")
 		return importUser, filepath.Join(m.dir, filepath.FromSlash(rest))
 	}
-	if codegen.IsStdlibNamespace(head) {
+	if binding.IsBuiltinModule(head) {
 		return importStdlib, ""
 	}
 	if m != nil {
