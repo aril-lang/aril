@@ -1232,6 +1232,15 @@ declarations themselves emit no Go (they are signature metadata).
 
   (Comma-ok `(U, bool) → Option<U>` is a generator-side lift; its
   codegen wrapper is a later slice.)
+
+  This boundary-lift is not extern-only: a **bound stdlib value-handle**
+  method (D37 — the `internal/binding` handle table, e.g. `net.Conn`'s
+  `read`/`write`/`close`) whose curated return is `Result<U, error>`
+  lowers through the identical `arilResultOf` / `arilResultUnit` helper,
+  keyed on `U` the same way. `net.Conn.read` (`(int, error)`) →
+  `arilResultOf(conn.Read(p))`; `net.Conn.close` (bare `error`) →
+  `arilResultUnit(conn.Close())`. A handle method whose return is *not*
+  `Result<…>` (`regexp.Regexp.matchString → bool`) emits the bare Go call.
 - **Imports.** The Go import path each used binding names via `@go` is
   added to the import block directly (it comes from `@go`, not the
   `.aril` imports). References use the path's base name; a Go package is

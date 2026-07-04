@@ -172,6 +172,10 @@ func TestNetSocketHandles(t *testing.T) {
 	if addr.GoName != "Addr" || addr.Return != "net.Addr" {
 		t.Errorf("net.Listener.addr = %+v; want Addr → net.Addr", addr)
 	}
+	lclose, _ := HandleMethodOf("net.Listener", "close")
+	if lclose.GoName != "Close" || lclose.Return != "Result<unit, error>" {
+		t.Errorf("net.Listener.close = %+v; want Close → Result<unit, error>", lclose)
+	}
 	astr, _ := HandleMethodOf("net.Addr", "string")
 	if astr.GoName != "String" || astr.Return != "string" {
 		t.Errorf("net.Addr.string = %+v; want String → string", astr)

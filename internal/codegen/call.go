@@ -569,7 +569,8 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Value-handle method whose curated return is `Result<…>` (net.Conn.read
 	// → (int,error), .close → error): wrap the Go call in ResultOf / ResultUnit,
-	// the same lift the stdlib registry (call.go ~108) and extern paths apply.
+	// the same boundary-lift the stdlibResultWrapOf path and extern-FFI handles
+	// apply (lowering-go.md §ForeignCall Boundary-lift, which covers D37 handles).
 	// The plain handle-method path (goMethodName rename) would emit the bare Go
 	// `(T, error)` call, which does not type as an arilrt.Result.
 	if fld, ok := c.Callee.(*ast.Field); ok {
