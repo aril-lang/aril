@@ -1,0 +1,72 @@
+--- TITLE ---
+Bound Go interface: an Aril class implements http.Handler — serveHTTP lowers to the exported Go ServeHTTP with (w http.ResponseWriter, r *http.Request); writeString lowers to Write([]byte(...)) wrapped in ResultOf; the class value (&HealthHandler{}) is passed where Go wants http.Handler; http.listenAndServe → ResultUnit(http.ListenAndServe(...))
+
+--- INPUT ---
+import http
+import log
+
+class HealthHandler implements http.Handler {
+  serveHTTP(w: http.ResponseWriter, r: http.Request) {
+    let _ = w.writeString("ok\n")
+  }
+}
+
+func main() {
+  let handler = HealthHandler{}
+  log.println("listening")
+  match http.listenAndServe(":8080", handler) {
+    Ok(_)  => {},
+    Err(e) => log.fatal(e),
+  }
+}
+
+--- GO ---
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func ResultUnit(err error) Result[struct{}, error] {
+	if err != nil {
+		return ResultErr[struct{}, error](err)
+	}
+	return ResultOk[struct{}, error](struct{}{})
+}
+
+type HealthHandler struct {
+}
+
+func (t *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var _ = ResultOf(w.Write([]byte("ok\n")))
+}
+func main() {
+	var handler = &HealthHandler{}
+	log.Println("listening")
+	__aril_match_1 := ResultUnit(http.ListenAndServe(":8080", handler))
+	switch __aril_match_1.Tag {
+	case 0:
+	case 1:
+		e := __aril_match_1.E
+		log.Fatal(e)
+	}
+}

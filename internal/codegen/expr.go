@@ -753,6 +753,12 @@ func (g *gen) goMethodName(receiver ast.Expr, name string) string {
 	if g.isContainerTypedExpr(receiver) || g.isOptionResultTypedExpr(receiver) {
 		return exportFieldName(name)
 	}
+	// A call on a class instance whose method implements a bound Go interface
+	// (`h.serveHTTP` → `h.ServeHTTP`): the exported Go name comes from the
+	// bound-interface table, mirroring the declaration-site classMethodGoName.
+	if goName, ok := g.boundInterfaceMethodGoName(receiver, name); ok {
+		return goName
+	}
 	// Value-handle method (`re.matchString` → `re.MatchString`): the receiver's
 	// sema type is a bound stdlib handle Named, and the Go method name comes
 	// from the shared binding table (D37), not the verbatim Aril name.
@@ -777,6 +783,35 @@ func (g *gen) handleGoType(spelled string) (string, bool) {
 		return g.rt(ht.GoType), true
 	}
 	return ht.GoType, true
+}
+
+// boundInterfaceMethodGoName returns the exported Go method name for
+// `receiver.name` when sema typed receiver as a class that implements a bound Go
+// interface declaring `name` (`h.serveHTTP` → `ServeHTTP`). Mirrors the
+// declaration-site classMethodGoName so a class method is spelled identically
+// wherever it is called. ok=false when the receiver is not such a class.
+func (g *gen) boundInterfaceMethodGoName(receiver ast.Expr, name string) (string, bool) {
+	if g.info == nil {
+		return "", false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	if !ok {
+		return "", false
+	}
+	cd, ok := named.Decl.(*ast.ClassDecl)
+	if !ok {
+		return "", false
+	}
+	for _, impl := range cd.Implements {
+		nt, ok := impl.(*ast.NamedType)
+		if !ok {
+			continue
+		}
+		if goName, ok := binding.BoundInterfaceMethodGoName(strings.Join(nt.QName, "."), name); ok {
+			return goName, true
+		}
+	}
+	return "", false
 }
 
 // handleMethodGoName returns the Go method name for `receiver.name` when
@@ -872,6 +907,16 @@ func (g *gen) isDurationReceiver(receiver ast.Expr) bool {
 	}
 	named, ok := g.info.Type[receiver].(*sema.Named)
 	return ok && named.N == "time.Duration"
+}
+
+// isResponseWriterReceiver reports whether sema typed receiver as the
+// http.ResponseWriter handle — gates the writeString convenience lowering.
+func (g *gen) isResponseWriterReceiver(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	return ok && named.N == "http.ResponseWriter"
 }
 
 // isErrorBuiltinReceiver reports whether sema typed receiver as the

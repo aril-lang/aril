@@ -854,6 +854,14 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 					}
 				}
 			}
+			// http.ResponseWriter.writeString(s) lowers to
+			// ResultOf(w.Write([]byte(s))) (Result<int, error>) — pull the
+			// ResultOf lift + Result in (matters for inline mode; vendored
+			// carries them in arilrt). Gated on the receiver's sema handle type.
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "writeString" && g.isResponseWriterReceiver(f.Receiver) {
+				g.usesResult = true
+				g.usesResultOf = true
+			}
 			// A comma-ok stdlib binding (`os.lookupEnv`) lowers via
 			// the OptionOf helper — pull in Option too.
 			if f, ok := v.Callee.(*ast.Field); ok {

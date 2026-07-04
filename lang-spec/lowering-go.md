@@ -753,8 +753,17 @@ The gate is the receiver / class type, not the spelling. (Only the
 `implements error` name is matched today — a class implementing an
 interface that `extends error` is not yet rewritten; sound-over-
 complete, since sema rejects `.error()` on such a value first.)
-v1 hand-codes this single boundary method; the general
-exported-method rewrite arrives with the bindgen pipeline.
+
+**Bound-interface method rewrite.** The same boundary generalizes to a
+class that `implements` a **bound Go interface** (`http.Handler`,
+§net/http): each interface method's Aril name lowers to its exported Go
+name from the binding table (`serveHTTP` → `ServeHTTP`), at both the
+method *declaration* and any *call* on a class value — so the emitted Go
+struct satisfies the Go interface structurally (a pointer receiver, and
+the constructed value is `&C{}`). E0219 has already verified the method
+set structurally in Aril terms (type-system.md §Bound-interface
+conformance), so the lowering is a pure name rewrite. `error` → `Error`
+is the special case of this rule the bindgen pipeline will subsume.
 
 ## Slice methods
 

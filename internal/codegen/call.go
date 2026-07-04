@@ -572,6 +572,26 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 		return g.emitArgList(c.Args)
 	}
+	// http.ResponseWriter.writeString(s) is an Aril convenience with no matching
+	// Go method — ResponseWriter is an io.Writer, so it lowers to
+	// `ResultOf(w.Write([]byte(s)))` (Result<int, error>), reusing the Write
+	// method rather than io.WriteString (no extra import). Gated on the receiver's
+	// sema type being the http.ResponseWriter handle, so a user value with its own
+	// `.writeString` is not hijacked (dev-insights §2).
+	if f, ok := c.Callee.(*ast.Field); ok && f.Name == "writeString" && len(c.Args) == 1 && g.isResponseWriterReceiver(f.Receiver) {
+		g.usesResult = true
+		g.usesResultOf = true
+		g.b.WriteString(g.rt("ResultOf") + "(")
+		if err := g.emitExpr(f.Receiver); err != nil {
+			return err
+		}
+		g.b.WriteString(".Write([]byte(")
+		if err := g.emitExpr(c.Args[0]); err != nil {
+			return err
+		}
+		g.b.WriteString(")))")
+		return nil
+	}
 	// Value-handle method whose curated return is `Result<…>` (net.Conn.read
 	// → (int,error), .close → error): wrap the Go call in ResultOf / ResultUnit,
 	// the same boundary-lift the stdlibResultWrapOf path and extern-FFI handles

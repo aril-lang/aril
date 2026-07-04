@@ -75,9 +75,12 @@ var handleTypes = map[string]HandleType{
 	// net/http server-path handles (HTTP-SERVER epoch). ResponseWriter is a Go
 	// interface (bare spelling, like net.Conn); Request is a pointer handle
 	// (*http.Request). Both obtain-only — a handler receives them, never
-	// constructs them. GoPkg "net/http", whose Go selector is `http`.
-	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "net/http"},
-	"http.Request":        {GoType: "*http.Request", GoPkg: "net/http"},
+	// constructs them. GoPkg is the *Aril import name* `http` (the key codegen
+	// marks used against the `import http` statement), not the import path
+	// `net/http`; the two differ only for a multi-segment package, and the Go
+	// selector in GoType (`http.`) is already correct.
+	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "http"},
+	"http.Request":        {GoType: "*http.Request", GoPkg: "http"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -159,13 +162,13 @@ var handleMethods = map[string]map[string]HandleBinding{
 	},
 	// net/http ResponseWriter method set (binding-surface §net/http). `write` and
 	// `writeHeader` are the real Go methods; `writeString` is an Aril convenience
-	// (ResponseWriter is an io.Writer) with no matching Go method — it must lower
-	// via a codegen intercept (→ io.WriteString). That intercept lands with the
-	// server codegen; until then this row is consumed by sema only (call typing).
-	// Result-returning methods are wrapped via ResultOf like the net handle methods.
+	// (ResponseWriter is an io.Writer) with no matching Go method — it lowers via
+	// a codegen intercept to `ResultOf(w.Write([]byte(s)))`, so its GoName is
+	// unused (empty, like time.Duration's operator methods). Result-returning
+	// methods are wrapped via ResultOf like the net handle methods.
 	"http.ResponseWriter": {
 		"write":       {GoName: "Write", Params: []string{"[]byte"}, Return: "Result<int, error>"},
-		"writeString": {GoName: "WriteString", Params: []string{"string"}, Return: "Result<int, error>"},
+		"writeString": {GoName: "", Params: []string{"string"}, Return: "Result<int, error>"},
 		"writeHeader": {GoName: "WriteHeader", Params: []string{"int"}, Return: "unit"},
 	},
 	// http.Request is opaque in v1 (a handler may ignore it); its field/method

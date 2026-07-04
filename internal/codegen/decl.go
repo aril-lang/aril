@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/binding"
 )
 
 // This file holds declaration-level emission: lowering Aril type,
@@ -200,13 +201,34 @@ func (g *gen) emitClassDecl(cd *ast.ClassDecl) error {
 		g.b.WriteByte('\n')
 	}
 	g.b.WriteString("}\n")
-	implError := classImplementsError(cd)
 	for _, m := range cd.Methods {
-		if err := g.emitMethod(cd.Name, cd.TypeParams, m, implError); err != nil {
+		if err := g.emitMethod(cd, m); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// classMethodGoName returns the Go name for a class instance-method declaration,
+// applying the binding-boundary rewrites so the emitted struct satisfies Go's
+// interfaces: a bound Go interface the class implements maps the Aril method to
+// its exported Go name (serveHTTP → ServeHTTP, D6/D14); a class `implements
+// error` maps `error` → `Error`. Otherwise the verbatim (lowercase) Aril name.
+// The call-site mirror is goMethodName (expr.go).
+func classMethodGoName(cd *ast.ClassDecl, m *ast.Method) string {
+	for _, impl := range cd.Implements {
+		nt, ok := impl.(*ast.NamedType)
+		if !ok {
+			continue
+		}
+		if goName, ok := binding.BoundInterfaceMethodGoName(strings.Join(nt.QName, "."), m.Name); ok {
+			return goName
+		}
+	}
+	if classImplementsError(cd) && m.Name == "error" {
+		return "Error"
+	}
+	return goIdent(m.Name)
 }
 
 // classImplementsError reports whether the class declares `implements error` —
@@ -263,24 +285,22 @@ func (g *gen) emitInterfaceDecl(id *ast.InterfaceDecl) error {
 	return nil
 }
 
-func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *ast.Method, implementsError bool) error {
+func (g *gen) emitMethod(cd *ast.ClassDecl, m *ast.Method) error {
 	g.line(m.Span.StartLine)
 	g.b.WriteString("func ")
 	if !m.IsStatic {
 		g.b.WriteString("(t *")
-		g.b.WriteString(goIdent(className))
-		g.emitTypeParamBrackets(classTypeParams, false) // receiver: type params without constraints
+		g.b.WriteString(goIdent(cd.Name))
+		g.emitTypeParamBrackets(cd.TypeParams, false) // receiver: type params without constraints
 		g.b.WriteString(") ")
-		// A class implementing `error` exposes its `error()` method as Go's
-		// `Error()` so the struct satisfies Go's error interface (D14 footnote).
-		if implementsError && m.Name == "error" {
-			g.b.WriteString("Error")
-		} else {
-			g.b.WriteString(goIdent(m.Name))
-		}
+		// The method name crosses the binding boundary: a bound Go interface the
+		// class implements maps the Aril method to its exported Go name
+		// (serveHTTP → ServeHTTP), and a class `implements error` maps
+		// `error` → `Error` — so the emitted struct satisfies Go's interface.
+		g.b.WriteString(classMethodGoName(cd, m))
 	} else {
-		g.b.WriteString(staticMethodName(className, m.Name))
-		g.emitTypeParamBrackets(classTypeParams, true) // static = package-level func, declare constraints
+		g.b.WriteString(staticMethodName(cd.Name, m.Name))
+		g.emitTypeParamBrackets(cd.TypeParams, true) // static = package-level func, declare constraints
 	}
 	g.b.WriteByte('(')
 	for i, p := range m.Params {
@@ -310,7 +330,7 @@ func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *a
 	// methods have no receiver and are skipped (construction-time checking
 	// is a later slice).
 	if !m.IsStatic {
-		if err := g.emitMethodInvariants(className); err != nil {
+		if err := g.emitMethodInvariants(cd.Name); err != nil {
 			return err
 		}
 	}
@@ -581,8 +601,11 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 		}
 		// A bound value-handle type (regexp.Regexp → *regexp.Regexp, …) lowers
 		// to its Go type spelling, which may differ from the Aril spelling in
-		// both pointer-ness and package (D37). The package's import is
-		// kept by the pre-walk (markHandlePkgs), which runs before writeHeader.
+		// both pointer-ness and package (D37). The package's import is kept when
+		// a *value-level* use marks it (a method call / constructor — predeclared.go
+		// pre-walk); a handle type in a *signature-only* position does not yet
+		// mark its import (a known gap — a real handler exercises a method on the
+		// value, which marks it).
 		if len(v.QName) > 1 {
 			if goType, ok := g.handleGoType(strings.Join(v.QName, ".")); ok {
 				g.b.WriteString(goType)
