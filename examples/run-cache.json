@@ -157,6 +157,11 @@
       "code": 0
     },
     {
+      "key": "54715077d71061fcb2a9216d4f6ef7e5d86bc8803fe7e77a87d4d55d98c2805d",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
       "key": "567ed291a174932a4f984e89192cc703c8614fce579fd601b572e1e1305612d8",
       "status": "ok",
       "code": 0

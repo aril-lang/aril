@@ -342,8 +342,10 @@ func (p *parser) parseDestructureLet(kw lexer.Token) (ast.Stmt, *Diag) {
 // statement position wrap it in an ExprStmt.
 func (p *parser) parseReturnExpr() (*ast.ReturnExpr, *Diag) {
 	kw := p.advance() // consume 'return'
-	// Bare `return` ends at end-of-statement (newline, `}`, EOF).
-	if p.at(lexer.KindNewline) || p.at(lexer.KindPunct, "}") || p.at(lexer.KindEOF) {
+	// Bare `return` ends at end-of-statement (newline, `}`, EOF) or an arm
+	// separator `,` — a valueless `return` is a legal braceless match/select
+	// arm body (`None => return,`), grammar.ebnf §MatchArm.
+	if p.at(lexer.KindNewline) || p.at(lexer.KindPunct, "}") || p.at(lexer.KindPunct, ",") || p.at(lexer.KindEOF) {
 		return &ast.ReturnExpr{
 			Span: ast.Span{
 				StartLine: kw.Line, StartCol: kw.Col,

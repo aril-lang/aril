@@ -2,9 +2,9 @@
   "schema_version": 3,
   "totals": {
     "total": 89,
-    "parse_fail": 1,
+    "parse_fail": 0,
     "sema_fail": 1,
-    "emit_fail": 0,
+    "emit_fail": 1,
     "build_ok": 87,
     "diag_ok": 94,
     "diag_total": 117,
@@ -174,8 +174,8 @@
     },
     {
       "path": "examples/core-language/lru_cache/lru_cache.aril",
-      "stage": "parse",
-      "blocker": "error[E0112]: expected expression, got Punct \",\""
+      "stage": "emit",
+      "blocker": "go build failed"
     },
     {
       "path": "examples/core-language/match_on_tuples/match_on_tuples.aril",

@@ -11,9 +11,9 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | Stage reached | Count |
 |---|---|
 | ✅ build (full pipeline) | 87 |
-| emit / codegen fail | 0 |
+| emit / codegen fail | 1 |
 | sema fail | 1 |
-| parse fail | 1 |
+| parse fail | 0 |
 
 ## Per-example
 
@@ -106,8 +106,8 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/tcp_echo/tcp_echo.aril` | build | — |
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
+| `examples/core-language/lru_cache/lru_cache.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
-| `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
 
 ## Diagnostic-quality gaps
 
