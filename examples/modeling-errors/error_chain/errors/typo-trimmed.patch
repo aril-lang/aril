@@ -8,4 +8,4 @@
 +  if trimed.len() == 0 {
      return Err(ParseError{ stage: "parsePositive", detail: "empty input" })
    }
-   match strconv.atoi(trimmed) {
+   // `try` propagates, but strconv fails with a bare `error` while this

@@ -434,6 +434,14 @@ func (c *checker) inferCall(call *ast.Call) Type {
 	if rt, handled := c.inferClosureBinding(call); handled {
 		return rt
 	}
+	// `r.mapErr(f)` — the Err-conversion combinator (builtins.md §Result
+	// methods). Its result type `Result<T, E2>` depends on the closure's
+	// return E2, so it can't be a fixed containerMethodType Func; typed here
+	// like inferClosureBinding, pre-typing the handler's param as the
+	// receiver's E (T-Result-MapErr).
+	if rt, handled := c.inferResultMapErr(call); handled {
+		return rt
+	}
 	args := make([]Type, len(call.Args))
 	for i, a := range call.Args {
 		args[i] = c.inferExpr(a)
@@ -539,6 +547,36 @@ func (c *checker) inferClosureBinding(call *ast.Call) (Type, bool) {
 		return sliceT, true
 	}
 	return &Slice{Elem: elem}, true
+}
+
+// inferResultMapErr types `r.mapErr(f)` — the Err-conversion combinator that
+// lets `try` cross an error-type boundary (builtins.md §Result methods,
+// T-Result-MapErr). The handler `f: (E) => E2` transforms the Err payload; the
+// call yields `Result<T, E2>`, its E2 read from the handler's inferred return.
+// The receiver was already typed by inferCall's callee walk (info.Type is
+// populated), so it is read from cache rather than re-inferred. Returns
+// (resultType, true) when it handled the call; (nil, false) otherwise —
+// non-Result receivers fall through to the ordinary member path.
+func (c *checker) inferResultMapErr(call *ast.Call) (Type, bool) {
+	f, ok := call.Callee.(*ast.Field)
+	if !ok || f.Name != "mapErr" || len(call.Args) != 1 {
+		return nil, false
+	}
+	res, ok := c.info.Type[f.Receiver].(*Result)
+	if !ok {
+		return nil, false
+	}
+	// Pre-type an unannotated handler param as the receiver's E, so its body
+	// checks against the real error type (mirrors inferClosureBinding).
+	if cl, ok := call.Args[0].(*ast.ClosureLit); ok {
+		c.closureExpect[cl] = &Func{Params: []Type{res.E}, Return: &Unknown{}}
+	}
+	argT := c.inferExpr(call.Args[0])
+	e2 := Type(&Unknown{})
+	if fn, ok := argT.(*Func); ok && fn.Return != nil {
+		e2 = fn.Return
+	}
+	return &Result{T: res.T, E: e2}, true
 }
 
 // staticMethodType returns the Func type of a user-class static method

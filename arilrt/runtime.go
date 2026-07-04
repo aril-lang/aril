@@ -61,6 +61,18 @@ func (r Result[T, E]) UnwrapOr(fallback T) T {
 	return fallback
 }
 
+// MapErr transforms the Err payload E→E2 (leaving an Ok untouched), so the
+// value keeps flowing as a Result. It is the error-conversion combinator that
+// lets `try` cross an error-type boundary (builtins.md §Result methods). A free
+// function, not a method: a Go method cannot introduce the fresh E2 type
+// parameter, though the Aril surface spells it `r.mapErr(f)`.
+func MapErr[T any, E any, E2 any](r Result[T, E], f func(E) E2) Result[T, E2] {
+	if r.Tag == 1 {
+		return Result[T, E2]{Tag: 1, E: f(r.E)}
+	}
+	return Result[T, E2]{Tag: 0, V: r.V}
+}
+
 // ResultOf folds a Go (T, error) pair into Result<T, error>: a non-nil
 // error becomes Err, a successful value becomes Ok. Backs the
 // (T, error) → Result stdlib bindings (strconv.atoi, os.readFile, …).

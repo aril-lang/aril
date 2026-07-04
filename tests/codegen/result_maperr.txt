@@ -1,0 +1,104 @@
+--- TITLE ---
+`r.mapErr(f)` — the Err-conversion combinator (builtins.md §Result methods).
+Transforms the Err payload E→E2 (Ok untouched), so `try` propagates across an
+error-type boundary: `strconv.atoi`'s `error` is wrapped into a `ParseError`
+before the enclosing `Result<int, ParseError>` returns it. Lowers to the free
+`MapErr(recv, func(e E) E2 { … })` helper (a Go method cannot add the E2 type
+param). The Ok path keeps the value flowing.
+
+--- INPUT ---
+import fmt
+import strconv
+
+type ParseError = { detail: string }
+
+func parsePositive(s: string): Result<int, ParseError> {
+  let n = try strconv.atoi(s).mapErr((e) => ParseError{ detail: e.error() })
+  return Ok(n)
+}
+
+func main() {
+  match parsePositive("42") {
+    Ok(v)  => fmt.println("ok", v),
+    Err(e) => fmt.println("err", e.detail),
+  }
+  match parsePositive("nope") {
+    Ok(v)  => fmt.println("ok", v),
+    Err(e) => fmt.println("err", e.detail),
+  }
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func MapErr[T any, E any, E2 any](r Result[T, E], f func(E) E2) Result[T, E2] {
+	if r.Tag == 1 {
+		return Result[T, E2]{Tag: 1, E: f(r.E)}
+	}
+	return Result[T, E2]{Tag: 0, V: r.V}
+}
+
+type ParseError struct {
+	Detail string `json:"detail"`
+}
+
+func parsePositive(s string) Result[int, ParseError] {
+	__aril_try_1 := MapErr(ResultOf(strconv.Atoi(s)), func(e error) ParseError {
+		return ParseError{Detail: e.Error()}
+	})
+	if __aril_try_1.Tag == 1 {
+		return Result[int, ParseError]{Tag: 1, E: __aril_try_1.E}
+	}
+	var n = __aril_try_1.V
+	return ResultOk[int, ParseError](n)
+}
+func main() {
+	__aril_match_1 := parsePositive("42")
+	switch __aril_match_1.Tag {
+	case 0:
+		v := __aril_match_1.V
+		fmt.Println("ok", v)
+	case 1:
+		e := __aril_match_1.E
+		fmt.Println("err", e.Detail)
+	}
+	__aril_match_2 := parsePositive("nope")
+	switch __aril_match_2.Tag {
+	case 0:
+		v := __aril_match_2.V
+		fmt.Println("ok", v)
+	case 1:
+		e := __aril_match_2.E
+		fmt.Println("err", e.Detail)
+	}
+}
+
+--- STDOUT ---
+ok 42
+err strconv.Atoi: parsing "nope": invalid syntax
+
+--- EXIT ---
+0

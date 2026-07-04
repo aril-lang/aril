@@ -31,16 +31,14 @@ func parsePositive(s: string): Result<int, ParseError> {
   if trimmed.len() == 0 {
     return Err(ParseError{ stage: "parsePositive", detail: "empty input" })
   }
-  match strconv.atoi(trimmed) {
-    Err(e) => Err(ParseError{ stage: "parsePositive", detail: e.error() }),
-    Ok(n)  => {
-      if n <= 0 {
-        Err(ParseError{ stage: "parsePositive", detail: "non-positive: " + trimmed })
-      } else {
-        Ok(n)
-      }
-    },
+  // `try` propagates, but strconv fails with a bare `error` while this
+  // function's error type is `ParseError`; `mapErr` bridges the two so a
+  // plain `try` crosses the error-type boundary — no hand-written `match`.
+  let n = try strconv.atoi(trimmed).mapErr((e) => ParseError{ stage: "parsePositive", detail: e.error() })
+  if n <= 0 {
+    return Err(ParseError{ stage: "parsePositive", detail: "non-positive: " + trimmed })
   }
+  return Ok(n)
 }
 
 func dividend(n: int): Result<int, ParseError> {
