@@ -747,7 +747,7 @@ func (g *gen) isDataFieldSelector(receiver ast.Expr, name string) bool {
 // behaviour (stdlib renames + the `error`→`Error` boundary, otherwise
 // the verbatim lowercase name).
 func (g *gen) goMethodName(receiver ast.Expr, name string) string {
-	if name == "error" && g.isErrorBuiltinReceiver(receiver) {
+	if name == "error" && (g.isErrorBuiltinReceiver(receiver) || g.isErrorImplementingClassReceiver(receiver)) {
 		return "Error"
 	}
 	if g.isContainerTypedExpr(receiver) || g.isOptionResultTypedExpr(receiver) {
@@ -882,6 +882,21 @@ func (g *gen) isErrorBuiltinReceiver(receiver ast.Expr) bool {
 	}
 	b, ok := g.info.Type[receiver].(*sema.Builtin)
 	return ok && b.N == "error"
+}
+
+// isErrorImplementingClassReceiver reports whether sema typed receiver as a
+// class that `implements error` — its `.error()` call renames to Go's `.Error()`
+// to match the method declaration's error→Error boundary (classImplementsError).
+func (g *gen) isErrorImplementingClassReceiver(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	if !ok {
+		return false
+	}
+	cd, ok := named.Decl.(*ast.ClassDecl)
+	return ok && classImplementsError(cd)
 }
 
 // emitStringInterp lowers an interpolated string to a Go fmt.Sprintf call:

@@ -300,6 +300,24 @@ func (g *gen) writePredeclaredOptionOf() {
 `)
 }
 
+// writePredeclaredErrorsAs emits the ErrorsAs helper backing errors.as<T>
+// (binding-surface.md §errors): Go's errors.As pointer-out protocol lifted
+// into Option<T>. Requires Option (usesOption, forced alongside usesErrorsAs);
+// inline mode also pulls the `errors` import. Conditional on usage.
+func (g *gen) writePredeclaredErrorsAs() {
+	if !g.usesErrorsAs {
+		return
+	}
+	g.b.WriteString(`func ErrorsAs[T any](err error) Option[T] {
+	var t T
+	if errors.As(err, &t) {
+		return OptionSome[T](t)
+	}
+	return OptionNone[T]()
+}
+`)
+}
+
 // writePredeclaredTryRecv emits the inline helper backing
 // `ch.tryRecv()` (lowering-go.md §Channel lowering): a non-blocking
 // receive that returns Some(v) when a value is ready, None when the
@@ -909,6 +927,14 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "tryRecv" {
 				g.usesTryRecv = true
 				g.usesOption = true
+			}
+			// errors.as<T> — the pointer-out ErrorsAs helper, into Option<T>
+			// (binding-surface.md §errors).
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "as" {
+				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "errors" && g.isBuiltinModule(recv) {
+					g.usesErrorsAs = true
+					g.usesOption = true
+				}
 			}
 			// Option/Result query/defaulting methods pull their inline
 			// method set into the prelude. Keyed on the method name (the

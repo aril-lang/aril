@@ -45,6 +45,25 @@ func (g *gen) emitJSONCall(c *ast.Call) (bool, error) {
 	return false, nil
 }
 
+// emitErrorsAsCall lowers `errors.as<T>(e)` → `ErrorsAs[T](e)` (the pointer-out
+// helper, into Option<T>). handled=false when the call is not this binding. The
+// receiver is gated on the sema symbol (isBuiltinModule), not the spelling.
+func (g *gen) emitErrorsAsCall(c *ast.Call) (bool, error) {
+	f, ok := c.Callee.(*ast.Field)
+	if !ok {
+		return false, nil
+	}
+	recv, ok := f.Receiver.(*ast.Ident)
+	if !ok || recv.Name != "errors" || f.Name != "as" || !g.isBuiltinModule(recv) {
+		return false, nil
+	}
+	g.b.WriteString(g.rt("ErrorsAs"))
+	if err := g.emitTypeArgs(c.TypeArgs); err != nil {
+		return true, err
+	}
+	return true, g.emitArgList(c.Args)
+}
+
 // emitResultOfCall emits `ResultOf(<goFn>(<args>))` — the wrap for a
 // Go `(T, error)`-returning binding into Result<T, error>.
 func (g *gen) emitResultOfCall(goFn string, args []ast.Expr) error {

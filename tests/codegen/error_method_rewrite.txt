@@ -1,5 +1,5 @@
 --- TITLE ---
-Go-error binding method rewrite: `.error()` on an `error`-typed value lowers to `.Error()`; a user class implementing `error` keeps its own lowercase `.error()` method.
+Go-error binding method rewrite: `.error()` on an `error`-typed value lowers to `.Error()`; a class implementing `error` lowers both its method declaration and calls on its values to `.Error()`, so the struct satisfies Go's error interface (D14 footnote).
 
 --- INPUT ---
 import strconv
@@ -57,7 +57,7 @@ type MyErr struct {
 	Msg string `json:"msg"`
 }
 
-func (t *MyErr) error() string {
+func (t *MyErr) Error() string {
 	return t.Msg
 }
 func render(e error) string {
@@ -65,7 +65,7 @@ func render(e error) string {
 }
 func main() {
 	var m = &MyErr{Msg: "custom"}
-	fmt.Println(m.error())
+	fmt.Println(m.Error())
 	__aril_match_1 := ResultOf(strconv.Atoi("xx"))
 	switch __aril_match_1.Tag {
 	case 0:

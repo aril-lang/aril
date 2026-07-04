@@ -735,15 +735,25 @@ receiver otherwise. For v1 every class uses a pointer receiver
 unconditionally — keeps the lowering uniform; the few
 pure-value classes pay an unnoticeable indirection cost.
 
-**Go-error method rewrite.** A method call `e.error()` on a value
-whose sema type is the predeclared `error` builtin lowers to Go's
-`e.Error()` — the PascalCase↔lowerCamel binding-name convention at
-the Go boundary (a **D6** rule, cf. the D14 footnote). This is
-gated on the *receiver's sema type*: a user class that
-`implements error` is a nominal `Named` type, not the `error`
-builtin, so its own declared `error()` method lowers unchanged to
-`t.error()`. (v1 hand-codes this single boundary method; the
-general exported-method rewrite arrives with the bindgen pipeline.)
+**Go-error method rewrite.** The `error()` method lowers to Go's
+`Error()` — the PascalCase↔lowerCamel binding-name convention at
+the Go boundary (a **D6** rule, cf. the D14 footnote) — in two
+gated cases:
+- a **call** `e.error()` whose receiver's sema type is the
+  predeclared `error` builtin;
+- a **class that `implements error`** (a nominal `Named` type):
+  both its `error(): string` method *declaration* and *calls* on
+  its values (`c.error()`) lower to `Error()`, so the Go struct
+  satisfies Go's `error` interface (and is matchable by
+  `errors.as<T>`). A class with an `error()` method that does **not**
+  implement `error` keeps its lowercase `error()` unchanged.
+
+The gate is the receiver / class type, not the spelling. (Only the
+`implements error` name is matched today — a class implementing an
+interface that `extends error` is not yet rewritten; sound-over-
+complete, since sema rejects `.error()` on such a value first.)
+v1 hand-codes this single boundary method; the general
+exported-method rewrite arrives with the bindgen pipeline.
 
 ## Slice methods
 

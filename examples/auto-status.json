@@ -4,11 +4,11 @@
     "total": 89,
     "parse_fail": 1,
     "sema_fail": 1,
-    "emit_fail": 1,
-    "build_ok": 86,
+    "emit_fail": 0,
+    "build_ok": 87,
     "diag_ok": 94,
     "diag_total": 117,
-    "run_ok": 85,
+    "run_ok": 86,
     "run_total": 88
   },
   "files": [
@@ -324,8 +324,8 @@
     },
     {
       "path": "examples/modeling-errors/errors_as/errors_as.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/modeling-errors/errors_as_types/errors_as_types.aril",
@@ -583,11 +583,6 @@
     },
     {
       "path": "examples/core-language/lru_cache",
-      "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/modeling-errors/errors_as",
       "status": "build-fail",
       "code": 1
     }

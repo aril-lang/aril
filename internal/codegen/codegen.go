@@ -446,6 +446,9 @@ type gen struct {
 	usesJSON      bool
 	usesJSONParse bool
 	usesTryRecv   bool
+	// usesErrorsAs — errors.as<T> lifts Go's errors.As pointer-out protocol
+	// into Option<T> via the ErrorsAs helper. Forces usesOption.
+	usesErrorsAs bool
 	// usesOptionOf — a comma-ok `(T, bool)` stdlib binding (os.lookupEnv)
 	// lifts to Option<T> via the OptionOf helper (the Option mirror of
 	// ResultOf's `(T, error)` lift). Forces usesOption.
@@ -675,7 +678,7 @@ func (g *gen) usesRuntime() bool {
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
 		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract ||
-		g.usesBigInt || g.usesMapErr
+		g.usesBigInt || g.usesMapErr || g.usesErrorsAs
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -774,6 +777,11 @@ func (g *gen) writeHeader(f *ast.File) {
 	if g.usesJSONParse && !g.vendored() {
 		add("encoding/json")
 	}
+	// The inline ErrorsAs helper (writePredeclaredErrorsAs) calls errors.As;
+	// vendored mode carries it in arilrt (arilrt/errors.go).
+	if g.usesErrorsAs && !g.vendored() {
+		add("errors")
+	}
 	if g.usesBigInt && !g.vendored() {
 		// The inline BigInt wrapper (writePredeclaredBigInt) is built on
 		// math/big; vendored mode carries it in arilrt.
@@ -834,6 +842,7 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredMapErr()
 	g.writePredeclaredResultUnit()
 	g.writePredeclaredOptionOf()
+	g.writePredeclaredErrorsAs()
 	g.writePredeclaredJSONParse()
 	g.writeOptionJSONMethods()
 	g.writePredeclaredSortSorted()

@@ -175,6 +175,14 @@ func (c *checker) genericBindingReturn(call *ast.Call, f *ast.Field) Type {
 		}
 		return &Result{T: c.typeFromExpr(call.TypeArgs[0]), E: errT}
 	}
+	// errors.as<T>(e) → Option<T> — the typed-unwrap counterpart to errors.is,
+	// generic over the target type (binding-surface.md §errors).
+	if recv.Name == "errors" && f.Name == "as" {
+		if len(call.TypeArgs) != 1 {
+			return nil
+		}
+		return &Option{T: c.typeFromExpr(call.TypeArgs[0])}
+	}
 	if recv.Name != "fmt" {
 		return nil
 	}

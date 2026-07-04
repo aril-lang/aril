@@ -34,6 +34,11 @@ func (g *gen) emitCall(c *ast.Call) error {
 	if handled, err := g.emitJSONCall(c); handled {
 		return err
 	}
+	// errors.as<T>(e) → ErrorsAs[T](e) (binding-surface.md §errors). Gated on
+	// the receiver's sema symbol so a user value named `errors` isn't hijacked.
+	if handled, err := g.emitErrorsAsCall(c); handled {
+		return err
+	}
 	// `error(msg)` free constructor (builtins.md §error) → Go's
 	// errors.New(msg). Distinguished from the `.error()` interface
 	// method (a Field callee) and from any error-conversion by the
@@ -817,6 +822,10 @@ func isRuntimeHelperBinding(pkg, method string) bool {
 		return method == "scan" || method == "scan2" || method == "scan3"
 	case "json":
 		return method == "parse"
+	case "errors":
+		// errors.as → ErrorsAs helper; errors.new / errors.is are direct
+		// renames to Go's errors pkg and DO need the import.
+		return method == "as"
 	case "big":
 		// big.fromInt / fromInt64 lower to arilrt runtime helpers (BigFromInt*),
 		// and the `big` namespace maps to the runtime, not a Go `big` package —
