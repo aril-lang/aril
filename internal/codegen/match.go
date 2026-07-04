@@ -403,6 +403,13 @@ func (g *gen) emitMatchAsExpr(m *ast.MatchExpr) error {
 	if len(m.Arms) == 0 {
 		return fmt.Errorf("codegen: match expression has no arms")
 	}
+	// A FromCatch match at *value-expression* position (a call arg, an
+	// operand — not a let/var/return, which emitCatchPreamble handles). The
+	// value-position lowering below wraps arms in an IIFE, which would trap
+	// the handler's `return`; refuse rather than miscompile (catch.go).
+	if m.FromCatch {
+		return catchExprErr()
+	}
 	// A tuple-subject match can't switch on a single tag — reuse the
 	// boolean decision-tree lowering, wrapping it in a value-returning
 	// IIFE (§MatchIR tuple decision-tree, value position).

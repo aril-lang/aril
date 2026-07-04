@@ -87,6 +87,53 @@ func (p *parser) parseMatchExpr() (*ast.MatchExpr, *Diag) {
 	}, nil
 }
 
+// parseCatchTail parses the postfix `catch e { block }` after its subject and
+// desugars it to a two-arm match (desugaring.md §Catch):
+// `match subject { Ok(__aril_catch_v) => __aril_catch_v, Err(e) => { block } }`,
+// tagged FromCatch so sema enforces the Err block diverges (E0406). The block
+// shares the enclosing function's frame — a `return` in it returns from that
+// function — because a match arm, unlike a closure, is not a new return frame.
+func (p *parser) parseCatchTail(subject ast.Expr) (ast.Expr, *Diag) {
+	kw := p.advance() // consume 'catch'
+	if !p.at(lexer.KindIdent) {
+		t := p.peek()
+		return nil, p.diag("E0112",
+			fmt.Sprintf("expected an error binder identifier after `catch`, got %s %q", t.Kind, t.Lexeme),
+			t.Line, t.Col)
+	}
+	binder := p.advance()
+	block, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	kwSpan := ast.Span{StartLine: kw.Line, StartCol: kw.Col, EndLine: kw.Line, EndCol: kw.Col + utf8.RuneCountInString(kw.Lexeme)}
+	binderSpan := ast.Span{
+		StartLine: binder.Line, StartCol: binder.Col,
+		EndLine: binder.Line, EndCol: binder.Col + utf8.RuneCountInString(binder.Lexeme),
+	}
+	const okBinder = "__aril_catch_v" // fresh Ok binder; the arm body just returns it (unwrap)
+	okArm := &ast.MatchArm{
+		Span:    kwSpan,
+		Pattern: &ast.VariantPat{Span: kwSpan, QName: []string{"Ok"}, Sub: []ast.Pattern{&ast.IdentPat{Span: kwSpan, Name: okBinder}}},
+		Body:    &ast.Ident{Span: kwSpan, Name: okBinder},
+	}
+	errArm := &ast.MatchArm{
+		Span:    block.Span,
+		Pattern: &ast.VariantPat{Span: binderSpan, QName: []string{"Err"}, Sub: []ast.Pattern{&ast.IdentPat{Span: binderSpan, Name: binder.Lexeme}}},
+		Body:    block,
+	}
+	return &ast.MatchExpr{
+		Span: ast.Span{
+			StartLine: subject.NodeSpan().StartLine, StartCol: subject.NodeSpan().StartCol,
+			EndLine: block.Span.EndLine, EndCol: block.Span.EndCol,
+		},
+		Subject:   subject,
+		Arms:      []*ast.MatchArm{okArm, errArm},
+		FromCatch: true,
+		CatchKw:   kwSpan,
+	}, nil
+}
+
 // parsePattern parses a full pattern: a single pattern, or — when
 // `|`-separated atoms follow — an AltPat (grammar.ebnf §Pattern).
 // Alternation is greedy here; the `|` is unambiguous in pattern

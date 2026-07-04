@@ -442,6 +442,32 @@ bites.
 - In an `Option<T>`-returning function: `try e` where `e: Option<U>`
   evaluates to `U` on `Some`; `None` returns `None` from the function.
 
+When the error types differ, bridge them with `mapErr` so a plain `try` still
+applies: `try e.mapErr((err) => Wrapped{…})`.
+
+`e catch err { … }` is `try`'s sibling for when there is **no propagation
+target** — the enclosing function does not return `Result`, so there is
+nowhere to propagate. It unwraps `e`'s `Ok` value and keeps going; on `Err` it
+binds the error to `err` and runs the handler block, which **must diverge**
+(`return` / `os.exit` / `panic`) — it may not fall through with a value:
+
+```aril
+func getLineCount(path: string): int {
+  let data = os.readFile(path) catch e {
+    fmt.println("can't read", path, e)
+    return 0                 // returns from getLineCount, not from a nested frame
+  }
+  return countLines(data)
+}
+```
+
+The handler shares the function's frame, so its `return` returns from the
+function (it is a control-flow form, not a closure). Recovering *and
+continuing* with a substitute value is `unwrapOr`'s job — the visible
+substitution — not `catch`'s. To discriminate among several error kinds, model
+the error as a sum type and `match err` inside the handler (each arm still
+diverging).
+
 For inspection rather than propagation, use `match`. Mapping Go's
 `errors.Is`/`errors.As`/`%w` wrapping onto Aril error values is a later
 design item.

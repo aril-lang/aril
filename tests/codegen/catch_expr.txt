@@ -1,0 +1,73 @@
+--- TITLE ---
+`expr catch e { block }` — the postfix control-flow form (desugaring.md
+§Catch). Unwraps the Ok value and keeps the flow going; on Err runs the
+handler block, which is *required* to diverge (here `return 0` bails the
+enclosing function). Desugars to `match { Ok(v) => v, Err(e) => <block> }`,
+so it reuses the value-position match lowering — no new codegen path.
+
+--- INPUT ---
+import fmt
+import strconv
+
+func doubleOrZero(s: string): int {
+  let n = strconv.atoi(s) catch e {
+    fmt.println("bad:", s)
+    return 0
+  }
+  return n * 2
+}
+
+func main() {
+  fmt.println(doubleOrZero("21"))
+  fmt.println(doubleOrZero("x"))
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func doubleOrZero(s string) int {
+	__aril_catch_1 := ResultOf(strconv.Atoi(s))
+	if __aril_catch_1.Tag == 1 {
+		e := __aril_catch_1.E
+		_ = e
+		fmt.Println("bad:", s)
+		return 0
+	}
+	var n = __aril_catch_1.V
+	return n * 2
+}
+func main() {
+	fmt.Println(doubleOrZero("21"))
+	fmt.Println(doubleOrZero("x"))
+}
+
+--- STDOUT ---
+42
+bad: x
+0
+
+--- EXIT ---
+0

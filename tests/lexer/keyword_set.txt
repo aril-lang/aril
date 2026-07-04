@@ -2,7 +2,7 @@
 all hard keywords get reclassified — intx stays Ident
 
 --- INPUT ---
-import type class interface implements extends static func let var if else for in while return match try defer spawn scope select break continue true false unit this intx
+import type class interface implements extends static func let var if else for in while return match try catch defer spawn scope select break continue true false unit this intx
 
 --- TOKENS ---
 Keyword<import>  1:1
@@ -23,15 +23,16 @@ Keyword<while>  1:83
 Keyword<return>  1:89
 Keyword<match>  1:96
 Keyword<try>  1:102
-Keyword<defer>  1:106
-Keyword<spawn>  1:112
-Keyword<scope>  1:118
-Keyword<select>  1:124
-Keyword<break>  1:131
-Keyword<continue>  1:137
-Keyword<true>  1:146
-Keyword<false>  1:151
-Keyword<unit>  1:157
-Keyword<this>  1:162
-Ident<intx>  1:167
-EOF<>  1:171
+Keyword<catch>  1:106
+Keyword<defer>  1:112
+Keyword<spawn>  1:118
+Keyword<scope>  1:124
+Keyword<select>  1:130
+Keyword<break>  1:137
+Keyword<continue>  1:143
+Keyword<true>  1:152
+Keyword<false>  1:157
+Keyword<unit>  1:163
+Keyword<this>  1:168
+Ident<intx>  1:173
+EOF<>  1:177

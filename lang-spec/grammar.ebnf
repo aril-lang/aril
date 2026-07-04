@@ -545,7 +545,14 @@ Stmtterm     = Newline+ | ";" Newline* ;
 // See operators.md (forthcoming — folded into keywords.md for v1)
 // for the formal precedence table.
 
-Expr         = OrExpr ;
+Expr         = OrExpr CatchTail? ;
+// CatchTail — the postfix `catch e { … }` control-flow form binds looser than
+// every operator: the whole preceding OrExpr is the Result subject. It must
+// cuddle on the same line (a newline ends the subject, §SyntaxNewlineSuppression),
+// like `} else if`; suppressed where a trailing `{` is not a block (a `match`
+// subject / `if` condition). See TryExpr (its propagating sibling), CatchExpr
+// below, and desugaring.md §Catch.
+CatchTail    = "catch" Ident Block ;
 OrExpr       = AndExpr ( "||" AndExpr )* ;
 AndExpr      = EqExpr  ( "&&" EqExpr )* ;
 EqExpr       = CmpExpr ( ( "==" | "!=" ) CmpExpr )? ;
@@ -671,6 +678,14 @@ MatchArm     = Pattern "=>" Newline? ( Expr | AssignStmt ) ;
 
 ScopeExpr    = "scope" TypeArgs? ( "(" Expr ")" )? Block ;   // optional parent ctx
 TryExpr      = "try" Expr ;
+// CatchExpr is the postfix `Subject catch e { block }` (see Expr → CatchTail):
+// `try`'s sibling, but with a custom, mandatorily-diverging bail instead of
+// the implicit `return Err(e)`. The handler `block` shares the enclosing
+// function's frame (a `return` in it returns from that function), and it MUST
+// diverge — `return` / `os.exit` / `panic` (T-Catch, E0409); it may not fall
+// through with a value (that is `unwrapOr`'s role). Desugars to a two-arm
+// `match { Ok(v) => v, Err(e) => block }` (desugaring.md §Catch).
+CatchExpr    = OrExpr "catch" Ident Block ;
 SpawnExpr    = "spawn" Block ;
 
 // =============================================================

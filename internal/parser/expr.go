@@ -20,7 +20,21 @@ import (
 //   logical   — &&
 //   logical   — ||
 
-func (p *parser) parseExpr() (ast.Expr, *Diag) { return p.parseLogicalOr() }
+func (p *parser) parseExpr() (ast.Expr, *Diag) {
+	e, err := p.parseLogicalOr()
+	if err != nil {
+		return nil, err
+	}
+	// Postfix `catch e { block }` (grammar.ebnf §CatchExpr) binds looser than
+	// every operator — the whole preceding expression is the Result subject.
+	// It must cuddle on the same line (a newline ends the subject, D11), like
+	// `} else if`. Suppressed under noBrace (match subject / `if` condition),
+	// where a trailing `{` is not a block.
+	if !p.noBrace && p.at(lexer.KindKeyword, "catch") {
+		return p.parseCatchTail(e)
+	}
+	return e, nil
+}
 
 func (p *parser) parseLogicalOr() (ast.Expr, *Diag) {
 	return p.parseBinaryL(p.parseLogicalAnd, []string{"||"})

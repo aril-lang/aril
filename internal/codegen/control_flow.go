@@ -26,7 +26,12 @@ func isDivergingExpr(e ast.Expr) bool {
 		}
 		return isFieldCall(v.Callee, "os", "exit")
 	case *ast.Block:
-		return v.Trailing != nil && isDivergingExpr(v.Trailing)
+		// A block diverges when its trailing value does, OR — with no
+		// trailing value — when its last statement diverges (`…; return x`).
+		// Delegates to blockAlwaysReturns so a value-position block arm ending
+		// in `return`/`os.exit` (a `catch` handler, a block-body closure) is
+		// recognised as diverging rather than demanding a trailing expression.
+		return blockAlwaysReturns(v)
 	}
 	return false
 }
