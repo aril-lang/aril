@@ -120,6 +120,53 @@ func TestResultUnwrapOrTypesOkPayload(t *testing.T) {
 	}
 }
 
+// String methods (builtins.md §Lowering pointers): `.len()` types int, `.bytes()`
+// []byte, `.runes()` []rune — the view/length helpers codegen lowers via
+// `len(s)`/`[]byte(s)`/`[]rune(s)`. Before this a string method call typed
+// Unknown, which then broke closure-return inference over it.
+func TestStringLenTypesInt(t *testing.T) {
+	src := `func f(s: string) {
+  let n = s.len()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "n"); got == nil || got.String() != "int" {
+		t.Errorf("s.len() = %v; want int", got)
+	}
+}
+
+func TestStringBytesRunesTypeSlices(t *testing.T) {
+	src := `func f(s: string) {
+  let b = s.bytes()
+  let r = s.runes()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "b"); got == nil || got.String() != "[]byte" {
+		t.Errorf("s.bytes() = %v; want []byte", got)
+	}
+	if got := defTypeByName(info, "r"); got == nil || got.String() != "[]rune" {
+		t.Errorf("s.runes() = %v; want []rune", got)
+	}
+}
+
+// The typing fix back-propagates a closure's result type when its body is a
+// string method call — `(s: string) => s.len()` now infers a `func(string): int`
+// instead of leaving the return Unknown (which had failed codegen: "cannot infer
+// closure result type", and blocked sort.sortedBy key-with-method-call). Assert
+// the *concrete* Func type, not `len(codes)==0`: an Unknown return unifies with
+// anything, so a no-diagnostic oracle passes falsely here (dev-insights §6).
+func TestClosureOverStringLenInfersInt(t *testing.T) {
+	src := `func f() {
+  let key = (s: string) => s.len()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "key"); got == nil || got.String() != "func(string): int" {
+		t.Errorf("closure over s.len() = %v; want func(string): int", got)
+	}
+}
+
 // mapErr transforms the Err payload E→E2 (Ok's T preserved), the new E2 read
 // from the handler's return (T-Result-MapErr): `(e: string) => ParseError`
 // yields Result<int, ParseError>, so the whole call's type carries the new E.
