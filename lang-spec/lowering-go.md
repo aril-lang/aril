@@ -287,6 +287,13 @@ form share one Go representation:
   fieldless class is the canonical behaviour-only interface implementor
   (strategy/visitor); a field-bearing `T{}` zero-fills, like a partial
   record literal.
+- An empty `pkg.Type{}` where `pkg.Type` names a **constructable stdlib
+  value handle** (`sync.Mutex{}`, `sync.WaitGroup{}`) lowers to the bare
+  Go value struct `pkg.Type{}` (no `&` — a local var is addressable, so
+  a pointer-receiver method like `mu.lock()` → `mu.Lock()` auto-addresses).
+  Only the empty form lowers; the handle has no Aril-visible fields.
+  Obtain-only handles (regexp.Regexp, net.Conn) are not constructable —
+  a brace literal on them is rejected.
 
 **Constructor type-argument stamping.** A constructor call
 (`Ok`/`Err`/`Some`/`None`) constrains only the type parameter its

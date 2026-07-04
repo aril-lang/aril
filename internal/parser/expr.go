@@ -348,13 +348,17 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 			}
 			e = next
 		case p.at(lexer.KindPunct, "{") && !p.noBrace:
-			// `Ident { … }` brace literal — record / map / set /
-			// stack. Suppressed in control-flow headers (noBrace).
-			id, ok := e.(*ast.Ident)
+			// Brace literal off a bare name (`Ident { … }` — record / map /
+			// set / stack) or a qualified name (`pkg.Type{ … }` — a bound
+			// stdlib struct like `sync.Mutex{}`). Only a name or a pure
+			// dotted name-chain forms a literal; any other `expr { … }`
+			// (`f().x`, `arr[0]`) does not (grammar.ebnf §BraceLit).
+			// Suppressed in control-flow headers (noBrace).
+			qname, span, ok := qualifiedNameChain(e)
 			if !ok {
-				return e, nil // `expr { … }` only forms a literal off a bare name
+				return e, nil
 			}
-			lit, err := p.parseBraceLitBody(&ast.NamedType{Span: id.Span, QName: []string{id.Name}})
+			lit, err := p.parseBraceLitBody(&ast.NamedType{Span: span, QName: qname})
 			if err != nil {
 				return nil, err
 			}
@@ -363,6 +367,26 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 			return e, nil
 		}
 	}
+}
+
+// qualifiedNameChain flattens a bare identifier or a pure dotted
+// field-access chain (`a`, `a.b`, `a.b.c`) into a qualified type name so
+// a brace literal off it (`pkg.Type{ … }`) is recognised in expression
+// position. Returns ok=false when any link is not itself a name
+// (`f().x`, `arr[0].y`) — those cannot spell a type. The returned span
+// covers the whole chain (grammar.ebnf §BraceLit).
+func qualifiedNameChain(e ast.Expr) ([]string, ast.Span, bool) {
+	switch v := e.(type) {
+	case *ast.Ident:
+		return []string{v.Name}, v.Span, true
+	case *ast.Field:
+		prefix, _, ok := qualifiedNameChain(v.Receiver)
+		if !ok {
+			return nil, ast.Span{}, false
+		}
+		return append(prefix, v.Name), v.Span, true
+	}
+	return nil, ast.Span{}, false
 }
 
 // parseBraceLitBody parses `{ … }` after a type name, committing the

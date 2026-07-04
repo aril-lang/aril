@@ -182,6 +182,46 @@ func TestNetSocketHandles(t *testing.T) {
 	}
 }
 
+// TestSyncHandles locks the sync primitives (IDIOM-CLOSURE): Mutex/WaitGroup
+// are Constructable value handles (built with `pkg.Type{}`, unlike every
+// obtain-only handle) whose methods rename to the Go set. lock/unlock/wait/done
+// return unit; tryLock returns bool; add takes an int.
+func TestSyncHandles(t *testing.T) {
+	for _, spelled := range []string{"sync.Mutex", "sync.WaitGroup"} {
+		ht, ok := HandleTypeOf(spelled)
+		if !ok {
+			t.Fatalf("%s should be a handle type", spelled)
+		}
+		if ht.GoType != spelled || ht.GoPkg != "sync" {
+			t.Errorf("%s lowering = %+v; want value GoType %s / sync", spelled, ht, spelled)
+		}
+		if !ht.Constructable || !IsConstructableHandle(spelled) {
+			t.Errorf("%s should be Constructable (built with %s{})", spelled, spelled)
+		}
+	}
+	// Obtain-only handles must stay non-constructable so a brace literal on them
+	// is rejected, not silently zero-built.
+	if IsConstructableHandle("regexp.Regexp") || IsConstructableHandle("net.Conn") {
+		t.Error("regexp.Regexp / net.Conn are obtain-only, not constructable")
+	}
+	lock, _ := HandleMethodOf("sync.Mutex", "lock")
+	if lock.GoName != "Lock" || lock.Return != "unit" {
+		t.Errorf("sync.Mutex.lock = %+v; want Lock → unit", lock)
+	}
+	tryLock, _ := HandleMethodOf("sync.Mutex", "tryLock")
+	if tryLock.GoName != "TryLock" || tryLock.Return != "bool" {
+		t.Errorf("sync.Mutex.tryLock = %+v; want TryLock → bool", tryLock)
+	}
+	add, _ := HandleMethodOf("sync.WaitGroup", "add")
+	if add.GoName != "Add" || len(add.Params) != 1 || add.Params[0] != "int" {
+		t.Errorf("sync.WaitGroup.add = %+v; want Add(int)", add)
+	}
+	wait, _ := HandleMethodOf("sync.WaitGroup", "wait")
+	if wait.GoName != "Wait" || wait.Return != "unit" {
+		t.Errorf("sync.WaitGroup.wait = %+v; want Wait → unit", wait)
+	}
+}
+
 // TestNetDialListenRegistry locks the mechanical net constructors: net.dial /
 // net.listen are derived ResultWrap rows (the deriver spells the local-package
 // interface return net.Conn/net.Listener as a handle Named), NOT handle ctors.

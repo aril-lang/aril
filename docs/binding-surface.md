@@ -476,6 +476,13 @@ class sync.Once {
 }
 ```
 
+**Bound today:** `sync.Mutex` (`lock`/`unlock`/`tryLock`) and `sync.WaitGroup`
+(`add`/`done`/`wait`) — constructable value handles built in place with
+`sync.Mutex{}` / `sync.WaitGroup{}` (the general `pkg.Type{}` qualified-type
+construction path). `sync.RWMutex` and `sync.Once` (its `do` takes a `func()`
+argument, which the handle-method param surface does not type yet) remain on the
+target surface.
+
 ## os/signal
 
 ```aril
