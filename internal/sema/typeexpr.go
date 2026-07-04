@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/aril-lang/aril/internal/ast"
@@ -74,7 +75,11 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 	// re-introducing the sema↔codegen split (D37). Other qualified
 	// names are not modelled by sema yet.
 	if len(v.QName) > 1 {
-		if spelled := strings.Join(v.QName, "."); binding.IsHandleType(spelled) {
+		// A bound value-handle (regexp.Regexp, net.Conn, http.ResponseWriter) or
+		// a bound Go interface (http.Handler) resolves to its Named boundary
+		// type, so an annotated parameter / field / return / `implements` entry
+		// types identically to the binding table's spelling.
+		if spelled := strings.Join(v.QName, "."); binding.IsHandleType(spelled) || binding.IsBoundInterface(spelled) {
 			return &Named{N: spelled}
 		}
 		return &Unknown{}
@@ -254,6 +259,20 @@ func (c *checker) satisfiesInterface(want, got Type) bool {
 	if !ok {
 		return false
 	}
+	// A *bound* Go interface (http.Handler): nominal conformance is the class
+	// declaring it in its `implements` list. The structural method-set match is
+	// verified separately at the class decl site (E0219, checkImplements), so
+	// here — the assignability path — the declared name is sufficient (D14).
+	if binding.IsBoundInterface(wn.N) {
+		gn, ok := got.(*Named)
+		if !ok {
+			return false
+		}
+		if cd, ok := gn.Decl.(*ast.ClassDecl); ok {
+			return classImplementsBoundInterface(cd, wn.N)
+		}
+		return false
+	}
 	wid, ok := wn.Decl.(*ast.InterfaceDecl)
 	if !ok {
 		return false // want is not an interface
@@ -302,6 +321,70 @@ func (c *checker) namesInterface(t ast.TypeExpr, name string) bool {
 		}
 	}
 	return false
+}
+
+// classImplementsBoundInterface reports whether class `cd` names the bound Go
+// interface spelled `spelled` (`pkg.Type`) in its `implements` list.
+func classImplementsBoundInterface(cd *ast.ClassDecl, spelled string) bool {
+	for _, impl := range cd.Implements {
+		if nt, ok := impl.(*ast.NamedType); ok && strings.Join(nt.QName, ".") == spelled {
+			return true
+		}
+	}
+	return false
+}
+
+// checkImplements verifies a class structurally provides every method of each
+// *bound* Go interface it declares in `implements` (D14 — the first structural
+// conformance check; conformance against a user `interface` stays nominal-only
+// for now). A missing or signature-mismatched method fires E0219 in Aril
+// coordinates, pre-empting a raw `go build` "X does not implement http.Handler"
+// leak against generated Go (D10). Only bound interfaces are checked here —
+// a `pkg.Type` in `implements` that is not a bound interface is ignored (the
+// head already resolved, or E0103 fired).
+func (c *checker) checkImplements(cd *ast.ClassDecl) {
+	for _, impl := range cd.Implements {
+		nt, ok := impl.(*ast.NamedType)
+		if !ok {
+			continue
+		}
+		spelled := strings.Join(nt.QName, ".")
+		methods, ok := binding.BoundInterfaceOf(spelled)
+		if !ok {
+			continue
+		}
+		// Deterministic diagnostic order (map iteration is randomised).
+		names := make([]string, 0, len(methods))
+		for name := range methods {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			m := classMethod(cd, name)
+			if m == nil {
+				c.report("E0219", "Class "+cd.Name+" does not implement "+spelled+
+					" — missing method `"+name+"`", cd.Span)
+				continue
+			}
+			want := handleMethodSigType(methods[name])
+			got := c.methodSigType(m)
+			if !equal(want, got) {
+				c.report("E0219", "Class "+cd.Name+" does not implement "+spelled+
+					" — method `"+name+"` has signature "+got.String()+
+					", but "+spelled+" requires "+want.String(), m.Span)
+			}
+		}
+	}
+}
+
+// classMethod returns the instance method named `name` on class `cd`, or nil.
+func classMethod(cd *ast.ClassDecl, name string) *ast.Method {
+	for _, m := range cd.Methods {
+		if !m.IsStatic && m.Name == name {
+			return m
+		}
+	}
+	return nil
 }
 
 // interfaceMethodSig looks up method `name` on interface `id`, following

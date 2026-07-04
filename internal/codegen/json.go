@@ -81,8 +81,11 @@ func (g *gen) emitResultOfCall(goFn string, args []ast.Expr) error {
 // where they differ — the Aril module `json` binds Go's "encoding/json"
 // (whose package selector is still `json`, so call sites are unaffected).
 func goImportPath(arilName string) string {
-	if arilName == "json" {
+	switch arilName {
+	case "json":
 		return "encoding/json"
+	case "http":
+		return "net/http" // Go selector is still `http`, so call sites are unaffected
 	}
 	return arilName
 }

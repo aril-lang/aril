@@ -385,7 +385,7 @@
     {
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
       "stage": "sema",
-      "blocker": "error[E0117]: unknown import path \"http\""
+      "blocker": "error[E0217]: Module `http` has no bound member `listenAndServe`"
     },
     {
       "path": "examples/stdlib-binding/http_by_hand/http_by_hand.aril",
