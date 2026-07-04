@@ -45,9 +45,9 @@ func loadUser(path: string): Result<User, error> {
 Each `try` unwraps a `Result` and short-circuits the error outward — Rust's
 `?`, no `if err != nil`. When a step fails with a *different* error type,
 `.mapErr` bridges it (`try step().mapErr((e) => Wrapped{…})`); when there is no
-`Result` to propagate into, `e catch err { … }` runs a handler that reports and
-bails. (This example compiles today; a `net/http` binding — for the
-`http.get`-shaped version — is a later effort.)
+`Result` to propagate into, `expr catch e { … }` runs a handler that must bail
+(`return` or `os.exit`). (This example compiles today; a `net/http` binding —
+for the `http.get`-shaped version — is a later effort.)
 
 ## Building the compiler
 
