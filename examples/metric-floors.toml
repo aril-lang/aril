@@ -20,11 +20,13 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 88   # current build_ok; strict ratchet (raised 87→88 at the
-                    # HTTP-SERVER epoch — healthcheck_server builds: an Aril
-                    # class implements Go's http.Handler + http.listenAndServe)
+build_ok_min = 89   # current build_ok; strict ratchet (raised 87→89 across the
+                    # HTTP-SERVER epoch — healthcheck_server builds, and the
+                    # http_server run_ok example serves an Aril http.Handler)
 diag_ok_min  = 88   # headroom below current diag_ok (97) so an
                     # individual imprecise message is a penalty, not a red
                     # (raised 82→88 at the BINDING-HARDENING close as E0217/E0218
                     # coverage grew diag_ok 94→97)
-run_ok_min   = 86   # current run_ok; strict ratchet
+run_ok_min   = 87   # current run_ok; strict ratchet (raised 86→87 at the
+                    # HTTP-SERVER epoch — the http_server example runs an Aril
+                    # http.Handler served over a real socket, driven in-process)

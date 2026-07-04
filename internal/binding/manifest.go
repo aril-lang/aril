@@ -44,7 +44,7 @@ var Manifest = map[string][]string{
 	// Aril class `implements http.Handler` (E0219 conformance, D14). The registry
 	// namespace derives as `http` (path.Base of "net/http"), so sema/codegen key
 	// on `http.listenAndServe`.
-	"net/http": {"ListenAndServe"},
+	"net/http": {"ListenAndServe", "Serve"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed
