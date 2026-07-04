@@ -36,7 +36,7 @@ syn keyword arilKeyword         import extern implements extends static
 syn keyword arilStorageClass    func let const var type class interface
 syn keyword arilConditional     if else match
 syn keyword arilRepeat          for while in
-syn keyword arilStatement       return break continue defer try
+syn keyword arilStatement       return break continue defer try catch
 syn keyword arilConcurrent      spawn scope select
 syn keyword arilReceiver        this
 
@@ -121,9 +121,20 @@ syn match   arilFloat           "\<\d\(\d\|_\)*[eE][+-]\?\d\(\d\|_\)*\>"
 syn match   arilEscape          contained "\\\([ntr\\\"'0]\|x\x\x\|u\x\x\x\x\)"
 syn match   arilEscapeError     contained "\\[^ntr\\\"'0xu]"
 syn region  arilString          start=+"+ skip=+\\"+ end=+"+ oneline
-                              \ contains=arilEscape,arilEscapeError,@Spell
+                              \ contains=arilEscape,arilEscapeError,arilInterp,@Spell
 syn match   arilRune            "'\(\\\([ntr\\\"'0]\|x\x\x\|u\x\x\x\x\)\|[^'\\]\)'"
                               \ contains=arilEscape
+
+" String interpolation hole  (grammar.ebnf §StringInterp / §InterpHole):
+" `"…${ Expr }…"` lowers to fmt.Sprintf. The `${` `}` delimiters highlight as
+" a distinct group so a hole stands out from surrounding string text; the
+" expression inside picks up the ordinary value-level groups (numbers,
+" operators, nested strings, constructors, …). Limitation: `end="}"` stops at
+" the first `}`, so a hole containing a nested brace literal (`${ T{x:1}.x }`)
+" ends early — rare; the grammar permits brace nesting inside a hole.
+syn cluster arilInterpInner     contains=arilNumber,arilFloat,arilOperator,arilBoolean,arilConstant,arilType,arilConstructor,arilBuiltin,arilString,arilRune
+syn region  arilInterp          contained matchgroup=arilInterpDelim start="${" end="}"
+                              \ contains=@arilInterpInner
 
 " =====================================================================
 " Operators and structural punctuation  (keywords.md §Operators)
@@ -166,6 +177,7 @@ hi def link arilString          String
 hi def link arilRune            Character
 hi def link arilEscape          SpecialChar
 hi def link arilEscapeError     Error
+hi def link arilInterpDelim     Special
 hi def link arilOperator        Operator
 hi def link arilAttribute       PreProc
 
