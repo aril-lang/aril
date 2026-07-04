@@ -1,0 +1,36 @@
+--- TITLE ---
+string methods — len / bytes / runes (byte vs rune length)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let s = "héllo"
+  fmt.println(s.len())
+  let bs = s.bytes()
+  fmt.println(bs.len())
+  let rs = s.runes()
+  fmt.println(rs.len())
+}
+
+--- GO ---
+package main
+
+import "fmt"
+
+func main() {
+	var s = "héllo"
+	fmt.Println(len(s))
+	var bs = []byte(s)
+	fmt.Println(len(bs))
+	var rs = []rune(s)
+	fmt.Println(len(rs))
+}
+
+--- STDOUT ---
+6
+6
+5
+
+--- EXIT ---
+0

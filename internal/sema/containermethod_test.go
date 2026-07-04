@@ -120,6 +120,51 @@ func TestResultUnwrapOrTypesOkPayload(t *testing.T) {
 	}
 }
 
+// String methods (builtins.md §String methods): `.len()` types int, `.bytes()`
+// []byte, `.runes()` []rune — the view/length helpers codegen lowers via
+// `len(s)`/`[]byte(s)`/`[]rune(s)`. Before this a string method call typed
+// Unknown, which then broke closure-return inference over it.
+func TestStringLenTypesInt(t *testing.T) {
+	src := `func f(s: string) {
+  let n = s.len()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "n"); got == nil || got.String() != "int" {
+		t.Errorf("s.len() = %v; want int", got)
+	}
+}
+
+func TestStringBytesRunesTypeSlices(t *testing.T) {
+	src := `func f(s: string) {
+  let b = s.bytes()
+  let r = s.runes()
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "b"); got == nil || got.String() != "[]byte" {
+		t.Errorf("s.bytes() = %v; want []byte", got)
+	}
+	if got := defTypeByName(info, "r"); got == nil || got.String() != "[]rune" {
+		t.Errorf("s.runes() = %v; want []rune", got)
+	}
+}
+
+// The typing fix back-propagates a short-closure's result type when its body is
+// a string method call — `(s) => s.len()` now infers `int` instead of leaving
+// the closure return Unknown (which had failed codegen: "cannot infer closure
+// result type"). This also closes the sort.sortedBy key-with-method-call gap.
+func TestClosureOverStringLenInfersInt(t *testing.T) {
+	src := `func f(): int {
+  let key = (s: string) => s.len()
+  return key("abc")
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (closure over string.len infers int), got %v", codes)
+	}
+}
+
 // mapErr transforms the Err payload E→E2 (Ok's T preserved), the new E2 read
 // from the handler's return (T-Result-MapErr): `(e: string) => ParseError`
 // yields Result<int, ParseError>, so the whole call's type carries the new E.

@@ -639,7 +639,8 @@ sketch below for reviewers' orientation:
 
 | Aril built-in | Go lowering |
 |---|---|
-| `int`, `string`, ... | identical Go primitives |
+| `int`, `float64`, ... | identical Go primitives |
+| `string` | Go `string`; `s.len()` lowers to `len(s)` (byte length), `s.bytes()` to `[]byte(s)`, `s.runes()` to `[]rune(s)` (codepoint view) |
 | `[]T` | `[]T`; `xs.push(e)` lowers to `append(xs, e)`; `xs.len()` to `len(xs)`; `xs.copy()` to a fresh-backing clone (see `lowering-go.md` §Slice methods) |
 | `Option<T>` | tagged struct `{tag uint8; v T}` (zero-cost for `None`) |
 | `Result<T, E>` | tagged struct `{tag uint8; v T; e E}` |

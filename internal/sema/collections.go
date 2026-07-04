@@ -331,6 +331,22 @@ func containerMethodType(recv Type, name string) *Func {
 		case "copy":
 			return &Func{Return: &Slice{Elem: r.Elem}}
 		}
+	case *Builtin:
+		// String methods (builtins.md §String methods): the view/length
+		// helpers codegen lowers via `len(s)` / `[]byte(s)` / `[]rune(s)`
+		// (call.go). Kept in lockstep with codegen — without these a string
+		// method call types Unknown, which then breaks closure-return
+		// inference over it (e.g. `(s) => s.len()`).
+		if r.N == "string" {
+			switch name {
+			case "len":
+				return &Func{Return: &Builtin{N: "int"}}
+			case "bytes":
+				return &Func{Return: &Slice{Elem: &Builtin{N: "byte"}}}
+			case "runes":
+				return &Func{Return: &Slice{Elem: &Builtin{N: "rune"}}}
+			}
+		}
 	case *Option:
 		// Option query / defaulting methods (builtins.md §Option methods).
 		// `unwrapOr(d)` defaults the payload; the predicates avoid a full
