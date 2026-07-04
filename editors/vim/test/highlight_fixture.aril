@@ -7,11 +7,13 @@ func myFunc(): int {
   let hexlit   = 0xFF
   let floatlit = 3.14
   let s        = "string \n more"
+  let greeting = "hi ${intlit} there"
   let r        = 'a'
   let half     = 1 / 2
   let b        = true
   let opt: Option<int> = None
   let ok       = Ok(1)
+  let safe     = parse(s) catch e { return 0 }
   panic("boom")
   return intlit
 }

@@ -28,6 +28,8 @@ let s:checks = [
   \ ['3\.14',        0, 'arilFloat'],
   \ ['"',            0, 'arilString'],
   \ ['\\n',          0, 'arilEscape'],
+  \ ['\${',          0, 'arilInterpDelim'],
+  \ ['\<catch\>',    0, 'arilStatement'],
   \ ["'a'",          0, 'arilRune'],
   \ ['\<func\>',     0, 'arilStorageClass'],
   \ ['myFunc',       0, 'arilFunction'],
