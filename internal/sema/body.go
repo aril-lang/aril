@@ -41,6 +41,11 @@ func (c *checker) checkBodies(f *ast.File) {
 				c.curContract = nil
 			}
 		case *ast.ClassDecl:
+			// Structural conformance against each bound Go interface the class
+			// declares in `implements` (E0219, D14) — the first structural
+			// method-set check; runs before body inference so a mis-typed
+			// override is reported at the decl, not as a downstream mismatch.
+			c.checkImplements(v)
 			for _, m := range v.Methods {
 				if m.Body == nil {
 					continue

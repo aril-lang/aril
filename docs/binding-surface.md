@@ -467,6 +467,17 @@ http.ErrServerClosed: error
 http.isServerClosed(e: error): bool                  // sugar for errors.Is
 ```
 
+**Bound today:** `import http` resolves (→ Go `net/http`). `http.Handler` is a
+**bound interface** an Aril class implements — the checker verifies the class
+structurally provides `serveHTTP(w: http.ResponseWriter, r: http.Request)` and
+reports a mismatch in Aril coordinates (E0219); the surface `serveHTTP` maps to
+Go's `ServeHTTP` at the boundary. `http.ResponseWriter` is a value handle with
+`write` / `writeString` / `writeHeader`; `http.Request` is an opaque handle (its
+field surface is a carry-forward). The server binding (`http.listenAndServe`) and
+the class-satisfies-Go-interface lowering land alongside the first server example.
+The HTTP **client** (`http.get` / `http.do` / `http.newRequest`, `http.Response`
+fields, `http.Header`) and `net/url` remain on the target surface above.
+
 ## sync
 
 ```aril

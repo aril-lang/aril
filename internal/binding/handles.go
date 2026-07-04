@@ -72,6 +72,12 @@ var handleTypes = map[string]HandleType{
 	"sync.WaitGroup": {GoType: "sync.WaitGroup", GoPkg: "sync", Constructable: true},
 	// context.Context — a Go interface (bare spelling, like net.Conn), obtain-only.
 	"context.Context": {GoType: "context.Context", GoPkg: "context"},
+	// net/http server-path handles (HTTP-SERVER epoch). ResponseWriter is a Go
+	// interface (bare spelling, like net.Conn); Request is a pointer handle
+	// (*http.Request). Both obtain-only — a handler receives them, never
+	// constructs them. GoPkg "net/http", whose Go selector is `http`.
+	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "net/http"},
+	"http.Request":        {GoType: "*http.Request", GoPkg: "net/http"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -151,6 +157,19 @@ var handleMethods = map[string]map[string]HandleBinding{
 		// done() → Go's <-chan struct{}; err/deadline/value deferred (binding-surface §context).
 		"done": {GoName: "Done", Params: nil, Return: "RecvChan<unit>"},
 	},
+	// net/http ResponseWriter method set (binding-surface §net/http). `write` and
+	// `writeHeader` are the real Go methods; `writeString` is an Aril convenience
+	// (ResponseWriter is an io.Writer) whose lowering is a codegen intercept
+	// (→ io.WriteString), so its GoName is documentary. Result-returning methods
+	// are wrapped via ResultOf like the net handle methods.
+	"http.ResponseWriter": {
+		"write":       {GoName: "Write", Params: []string{"[]byte"}, Return: "Result<int, error>"},
+		"writeString": {GoName: "WriteString", Params: []string{"string"}, Return: "Result<int, error>"},
+		"writeHeader": {GoName: "WriteHeader", Params: []string{"int"}, Return: "unit"},
+	},
+	// http.Request is opaque in v1 (a handler may ignore it); its field/method
+	// surface (method/url/header/body) is a carry-forward. Registered as a handle
+	// type above so `r: http.Request` annotations resolve; no methods bound yet.
 }
 
 // HandleCtorOf returns the binding for a handle constructor `pkg.arilName`, or

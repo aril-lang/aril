@@ -1016,14 +1016,41 @@ Method-set match is **exact** for v1 — no implicit conversion of
 generator handles any Go-side `(T, error)` ↔ `Result<T, error>`
 mapping; user-side conformance is by-the-letter.
 
-> **Implementation gap (v1).** The checker currently enforces the
-> *direction* of (C-Implements) — a class that `implements I` (or an
-> interface that `extends I`) is accepted where `I` is expected — but
-> does **not** yet verify the method-set premise (that `C` declares
-> every method of each `I_j`). A non-satisfying class is caught only
-> by the Go build, surfacing a `go/types` error rather than a
-> `.aril`-coordinate diagnostic. Closing this needs the method-set check
-> in `satisfy.go` and a dedicated catalog code.
+> **Implementation gap (v1).** The checker enforces the *direction* of
+> (C-Implements) — a class that `implements I` (or an interface that
+> `extends I`) is accepted where `I` is expected — for every `I`. The
+> method-set **premise** (that `C` declares every method of each `I_j`
+> with a matching signature) is verified when `I_j` is a **bound Go
+> interface** (see §Bound-interface conformance below — E0219). For a
+> user-declared `interface`, the premise is not yet checked: a
+> non-satisfying class is caught only by the Go build, surfacing a
+> `go/types` error rather than a `.aril`-coordinate diagnostic. Closing
+> the user-interface half reuses the same method-set check.
+
+### Bound-interface conformance (D14)
+
+A class may declare `implements` a **bound Go interface** — a Go
+interface surfaced through the binding layer that an Aril class is
+*implemented against* (e.g. `http.Handler`, `binding-surface.md`
+§net/http). This is the inverse of a value-handle (a Go type Aril
+*calls into*): the binding table records the interface's method set,
+so the checker can verify the (C-Implements) premise **structurally**:
+
+```
+(C-Implements-Bound) class C declares `implements P.I`, where P.I is a bound interface
+                     for each method (name, sig) ∈ boundInterface(P.I):
+                       C declares instance method `name` with signature `sig`  (exact, C-Implements)
+                     ─────────────────────────────────────────────────────────
+                                       C : P.I    else E0219
+```
+
+A missing method, or one whose signature is not an exact match, is
+**E0219** in `.aril` coordinates — pre-empting a raw `go build` "C does
+not implement P.I" leak against generated Go (D10). This is the first
+structural method-set check; the surface method name maps to the
+exported Go name at the binding boundary (`serveHTTP` → `ServeHTTP`, a
+D6 convention — D14 footnote G15), so conformance is checked in Aril
+terms and lowered in Go terms.
 
 ### Generic class / interface
 

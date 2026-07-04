@@ -107,7 +107,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/core-language/lru_cache/lru_cache.aril` | emit | go build failed |
-| `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0117]: unknown import path "http" |
+| `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0217]: Module `http` has no bound member `listenAndServe` |
 
 ## Diagnostic-quality gaps
 
