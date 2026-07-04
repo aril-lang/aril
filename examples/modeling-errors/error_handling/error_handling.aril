@@ -1,0 +1,53 @@
+// Idiomatic error handling in Aril — the three tools, and when to reach for each.
+//
+//   try         propagate the error unchanged (the common case — Rust's `?`)
+//   .mapErr     propagate ACROSS an error-type boundary (convert E → E2)
+//   catch       bail when there is no Result to propagate into
+//
+// try / .mapErr stay in the Result world (the error flows outward); `catch`
+// leaves it — its handler MUST diverge (return / os.exit / panic), so an error
+// is never silently continued past on fabricated data.
+
+import fmt
+import strconv
+import strings
+
+// A typed, domain-specific error for the parsing layer.
+type ConfigError = {
+  field:  string
+  detail: string
+}
+
+// `try` propagates, but strconv fails with a bare `error` while this function's
+// error type is ConfigError — `.mapErr` bridges the boundary so a plain `try`
+// still applies (no hand-written `match`).
+func parsePort(raw: string): Result<int, ConfigError> {
+  let n = try strconv.atoi(strings.trimSpace(raw)).mapErr((e) => ConfigError{ field: "port", detail: e.error() })
+  if n < 1 || n > 65535 {
+    return Err(ConfigError{ field: "port", detail: "out of range: " + raw })
+  }
+  return Ok(n)
+}
+
+// Same error type as parsePort, so `try` propagates it unchanged — no conversion.
+func summarize(raw: string): Result<string, ConfigError> {
+  let port = try parsePort(raw)
+  return Ok("listening on :" + strconv.itoa(port))
+}
+
+// Returns a plain string — there is no Result to propagate into, so `catch`
+// runs a handler that must diverge. Here it returns a deliberate fallback (the
+// function's own answer, written explicitly — not a silent continue).
+func describePort(raw: string): string {
+  let s = summarize(raw) catch e {
+    return "invalid " + e.field + " (" + e.detail + ")"
+  }
+  return s
+}
+
+func main() {
+  let inputs = ["8080", "70000", "not-a-number", "  443  "]
+  for raw in inputs {
+    fmt.println(describePort(raw))
+  }
+}

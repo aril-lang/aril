@@ -257,10 +257,10 @@ func tomlCodes(line: string): []string {
 }
 
 func readFileOrEmpty(path: string): string {
-  match os.readFile(path) {
-    Ok(data) => return strings.fromBytes(data),
-    Err(_) => return "",
-  }
+  // Unreadable → the empty string is this function's answer (a written,
+  // deliberate fallback via a diverging `catch`, not a silent continue).
+  let data = os.readFile(path) catch e { return "" }
+  return strings.fromBytes(data)
 }
 
 // parseNegCases extracts the [[error]] entries of one example.toml. `entry`
@@ -339,12 +339,9 @@ func lessMiss(a: Miss, b: Miss): bool {
 // failure (an opaque handle cannot be zero-constructed, so the value must
 // come from the extern call).
 func mustCompile(expr: string): Regexp {
-  match compileRegexp(expr) {
-    Ok(c) => return c,
-    Err(e) => {
-      fmt.println("corpus-status: internal regexp failed:", e)
-      os.exit(1)
-    },
+  return compileRegexp(expr) catch e {
+    fmt.println("corpus-status: internal regexp failed:", e)
+    os.exit(1)
   }
 }
 

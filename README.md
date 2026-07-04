@@ -27,22 +27,27 @@ JavaScript semantics, no npm, no browser target — and that is deliberate.
 ## A taste
 
 ```aril
-import http
-import io
 import json
+import os
 
 type User = {
   id:   string
   name: string
 }
 
-func getUser(id: string): Result<User, error> {
-  let resp = try http.get("https://api.example.com/users/" + id)
-  let body = try io.readAll(resp.body)
-  let user = try json.parse<User>(body)
+func loadUser(path: string): Result<User, error> {
+  let raw  = try os.readFile(path)
+  let user = try json.parse<User>(raw)
   return Ok(user)
 }
 ```
+
+Each `try` unwraps a `Result` and short-circuits the error outward — Rust's
+`?`, no `if err != nil`. When a step fails with a *different* error type,
+`.mapErr` bridges it (`try step().mapErr((e) => Wrapped{…})`); when there is no
+`Result` to propagate into, `expr catch e { … }` runs a handler that must bail
+(`return` or `os.exit`). (This example compiles today; a `net/http` binding —
+for the `http.get`-shaped version — is a later effort.)
 
 ## Building the compiler
 

@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 86,
+    "total": 87,
     "parse_fail": 2,
     "sema_fail": 1,
     "emit_fail": 5,
-    "build_ok": 78,
+    "build_ok": 79,
     "diag_ok": 91,
     "diag_total": 114,
-    "run_ok": 78,
-    "run_total": 85
+    "run_ok": 79,
+    "run_total": 86
   },
   "files": [
     {
@@ -309,6 +309,11 @@
     },
     {
       "path": "examples/modeling-errors/error_chain/error_chain.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/modeling-errors/error_handling/error_handling.aril",
       "stage": "build",
       "blocker": ""
     },

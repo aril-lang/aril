@@ -57,9 +57,10 @@ Go, which has no sum types.
 
 | Example | Forces |
 |---|---|
+| `error_handling` ★ | the **canonical** error-handling reference — `try` (propagate), `.mapErr` (convert across an error-type boundary), `catch` (bail when there is no `Result` to propagate into) |
 | `rpn_calculator` ★ | `Result` / `try` / `match`; sum-typed tokens; errors as values |
 | `vending_machine` ★ | a **state machine** — exhaustive `match` over a sum-typed state |
-| `error_chain` | error chaining with `Result` |
+| `error_chain` | error chaining with `Result` + `.mapErr` boundary conversion |
 | `errors_as_types` | errors modelled as sum-typed values |
 
 ## `stdlib-binding/` — typed bindings over the Go standard library

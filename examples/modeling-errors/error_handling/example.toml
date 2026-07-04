@@ -1,0 +1,10 @@
+description = "Idiomatic error handling — try / mapErr / catch, and when to use each"
+source   = "aril canon"
+category = "modeling-errors"
+showcase = true
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.5"
+status   = "running"
+expects  = "run-pass"
+entry    = "error_handling.aril"
+expected_output = "expected-output.txt"
