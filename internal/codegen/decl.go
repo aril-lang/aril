@@ -216,19 +216,32 @@ func (g *gen) emitClassDecl(cd *ast.ClassDecl) error {
 // error` maps `error` → `Error`. Otherwise the verbatim (lowercase) Aril name.
 // The call-site mirror is goMethodName (expr.go).
 func classMethodGoName(cd *ast.ClassDecl, m *ast.Method) string {
-	for _, impl := range cd.Implements {
-		nt, ok := impl.(*ast.NamedType)
-		if !ok {
-			continue
-		}
-		if goName, ok := binding.BoundInterfaceMethodGoName(strings.Join(nt.QName, "."), m.Name); ok {
-			return goName
-		}
+	if goName, ok := boundInterfaceGoName(cd, m.Name); ok {
+		return goName
 	}
 	if classImplementsError(cd) && m.Name == "error" {
 		return "Error"
 	}
 	return goIdent(m.Name)
+}
+
+// boundInterfaceGoName returns the exported Go method name for Aril method
+// `arilName` on a bound Go interface that class `cd` declares in `implements`
+// (serveHTTP → ServeHTTP), or ok=false. The shared lookup behind the two faces
+// of the name boundary — the declaration site (classMethodGoName) and the call
+// site (boundInterfaceMethodGoName, which first resolves receiver → ClassDecl).
+// Mirrors classImplementsError, the shared predicate behind the error→Error pair.
+func boundInterfaceGoName(cd *ast.ClassDecl, arilName string) (string, bool) {
+	for _, impl := range cd.Implements {
+		nt, ok := impl.(*ast.NamedType)
+		if !ok {
+			continue
+		}
+		if goName, ok := binding.BoundInterfaceMethodGoName(strings.Join(nt.QName, "."), arilName); ok {
+			return goName, true
+		}
+	}
+	return "", false
 }
 
 // classImplementsError reports whether the class declares `implements error` —

@@ -802,16 +802,7 @@ func (g *gen) boundInterfaceMethodGoName(receiver ast.Expr, name string) (string
 	if !ok {
 		return "", false
 	}
-	for _, impl := range cd.Implements {
-		nt, ok := impl.(*ast.NamedType)
-		if !ok {
-			continue
-		}
-		if goName, ok := binding.BoundInterfaceMethodGoName(strings.Join(nt.QName, "."), name); ok {
-			return goName, true
-		}
-	}
-	return "", false
+	return boundInterfaceGoName(cd, name) // shared decl/call kernel (decl.go)
 }
 
 // handleMethodGoName returns the Go method name for `receiver.name` when
