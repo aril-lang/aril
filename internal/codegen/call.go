@@ -779,20 +779,14 @@ func (g *gen) isBuiltinModule(id *ast.Ident) bool {
 	return sym != nil && sym.Kind == sema.SymBuiltinModule
 }
 
+// isStdlibNamespaceName reports whether name is a Go-package-binding stdlib
+// namespace — the Go-import/rename machinery set. The arilrt runtime modules
+// (reflect, big) are importable but inlined with no Go import, so they are
+// excluded (binding.IsStdlibNamespace is the stdlib-only source; the importable
+// union is binding.IsBuiltinModule).
 func isStdlibNamespaceName(name string) bool {
-	switch name {
-	case "errors", "fmt", "os", "strings", "strconv", "bufio", "context",
-		"time", "sync", "io", "log", "net", "encoding", "math", "sort",
-		"json", "unicode", "slices", "regexp", "big":
-		return true
-	}
-	return false
+	return binding.IsStdlibNamespace(name)
 }
-
-// IsStdlibNamespace reports whether name is a recognized stdlib binding
-// namespace (the v0.x hardcoded registry). Exported for the package
-// resolver's import classification (RFC-0002 §Resolution, step 2).
-func IsStdlibNamespace(name string) bool { return isStdlibNamespaceName(name) }
 
 // isConversionBinding reports whether the stdlib binding pkg.method
 // lowers to a Go type conversion (not a pkg.* call), so it needs no
