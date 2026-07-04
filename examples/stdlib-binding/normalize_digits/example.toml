@@ -8,3 +8,13 @@ status   = "running"
 expects  = "run-pass"
 entry    = "normalize_digits.aril"
 expected_output = "expected-output.txt"
+
+# E0217 — an unbound member on a bound stdlib namespace (`strings.stripZeros`)
+# is diagnosed in Aril coordinates, not leaked as a raw `go build` "undefined:
+# strings.stripZeros" (D10).
+[[error]]
+patch   = "errors/unbound-strings-member.patch"
+expect  = ["E0217"]
+stage   = "sema"
+matches = "errors/unbound-strings-member.expected"
+origin  = "synthetic"

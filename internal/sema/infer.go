@@ -765,6 +765,12 @@ func (c *checker) inferField(f *ast.Field) Type {
 	}
 	named, ok := recv.(*Named)
 	if !ok {
+		// Unbound member on a bound stdlib namespace (`strings.foo`): report
+		// E0217 rather than leaking a raw `go build` "undefined: pkg.foo" (D10).
+		// architecture.md §binding subsystem.
+		if c.unboundStdlibMember(f) {
+			return &Unknown{}
+		}
 		// A builtin receiver with a fully-known method set (a container/sum/
 		// channel, or a closed-method-set primitive like int/string/error) —
 		// its valid methods resolved via channelMethodType / containerMethodType
@@ -831,6 +837,29 @@ func (c *checker) inferField(f *ast.Field) Type {
 		}
 	}
 	return c.unknownMember(named, f)
+}
+
+// unboundStdlibMember reports E0217 when `pkg.name` accesses a member that is
+// not bound on a shipped stdlib namespace, and returns whether it fired. Gated
+// on the resolved SymBuiltinModule symbol (shadow-safe: a value or `extern`
+// binding sharing the name is a different symbol kind, so it never fires) and
+// on binding.IsMember (sound-over-complete: a member missing from the binding
+// tables stays silent — leaks as before — never a false reject of a working
+// call). architecture.md §binding subsystem.
+func (c *checker) unboundStdlibMember(f *ast.Field) bool {
+	recv, ok := f.Receiver.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	sym := c.info.Symbol[recv]
+	if sym == nil || sym.Kind != SymBuiltinModule {
+		return false
+	}
+	if binding.IsMember(recv.Name, f.Name) {
+		return false
+	}
+	c.report("E0217", "Module `"+recv.Name+"` has no bound member `"+f.Name+"`", f.Span)
+	return true
 }
 
 // unknownMember reports an Aril-coordinate diagnostic (E0214) when a
