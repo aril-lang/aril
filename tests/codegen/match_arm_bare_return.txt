@@ -1,0 +1,45 @@
+--- TITLE ---
+Braceless valueless `return` as a match-arm body (`0 => return,`) — the bare return terminates at the arm-separator comma, lowering to a Go `return` in the case (grammar.ebnf §MatchArm)
+
+--- INPUT ---
+import fmt
+
+func report(xs: []int) {
+  for x in xs {
+    match x {
+      0 => return,
+      _ => fmt.println(x),
+    }
+  }
+}
+
+func main() {
+  report([1, 2, 0, 3])
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func report(xs []int) {
+	for _, x := range xs {
+		switch x {
+		case 0:
+			return
+		default:
+			fmt.Println(x)
+		}
+	}
+}
+func main() {
+	report([]int{1, 2, 0, 3})
+}
+
+--- STDOUT ---
+1
+2
+
+--- EXIT ---
+0

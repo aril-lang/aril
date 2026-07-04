@@ -1,0 +1,30 @@
+--- TITLE ---
+Braceless valueless `return` as a match-arm body — the bare return ends at the arm-separator comma (grammar.ebnf §MatchArm)
+
+--- INPUT ---
+func f(x: int) {
+  match x {
+    0 => return,
+    _ => g(x),
+  }
+}
+
+--- AST ---
+(File @1:1-6:2
+  (FuncDecl "f" @1:1-6:2
+    (type-params)
+    (params
+      (Param "x" @1:8-1:14
+        (PrimitiveType "int" @1:11-1:14)))
+    (Block @1:16-6:2
+      (trailing
+        (MatchExpr @2:3-5:4
+          (Ident "x" @2:9-2:10)
+          (MatchArm @3:5-3:16
+            (IntLitPat 0 @3:5-3:6)
+            (ReturnExpr @3:10-3:16))
+          (MatchArm @4:5-4:14
+            (WildcardPat @4:5-4:6)
+            (Call @4:10-4:14
+              (Ident "g" @4:10-4:11)
+              (Ident "x" @4:12-4:13))))))))
