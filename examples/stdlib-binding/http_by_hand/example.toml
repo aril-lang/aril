@@ -1,0 +1,10 @@
+description = "HTTP/1.1 built by hand in Aril over the raw net socket layer"
+source   = "stdlib-binding http_by_hand"
+category = "stdlib-binding"
+showcase = true
+forces   = []
+since    = "0.7"
+status   = "running"
+expects  = "run-pass"
+entry    = "http_by_hand.aril"
+expected_output = "expected-output.txt"
