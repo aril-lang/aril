@@ -1,0 +1,10 @@
+--- regexp_extract.aril
++++ regexp_extract.aril
+@@ -8,6 +8,7 @@
+ 
+ func main() {
+   let re = regexp.mustCompile("[0-9]+")
++  let bad = regexp.Regexp{}
+   let inputs = ["order-42", "no digits here", "x9y8z7"]
+   for s in inputs {
+     if re.matchString(s) {

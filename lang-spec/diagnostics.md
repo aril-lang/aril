@@ -91,6 +91,7 @@ severity column.
 | E0215 | E | Result of a slice `push` is discarded | `builtins.md` §Slice methods (`push` — append semantics) | `push` returns a *new* slice and does not mutate in place; assign it back — `xs = xs.push(...)`. (A `Stack` `push` mutates, so a bare `st.push(...)` statement is fine and not diagnosed.) |
 | E0216 | E | Assignment to an immutable `let` binding | `type-system.md` T-Assign / `ast.md` §Mutability | `let` is a single-assignment binding; declare the local with `var` to make it mutable. Mutating *through* a `let` (a field or element write) is not a rebind and is allowed. |
 | E0217 | E | Module has no bound member `name` | `type-system.md` T-Field (member access over a bound stdlib namespace) | The name is a shipped stdlib module (`import strings`) but the member is not bound by Aril's binding surface — check the spelling against `binding-surface.md`, or the member is simply unbound in this release. Gated on the resolved namespace symbol, so a value or `extern` binding that shares the name is not affected. |
+| E0218 | E | Invalid stdlib-handle construction | `lowering-go.md` §Brace literals / `binding-surface.md` §handles | A bound stdlib handle cannot be brace-built freely: a *constructable* one (`sync.Mutex`) takes no fields — write `sync.Mutex{}`; an *obtain-only* one (`regexp.Regexp`) is returned from a constructor (`regexp.mustCompile(…)`), never a `{}` literal. |
 
 ### E03xx — Pattern matching
 

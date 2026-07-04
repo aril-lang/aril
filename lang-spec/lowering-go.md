@@ -291,9 +291,10 @@ form share one Go representation:
   value handle** (`sync.Mutex{}`, `sync.WaitGroup{}`) lowers to the bare
   Go value struct `pkg.Type{}` (no `&` — a local var is addressable, so
   a pointer-receiver method like `mu.lock()` → `mu.Lock()` auto-addresses).
-  Only the empty form lowers; the handle has no Aril-visible fields.
-  Obtain-only handles (regexp.Regexp, net.Conn) are not constructable —
-  a brace literal on them is rejected.
+  Only the empty form lowers; the handle has no Aril-visible fields —
+  a field-bearing `sync.Mutex{x: 1}` is rejected in sema (E0218). Obtain-only
+  handles (regexp.Regexp, net.Conn) are not constructable — a brace literal on
+  them is likewise rejected in sema (E0218), pointing at the constructor.
 
 **Constructor type-argument stamping.** A constructor call
 (`Ok`/`Err`/`Some`/`None`) constrains only the type parameter its

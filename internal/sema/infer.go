@@ -291,6 +291,21 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 		c.report("E1001", "Cannot construct opaque foreign handle "+rt.String()+" — obtain it from an extern function", b.Span)
 		return &Unknown{}
 	}
+	// A bound stdlib handle: a Constructable one is empty-only (`sync.Mutex{}`);
+	// an obtain-only one (regexp.Regexp) is never brace-built. Diagnose the misuse
+	// here in .aril coordinates (E0218) rather than leaking a codegen bail string
+	// (D10; lowering-go §Brace literals).
+	if named, ok := rt.(*Named); ok && binding.IsHandleType(named.N) {
+		if !binding.IsConstructableHandle(named.N) {
+			c.report("E0218", "Stdlib handle `"+named.N+"` is obtain-only — obtain it from its constructor, not a `{}` literal", b.Span)
+			return &Unknown{}
+		}
+		if len(b.Entries) != 0 {
+			c.report("E0218", "Stdlib handle `"+named.N+"` takes no fields — construct it as `"+named.N+"{}`", b.Span)
+			return &Unknown{}
+		}
+		return rt // `sync.Mutex{}` zero-construction; its method set resolves off rt.
+	}
 	for _, e := range b.Entries {
 		switch en := e.(type) {
 		case *ast.RecordEntry:
@@ -322,11 +337,8 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 	if len(b.Entries) == 0 && isClassOrRecordNamed(rt) {
 		return rt
 	}
-	// Zero-construction of a constructable stdlib handle (`sync.Mutex{}`) types
-	// as the handle so its method set resolves (lowering-go §Brace literals).
-	if named, ok := rt.(*Named); ok && len(b.Entries) == 0 && binding.IsConstructableHandle(named.N) {
-		return rt
-	}
+	// (A constructable stdlib handle `sync.Mutex{}` is typed above, alongside the
+	// E0218 handle-brace-literal diagnostics.)
 	return &Unknown{}
 }
 

@@ -1,0 +1,11 @@
+--- mutex_counter.aril
++++ mutex_counter.aril
+@@ -8,7 +8,7 @@
+ import sync
+ 
+ func accumulate(): Result<int, error> {
+-  let mu = sync.Mutex{}
++  let mu = sync.Mutex{n: 1}
+   var total = 0
+   try scope<unit, error> {
+     for i in [1, 2, 3, 4, 5] {
