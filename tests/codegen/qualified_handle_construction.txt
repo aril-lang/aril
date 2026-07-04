@@ -1,0 +1,31 @@
+--- TITLE ---
+Qualified-type construction: sync.Mutex{}/sync.WaitGroup{} lower to the Go value struct `pkg.Type{}`; lock/unlock/add/done/wait rename to the Go method set (GO-only; the corpus mutex_counter execs it under scope fan-out)
+
+--- INPUT ---
+import sync
+
+func guard() {
+  var mu = sync.Mutex{}
+  mu.lock()
+  mu.unlock()
+  var wg = sync.WaitGroup{}
+  wg.add(1)
+  wg.done()
+  wg.wait()
+}
+
+--- GO ---
+
+package main
+
+import "sync"
+
+func guard() {
+	var mu = sync.Mutex{}
+	mu.Lock()
+	mu.Unlock()
+	var wg = sync.WaitGroup{}
+	wg.Add(1)
+	wg.Done()
+	wg.Wait()
+}

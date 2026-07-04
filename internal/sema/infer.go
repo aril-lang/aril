@@ -322,6 +322,12 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 	if len(b.Entries) == 0 && isClassOrRecordNamed(rt) {
 		return rt
 	}
+	// Zero-construction of a bound constructable stdlib handle (`sync.Mutex{}`
+	// → a fresh Go value struct). Type it as the handle so its method set
+	// (lock/unlock/…) resolves and codegen lowers the literal (D37).
+	if named, ok := rt.(*Named); ok && len(b.Entries) == 0 && binding.IsConstructableHandle(named.N) {
+		return rt
+	}
 	return &Unknown{}
 }
 

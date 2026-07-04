@@ -4,6 +4,6 @@ category = "concurrency"
 showcase = false
 forces   = []
 since    = "0.1"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "mutex_counter.aril"

@@ -4,16 +4,16 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 81 / 89 examples build end-to-end** (floor 81).
+- **build_ok — 83 / 89 examples build end-to-end** (floor 83).
 - **diag_ok — 94 / 117 negative cases produce their expected diagnostic** (floor 82).
-- **run_ok — 81 / 88 run-pass examples build and run as specified** (floor 81; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 83 / 88 run-pass examples build and run as specified** (floor 83; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 81 |
-| emit / codegen fail | 5 |
+| ✅ build (full pipeline) | 83 |
+| emit / codegen fail | 4 |
 | sema fail | 1 |
-| parse fail | 2 |
+| parse fail | 1 |
 
 ## Per-example
 
@@ -21,9 +21,11 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 |---|---|---|
 | `examples/concurrency/concurrency/concurrency.aril` | build | — |
 | `examples/concurrency/graceful_server/graceful_server.aril` | build | — |
+| `examples/concurrency/mutex_counter/mutex_counter.aril` | build | — |
 | `examples/concurrency/parallel_fetcher/parallel_fetcher.aril` | build | — |
 | `examples/concurrency/parallel_sum/parallel_sum.aril` | build | — |
 | `examples/concurrency/pipeline/pipeline.aril` | build | — |
+| `examples/concurrency/pubsub/pubsub.aril` | build | — |
 | `examples/concurrency/rate_limited/rate_limited.aril` | build | — |
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
 | `examples/concurrency/worker_pool/worker_pool.aril` | build | — |
@@ -100,13 +102,11 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/tcp_echo/tcp_echo.aril` | build | — |
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
-| `examples/concurrency/mutex_counter/mutex_counter.aril` | emit | go build failed |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | emit | go build failed |
 | `examples/modeling-errors/errors_as/errors_as.aril` | emit | go build failed |
 | `examples/stdlib-binding/leveled_log/leveled_log.aril` | emit | go build failed |
 | `examples/stdlib-binding/stdin_bytes/stdin_bytes.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
-| `examples/concurrency/pubsub/pubsub.aril` | parse | error[E0112]: mixed brace-literal entry kinds |
 | `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
 
 ## Diagnostic-quality gaps
@@ -145,13 +145,11 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**7 of 88 run-pass examples fall short of run_ok.**
+**5 of 88 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
-| `examples/concurrency/mutex_counter` | build-fail | 1 |
 | `examples/concurrency/nested_scopes` | build-fail | 1 |
-| `examples/concurrency/pubsub` | build-fail | 1 |
 | `examples/core-language/lru_cache` | build-fail | 1 |
 | `examples/modeling-errors/errors_as` | build-fail | 1 |
 | `examples/stdlib-binding/leveled_log` | build-fail | 1 |

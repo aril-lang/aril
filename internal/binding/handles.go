@@ -42,6 +42,11 @@ type HandleType struct {
 	GoType  string
 	GoPkg   string
 	Runtime bool
+	// Constructable marks a handle that is a zero-value Go struct built in
+	// place with `pkg.Type{}` (sync.Mutex), as opposed to one obtained only
+	// from a constructor / dial (regexp.Regexp, net.Conn — those stay
+	// obtain-only, so a brace literal on them is rejected).
+	Constructable bool
 }
 
 // handleTypes registers every bound handle type. IsHandleType / HandleTypeOf
@@ -64,6 +69,13 @@ var handleTypes = map[string]HandleType{
 	"net.Conn":     {GoType: "net.Conn", GoPkg: "net"},
 	"net.Listener": {GoType: "net.Listener", GoPkg: "net"},
 	"net.Addr":     {GoType: "net.Addr", GoPkg: "net"},
+	// sync primitives (IDIOM-CLOSURE epoch). Unlike every handle above, these
+	// are zero-value Go structs built in place (`sync.Mutex{}`) rather than
+	// obtained from a constructor — Constructable lets the brace-literal path
+	// lower them. Value types (Lock/Add have pointer receivers, but a local
+	// var is addressable, so Go auto-addresses `mu.Lock()`).
+	"sync.Mutex":     {GoType: "sync.Mutex", GoPkg: "sync", Constructable: true},
+	"sync.WaitGroup": {GoType: "sync.WaitGroup", GoPkg: "sync", Constructable: true},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -128,6 +140,18 @@ var handleMethods = map[string]map[string]HandleBinding{
 	"net.Addr": {
 		"string": {GoName: "String", Params: nil, Return: "string"},
 	},
+	// sync method sets. lock/unlock/wait/done return nothing (Aril `unit`);
+	// tryLock returns bool; add takes the delta.
+	"sync.Mutex": {
+		"lock":    {GoName: "Lock", Params: nil, Return: "unit"},
+		"unlock":  {GoName: "Unlock", Params: nil, Return: "unit"},
+		"tryLock": {GoName: "TryLock", Params: nil, Return: "bool"},
+	},
+	"sync.WaitGroup": {
+		"add":  {GoName: "Add", Params: []string{"int"}, Return: "unit"},
+		"done": {GoName: "Done", Params: nil, Return: "unit"},
+		"wait": {GoName: "Wait", Params: nil, Return: "unit"},
+	},
 }
 
 // HandleCtorOf returns the binding for a handle constructor `pkg.arilName`, or
@@ -152,4 +176,12 @@ func HandleMethodOf(handle, arilName string) (HandleBinding, bool) {
 func IsHandleType(spelled string) bool {
 	_, ok := handleTypes[spelled]
 	return ok
+}
+
+// IsConstructableHandle reports whether `spelled` names a handle type built
+// in place with a zero-value `pkg.Type{}` literal (sync.Mutex), as opposed to
+// an obtain-only handle reached through a constructor.
+func IsConstructableHandle(spelled string) bool {
+	ht, ok := handleTypes[spelled]
+	return ok && ht.Constructable
 }
