@@ -1,9 +1,7 @@
-// DEMAND SKETCH (build-fails until `sync.Mutex` construction is bound) — a
-// structured-concurrent fan-out whose workers increment a shared counter under
+// A structured-concurrent fan-out whose workers increment a shared counter under
 // a `sync.Mutex`. Aril's `scope` replaces Go's WaitGroup (it joins the workers),
-// so the only sync primitive forced here is the Mutex guarding the shared cell —
-// currently unconstructable (`sync.Mutex{}` fails sema). See
-// docs/binding-surface.md §sync.
+// so the only sync primitive forced here is the Mutex guarding the shared cell.
+// See docs/binding-surface.md §sync.
 import fmt
 import sync
 
