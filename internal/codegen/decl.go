@@ -601,8 +601,11 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 		}
 		// A bound value-handle type (regexp.Regexp → *regexp.Regexp, …) lowers
 		// to its Go type spelling, which may differ from the Aril spelling in
-		// both pointer-ness and package (D37). The package's import is
-		// kept by the pre-walk (markHandlePkgs), which runs before writeHeader.
+		// both pointer-ness and package (D37). The package's import is kept when
+		// a *value-level* use marks it (a method call / constructor — predeclared.go
+		// pre-walk); a handle type in a *signature-only* position does not yet
+		// mark its import (a known gap — a real handler exercises a method on the
+		// value, which marks it).
 		if len(v.QName) > 1 {
 			if goType, ok := g.handleGoType(strings.Join(v.QName, ".")); ok {
 				g.b.WriteString(goType)
