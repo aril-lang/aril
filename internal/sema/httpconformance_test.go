@@ -68,6 +68,32 @@ func main() {}`
 	}
 }
 
+// A `serveHTTP` present but *static* does not satisfy the (instance) interface
+// method — the check filters static methods (classMethod).
+func TestBoundInterfaceStaticMethodFiresE0219(t *testing.T) {
+	src := `import http
+class StaticHandler implements http.Handler {
+  static serveHTTP(w: http.ResponseWriter, r: http.Request) {}
+}
+func main() {}`
+	if codes := runCheck(t, src); !contains(codes, "E0219") {
+		t.Errorf("expected E0219 (static method does not satisfy instance interface), got %v", codes)
+	}
+}
+
+// A wrong *return* type (interface requires unit; class returns int) is a
+// conformance failure — the check is over the full signature, not just params.
+func TestBoundInterfaceWrongReturnFiresE0219(t *testing.T) {
+	src := `import http
+class WrongHandler implements http.Handler {
+  serveHTTP(w: http.ResponseWriter, r: http.Request): int { return 0 }
+}
+func main() {}`
+	if codes := runCheck(t, src); !contains(codes, "E0219") {
+		t.Errorf("expected E0219 (wrong return type), got %v", codes)
+	}
+}
+
 // A class that does not implement the bound interface at all is unaffected —
 // the check is scoped to declared `implements` targets (no false positive on
 // an ordinary class that happens to lack serveHTTP).

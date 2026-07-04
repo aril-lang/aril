@@ -1049,8 +1049,8 @@ A missing method, or one whose signature is not an exact match, is
 not implement P.I" leak against generated Go (D10). This is the first
 structural method-set check; the surface method name maps to the
 exported Go name at the binding boundary (`serveHTTP` → `ServeHTTP`, a
-D6 convention — D14 footnote G15), so conformance is checked in Aril
-terms and lowered in Go terms.
+D6 binding-boundary convention noted under D14), so conformance is
+checked in Aril terms and lowered in Go terms.
 
 ### Generic class / interface
 
