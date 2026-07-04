@@ -22,8 +22,10 @@ package binding
 // "semantic layer needs review" carve-out D6 names). The `Sprint*` variants
 // return a bare `string` and are mechanical, so they are listed.
 var Manifest = map[string][]string{
-	"errors":  {"Is"},
-	"fmt":     {"Sprint", "Sprintf", "Sprintln"},
+	"errors": {"Is"},
+	"fmt":    {"Sprint", "Sprintf", "Sprintln"},
+	// io.ReadAll — mechanical (T, error) row (binding-surface §io).
+	"io":      {"ReadAll"},
 	"os":      {"Args", "Exit", "Getenv", "ReadFile", "WriteFile"},
 	"strings": {"Contains", "Count", "Fields", "HasPrefix", "HasSuffix", "Index", "Join", "Replace", "Split", "SplitN", "ToLower", "ToUpper", "Trim", "TrimLeft", "TrimPrefix", "TrimRight", "TrimSpace", "TrimSuffix"},
 	"strconv": {"Atoi", "FormatBool", "FormatFloat", "Itoa", "ParseBool", "ParseFloat", "ParseInt", "Quote"},

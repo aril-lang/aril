@@ -1,0 +1,61 @@
+--- TITLE ---
+Mechanical io.readAll → io.ReadAll wrapped as Result; log.* effect renames (setFlags/setPrefix/println/printf) lower like fmt.print* (GO-only; corpus stdin_bytes + leveled_log exec them)
+
+--- INPUT ---
+import io
+import os
+import log
+
+func demo(bad: bool) {
+  let r = io.readAll(os.stdin)
+  log.setFlags(0)
+  log.setPrefix("[svc] ")
+  log.print("raw")
+  log.println("up")
+  log.printf("port %d", 8080)
+  if bad {
+    log.fatal("boom")
+    log.fatalf("boom %d", 1)
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"io"
+	"log"
+	"os"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func demo(bad bool) {
+	var r = ResultOf(io.ReadAll(os.Stdin))
+	log.SetFlags(0)
+	log.SetPrefix("[svc] ")
+	log.Print("raw")
+	log.Println("up")
+	log.Printf("port %d", 8080)
+	if bad {
+		log.Fatal("boom")
+		log.Fatalf("boom %d", 1)
+	}
+}

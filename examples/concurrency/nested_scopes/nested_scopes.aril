@@ -49,20 +49,32 @@ func fetchRegion(ctx: context.Context, region: Region):
   return scope<[]string, error>(ctx) {
     // Buffer sized to the spawn count — see parallel_fetcher.aril for why
     // shrinking the buffer reintroduces deadlock on Err short-circuit.
-    let collect = makeChannel<string>(region.items.len())
+    let itemCh = makeChannel<string>(region.items.len())
     for item in region.items {
       spawn {
         let s = try fetch(scope.context, region.name, item)
-        collect.send(s)
+        itemCh.send(s)
         return Ok(())
       }
     }
     // Trailing expression — runs after every spawn has joined.
-    collect.close()
+    itemCh.close()
     var out: []string = []string{}
-    for s in collect { out = out.push(s) }
+    for s in itemCh { out = out.push(s) }
     out
   }
+}
+
+// Both fan-in channels declare their close protocol: a send may never follow the
+// close (RFC-0007 §close-safety). A short-circuit that closed while a sibling
+// spawn was still sending trips E1203 with `.aril` blame — a controlled
+// diagnostic, not Go's raw "send on closed channel" panic (D10).
+channel itemCh {
+  forbid send after close
+}
+
+channel regionCh {
+  forbid send after close
 }
 
 func main() {
@@ -73,17 +85,17 @@ func main() {
   ]
 
   let result = scope<[][]string, error> {
-    let collect = makeChannel<[]string>(regions.len())
+    let regionCh = makeChannel<[]string>(regions.len())
     for r in regions {
       spawn {
         let items = try fetchRegion(scope.context, r)
-        collect.send(items)
+        regionCh.send(items)
         return Ok(())
       }
     }
-    collect.close()
+    regionCh.close()
     var byRegion: [][]string = [][]string{}
-    for items in collect { byRegion = byRegion.push(items) }
+    for items in regionCh { byRegion = byRegion.push(items) }
     byRegion
   }
 

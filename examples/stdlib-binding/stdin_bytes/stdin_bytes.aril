@@ -1,6 +1,6 @@
-// DEMAND SKETCH (build-fails until `io` + `os.stdin` bind) — slurp all of stdin
-// through an io.Reader and report the byte count. Forces `io.readAll(os.stdin):
-// Result<[]byte, error>` (binding-surface.md §io) + the `os.stdin` std stream.
+// Slurp all of stdin through an io.Reader and report the byte count. Exercises
+// `io.readAll(os.stdin): Result<[]byte, error>` (binding-surface.md §io) + the
+// `os.stdin` std stream.
 import fmt
 import io
 import os

@@ -222,6 +222,23 @@ func TestSyncHandles(t *testing.T) {
 	}
 }
 
+// TestContextHandle locks context.Context: an obtain-only interface handle
+// (not Constructable) whose done() renames to Done() returning a receive
+// channel of unit (Go's <-chan struct{}).
+func TestContextHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("context.Context")
+	if !ok || ht.GoType != "context.Context" || ht.GoPkg != "context" {
+		t.Fatalf("context.Context lowering = %+v ok=%v; want bare interface / context", ht, ok)
+	}
+	if IsConstructableHandle("context.Context") {
+		t.Error("context.Context is obtain-only, not constructable")
+	}
+	done, _ := HandleMethodOf("context.Context", "done")
+	if done.GoName != "Done" || done.Return != "RecvChan<unit>" {
+		t.Errorf("context.Context.done = %+v; want Done → RecvChan<unit>", done)
+	}
+}
+
 // TestNetDialListenRegistry locks the mechanical net constructors: net.dial /
 // net.listen are derived ResultWrap rows (the deriver spells the local-package
 // interface return net.Conn/net.Listener as a handle Named), NOT handle ctors.

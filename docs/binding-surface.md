@@ -108,6 +108,11 @@ io.copy(dst: io.Writer, src: io.Reader): Result<int64, error>
 io.EOF: error
 ```
 
+**Bound today:** `io.readAll(r): Result<[]byte, error>` (a mechanical `(T, error)`
+row; `os.stdin` flows in as the reader). `io.copy`, `io.EOF`, and the
+`Reader`/`Writer`/`Closer` interfaces as first-class values remain on the target
+surface.
+
 ## strings
 
 ```aril
@@ -162,6 +167,11 @@ log.fatalf(format: string, args: ...Any)
 log.setPrefix(prefix: string)
 log.setFlags(flags: int)
 ```
+
+**Bound today:** the full set above — `println` / `printf` / `print` / `fatal` /
+`fatalf` / `setPrefix` / `setFlags`, as fire-and-forget effect renames (like
+`fmt.print*`). `fatal*` log then exit in Go; a diverging-return annotation for
+them is future surface.
 
 ## math/big
 
@@ -267,6 +277,12 @@ context.withCancel(parent: context.Context):
 context.withTimeout(parent: context.Context, d: time.Duration):
     (context.Context, func())
 ```
+
+**Bound today:** `context.Context` as a value handle with `done(): RecvChan<unit>`
+— enough to honour cancellation in a `select` (the nested-scope callee pattern).
+`err` (needs nullable-error → Option) / `deadline` (needs `time.Time`) / `value`
+and the `background` / `withCancel` / `withTimeout` constructors remain on the
+target surface.
 
 ## encoding/json
 

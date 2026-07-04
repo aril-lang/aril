@@ -4,11 +4,11 @@
     "total": 89,
     "parse_fail": 1,
     "sema_fail": 1,
-    "emit_fail": 4,
-    "build_ok": 83,
+    "emit_fail": 1,
+    "build_ok": 86,
     "diag_ok": 94,
     "diag_total": 117,
-    "run_ok": 83,
+    "run_ok": 85,
     "run_total": 88
   },
   "files": [
@@ -29,8 +29,8 @@
     },
     {
       "path": "examples/concurrency/nested_scopes/nested_scopes.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/concurrency/parallel_fetcher/parallel_fetcher.aril",
@@ -394,8 +394,8 @@
     },
     {
       "path": "examples/stdlib-binding/leveled_log/leveled_log.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/line_numberer/line_numberer.aril",
@@ -434,8 +434,8 @@
     },
     {
       "path": "examples/stdlib-binding/stdin_bytes/stdin_bytes.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/struct_dump/struct_dump.aril",
@@ -578,8 +578,8 @@
   "run_fails": [
     {
       "path": "examples/concurrency/nested_scopes",
-      "status": "build-fail",
-      "code": 1
+      "status": "run-fail",
+      "code": 2
     },
     {
       "path": "examples/core-language/lru_cache",
@@ -588,16 +588,6 @@
     },
     {
       "path": "examples/modeling-errors/errors_as",
-      "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/stdlib-binding/leveled_log",
-      "status": "build-fail",
-      "code": 1
-    },
-    {
-      "path": "examples/stdlib-binding/stdin_bytes",
       "status": "build-fail",
       "code": 1
     }

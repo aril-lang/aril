@@ -41,10 +41,8 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 		return fmt.Errorf("codegen: %s brace literal not yet supported — use the container constructor / `.new()`", b.Kind)
 	}
 	if len(b.TypeName.QName) != 1 {
-		// A qualified name in construction position is a bound constructable
-		// stdlib handle (`sync.Mutex{}` → the Go value struct `sync.Mutex{}`);
-		// it has no Aril-visible fields, so only the empty form lowers. Value
-		// type (no `&` — methods auto-address an addressable local).
+		// A qualified name here is a constructable stdlib handle, empty-only
+		// (lowering-go §Brace literals).
 		spelled := strings.Join(b.TypeName.QName, ".")
 		if ht, ok := binding.HandleTypeOf(spelled); ok && ht.Constructable {
 			if len(b.Entries) != 0 {
