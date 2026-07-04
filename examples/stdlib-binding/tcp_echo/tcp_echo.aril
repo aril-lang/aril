@@ -1,0 +1,78 @@
+// Showcase: the raw-TCP socket layer (`net`) — the low-level networking base.
+//
+// A `net.Conn` is just a bidirectional byte stream (read / write / close), and a
+// `net.Listener` accepts connections. Every application protocol (HTTP included)
+// is built *on top* of this base — so with the socket layer alone a programmer
+// can implement any protocol by hand, without the stdlib binding a single
+// high-level convenience.
+//
+// Here an in-process echo server and client run concurrently under a structured
+// `scope` (D7 uncolored concurrency): the server accepts one connection, reads a
+// message and writes it straight back; the client dials, sends "ping", and reads
+// the echo. Self-contained and deterministic — no external host, no fixed port
+// (`:0` lets the OS pick a free one, reported back via `ln.addr()`).
+
+import fmt
+import net
+import strings
+
+func main() {
+  // Bind an ephemeral loopback port; the OS assigns the actual port.
+  let ln = net.listen("tcp", "127.0.0.1:0") catch e {
+    fmt.println("listen failed")
+    return
+  }
+  let addr = ln.addr().string()
+  var echoed = ""
+
+  let outcome = scope<unit, error> {
+    // Server: accept one connection, echo exactly the bytes it received.
+    spawn {
+      match ln.accept() {
+        Ok(conn) => {
+          let buf = makeSlice<byte>(64)
+          match conn.read(buf) {
+            Ok(n) => {
+              match conn.write(buf[0:n]) {
+                Ok(_)  => {},
+                Err(_) => {},
+              }
+            },
+            Err(_) => {},
+          }
+          match conn.close() {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+        },
+        Err(_) => {},
+      }
+    }
+    // Client: dial the server, send a message, read the echo.
+    spawn {
+      match net.dial("tcp", addr) {
+        Ok(c) => {
+          match c.write(strings.toBytes("ping")) {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+          let reply = makeSlice<byte>(64)
+          match c.read(reply) {
+            Ok(n)  => echoed = strings.fromBytes(reply[0:n]),
+            Err(_) => {},
+          }
+          match c.close() {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+        },
+        Err(_) => {},
+      }
+    }
+  }
+
+  match outcome {
+    Ok(_)  => fmt.println("echo: " + echoed),
+    Err(_) => fmt.println("scope failed"),
+  }
+}

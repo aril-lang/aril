@@ -567,6 +567,33 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 		return g.emitArgList(c.Args)
 	}
+	// Value-handle method whose curated return is `Result<…>` (net.Conn.read
+	// → (int,error), .close → error): wrap the Go call in ResultOf / ResultUnit,
+	// the same lift the stdlib registry (call.go ~108) and extern paths apply.
+	// The plain handle-method path (goMethodName rename) would emit the bare Go
+	// `(T, error)` call, which does not type as an arilrt.Result.
+	if fld, ok := c.Callee.(*ast.Field); ok {
+		if hm, isResultHandle, isUnit := g.handleMethodResultWrap(fld); isResultHandle {
+			helper := "ResultOf"
+			if isUnit {
+				helper = "ResultUnit"
+				g.usesResultUnit = true
+			} else {
+				g.usesResultOf = true
+			}
+			g.b.WriteString(g.rt(helper) + "(")
+			if err := g.emitExpr(fld.Receiver); err != nil {
+				return err
+			}
+			g.b.WriteByte('.')
+			g.b.WriteString(hm.GoName)
+			if err := g.emitArgList(c.Args); err != nil {
+				return err
+			}
+			g.b.WriteByte(')')
+			return nil
+		}
+	}
 	// A method-call selector `recv.method(...)` is spelled by
 	// goMethodName (lowercase for user/stdlib methods; exported for
 	// predeclared-container methods, which must cross the arilrt

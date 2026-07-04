@@ -63,6 +63,40 @@ func TestHandleMethodSigType(t *testing.T) {
 	}
 }
 
+// TestNetHandleMethodSigType locks the net socket method rows: net.Conn.read
+// types as a Func returning Result<int, error> (the first handle methods with a
+// Result return), and net.listen types as Result<net.Listener, error> — a
+// handle Named inside a Result, so `let ln = net.listen(...)` propagates the
+// Listener handle to `ln.accept()`.
+func TestNetHandleMethodSigType(t *testing.T) {
+	read, ok := binding.HandleMethodOf("net.Conn", "read")
+	if !ok {
+		t.Fatal("net.Conn.read should be a bound handle method")
+	}
+	r, ok := handleMethodSigType(read).Return.(*Result)
+	if !ok {
+		t.Fatalf("net.Conn.read return = %v; want *Result", handleMethodSigType(read).Return)
+	}
+	if b, ok := r.T.(*Builtin); !ok || b.N != "int" {
+		t.Errorf("net.Conn.read Result payload = %v; want Builtin int", r.T)
+	}
+	c := &checker{}
+	got := c.stdlibBindingReturn("net", "listen")
+	lr, ok := got.(*Result)
+	if !ok {
+		t.Fatalf("stdlibBindingReturn(net, listen) = %v; want *Result", got)
+	}
+	if n, ok := lr.T.(*Named); !ok || n.N != "net.Listener" {
+		t.Errorf("net.listen Result payload = %v; want Named net.Listener", lr.T)
+	}
+	// A `net.Conn` param annotation resolves to the same handle Named a
+	// dialed/accepted connection carries (no sema↔codegen split).
+	nt := &ast.NamedType{QName: []string{"net", "Conn"}}
+	if n, ok := c.namedTypeToType(nt, map[string]bool{}).(*Named); !ok || n.N != "net.Conn" {
+		t.Errorf("net.Conn annotation = %v; want Named net.Conn", c.namedTypeToType(nt, map[string]bool{}))
+	}
+}
+
 // TestSemaTypeFromSpelling round-trips the binding-registry return spellings
 // through the bridge: spelling → sema Type → String() must reproduce the
 // spelling, over every construct the stdlib registry uses. This locks the

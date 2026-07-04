@@ -69,6 +69,7 @@ Go, which has no sum types.
 |---|---|
 | `config_loader` | typed structs, the `encoding/json` binding, error handling |
 | `wc` | a CLI: `os`/args, `io`, file reading, exit codes |
+| `tcp_echo` ★ | the raw-TCP socket layer (`net`) — `dial`/`listen`, a `net.Conn` byte stream (read/write/close), in-process echo server + client under a `scope` |
 | `healthcheck_server` ★ | `net/http`; **Go interface conformance** (a Aril type as `http.Handler`) |
 | `todo_api` | JSON CRUD over an actor-serialised store (concurrent client goroutines); DTO structs; `Result` mapped to HTTP status codes |
 | `counterstack` | sum-typed JSON wire protocol over an in-process channel transport, `encoding/json` round-trip, concurrent reader/writer, a `class implements Strategy` |
