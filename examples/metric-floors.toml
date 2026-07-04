@@ -20,7 +20,7 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 78   # current build_ok; strict ratchet
+build_ok_min = 79   # current build_ok; strict ratchet
 diag_ok_min  = 79   # headroom below current diag_ok (91) so an
                     # individual imprecise message is a penalty, not a red
-run_ok_min   = 78   # current run_ok; strict ratchet
+run_ok_min   = 79   # current run_ok; strict ratchet
