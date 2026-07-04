@@ -120,7 +120,7 @@ func TestResultUnwrapOrTypesOkPayload(t *testing.T) {
 	}
 }
 
-// String methods (builtins.md §String methods): `.len()` types int, `.bytes()`
+// String methods (builtins.md §Lowering pointers): `.len()` types int, `.bytes()`
 // []byte, `.runes()` []rune — the view/length helpers codegen lowers via
 // `len(s)`/`[]byte(s)`/`[]rune(s)`. Before this a string method call typed
 // Unknown, which then broke closure-return inference over it.
@@ -150,18 +150,20 @@ func TestStringBytesRunesTypeSlices(t *testing.T) {
 	}
 }
 
-// The typing fix back-propagates a short-closure's result type when its body is
-// a string method call — `(s) => s.len()` now infers `int` instead of leaving
-// the closure return Unknown (which had failed codegen: "cannot infer closure
-// result type"). This also closes the sort.sortedBy key-with-method-call gap.
+// The typing fix back-propagates a closure's result type when its body is a
+// string method call — `(s: string) => s.len()` now infers a `func(string): int`
+// instead of leaving the return Unknown (which had failed codegen: "cannot infer
+// closure result type", and blocked sort.sortedBy key-with-method-call). Assert
+// the *concrete* Func type, not `len(codes)==0`: an Unknown return unifies with
+// anything, so a no-diagnostic oracle passes falsely here (dev-insights §6).
 func TestClosureOverStringLenInfersInt(t *testing.T) {
-	src := `func f(): int {
+	src := `func f() {
   let key = (s: string) => s.len()
-  return key("abc")
 }
 `
-	if codes := runCheck(t, src); len(codes) != 0 {
-		t.Errorf("expected clean (closure over string.len infers int), got %v", codes)
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "key"); got == nil || got.String() != "func(string): int" {
+		t.Errorf("closure over s.len() = %v; want func(string): int", got)
 	}
 }
 

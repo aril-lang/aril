@@ -332,7 +332,7 @@ func containerMethodType(recv Type, name string) *Func {
 			return &Func{Return: &Slice{Elem: r.Elem}}
 		}
 	case *Builtin:
-		// String methods (builtins.md §String methods): the view/length
+		// String methods (builtins.md §Lowering pointers): the view/length
 		// helpers codegen lowers via `len(s)` / `[]byte(s)` / `[]rune(s)`
 		// (call.go). Kept in lockstep with codegen — without these a string
 		// method call types Unknown, which then breaks closure-return
