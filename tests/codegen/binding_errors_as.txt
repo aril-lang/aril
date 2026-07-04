@@ -1,0 +1,64 @@
+--- TITLE ---
+errors.as<T>(e) → ErrorsAs[T](e): Go's errors.As pointer-out protocol lifted into Option<T>; the class type arg lowers to its pointer form *NotFound (GO-only; corpus errors_as execs it)
+
+--- INPUT ---
+import errors
+import fmt
+
+class NotFound implements error {
+  let key: string
+  error(): string { return "not found: " + key }
+}
+
+func classify(e: error) {
+  match errors.as<NotFound>(e) {
+    Some(nf) => fmt.println("missing:", nf.key),
+    None     => fmt.println("other"),
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+func ErrorsAs[T any](err error) Option[T] {
+	var t T
+	if errors.As(err, &t) {
+		return OptionSome[T](t)
+	}
+	return OptionNone[T]()
+}
+
+type NotFound struct {
+	Key string `json:"key"`
+}
+
+func (t *NotFound) Error() string {
+	return "not found: " + t.Key
+}
+func classify(e error) {
+	__aril_match_1 := ErrorsAs[*NotFound](e)
+	switch __aril_match_1.Tag {
+	case 1:
+		nf := __aril_match_1.V
+		fmt.Println("missing:", nf.Key)
+	case 0:
+		fmt.Println("other")
+	}
+}

@@ -200,12 +200,25 @@ func (g *gen) emitClassDecl(cd *ast.ClassDecl) error {
 		g.b.WriteByte('\n')
 	}
 	g.b.WriteString("}\n")
+	implError := classImplementsError(cd)
 	for _, m := range cd.Methods {
-		if err := g.emitMethod(cd.Name, cd.TypeParams, m); err != nil {
+		if err := g.emitMethod(cd.Name, cd.TypeParams, m, implError); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// classImplementsError reports whether the class declares `implements error` —
+// then its `error(): string` method must lower to Go's `Error()` so the struct
+// satisfies Go's `error` interface (the error→Error boundary, D14 footnote).
+func classImplementsError(cd *ast.ClassDecl) bool {
+	for _, impl := range cd.Implements {
+		if nt, ok := impl.(*ast.NamedType); ok && len(nt.QName) == 1 && nt.QName[0] == "error" {
+			return true
+		}
+	}
+	return false
 }
 
 // emitInterfaceDecl lowers `interface Name { sig … }` to a Go
@@ -250,7 +263,7 @@ func (g *gen) emitInterfaceDecl(id *ast.InterfaceDecl) error {
 	return nil
 }
 
-func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *ast.Method) error {
+func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *ast.Method, implementsError bool) error {
 	g.line(m.Span.StartLine)
 	g.b.WriteString("func ")
 	if !m.IsStatic {
@@ -258,7 +271,13 @@ func (g *gen) emitMethod(className string, classTypeParams []ast.TypeParam, m *a
 		g.b.WriteString(goIdent(className))
 		g.emitTypeParamBrackets(classTypeParams, false) // receiver: type params without constraints
 		g.b.WriteString(") ")
-		g.b.WriteString(goIdent(m.Name))
+		// A class implementing `error` exposes its `error()` method as Go's
+		// `Error()` so the struct satisfies Go's error interface (D14 footnote).
+		if implementsError && m.Name == "error" {
+			g.b.WriteString("Error")
+		} else {
+			g.b.WriteString(goIdent(m.Name))
+		}
 	} else {
 		g.b.WriteString(staticMethodName(className, m.Name))
 		g.emitTypeParamBrackets(classTypeParams, true) // static = package-level func, declare constraints

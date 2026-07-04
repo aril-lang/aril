@@ -4,14 +4,14 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 86 / 89 examples build end-to-end** (floor 86).
+- **build_ok — 87 / 89 examples build end-to-end** (floor 87).
 - **diag_ok — 94 / 117 negative cases produce their expected diagnostic** (floor 82).
-- **run_ok — 85 / 88 run-pass examples build and run as specified** (floor 85; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 86 / 88 run-pass examples build and run as specified** (floor 86; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 86 |
-| emit / codegen fail | 1 |
+| ✅ build (full pipeline) | 87 |
+| emit / codegen fail | 0 |
 | sema fail | 1 |
 | parse fail | 1 |
 
@@ -80,6 +80,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/error_chain/error_chain.aril` | build | — |
 | `examples/modeling-errors/error_handling/error_handling.aril` | build | — |
 | `examples/modeling-errors/error_wrapping/error_wrapping.aril` | build | — |
+| `examples/modeling-errors/errors_as/errors_as.aril` | build | — |
 | `examples/modeling-errors/errors_as_types/errors_as_types.aril` | build | — |
 | `examples/modeling-errors/parse_int/parse_int.aril` | build | — |
 | `examples/modeling-errors/rpn_calculator/rpn_calculator.aril` | build | — |
@@ -105,7 +106,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/tcp_echo/tcp_echo.aril` | build | — |
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
-| `examples/modeling-errors/errors_as/errors_as.aril` | emit | go build failed |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | sema | error[E0103]: Unknown name http |
 | `examples/core-language/lru_cache/lru_cache.aril` | parse | error[E0112]: expected expression, got Punct "," |
 
@@ -145,10 +145,9 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**3 of 88 run-pass examples fall short of run_ok.**
+**2 of 88 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
 | `examples/concurrency/nested_scopes` | run-fail | 2 |
 | `examples/core-language/lru_cache` | build-fail | 1 |
-| `examples/modeling-errors/errors_as` | build-fail | 1 |

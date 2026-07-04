@@ -547,6 +547,13 @@ errors.is(err: error, target: error): bool
 errors.as<T>(err: error): Option<T>                    // generic As
 ```
 
+**Bound today:** the full set — `errors.new` / `errors.is` (renames), and
+`errors.as<T>` (generic), whose Go `errors.As(err, &t)` pointer-out protocol
+lifts into `Option<T>` via the `ErrorsAs` runtime helper. A user `class X
+implements error` has its `error(): string` method (and calls on its values)
+lowered to Go's `Error()`, so the struct satisfies Go's `error` interface and is
+matchable by `errors.as` (the error→Error boundary, D14 footnote).
+
 ## regexp
 
 A value-handle type surfaced through the builtin-module namespace: the
