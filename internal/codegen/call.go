@@ -225,6 +225,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// param), gated on sema typing the receiver as Result. `MapErr(recv, f)`.
 	if f, ok := c.Callee.(*ast.Field); ok && f.Name == "mapErr" && len(c.Args) == 1 && g.isResultReceiver(f.Receiver) {
 		g.usesMapErr = true
+		g.usesResult = true // the helper references Result — force it, like the ResultOf/Scan siblings
 		g.b.WriteString(g.rt("MapErr"))
 		g.b.WriteByte('(')
 		if err := g.emitExpr(f.Receiver); err != nil {

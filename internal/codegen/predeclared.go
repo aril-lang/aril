@@ -880,6 +880,7 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			// receiver as Result (isResultReceiver), like the emitCall gate.
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "mapErr" && len(v.Args) == 1 && g.isResultReceiver(f.Receiver) {
 				g.usesMapErr = true
+				g.usesResult = true // the MapErr helper references Result (sibling-parity with usesResultOf/usesScan)
 			}
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "reverse" {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
