@@ -55,6 +55,15 @@ var handleTypes = map[string]HandleType{
 	// `string` is a real method (→ String()), but `add`/`mul` lower to Go
 	// operators (codegen intercept), since Duration has no Add/Mul method.
 	"time.Duration": {GoType: "time.Duration", GoPkg: "time"},
+	// The net socket layer (NETWORKING epoch). Conn/Listener/Addr are Go
+	// *interfaces*, so GoType is the bare interface spelling (no pointer, unlike
+	// *regexp.Regexp). net.Conn *is* io.Reader+io.Writer+io.Closer, so it flows
+	// into io.readAll without extra wiring. Their read/write/accept/close methods
+	// return Result (see handleMethods below) — the handle-method emit path wraps
+	// the (T,error) / bare-error Go returns via ResultOf/ResultUnit.
+	"net.Conn":     {GoType: "net.Conn", GoPkg: "net"},
+	"net.Listener": {GoType: "net.Listener", GoPkg: "net"},
+	"net.Addr":     {GoType: "net.Addr", GoPkg: "net"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -101,6 +110,22 @@ var handleMethods = map[string]map[string]HandleBinding{
 		// GoName is unused for them. string is a genuine Duration method.
 		"add":    {GoName: "", Params: []string{"time.Duration"}, Return: "time.Duration"},
 		"mul":    {GoName: "", Params: []string{"int"}, Return: "time.Duration"},
+		"string": {GoName: "String", Params: nil, Return: "string"},
+	},
+	// net socket layer. Result-returning methods (read/write/accept/close) are
+	// wrapped by the handle-method emit path (ResultOf for (T,error), ResultUnit
+	// for bare error) — the first handle methods to carry a Result return.
+	"net.Conn": {
+		"read":  {GoName: "Read", Params: []string{"[]byte"}, Return: "Result<int, error>"},
+		"write": {GoName: "Write", Params: []string{"[]byte"}, Return: "Result<int, error>"},
+		"close": {GoName: "Close", Params: nil, Return: "Result<unit, error>"},
+	},
+	"net.Listener": {
+		"accept": {GoName: "Accept", Params: nil, Return: "Result<net.Conn, error>"},
+		"close":  {GoName: "Close", Params: nil, Return: "Result<unit, error>"},
+		"addr":   {GoName: "Addr", Params: nil, Return: "net.Addr"},
+	},
+	"net.Addr": {
 		"string": {GoName: "String", Params: nil, Return: "string"},
 	},
 }

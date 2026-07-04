@@ -133,3 +133,75 @@ func TestDurationHandle(t *testing.T) {
 		t.Errorf("time.Duration.string = %+v; want String → string", s)
 	}
 }
+
+// TestNetSocketHandles locks the net socket layer: Conn/Listener/Addr are
+// external Go-interface handles (bare interface GoType, no pointer, GoPkg net),
+// and the read/write/accept/close methods carry a Result<…> return — the first
+// handle methods lifted via ResultOf/ResultUnit (net.Conn is io.Reader/Writer/
+// Closer, so its byte-stream methods mirror Go's (T,error) / bare-error shapes).
+func TestNetSocketHandles(t *testing.T) {
+	for _, spelled := range []string{"net.Conn", "net.Listener", "net.Addr"} {
+		ht, ok := HandleTypeOf(spelled)
+		if !ok || ht.Runtime {
+			t.Fatalf("%s should be an external handle; got %+v ok=%v", spelled, ht, ok)
+		}
+		if ht.GoType != spelled || ht.GoPkg != "net" {
+			t.Errorf("%s lowering = %+v; want bare interface GoType %s / net", spelled, ht, spelled)
+		}
+	}
+	// Conn: read/write are (int,error) → ResultOf; close is bare error → ResultUnit.
+	read, _ := HandleMethodOf("net.Conn", "read")
+	if read.GoName != "Read" || read.Return != "Result<int, error>" {
+		t.Errorf("net.Conn.read = %+v; want Read → Result<int, error>", read)
+	}
+	write, _ := HandleMethodOf("net.Conn", "write")
+	if write.GoName != "Write" || write.Return != "Result<int, error>" {
+		t.Errorf("net.Conn.write = %+v; want Write → Result<int, error>", write)
+	}
+	cclose, _ := HandleMethodOf("net.Conn", "close")
+	if cclose.GoName != "Close" || cclose.Return != "Result<unit, error>" {
+		t.Errorf("net.Conn.close = %+v; want Close → Result<unit, error>", cclose)
+	}
+	// Listener: accept yields a Conn handle inside a Result; addr yields a plain
+	// net.Addr handle (no Result — Go's Listener.Addr can't fail).
+	accept, _ := HandleMethodOf("net.Listener", "accept")
+	if accept.GoName != "Accept" || accept.Return != "Result<net.Conn, error>" {
+		t.Errorf("net.Listener.accept = %+v; want Accept → Result<net.Conn, error>", accept)
+	}
+	addr, _ := HandleMethodOf("net.Listener", "addr")
+	if addr.GoName != "Addr" || addr.Return != "net.Addr" {
+		t.Errorf("net.Listener.addr = %+v; want Addr → net.Addr", addr)
+	}
+	lclose, _ := HandleMethodOf("net.Listener", "close")
+	if lclose.GoName != "Close" || lclose.Return != "Result<unit, error>" {
+		t.Errorf("net.Listener.close = %+v; want Close → Result<unit, error>", lclose)
+	}
+	astr, _ := HandleMethodOf("net.Addr", "string")
+	if astr.GoName != "String" || astr.Return != "string" {
+		t.Errorf("net.Addr.string = %+v; want String → string", astr)
+	}
+}
+
+// TestNetDialListenRegistry locks the mechanical net constructors: net.dial /
+// net.listen are derived ResultWrap rows (the deriver spells the local-package
+// interface return net.Conn/net.Listener as a handle Named), NOT handle ctors.
+func TestNetDialListenRegistry(t *testing.T) {
+	dial, ok := ResultWrapOf("net", "dial")
+	if !ok || dial != "Dial" {
+		t.Errorf("net.dial ResultWrap = %q ok=%v; want Dial", dial, ok)
+	}
+	if s, _ := ReturnSpelling("net", "dial"); s != "Result<net.Conn, error>" {
+		t.Errorf("net.dial return = %q; want Result<net.Conn, error>", s)
+	}
+	listen, ok := ResultWrapOf("net", "listen")
+	if !ok || listen != "Listen" {
+		t.Errorf("net.listen ResultWrap = %q ok=%v; want Listen", listen, ok)
+	}
+	if s, _ := ReturnSpelling("net", "listen"); s != "Result<net.Listener, error>" {
+		t.Errorf("net.listen return = %q; want Result<net.Listener, error>", s)
+	}
+	// They are registry rows, not handle constructors.
+	if _, ok := HandleCtorOf("net", "dial"); ok {
+		t.Error("net.dial should be a registry ResultWrap row, not a handle ctor")
+	}
+}

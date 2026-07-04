@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 87,
+    "total": 88,
     "parse_fail": 2,
     "sema_fail": 1,
     "emit_fail": 5,
-    "build_ok": 79,
+    "build_ok": 80,
     "diag_ok": 94,
     "diag_total": 117,
-    "run_ok": 79,
-    "run_total": 86
+    "run_ok": 80,
+    "run_total": 87
   },
   "files": [
     {
@@ -434,6 +434,11 @@
     },
     {
       "path": "examples/stdlib-binding/struct_dump/struct_dump.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/stdlib-binding/tcp_echo/tcp_echo.aril",
       "stage": "build",
       "blocker": ""
     },

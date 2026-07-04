@@ -783,6 +783,31 @@ func (g *gen) handleMethodGoName(receiver ast.Expr, name string) (string, bool) 
 	return hm.GoName, true
 }
 
+// handleMethodResultWrap reports whether the field-callee `fld` is a
+// value-handle method whose curated return is `Result<…>` (net.Conn.read/
+// write/close, net.Listener.accept) — the first handle methods to carry a
+// Result. It returns the binding and whether the Result is unit-typed
+// (`Result<unit, error>` ← a bare-`error` Go return → ResultUnit) vs a
+// `(T, error)` pair (→ ResultOf). The plain handle-method path
+// (handleMethodGoName) only renames the Go method, emitting the bare Go
+// `(T, error)` call, which would not type as an arilrt.Result — so emitCall
+// intercepts these before the generic method emit and applies the same lift
+// the stdlib registry / extern paths use.
+func (g *gen) handleMethodResultWrap(fld *ast.Field) (binding.HandleBinding, bool, bool) {
+	if g.info == nil {
+		return binding.HandleBinding{}, false, false
+	}
+	named, ok := g.info.Type[fld.Receiver].(*sema.Named)
+	if !ok {
+		return binding.HandleBinding{}, false, false
+	}
+	hm, ok := binding.HandleMethodOf(named.N, fld.Name)
+	if !ok || !strings.HasPrefix(hm.Return, "Result<") {
+		return binding.HandleBinding{}, false, false
+	}
+	return hm, true, hm.Return == "Result<unit, error>"
+}
+
 // isContainerTypedExpr reports whether sema typed receiver as one of the
 // predeclared container types (Map / Set / Stack), whose methods are
 // emitted with their exported Go spelling. Unlike isContainerReceiver

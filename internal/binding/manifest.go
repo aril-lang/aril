@@ -30,6 +30,12 @@ var Manifest = map[string][]string{
 	"math":    {"Abs", "Ceil", "Cos", "Exp", "Floor", "Hypot", "Log", "Log10", "Log2", "Max", "Min", "Mod", "Pi", "Pow", "Round", "Sin", "Sqrt", "Tan", "Trunc"},
 	"time":    {"After", "Sleep", "Tick"},
 	"unicode": {"IsDigit", "IsLetter", "IsSpace"},
+	// net socket layer (NETWORKING epoch). Dial/Listen return
+	// (net.Conn/net.Listener, error) — mechanical (T, error) rows. The deriver
+	// spells the local-package interface return net.Conn/net.Listener as a handle
+	// Named (bindgen translate → localName), and those handle types + their method
+	// sets are registered in handles.go.
+	"net": {"Dial", "Listen"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed

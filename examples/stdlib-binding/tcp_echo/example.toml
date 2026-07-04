@@ -1,0 +1,10 @@
+description = "Raw-TCP echo server + client over the net socket layer"
+source   = "stdlib-binding tcp_echo"
+category = "stdlib-binding"
+showcase = true
+forces   = []
+since    = "0.7"
+status   = "running"
+expects  = "run-pass"
+entry    = "tcp_echo.aril"
+expected_output = "expected-output.txt"

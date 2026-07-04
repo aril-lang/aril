@@ -29,6 +29,8 @@ var registry = map[[2]string]Fact{
 	{"math", "sqrt"}:           {Pkg: "math", ArilName: "sqrt", GoName: "Sqrt", Kind: Rename, Return: "float64"},
 	{"math", "tan"}:            {Pkg: "math", ArilName: "tan", GoName: "Tan", Kind: Rename, Return: "float64"},
 	{"math", "trunc"}:          {Pkg: "math", ArilName: "trunc", GoName: "Trunc", Kind: Rename, Return: "float64"},
+	{"net", "dial"}:            {Pkg: "net", ArilName: "dial", GoName: "Dial", Kind: ResultWrap, Return: "Result<net.Conn, error>"},
+	{"net", "listen"}:          {Pkg: "net", ArilName: "listen", GoName: "Listen", Kind: ResultWrap, Return: "Result<net.Listener, error>"},
 	{"os", "args"}:             {Pkg: "os", ArilName: "args", GoName: "Args", Kind: Rename, Return: "[]string"},
 	{"os", "exit"}:             {Pkg: "os", ArilName: "exit", GoName: "Exit", Kind: Rename, Return: ""},
 	{"os", "getenv"}:           {Pkg: "os", ArilName: "getenv", GoName: "Getenv", Kind: Rename, Return: "string"},

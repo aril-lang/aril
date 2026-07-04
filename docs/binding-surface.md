@@ -287,15 +287,46 @@ json.serializeIndent(v: Any, prefix: string, indent: string): Result<[]byte, err
 
 ## net
 
+The low-level socket layer — the networking *base*. A `net.Conn` is a
+bidirectional byte stream (read / write / close); a `net.Listener` accepts
+connections. Every application protocol (HTTP included) is built on top of this
+base, so the socket layer alone lets a program implement any protocol by hand.
+Conn / Listener / Addr are surfaced as value handles (D37): Go interfaces, so the
+handle's Go type is the bare interface spelling (no pointer).
+
 ```aril
-interface net.Conn extends io.Reader, io.Writer, io.Closer {
-  // ... addresses, deadlines as added when needed
+// A connection — a byte stream. `read`/`write` return the byte count in a
+// Result (mirroring Go's (int, error)); `close` returns Result<unit, error>.
+// net.Conn is io.Reader + io.Writer + io.Closer, so it flows into io.readAll etc.
+class net.Conn {
+  read(p: []byte):  Result<int, error>
+  write(p: []byte): Result<int, error>
+  close():          Result<unit, error>
 }
 
-net.dial(network: string, address: string): Result<net.Conn, error>
-// Convenience for TCP — equivalent to `net.dial("tcp", addr)`.
-net.dialTCP(address: string): Result<net.Conn, error>
+// A listening socket.
+class net.Listener {
+  accept(): Result<net.Conn, error>       // block for the next connection
+  close():  Result<unit, error>
+  addr():   net.Addr                       // the bound address (e.g. after :0)
+}
+
+class net.Addr {
+  string(): string                         // "host:port"
+}
+
+// Dial a connection / open a listener. `network` is "tcp", "tcp4", "udp", …;
+// `address` is "host:port" ("127.0.0.1:0" lets the OS pick a free port).
+net.dial(network: string, address: string):   Result<net.Conn, error>
+net.listen(network: string, address: string): Result<net.Listener, error>
 ```
+
+**Bound today:** `net.dial` / `net.listen` (mechanical `(T, error)` registry rows
+whose handle-typed returns the deriver spells from the local-package interface),
+plus the `net.Conn` / `net.Listener` / `net.Addr` handle method sets above. The
+Result-returning methods (`read`/`write`/`accept`/`close`) are the first handle
+methods lifted via `ResultOf` / `ResultUnit`. A `net.dialTCP` convenience,
+deadlines/timeouts, and UDP (`net.PacketConn`) remain on the target surface.
 
 ## bufio
 
