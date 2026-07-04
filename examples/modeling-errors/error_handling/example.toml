@@ -8,3 +8,20 @@ status   = "running"
 expects  = "run-pass"
 entry    = "error_handling.aril"
 expected_output = "expected-output.txt"
+
+# Negative cases: the builtin-generic-receiver diagnostics (Aril-coordinate,
+# not a go/types leak) — mapErr with the wrong arity, and an unknown method on
+# a Result receiver.
+[[error]]
+patch   = "errors/maperr-wrong-arity.patch"    # r.mapErr() — a 0-arg call to the 1-arg combinator
+expect  = ["E0202"]
+stage   = "sema"
+matches = "errors/maperr-wrong-arity.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/unknown-result-member.patch" # r.noSuchMethod — absent from the Result method set
+expect  = ["E0214"]
+stage   = "sema"
+matches = "errors/unknown-result-member.expected"
+origin  = "synthetic"

@@ -41,6 +41,77 @@ func use(): bool { let re = regexp.mustCompile("x")  return re.noSuchMethod("a")
 	}
 }
 
+// E0214 also covers a builtin-generic receiver (Map/Set/Stack/[]T/Option/
+// Result/channel) — its method set is fully known (containerMethodType /
+// channelMethodType), so an unresolved method is a real unknown-member error,
+// not the go/types leak `type arilrt.Option[int] has no field or method …`.
+
+func TestUnknownOptionMemberFiresE0214(t *testing.T) {
+	src := `func use(o: Option<int>) { let _ = o.map() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown Option member), got %v", codes)
+	}
+}
+
+func TestUnknownMapMemberFiresE0214(t *testing.T) {
+	src := `func use(m: Map<int, int>) { let _ = m.nope() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown Map member), got %v", codes)
+	}
+}
+
+// The known builtin-generic methods must NOT fire E0214 (they resolve through
+// containerMethodType/channelMethodType) — the false-positive guard.
+func TestKnownContainerMembersNoE0214(t *testing.T) {
+	src := `func use(o: Option<int>, r: Result<int, string>, m: Map<int, int>): int {
+  let a = o.unwrapOr(0)
+  let b = r.unwrapOr(0)
+  let c = m.len()
+  return a + b + c
+}`
+	if codes := runCheck(t, src); contains(codes, "E0214") {
+		t.Errorf("known container members must not fire E0214, got %v", codes)
+	}
+}
+
+// `mapErr` is a real Result method (typed in inferCall, not containerMethodType),
+// so a correct 1-arg call must not be misreported as an unknown member.
+func TestResultMapErrNoE0214(t *testing.T) {
+	src := `func use(r: Result<int, error>): Result<int, string> {
+  return r.mapErr((e) => "wrapped")
+}`
+	if codes := runCheck(t, src); contains(codes, "E0214") {
+		t.Errorf("valid mapErr must not fire E0214, got %v", codes)
+	}
+}
+
+// E0202 also covers `mapErr` with the wrong arity — a real Result method whose
+// dynamic-E2 result keeps it out of containerMethodType, so its arity is checked
+// explicitly (0-/2-arg calls otherwise leak the MapErr helper's go/types error).
+
+func TestMapErrZeroArgFiresE0202(t *testing.T) {
+	src := `func use(r: Result<int, error>) { let _ = r.mapErr() }`
+	if codes := runCheck(t, src); !contains(codes, "E0202") {
+		t.Errorf("expected E0202 (mapErr 0-arg), got %v", codes)
+	}
+}
+
+func TestMapErrTwoArgFiresE0202(t *testing.T) {
+	src := `func use(r: Result<int, error>) { let _ = r.mapErr((e) => e, 9) }`
+	if codes := runCheck(t, src); !contains(codes, "E0202") {
+		t.Errorf("expected E0202 (mapErr 2-arg), got %v", codes)
+	}
+}
+
+func TestMapErrOneArgNoE0202(t *testing.T) {
+	src := `func use(r: Result<int, error>): Result<int, string> {
+  return r.mapErr((e) => "x")
+}`
+	if codes := runCheck(t, src); contains(codes, "E0202") {
+		t.Errorf("correct 1-arg mapErr must not fire E0202, got %v", codes)
+	}
+}
+
 // A method inherited through the `extends` chain is a *known* member, so
 // access is typed and E0214 does NOT fire — the guard against a false
 // positive that the interfaces corpus example first surfaced.
