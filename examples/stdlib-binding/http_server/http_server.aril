@@ -1,0 +1,65 @@
+// Showcase: an Aril class IS a Go http.Handler — served over a real socket.
+//
+// `HelloHandler implements http.Handler` is checked structurally by Aril (E0219,
+// no hand-written glue), lowered so `serveHTTP` becomes Go's `ServeHTTP`, and
+// handed to `http.serve` — Go's HTTP runtime invokes it on a live connection.
+// The runtime proof (vs. build-only healthcheck_server): a raw `net` client GETs
+// the server and reads the handler's response, all in-process on an OS-assigned
+// loopback port. Closing the listener stops `http.serve` so the scope joins.
+
+import fmt
+import net
+import http
+import strings
+
+class HelloHandler implements http.Handler {
+  serveHTTP(w: http.ResponseWriter, r: http.Request) {
+    let _ = w.writeString("aril-handler-ok")
+  }
+}
+
+func main() {
+  let ln = net.listen("tcp", "127.0.0.1:0") catch e {
+    fmt.println("listen failed")
+    return
+  }
+  let addr = ln.addr().string()
+  let handler = HelloHandler{}
+
+  let outcome = scope<unit, error> {
+    // Server: Go's HTTP runtime drives the Aril handler until the listener closes.
+    spawn {
+      match http.serve(ln, handler) {
+        Ok(_)  => {},
+        Err(_) => {},   // listener closed → serve returns cleanly
+      }
+    }
+    // Client: one HTTP/1.1 GET; read the response, then stop the server.
+    spawn {
+      match net.dial("tcp", addr) {
+        Ok(c) => {
+          let req = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+          match c.write(strings.toBytes(req)) { Ok(_) => {}, Err(_) => {} }
+          // The whole small response arrives in one read on loopback.
+          let buf = makeSlice<byte>(1024)
+          match c.read(buf) {
+            Ok(n) => {
+              let raw = strings.fromBytes(buf[0:n])
+              if strings.contains(raw, "aril-handler-ok") {
+                fmt.println("client received handler response")
+              } else {
+                fmt.println("client received unexpected response")
+              }
+            },
+            Err(_) => { fmt.println("read failed") },
+          }
+          match c.close() { Ok(_) => {}, Err(_) => {} }
+        },
+        Err(_) => { fmt.println("dial failed") },
+      }
+      // Stop the server: close the listener so http.serve returns and the scope joins.
+      match ln.close() { Ok(_) => {}, Err(_) => {} }
+    }
+  }
+  match outcome { Ok(_) => {}, Err(_) => {} }
+}

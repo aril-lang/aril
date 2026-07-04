@@ -11,6 +11,7 @@ var registry = map[[2]string]Fact{
 	{"fmt", "sprintf"}:         {Pkg: "fmt", ArilName: "sprintf", GoName: "Sprintf", Kind: Rename, Return: "string"},
 	{"fmt", "sprintln"}:        {Pkg: "fmt", ArilName: "sprintln", GoName: "Sprintln", Kind: Rename, Return: "string"},
 	{"http", "listenAndServe"}: {Pkg: "http", ArilName: "listenAndServe", GoName: "ListenAndServe", Kind: ResultWrap, Return: "Result<unit, error>"},
+	{"http", "serve"}:          {Pkg: "http", ArilName: "serve", GoName: "Serve", Kind: ResultWrap, Return: "Result<unit, error>"},
 	{"io", "readAll"}:          {Pkg: "io", ArilName: "readAll", GoName: "ReadAll", Kind: ResultWrap, Return: "Result<[]byte, error>"},
 	{"math", "abs"}:            {Pkg: "math", ArilName: "abs", GoName: "Abs", Kind: Rename, Return: "float64"},
 	{"math", "ceil"}:           {Pkg: "math", ArilName: "ceil", GoName: "Ceil", Kind: Rename, Return: "float64"},

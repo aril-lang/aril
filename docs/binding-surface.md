@@ -461,6 +461,8 @@ class http.Server {
 }
 
 http.listenAndServe(addr: string, handler: http.Handler): Result<unit, error>
+// Serve on an existing listener (net.Listen) — stoppable by closing the listener.
+http.serve(l: net.Listener, handler: http.Handler): Result<unit, error>
 
 // Sentinel.
 http.ErrServerClosed: error
@@ -476,8 +478,12 @@ satisfies Go's `http.Handler` structurally. `http.ResponseWriter` is a value
 handle with `write` / `writeString` / `writeHeader` (`writeString` lowers to
 `Write([]byte(s))`, since ResponseWriter is an io.Writer); `http.Request` is an
 opaque handle (its field surface is a carry-forward). `http.listenAndServe(addr,
-handler)` is bound (mechanical `Result<unit, error>` row) — a blocking server, so
-`healthcheck_server` builds but is `no-run`. The HTTP **client** (`http.get` /
+handler)` and `http.serve(listener, handler)` are bound (mechanical `Result<unit,
+error>` rows). `listenAndServe` blocks (so `healthcheck_server` builds but is
+`no-run`); `serve` over a `net.Listen` listener is stoppable by closing the
+listener — the `http_server` example uses it for a run-checkable in-process
+server driven by a raw `net` client (the runtime proof of the conformance
+machinery). The HTTP **client** (`http.get` /
 `http.do` / `http.newRequest`, `http.Response` fields, `http.Header`), the
 `http.Server` handle with `shutdown` (for a run-checkable server), and `net/url`
 remain on the target surface above.

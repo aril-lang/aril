@@ -1,0 +1,10 @@
+description = "an Aril class as a Go http.Handler, served over a real socket via http.serve; a raw net client drives it in-process (run_ok proof of the implements-Go-interface machinery)"
+source   = "HTTP-SERVER epoch"
+category = "stdlib-binding"
+showcase = true
+forces   = []
+since    = "0.10"
+status   = "running"
+expects  = "run-pass"
+entry    = "http_server.aril"
+expected_output = "expected-output.txt"
