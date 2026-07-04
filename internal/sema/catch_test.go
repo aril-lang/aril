@@ -63,7 +63,7 @@ func TestCatchNonResultSubjectE0410(t *testing.T) {
 }
 
 // A handler whose last statement is an `if`/`else` with every branch diverging
-// satisfies the divergence rule (catchBlockDiverges recurses into if/else).
+// satisfies the divergence rule (ast.BlockDiverges recurses into if/else).
 func TestCatchDivergesViaIfElse(t *testing.T) {
 	src := `func f(r: Result<int, string>, flag: bool): int {
   let n = r catch e {

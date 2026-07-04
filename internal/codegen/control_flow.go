@@ -7,73 +7,10 @@ import (
 	"github.com/aril-lang/aril/internal/sema"
 )
 
-// isDivergingExpr reports whether e never produces a value: the
-// diverging expressions (return/break/continue), an `os.exit(...)` or
-// `panic(...)` call (Never per binding-surface.md §os / builtins.md
-// §panic), or a block whose trailing value diverges.
-func isDivergingExpr(e ast.Expr) bool {
-	switch v := e.(type) {
-	case *ast.ParenExpr:
-		return isDivergingExpr(v.Inner)
-	case *ast.ReturnExpr, *ast.BreakExpr, *ast.ContinueExpr:
-		return true
-	case *ast.Call:
-		// `panic(…)` never returns — Go treats a call to the builtin
-		// panic as a terminating statement, so a value/tail-position arm
-		// must emit it as a statement, not `return panic(…)` (no value).
-		if id, ok := v.Callee.(*ast.Ident); ok && id.Name == "panic" {
-			return true
-		}
-		return isFieldCall(v.Callee, "os", "exit")
-	case *ast.Block:
-		// A block diverges when its trailing value does, OR — with no
-		// trailing value — when its last statement diverges (`…; return x`).
-		// Delegates to blockAlwaysReturns so a value-position block arm ending
-		// in `return`/`os.exit` (a `catch` handler, a block-body closure) is
-		// recognised as diverging rather than demanding a trailing expression.
-		return blockAlwaysReturns(v)
-	}
-	return false
-}
-
-// blockAlwaysReturns reports whether every control path through the block
-// leaves via a diverging statement (a `return`/`break`/`continue`,
-// `panic`, or `os.exit`) — so the block yields a value without a trailing
-// expression. Used to admit a value-position block body that ends in
-// returns (a block-body closure `=> { …; return x }`, T-Closure-Block).
-func blockAlwaysReturns(b *ast.Block) bool {
-	if b.Trailing != nil {
-		return isDivergingExpr(b.Trailing)
-	}
-	if len(b.Stmts) == 0 {
-		return false
-	}
-	return stmtDiverges(b.Stmts[len(b.Stmts)-1])
-}
-
-// stmtDiverges reports whether s guarantees control leaves the enclosing
-// block — a diverging expression statement, or an `if`/`else` whose every
-// branch diverges.
-func stmtDiverges(s ast.Stmt) bool {
-	switch v := s.(type) {
-	case *ast.ExprStmt:
-		return isDivergingExpr(v.Expr)
-	case *ast.IfStmt:
-		if v.Else == nil {
-			return false
-		}
-		if !blockAlwaysReturns(v.ThenBlock) {
-			return false
-		}
-		switch e := v.Else.(type) {
-		case *ast.Block:
-			return blockAlwaysReturns(e)
-		case *ast.IfStmt:
-			return stmtDiverges(e)
-		}
-	}
-	return false
-}
+// The divergence predicate (does an expr/block never fall through with a
+// value?) lives in internal/ast as the shared ast.ExprDiverges /
+// ast.BlockDiverges — one source of truth with sema's checkCatch, so the
+// value-position lowering here admits exactly what sema's E0409 accepts.
 
 // emitBlockAsExpr lowers a block in value position to an IIFE
 // `func() T { stmts; return trailing }()`. T comes from the trailing
@@ -624,7 +561,7 @@ func (g *gen) emitClosure(cl *ast.ClosureLit) error {
 	if cl.Short {
 		// Short form: the trailing value is the result — `return` it
 		// unless the closure is unit-typed (then it's a bare stmt).
-		if blk, ok := cl.Body.Trailing.(*ast.Block); ok && blk.Trailing == nil && !isUnit && blockAlwaysReturns(blk) {
+		if blk, ok := cl.Body.Trailing.(*ast.Block); ok && blk.Trailing == nil && !isUnit && ast.BlockDiverges(blk) {
 			// `=> { …; return x }` — a block body that returns on every
 			// path. A value-position IIFE can't express a trailing-less
 			// block, so emit the block's statements directly: the inner

@@ -19,6 +19,31 @@ import (
 // right thing. Bare statement-position catch keeps the plain switch
 // (emitMatchAsStmt) — no IIFE there, so its `return` already escapes.
 
+// emitBailPreamble emits the shared statement preamble for a *bail form* — a
+// `try e` (early-return on Err/None) or an `e catch err { … }` (custom
+// diverging handler). Both lower to a preamble that binds a fresh temp and
+// conditionally leaves the frame; the caller then reads the unwrapped Ok
+// payload via `<tmp>.V`. isBail is false (with an empty tmp) when value is
+// neither, so the caller falls through to its ordinary emission path.
+//
+// This folds the three positions where `try` and `catch` were threaded as
+// parallel branch-pairs differing only in which preamble ran (return value,
+// `let`/`var` initializer, discarded expression statement); a future bail form
+// (e.g. a pattern-catch shorthand) extends the switch here, not all three.
+func (g *gen) emitBailPreamble(value ast.Expr) (tmp string, isBail bool, err error) {
+	switch v := value.(type) {
+	case *ast.TryExpr:
+		tmp, err = g.emitTryPreamble(v)
+		return tmp, true, err
+	case *ast.MatchExpr:
+		if v.FromCatch {
+			tmp, err = g.emitCatchPreamble(v)
+			return tmp, true, err
+		}
+	}
+	return "", false, nil
+}
+
 // emitCatchPreamble lowers a FromCatch match to the try-style preamble:
 //
 //	<tmp> := <subject>

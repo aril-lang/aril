@@ -476,7 +476,7 @@ func (g *gen) emitMatchAsExpr(m *ast.MatchExpr) error {
 		// A diverging arm (os.exit / return / …) yields no value —
 		// emit it as a statement; control never falls through to the
 		// trailing zero-value return.
-		if isDivergingExpr(arm.Body) {
+		if ast.ExprDiverges(arm.Body) {
 			if err := g.emitMatchArmBody(arm.Body, arm.Span); err != nil {
 				return err
 			}
@@ -519,7 +519,7 @@ func (g *gen) emitTupleMatchAsExpr(m *ast.MatchExpr, tup *ast.TupleLit) error {
 	g.b.WriteString(" {\n")
 	g.indent++
 	if err := g.emitTupleMatchSwitch(m, tup, func(arm *ast.MatchArm) error {
-		if isDivergingExpr(arm.Body) {
+		if ast.ExprDiverges(arm.Body) {
 			return g.emitMatchArmBody(arm.Body, arm.Span)
 		}
 		g.writeIndent()
@@ -553,7 +553,7 @@ func (g *gen) emitTupleMatchAsExpr(m *ast.MatchExpr, tup *ast.TupleLit) error {
 func (g *gen) matchResultType(m *ast.MatchExpr) (string, error) {
 	var firstErr error
 	for _, arm := range m.Arms {
-		if isDivergingExpr(arm.Body) {
+		if ast.ExprDiverges(arm.Body) {
 			continue
 		}
 		rt, err := g.inferArmResultType(arm.Body)
