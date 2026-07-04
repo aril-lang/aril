@@ -67,6 +67,13 @@ func TestUnknownSliceMemberFiresE0214(t *testing.T) {
 	}
 }
 
+func TestUnknownChannelMemberFiresE0214(t *testing.T) {
+	src := `func use(ch: Channel<int>) { let _ = ch.nope() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown channel member), got %v", codes)
+	}
+}
+
 // A deferred-but-documented Map method (entries, unimplemented in v1) is an
 // unknown member today — the diagnostic agrees with the spec's `deferred` mark.
 func TestDeferredMapEntriesFiresE0214(t *testing.T) {
