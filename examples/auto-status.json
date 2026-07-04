@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 88,
+    "total": 89,
     "parse_fail": 2,
     "sema_fail": 1,
     "emit_fail": 5,
-    "build_ok": 80,
+    "build_ok": 81,
     "diag_ok": 94,
     "diag_total": 117,
-    "run_ok": 80,
-    "run_total": 87
+    "run_ok": 81,
+    "run_total": 88
   },
   "files": [
     {
@@ -386,6 +386,11 @@
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
       "stage": "sema",
       "blocker": "error[E0103]: Unknown name http"
+    },
+    {
+      "path": "examples/stdlib-binding/http_by_hand/http_by_hand.aril",
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/stdlib-binding/leveled_log/leveled_log.aril",

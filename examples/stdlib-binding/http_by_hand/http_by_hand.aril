@@ -1,0 +1,107 @@
+// Proof: HTTP/1.1 — built BY HAND in Aril, over the raw `net` socket layer.
+//
+// The NETWORKING epoch binds only the low-level socket base (net.Conn / Listener).
+// HTTP is deliberately NOT bound — this example shows it doesn't need to be: a
+// programmer can implement the protocol themselves over a byte-stream `net.Conn`.
+// The server reads a request line, routes on the path, and writes a hand-assembled
+// HTTP/1.1 response; the client sends a GET and parses the status line + body.
+//
+// Self-contained and deterministic: an in-process server + client under a `scope`,
+// on an OS-assigned loopback port (`:0`).
+
+import fmt
+import net
+import bufio
+import strings
+import strconv
+
+// Assemble a minimal HTTP/1.1 response: status line + headers + body.
+func httpResponse(status: string, body: string): string {
+  return (
+    "HTTP/1.1 " + status + "\r\n" +
+    "Content-Type: text/plain\r\n" +
+    "Content-Length: " + strconv.itoa(body.bytes().len()) + "\r\n" +
+    "Connection: close\r\n" +
+    "\r\n" +
+    body
+  )
+}
+
+func main() {
+  let ln = net.listen("tcp", "127.0.0.1:0") catch e {
+    fmt.println("listen failed")
+    return
+  }
+  let addr = ln.addr().string()
+  var statusLine = ""
+  var bodyLine = ""
+
+  let outcome = scope<unit, error> {
+    // Server: one request, hand-rolled HTTP.
+    spawn {
+      match ln.accept() {
+        Ok(conn) => {
+          let sc = bufio.newScanner(conn)
+          // The request line, e.g. "GET /health HTTP/1.1".
+          if sc.scan() {
+            let parts = strings.fields(sc.text())
+            var path = "/"
+            if parts.len() >= 2 {
+              path = parts[1]
+            }
+            let resp = httpResponse("200 OK", "hello " + path)
+            match conn.write(strings.toBytes(resp)) {
+              Ok(_)  => {},
+              Err(_) => {},
+            }
+          }
+          match conn.close() {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+        },
+        Err(_) => {},
+      }
+    }
+    // Client: send a GET, parse the response.
+    spawn {
+      match net.dial("tcp", addr) {
+        Ok(c) => {
+          let req = "GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n"
+          match c.write(strings.toBytes(req)) {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+          // The whole small response arrives in one read on loopback.
+          let buf = makeSlice<byte>(512)
+          match c.read(buf) {
+            Ok(n) => {
+              let raw = strings.fromBytes(buf[0:n])
+              // Split head from body at the blank line; status is head's first line.
+              let halves = strings.split(raw, "\r\n\r\n")
+              let head = halves[0]
+              statusLine = strings.split(head, "\r\n")[0]
+              if halves.len() >= 2 {
+                bodyLine = halves[1]
+              }
+            },
+            Err(_) => {},
+          }
+          match c.close() {
+            Ok(_)  => {},
+            Err(_) => {},
+          }
+        },
+        Err(_) => {},
+      }
+    }
+  }
+
+  match outcome {
+    Ok(_) => {
+      fmt.println("status: " + statusLine)
+      fmt.println("body: " + bodyLine)
+    },
+    Err(_) => fmt.println("scope failed"),
+  }
+}
