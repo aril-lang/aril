@@ -94,6 +94,29 @@ func TestUnknownImportPath(t *testing.T) {
 	}
 }
 
+// TestUnknownImportLoneFile — a lone file (no manifest) with an unresolvable
+// import is E0117, not a raw `go build` "package X is not in std" leak (D10).
+// A predeclared stdlib import in the same shape stays clean.
+func TestUnknownImportLoneFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "bad.aril", "import mymodule\nfunc main() {}\n")
+	_, stderr, exit := runAril(t, "run", filepath.Join(dir, "bad.aril"))
+	if exit == 0 {
+		t.Fatal("expected non-zero exit for an unknown lone-file import")
+	}
+	if !strings.Contains(stderr, "E0117") {
+		t.Errorf("stderr = %q; want E0117 (not a raw go build leak)", stderr)
+	}
+	if strings.Contains(stderr, "is not in std") {
+		t.Errorf("stderr leaked a raw go build error: %q", stderr)
+	}
+	// A predeclared stdlib import in the same lone-file shape must stay clean.
+	writeFile(t, dir, "ok.aril", "import fmt\nfunc main() { fmt.println(\"ok\") }\n")
+	if _, _, exit := runAril(t, "run", filepath.Join(dir, "ok.aril")); exit != 0 {
+		t.Errorf("lone-file stdlib import should build; exit=%d", exit)
+	}
+}
+
 // TestCyclicPackageImport — a user-package import cycle is E0116.
 func TestCyclicPackageImport(t *testing.T) {
 	dir := t.TempDir()
