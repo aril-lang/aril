@@ -814,6 +814,17 @@ func (g *gen) isOptionResultTypedExpr(receiver ast.Expr) bool {
 	return false
 }
 
+// isResultReceiver reports whether sema typed receiver as Result — the gate
+// for lowering `r.mapErr(f)` to the free MapErr helper (excludes Option, which
+// has no mapErr).
+func (g *gen) isResultReceiver(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	_, ok := g.info.Type[receiver].(*sema.Result)
+	return ok
+}
+
 // isDurationReceiver reports whether sema typed receiver as the time.Duration
 // handle — the gate for lowering d.add/d.mul to Go operators (D37).
 func (g *gen) isDurationReceiver(receiver ast.Expr) bool {

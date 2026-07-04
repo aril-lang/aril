@@ -152,6 +152,7 @@ Result<T, E>:
   isOk(): bool                       [Tag == Ok]
   isErr(): bool                      [Tag == Err]
   unwrapOr(fallback: T): T           [the Ok payload, else fallback]
+  mapErr(f: (E) => E2): Result<T, E2>   [transform the Err payload; Ok untouched]
 ```
 
 `unwrapOr` defaults to the **Ok** payload type `T` (the fallback
@@ -159,6 +160,18 @@ is a `T`, not an `E`). E is conventionally bound to `error` but any
 type is admissible — `try` requires the inner `E` to equal the
 enclosing function's declared error type (no implicit
 conversion).
+
+`mapErr` is the **error-conversion** combinator (T-Result-MapErr):
+it rewrites the `Err` payload `E → E2` through the handler and
+leaves an `Ok` untouched, so the value keeps flowing as a
+`Result<T, E2>`. It is the bridge that lets a plain `try` cross an
+error-type boundary — `try f().mapErr((e) => Wrapped{…})` propagates
+where the enclosing function's error type differs from `f`'s, with
+no hand-written `match`. Still deliberately out of v1: the Ok-mapping
+`.map` and the partial, panicking `.unwrap` (richer Ok consumption
+stays `match` / `try` / `unwrapOr`). `mapErr` lowers to the free
+`arilrt.MapErr` helper (a Go method cannot introduce the fresh `E2`
+type parameter), the closure to a Go func literal.
 
 **Default error parameter.** When `E` is omitted from a written
 type — `Result<T>` rather than `Result<T, E>` — the second

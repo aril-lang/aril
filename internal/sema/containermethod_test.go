@@ -119,3 +119,31 @@ func TestResultUnwrapOrTypesOkPayload(t *testing.T) {
 		t.Errorf("unwrapOr payload = %v; want int", got)
 	}
 }
+
+// mapErr transforms the Err payload E→E2 (Ok's T preserved), the new E2 read
+// from the handler's return (T-Result-MapErr): `(e: string) => ParseError`
+// yields Result<int, ParseError>, so the whole call's type carries the new E.
+func TestResultMapErrTypesNewErrorPayload(t *testing.T) {
+	src := `type ParseError = { detail: string }
+func f(r: Result<int, string>) {
+  let x = r.mapErr((e) => ParseError{ detail: e })
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "x"); got == nil || got.String() != "Result<int, ParseError>" {
+		t.Errorf("mapErr result = %v; want Result<int, ParseError>", got)
+	}
+}
+
+// mapErr pre-types an unannotated handler param as the receiver's E, so its
+// body checks against the real error type (here `e` is a string, concatenated)
+// and the whole call unifies with the declared Result<T, E2> return.
+func TestResultMapErrHandlerParamTypedAsError(t *testing.T) {
+	src := `func f(r: Result<int, string>): Result<int, string> {
+  return r.mapErr((e) => e + "!")
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (mapErr handler param string), got %v", codes)
+	}
+}

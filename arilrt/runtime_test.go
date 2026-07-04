@@ -20,6 +20,19 @@ func TestOptionResult(t *testing.T) {
 	}
 }
 
+func TestMapErr(t *testing.T) {
+	// Err payload is transformed E→E2; Ok is passed through untouched (its
+	// value preserved, the new E2 zero-valued).
+	errIn := ResultErr[int, string]("boom")
+	if got := MapErr(errIn, func(e string) int { return len(e) }); got.Tag != 1 || got.E != 4 {
+		t.Fatalf("MapErr err: %+v", got)
+	}
+	okIn := ResultOk[int, string](3)
+	if got := MapErr(okIn, func(e string) int { return len(e) }); got.Tag != 0 || got.V != 3 {
+		t.Fatalf("MapErr ok: %+v", got)
+	}
+}
+
 func TestResultOfUnit(t *testing.T) {
 	// ResultOf folds (value, nil) → Ok, (zero, err) → Err.
 	if got := ResultOf(42, error(nil)); got.Tag != 0 || got.V != 42 {

@@ -220,6 +220,23 @@ func (g *gen) emitCall(c *ast.Call) error {
 			return g.emitArgList(c.Args)
 		}
 	}
+	// r.mapErr(f) — transform the Err payload E→E2, keeping an Ok. Lowered to
+	// the free MapErr helper (not a method: a Go method can't add the E2 type
+	// param), gated on sema typing the receiver as Result. `MapErr(recv, f)`.
+	if f, ok := c.Callee.(*ast.Field); ok && f.Name == "mapErr" && len(c.Args) == 1 && g.isResultReceiver(f.Receiver) {
+		g.usesMapErr = true
+		g.b.WriteString(g.rt("MapErr"))
+		g.b.WriteByte('(')
+		if err := g.emitExpr(f.Receiver); err != nil {
+			return err
+		}
+		g.b.WriteString(", ")
+		if err := g.emitExpr(c.Args[0]); err != nil {
+			return err
+		}
+		g.b.WriteByte(')')
+		return nil
+	}
 	// slices.reverse(xs) — returns a NEW reversed slice (Go's slices.Reverse is
 	// in-place), lowered to the SlicesReverse runtime helper. Gated on the sema
 	// `slices` module (like sort.sorted).

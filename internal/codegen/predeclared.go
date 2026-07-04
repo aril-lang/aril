@@ -57,6 +57,24 @@ func (g *gen) writePredeclaredSums() {
 	}
 }
 
+// writePredeclaredMapErr emits the MapErr helper backing `r.mapErr(f)` —
+// the error-conversion combinator (builtins.md §Result methods). A free
+// function, not a method: a Go method cannot introduce the fresh E2 type
+// parameter. Requires the predeclared Result sum (usesResult, forced
+// alongside usesMapErr). Conditional on usage.
+func (g *gen) writePredeclaredMapErr() {
+	if !g.usesMapErr {
+		return
+	}
+	res := g.rt("Result")
+	g.b.WriteString("func MapErr[T any, E any, E2 any](r " + res + "[T, E], f func(E) E2) " + res + "[T, E2] {\n")
+	g.b.WriteString("\tif r.Tag == 1 {\n")
+	g.b.WriteString("\t\treturn " + res + "[T, E2]{Tag: 1, E: f(r.E)}\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + res + "[T, E2]{Tag: 0, V: r.V}\n")
+	g.b.WriteString("}\n")
+}
+
 // writePredeclaredMakeSlice emits the inline helper for the
 // `makeSlice<T>(n: int): []T` predeclared builtin (per
 // `lang-spec/builtins.md` §makeSlice). Returns a fresh slice
@@ -855,6 +873,13 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
 					g.usesSlicesDedup = true
 				}
+			}
+			// `r.mapErr(f)` lowers to the free MapErr helper — detected in the
+			// pre-walk (not just the emitCall intercept) so the inline prelude
+			// emits the helper before the body. Gated on sema typing the
+			// receiver as Result (isResultReceiver), like the emitCall gate.
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "mapErr" && len(v.Args) == 1 && g.isResultReceiver(f.Receiver) {
+				g.usesMapErr = true
 			}
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "reverse" {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {
