@@ -136,7 +136,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Comma-ok stdlib binding — `pkg.method(args)` whose Go referent
 	// returns `(T, bool)`, lowered to `OptionOf(pkg.GoName(args))`
-	// (bindings.go §stdlibCommaOk). The Option mirror of the ResultWrap
+	// (binding.commaOkTable). The Option mirror of the ResultWrap
 	// path above.
 	if f, ok := c.Callee.(*ast.Field); ok {
 		if recv, ok := f.Receiver.(*ast.Ident); ok {
@@ -159,7 +159,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	// (bindings.go). Lower to `time.Duration(n) * time.<Unit>`.
 	if f, ok := c.Callee.(*ast.Field); ok {
 		if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "time" {
-			if unit, ok := timeDurationUnit(f.Name); ok {
+			if unit, ok := binding.DurationUnitOf(f.Name); ok {
 				if len(c.Args) != 1 {
 					return fmt.Errorf("codegen: time.%s expects exactly one argument, got %d", f.Name, len(c.Args))
 				}
@@ -279,7 +279,7 @@ func (g *gen) emitCall(c *ast.Call) error {
 	}
 	// Conversion binding — `pkg.method(arg)` that lowers to a Go type
 	// conversion `target(arg)` (e.g. strings.fromBytes → string(b)),
-	// not a package call (bindings.go §stdlibConversion).
+	// not a package call (binding.conversionTable).
 	if f, ok := c.Callee.(*ast.Field); ok && len(c.Args) == 1 {
 		if recv, ok := f.Receiver.(*ast.Ident); ok {
 			if target, ok := stdlibConversionOf(recv.Name, f.Name); ok {
@@ -796,7 +796,7 @@ func IsStdlibNamespace(name string) bool { return isStdlibNamespaceName(name) }
 
 // isConversionBinding reports whether the stdlib binding pkg.method
 // lowers to a Go type conversion (not a pkg.* call), so it needs no
-// import. Derived from the stdlibConversion registry — the same source
+// import. Derived from binding.conversionTable — the same source
 // the lowering uses, so the two never diverge.
 func isConversionBinding(pkg, method string) bool {
 	_, ok := stdlibConversionOf(pkg, method)

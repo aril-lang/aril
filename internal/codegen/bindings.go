@@ -2,113 +2,27 @@ package codegen
 
 import "github.com/aril-lang/aril/internal/binding"
 
-// bindings.go — the codegen side of the stdlib binding surface. The
-// *mechanical* rows (a value/effect rename, or a `(T, error)` → Result
-// lift) are no longer hand-written here: they are derived from the Go
-// type checker and read from the `internal/binding` registry (D6), the
-// single source `internal/sema` shares. This file keeps only the
-// *idiom* rows that are not mechanical signature transforms — the
-// `fmt.print*` effect renames and `strings.fromBytes` conversion (the
-// time-duration constructors and the runtime-helper bindings live in
-// emitCall). Source of truth for the intended surface is
-// `docs/binding-surface.md`.
+// bindings.go — codegen's view of the stdlib binding surface: thin forwarders
+// over the consolidated tables in internal/binding (membership.go) plus the
+// codegen-local lowering glue. Data + rationale: architecture.md §binding
+// subsystem; surface spelling: binding-surface.md.
 //
-// Three lowering shapes:
-//   - rename:     `pkg.method(args)` → `pkg.GoName(args)` (or a value
-//                 reference `pkg.GoName`). Registry Rename rows +
-//                 stdlibRenameOverlay. Handled by mapFieldName.
-//   - resultWrap: `pkg.method(args)` → `ResultOf(pkg.GoName(args))`.
-//                 Registry ResultWrap rows. Handled by emitCall.
-//   - conversion: `strings.fromBytes(b)` → `string(b)` — a Go type
-//                 conversion, not a package call (needs no import).
-
-// stdlibRenameOverlay holds the value/effect renames the derived
-// registry deliberately excludes because they are a curation choice,
-// not a mechanical signature transform: `fmt.Print/Printf/Println`
-// return `(int, error)` in Go, but the Aril surface treats them as
-// fire-and-forget effects that discard the count+error (binding.Manifest
-// §curation note). They lower like any other rename.
-var stdlibRenameOverlay = map[[2]string]string{
-	{"fmt", "println"}: "Println",
-	{"fmt", "print"}:   "Print",
-	{"fmt", "printf"}:  "Printf",
-	// log effects — like fmt.print*, fire-and-forget renames (binding-surface §log).
-	{"log", "println"}:   "Println",
-	{"log", "printf"}:    "Printf",
-	{"log", "print"}:     "Print",
-	{"log", "fatal"}:     "Fatal",
-	{"log", "fatalf"}:    "Fatalf",
-	{"log", "setPrefix"}: "SetPrefix",
-	{"log", "setFlags"}:  "SetFlags",
-	// Bare-`error` *constructors* (binding.Manifest §curation note): the
-	// returned `error` IS the value, not a failure signal, so they are a
-	// bare-`error` Rename here — NOT a registry ResultWrap row (which would
-	// wrongly lift them to Result<unit, error>). errors.new mirrors the
-	// `error(msg)` built-in; fmt.errorf adds `%w` wrapping.
-	{"errors", "new"}: "New",
-	{"fmt", "errorf"}: "Errorf",
-	// Value-returning `slices` helpers (Go ≥1.21) — generic, so not mechanical
-	// registry rows; they rename to the real Go `slices` package and Go infers
-	// the element type. `slices.reverse` is separate (Go's is in-place/void →
-	// runtime helper). (binding-surface.md §slices.)
-	{"slices", "max"}:      "Max",
-	{"slices", "min"}:      "Min",
-	{"slices", "contains"}: "Contains",
-	{"slices", "indexOf"}:  "Index",
-	// os.stdin — the standard-input stream (Go's os.Stdin, a *os.File that
-	// satisfies io.Reader), the reader `bufio.newScanner` consumes. A value
-	// reference, not a call; sema leaves it Unknown (module field access), which
-	// fits the reader parameter (D37).
-	{"os", "stdin"}: "Stdin",
-}
-
-// timeDurationUnit maps a `time.<ctor>(n)` Duration constructor to
-// its Go `time.<Unit>` constant. The call lowers to
-// `time.Duration(n) * time.<Unit>` (binding-surface.md §time —
-// Aril hides Go's `time.Second * N` idiom behind factory funcs).
-// ("", false) when name is not a Duration constructor.
-func timeDurationUnit(name string) (string, bool) {
-	switch name {
-	case "seconds":
-		return "Second", true
-	case "milliseconds":
-		return "Millisecond", true
-	}
-	return "", false
-}
-
-// stdlibConversion maps a binding that lowers to a Go *type
-// conversion* `<target>(arg)` rather than a package call — so it pulls
-// in no import (binding-surface.md). Single source of truth for both
-// the lowering (emitCall) and the import-suppression check
-// (isConversionBinding); a divergence between the two would mis-track
-// imports.
-var stdlibConversion = map[[2]string]string{
-	{"strings", "fromBytes"}: "string", // []byte → string
-	{"strings", "toBytes"}:   "[]byte", // string → []byte
-}
+// Three lowering shapes: rename `pkg.m(a)` → `pkg.GoName(a)` (mapFieldName);
+// resultWrap → `ResultOf(pkg.GoName(a))` (emitCall); conversion
+// `strings.fromBytes(b)` → `string(b)`, a Go conversion (no import).
 
 // stdlibConversionOf returns the Go conversion target for a conversion
 // binding `recv.name`, or ("", false) when the pair is not one.
+// (Table lives in binding.conversionTable — shared with sema membership.)
 func stdlibConversionOf(recv, name string) (string, bool) {
-	g, ok := stdlibConversion[[2]string{recv, name}]
-	return g, ok
-}
-
-// stdlibCommaOk maps a binding whose Go referent returns a comma-ok
-// `(T, bool)` pair to its Go identifier; the call lowers to
-// `OptionOf(pkg.GoName(args))` (binding-surface.md §os — lookupEnv
-// distinguishes an unset variable from an empty one). These are idiom
-// bindings: the deriver rejects a `(T, bool)` result as non-mechanical.
-var stdlibCommaOk = map[[2]string]string{
-	{"os", "lookupEnv"}: "LookupEnv", // (string, bool) → Option<string>
+	return binding.ConversionOf(recv, name)
 }
 
 // stdlibCommaOkOf returns the Go identifier for a comma-ok binding
 // `recv.name`, or ("", false) when the pair is not one.
+// (Table lives in binding.commaOkTable — shared with sema membership.)
 func stdlibCommaOkOf(recv, name string) (string, bool) {
-	g, ok := stdlibCommaOk[[2]string{recv, name}]
-	return g, ok
+	return binding.CommaOkOf(recv, name)
 }
 
 // stdlibRenameOf returns the Go identifier for a value/effect-returning
@@ -122,7 +36,7 @@ func stdlibRenameOf(recv, name string) (string, bool) {
 	if g, ok := binding.RenameOf(recv, name); ok {
 		return g, true
 	}
-	if g, ok := stdlibRenameOverlay[[2]string{recv, name}]; ok {
+	if g, ok := binding.RenameOverlayOf(recv, name); ok {
 		return g, true
 	}
 	// Value-handle constructor (binding.handleCtors): a package function that

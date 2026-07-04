@@ -99,6 +99,28 @@ signature transforms — fire-and-forget effects (`fmt.print*`, whose Go
 involves judgment" rule, made concrete. (The committed-`std/<package>.aril`
 form above is the longer arc; the Go-data registry is the realized MVP.)
 
+**Binding membership is consolidated in `internal/binding`** (`membership.go`).
+The idiom rows that stay hand-authored still split into two flavours: the
+*value* tables whose data has no codegen dependency (the rename overlay for
+`fmt.print*`/`log.*`/`slices.max`/…, the `strings.fromBytes` conversion table,
+the `os.lookupEnv` comma-ok table, the time-duration constructors) live in
+`internal/binding` so `internal/sema` and `internal/codegen` share them; the
+rows whose lowering *is* code (the `json`/`fmt.scan`/`errors.as` codegen
+intercepts, the `sort`/`slices` runtime helpers, and the codegen-owned
+`reflect` surface) keep their code in the consumer but register their
+*membership* in `binding.idiomMembers`. `binding.IsMember(pkg, arilName)` folds
+every source — registry, overlays, handle constructors, idiom members — into
+one predicate. Its single consumer is sema's unbound-member diagnostic: firing
+"member not bound" requires the *complete* bound set, and the pre-consolidation
+overlays lived in `internal/codegen`, invisible to sema. The predicate is
+sound-over-complete — a member missing from `idiomMembers` suppresses the
+diagnostic (leaks as before), never rejects a working call — so a new codegen
+intercept must add its `idiomMembers` row in lockstep, checked by the corpus
+ratchet (a false reject drops `build_ok`). The diagnostic gates on the sema
+`SymBuiltinModule` symbol, which only the shipped predeclared namespaces
+produce, so a user's own `extern`/`@go` binding (a distinct `SymExtern*`
+symbol) is never mistaken for an unbound stdlib member.
+
 ### Mapping rules (Go -> Aril)
 
 | Go shape | Aril shape | Notes |
