@@ -61,3 +61,45 @@ func TestCatchNonResultSubjectE0410(t *testing.T) {
 		t.Errorf("expected E0410 (catch on non-Result), got %v", codes)
 	}
 }
+
+// A handler whose last statement is an `if`/`else` with every branch diverging
+// satisfies the divergence rule (catchBlockDiverges recurses into if/else).
+func TestCatchDivergesViaIfElse(t *testing.T) {
+	src := `func f(r: Result<int, string>, flag: bool): int {
+  let n = r catch e {
+    if flag { return 0 } else { return 1 }
+  }
+  return n
+}
+`
+	if codes := codesOf(t, src); hasCode(codes, "E0409") {
+		t.Errorf("if/else-both-diverge handler should satisfy the rule, got %v", codes)
+	}
+}
+
+// An `if` with no `else` does NOT diverge (the missing branch falls through) —
+// E0409 fires.
+func TestCatchIfWithoutElseIsNonDivergingE0409(t *testing.T) {
+	src := `func f(r: Result<int, string>, flag: bool): int {
+  let n = r catch e {
+    if flag { return 0 }
+  }
+  return n
+}
+`
+	if codes := codesOf(t, src); !hasCode(codes, "E0409") {
+		t.Errorf("if-without-else handler must fire E0409, got %v", codes)
+	}
+}
+
+// A handler diverging via panic satisfies the rule.
+func TestCatchDivergesViaPanic(t *testing.T) {
+	src := `func f(r: Result<int, string>): int {
+  let n = r catch e { panic("boom") }
+  return n
+}
+`
+	if codes := codesOf(t, src); hasCode(codes, "E0409") {
+		t.Errorf("panic handler should satisfy the divergence rule, got %v", codes)
+	}
+}

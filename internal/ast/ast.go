@@ -1150,7 +1150,7 @@ type MatchExpr struct {
 	// `expr catch e { … }` control-flow form (grammar.ebnf §CatchExpr,
 	// desugaring.md §Catch): a two-arm `{ Ok(v) => v, Err(e) => <block> }`
 	// whose Err block is required to diverge. sema uses it to enforce that
-	// rule (E0406) and to phrase subject/handler diagnostics as `catch`,
+	// rule (E0409) and to phrase subject/handler diagnostics as `catch`,
 	// not `match`. Zero value (false) is an ordinary user `match`.
 	FromCatch bool
 	// CatchKw is the `catch` keyword span (only when FromCatch) — the anchor

@@ -90,7 +90,7 @@ func (p *parser) parseMatchExpr() (*ast.MatchExpr, *Diag) {
 // parseCatchTail parses the postfix `catch e { block }` after its subject and
 // desugars it to a two-arm match (desugaring.md §Catch):
 // `match subject { Ok(__aril_catch_v) => __aril_catch_v, Err(e) => { block } }`,
-// tagged FromCatch so sema enforces the Err block diverges (E0406). The block
+// tagged FromCatch so sema enforces the Err block diverges (E0409). The block
 // shares the enclosing function's frame — a `return` in it returns from that
 // function — because a match arm, unlike a closure, is not a new return frame.
 func (p *parser) parseCatchTail(subject ast.Expr) (ast.Expr, *Diag) {

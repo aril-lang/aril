@@ -678,14 +678,16 @@ MatchArm     = Pattern "=>" Newline? ( Expr | AssignStmt ) ;
 
 ScopeExpr    = "scope" TypeArgs? ( "(" Expr ")" )? Block ;   // optional parent ctx
 TryExpr      = "try" Expr ;
-// CatchExpr is the postfix `Subject catch e { block }` (see Expr → CatchTail):
-// `try`'s sibling, but with a custom, mandatorily-diverging bail instead of
-// the implicit `return Err(e)`. The handler `block` shares the enclosing
-// function's frame (a `return` in it returns from that function), and it MUST
-// diverge — `return` / `os.exit` / `panic` (T-Catch, E0409); it may not fall
-// through with a value (that is `unwrapOr`'s role). Desugars to a two-arm
-// `match { Ok(v) => v, Err(e) => block }` (desugaring.md §Catch).
-CatchExpr    = OrExpr "catch" Ident Block ;
+// CatchExpr is the illustrative full spelling of the postfix catch form — the
+// same thing the grammar admits via `Expr = OrExpr CatchTail?` above, named
+// here (like TryExpr) for cross-reference. `try`'s sibling, but with a custom,
+// mandatorily-diverging bail instead of the implicit `return Err(e)`. The
+// handler `block` shares the enclosing function's frame (a `return` in it
+// returns from that function), and it MUST diverge — `return` / `os.exit` /
+// `panic` (T-Catch, E0409); it may not fall through with a value (that is
+// `unwrapOr`'s role). Desugars to `match { Ok(v) => v, Err(e) => block }`
+// (desugaring.md §Catch).
+CatchExpr    = OrExpr CatchTail ;   // ≡ OrExpr "catch" Ident Block
 SpawnExpr    = "spawn" Block ;
 
 // =============================================================

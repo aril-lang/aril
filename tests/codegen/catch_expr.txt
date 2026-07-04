@@ -2,8 +2,11 @@
 `expr catch e { block }` — the postfix control-flow form (desugaring.md
 §Catch). Unwraps the Ok value and keeps the flow going; on Err runs the
 handler block, which is *required* to diverge (here `return 0` bails the
-enclosing function). Desugars to `match { Ok(v) => v, Err(e) => <block> }`,
-so it reuses the value-position match lowering — no new codegen path.
+enclosing function). Parses as a `FromCatch` two-arm match, but codegen
+lowers it via a `try`-style statement preamble (`__aril_catch_N := …; if
+…Tag == Err { <handler> }`), NOT the value-position match IIFE — so the
+handler's `return` returns from the enclosing function instead of being
+trapped in a `func() T { … }()` (catch.go §emitCatchPreamble).
 
 --- INPUT ---
 import fmt
