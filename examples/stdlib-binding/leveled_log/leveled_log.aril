@@ -1,10 +1,11 @@
-// DEMAND SKETCH (build-fails until the `log` package binds) — leveled logging
-// with a prefix. `log` is a recognised namespace but no functions are bound yet.
-// Forces `log.setPrefix(s)`, `log.printf(fmt, ...)`, `log.println(...)`
-// (binding-surface.md §log).
+// Leveled logging with a prefix over the `log` package. Exercises
+// `log.setFlags`, `log.setPrefix`, `log.println`, `log.printf`
+// (binding-surface.md §log). `log` writes to stderr, so correctness is the
+// exit code, not a stdout diff.
 import log
 
 func main() {
+  log.setFlags(0)                // drop the date/time prefix — deterministic output
   log.setPrefix("[svc] ")
   log.println("starting up")
   log.printf("listening on port %d", 8080)

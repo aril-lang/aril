@@ -32,6 +32,14 @@ var stdlibRenameOverlay = map[[2]string]string{
 	{"fmt", "println"}: "Println",
 	{"fmt", "print"}:   "Print",
 	{"fmt", "printf"}:  "Printf",
+	// log effects — like fmt.print*, fire-and-forget renames (binding-surface §log).
+	{"log", "println"}:   "Println",
+	{"log", "printf"}:    "Printf",
+	{"log", "print"}:     "Print",
+	{"log", "fatal"}:     "Fatal",
+	{"log", "fatalf"}:    "Fatalf",
+	{"log", "setPrefix"}: "SetPrefix",
+	{"log", "setFlags"}:  "SetFlags",
 	// Bare-`error` *constructors* (binding.Manifest §curation note): the
 	// returned `error` IS the value, not a failure signal, so they are a
 	// bare-`error` Rename here — NOT a registry ResultWrap row (which would

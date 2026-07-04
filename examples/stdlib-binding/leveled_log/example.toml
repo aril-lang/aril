@@ -4,6 +4,6 @@ category = "stdlib-binding"
 showcase = false
 forces   = []
 since    = "0.1"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "leveled_log.aril"

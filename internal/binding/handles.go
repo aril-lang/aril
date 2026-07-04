@@ -42,10 +42,8 @@ type HandleType struct {
 	GoType  string
 	GoPkg   string
 	Runtime bool
-	// Constructable marks a handle that is a zero-value Go struct built in
-	// place with `pkg.Type{}` (sync.Mutex), as opposed to one obtained only
-	// from a constructor / dial (regexp.Regexp, net.Conn — those stay
-	// obtain-only, so a brace literal on them is rejected).
+	// Constructable: built in place via `pkg.Type{}`, vs obtain-only handles
+	// reached through a ctor (lowering-go §Brace literals).
 	Constructable bool
 }
 
@@ -69,13 +67,11 @@ var handleTypes = map[string]HandleType{
 	"net.Conn":     {GoType: "net.Conn", GoPkg: "net"},
 	"net.Listener": {GoType: "net.Listener", GoPkg: "net"},
 	"net.Addr":     {GoType: "net.Addr", GoPkg: "net"},
-	// sync primitives (IDIOM-CLOSURE epoch). Unlike every handle above, these
-	// are zero-value Go structs built in place (`sync.Mutex{}`) rather than
-	// obtained from a constructor — Constructable lets the brace-literal path
-	// lower them. Value types (Lock/Add have pointer receivers, but a local
-	// var is addressable, so Go auto-addresses `mu.Lock()`).
+	// sync primitives — Constructable value structs (binding-surface §sync).
 	"sync.Mutex":     {GoType: "sync.Mutex", GoPkg: "sync", Constructable: true},
 	"sync.WaitGroup": {GoType: "sync.WaitGroup", GoPkg: "sync", Constructable: true},
+	// context.Context — a Go interface (bare spelling, like net.Conn), obtain-only.
+	"context.Context": {GoType: "context.Context", GoPkg: "context"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -140,8 +136,7 @@ var handleMethods = map[string]map[string]HandleBinding{
 	"net.Addr": {
 		"string": {GoName: "String", Params: nil, Return: "string"},
 	},
-	// sync method sets. lock/unlock/wait/done return nothing (Aril `unit`);
-	// tryLock returns bool; add takes the delta.
+	// sync method sets — lock/unlock/wait/done return `unit` (binding-surface §sync).
 	"sync.Mutex": {
 		"lock":    {GoName: "Lock", Params: nil, Return: "unit"},
 		"unlock":  {GoName: "Unlock", Params: nil, Return: "unit"},
@@ -151,6 +146,10 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"add":  {GoName: "Add", Params: []string{"int"}, Return: "unit"},
 		"done": {GoName: "Done", Params: nil, Return: "unit"},
 		"wait": {GoName: "Wait", Params: nil, Return: "unit"},
+	},
+	"context.Context": {
+		// done() → Go's <-chan struct{}; err/deadline/value deferred (binding-surface §context).
+		"done": {GoName: "Done", Params: nil, Return: "RecvChan<unit>"},
 	},
 }
 
@@ -178,9 +177,8 @@ func IsHandleType(spelled string) bool {
 	return ok
 }
 
-// IsConstructableHandle reports whether `spelled` names a handle type built
-// in place with a zero-value `pkg.Type{}` literal (sync.Mutex), as opposed to
-// an obtain-only handle reached through a constructor.
+// IsConstructableHandle reports whether `spelled` is built in place with a
+// zero-value `pkg.Type{}` literal (lowering-go §Brace literals).
 func IsConstructableHandle(spelled string) bool {
 	ht, ok := handleTypes[spelled]
 	return ok && ht.Constructable
