@@ -76,6 +76,61 @@ func TestDeferredMapEntriesFiresE0214(t *testing.T) {
 	}
 }
 
+// E0214 also covers a primitive receiver with a closed method set — numeric
+// types and bool have none, string has len/bytes/runes, error has error(). An
+// unknown method on one is a real miss, not the go/types leak `type int has no
+// field or method …`. Any/Dynamic (separate types, escape hatches) stay silent.
+
+func TestUnknownIntMemberFiresE0214(t *testing.T) {
+	src := `func use(n: int): int { return n.nope() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown int member), got %v", codes)
+	}
+}
+
+func TestUnknownBoolMemberFiresE0214(t *testing.T) {
+	src := `func use(b: bool): bool { return b.flip() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown bool member), got %v", codes)
+	}
+}
+
+func TestUnknownErrorMemberFiresE0214(t *testing.T) {
+	src := `func use(e: error): string { return e.stack() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown error member), got %v", codes)
+	}
+}
+
+// The `error` interface's real method must resolve (typed as string), not fire
+// E0214 — the false-positive guard for the one primitive with a method.
+func TestErrorDotErrorNoE0214(t *testing.T) {
+	src := `func use(e: error): string { return e.error() }`
+	if codes := runCheck(t, src); contains(codes, "E0214") {
+		t.Errorf("valid e.error() must not fire E0214, got %v", codes)
+	}
+}
+
+func TestErrorDotErrorTypesString(t *testing.T) {
+	src := `func use(e: error) {
+  let m = e.error()
+}`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "m"); got == nil || got.String() != "string" {
+		t.Errorf("e.error() = %v; want string", got)
+	}
+}
+
+// An Any-typed receiver (the binding-boundary escape type) has no known member
+// set, so a method on it must NOT fire E0214 — sound over complete.
+func TestAnyMemberNoE0214(t *testing.T) {
+	src := `extern func raw(): Any
+func use() { let _ = raw().whatever() }`
+	if codes := runCheck(t, src); contains(codes, "E0214") {
+		t.Errorf("Any-typed receiver member must not fire E0214, got %v", codes)
+	}
+}
+
 // The known builtin-generic methods must NOT fire E0214 (they resolve through
 // containerMethodType/channelMethodType) — the false-positive guard.
 func TestKnownContainerMembersNoE0214(t *testing.T) {

@@ -760,16 +760,15 @@ func (c *checker) inferField(f *ast.Field) Type {
 	}
 	named, ok := recv.(*Named)
 	if !ok {
-		// A builtin-generic receiver (Map/Set/Stack/[]T/Option/Result/channel)
-		// has a fully-known method set, resolved by channelMethodType /
-		// containerMethodType above; a miss here is a real unknown-member error.
-		// Report it in Aril coordinates (E0214) rather than falling through to
-		// Unknown, which leaks a go/types `type arilrt.… has no field or method`
-		// against generated Go (D10). `mapErr` is the one Result method not in
-		// containerMethodType (its E2 result is dynamic — typed in inferCall), so
-		// exclude it here; its arity is checked in inferCall. Sound-over-complete
-		// (D38): only these fully-known kinds fire; Unknown/other stay silent.
-		if hasKnownBuiltinMethodSet(recv) && !isResultMapErr(recv, f.Name) {
+		// A builtin receiver with a fully-known method set (a container/sum/
+		// channel, or a closed-method-set primitive like int/string/error) —
+		// its valid methods resolved via channelMethodType / containerMethodType
+		// above, so a miss here is a real unknown-member error. Report it in Aril
+		// coordinates (E0214) rather than falling through to Unknown, which leaks
+		// a go/types `type … has no field or method` against generated Go (D10).
+		// Sound-over-complete (D38): only fully-known kinds fire — a bare type
+		// parameter, Any/Dynamic, or an Unknown receiver stays silent.
+		if builtinMemberMiss(recv, f.Name) {
 			c.report("E0214", "Type "+recv.String()+" has no member `"+f.Name+"`", f.Span)
 		}
 		return &Unknown{}

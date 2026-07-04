@@ -25,3 +25,10 @@ expect  = ["E0214"]
 stage   = "sema"
 matches = "errors/unknown-result-member.expected"
 origin  = "synthetic"
+
+[[error]]
+patch   = "errors/unknown-error-member.patch"  # e.stack — a closed-method-set primitive (error has only error())
+expect  = ["E0214"]
+stage   = "sema"
+matches = "errors/unknown-error-member.expected"
+origin  = "synthetic"
