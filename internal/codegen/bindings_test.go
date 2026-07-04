@@ -1,6 +1,10 @@
 package codegen
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/aril-lang/aril/internal/binding"
+)
 
 // TestStdlibRenameOf locks the rename registry's gating: a stdlib
 // namespace + known method renames to the Go identifier; a non-stdlib
@@ -79,18 +83,14 @@ func TestStdlibConversionExclusivity(t *testing.T) {
 	}
 }
 
-// TestTimeDurationUnit locks the Duration-constructor mapping. These
-// are NOT renames (they lower to `time.Duration(n) * time.<Unit>`), so
-// they must be absent from stdlibRename and present here.
-func TestTimeDurationUnit(t *testing.T) {
-	if got, ok := timeDurationUnit("milliseconds"); !ok || got != "Millisecond" {
-		t.Errorf(`timeDurationUnit("milliseconds") = (%q,%v); want ("Millisecond",true)`, got, ok)
-	}
-	if got, ok := timeDurationUnit("seconds"); !ok || got != "Second" {
-		t.Errorf(`timeDurationUnit("seconds") = (%q,%v); want ("Second",true)`, got, ok)
-	}
-	if _, ok := timeDurationUnit("after"); ok {
-		t.Errorf(`timeDurationUnit("after") should be false (it is a rename)`)
+// TestTimeDurationUnitNotRename locks the codegen-side exclusivity: the
+// Duration constructors (now binding.DurationUnitOf — they lower to
+// `time.Duration(n) * time.<Unit>`) must NOT also resolve as a rename, or the
+// call lowering would diverge. The unit mapping itself is tested in
+// internal/binding (TestMembershipAccessors).
+func TestTimeDurationUnitNotRename(t *testing.T) {
+	if got, ok := binding.DurationUnitOf("milliseconds"); !ok || got != "Millisecond" {
+		t.Errorf(`binding.DurationUnitOf("milliseconds") = (%q,%v); want ("Millisecond",true)`, got, ok)
 	}
 	// The Duration constructors must not also be in the rename table.
 	if _, ok := stdlibRenameOf("time", "milliseconds"); ok {
