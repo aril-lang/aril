@@ -38,7 +38,7 @@ func (g *gen) emitTailReturn(e ast.Expr) error {
 	case *ast.Block:
 		return g.emitBlockTail(v)
 	}
-	if isDivergingExpr(e) {
+	if ast.ExprDiverges(e) {
 		return g.emitStmt(&ast.ExprStmt{Span: e.NodeSpan(), Expr: e})
 	}
 	g.line(e.NodeSpan().StartLine)

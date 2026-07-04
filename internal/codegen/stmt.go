@@ -79,23 +79,9 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 			if g.inSpawnBody {
 				return g.emitSpawnReturn(r)
 			}
-			// `return try e` — emit the try preamble, then
-			// `return tmp.V`.
-			if try, ok := r.Value.(*ast.TryExpr); ok {
-				tmp, err := g.emitTryPreamble(try)
-				if err != nil {
-					return err
-				}
-				g.line(r.Span.StartLine)
-				g.writeIndent()
-				g.b.WriteString("return ")
-				g.b.WriteString(tmp)
-				g.b.WriteString(".V\n")
-				return nil
-			}
-			// `return e catch err { … }` — catch preamble, then `return tmp.V`.
-			if m, ok := r.Value.(*ast.MatchExpr); ok && m.FromCatch {
-				tmp, err := g.emitCatchPreamble(m)
+			// `return try e` / `return e catch err { … }` — emit the bail
+			// preamble, then `return tmp.V`.
+			if tmp, isBail, err := g.emitBailPreamble(r.Value); isBail {
 				if err != nil {
 					return err
 				}
@@ -133,9 +119,12 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 			g.b.WriteByte('\n')
 			return nil
 		}
-		// Bare `try e` as a discarded expression statement.
-		if try, ok := v.Expr.(*ast.TryExpr); ok {
-			_, err := g.emitTryPreamble(try)
+		// Bare `try e` / `e catch err { … }` as a discarded expression
+		// statement (side-effecting subject, Ok value unused) — emit just the
+		// bail preamble. The catch case must precede the general match path
+		// below: a FromCatch match's Ok arm is a bare `__aril_catch_v` that a
+		// plain switch would emit as an unused-value statement.
+		if _, isBail, err := g.emitBailPreamble(v.Expr); isBail {
 			return err
 		}
 		// Diverging loop expressions lower to Go statements.
@@ -154,15 +143,6 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 			g.writeIndent()
 			g.b.WriteString("continue\n")
 			return nil
-		}
-		// `e catch err { … }` as a discarded statement (a side-effecting
-		// subject whose Ok value is unused) — emit just the catch preamble,
-		// like a bare `try` (catch.go). Must precede the general match path:
-		// the FromCatch match's Ok arm is a bare `__aril_catch_v` that a plain
-		// switch would emit as an unused-value statement.
-		if m, ok := v.Expr.(*ast.MatchExpr); ok && m.FromCatch {
-			_, err := g.emitCatchPreamble(m)
-			return err
 		}
 		// MatchExpr: lower to Go `switch` statement.
 		if m, ok := v.Expr.(*ast.MatchExpr); ok {
@@ -326,34 +306,11 @@ func (g *gen) nextDestructureTemp() string {
 // Immutability of `let` is a sema concern (not yet implemented); the
 // generated Go is identical for both keywords.
 func (g *gen) emitLetOrVar(span ast.Span, name string, declType ast.TypeExpr, value ast.Expr) error {
-	// `let x = try e` / `var x = try e` — emit the try
-	// preamble, then bind the unwrapped value.
-	if try, ok := value.(*ast.TryExpr); ok {
-		tmp, err := g.emitTryPreamble(try)
-		if err != nil {
-			return err
-		}
-		g.line(span.StartLine)
-		g.writeIndent()
-		g.b.WriteString("var ")
-		g.b.WriteString(goIdent(name))
-		if declType != nil {
-			g.b.WriteByte(' ')
-			if err := g.emitTypeExpr(declType); err != nil {
-				return err
-			}
-		}
-		g.b.WriteString(" = ")
-		g.b.WriteString(tmp)
-		g.b.WriteString(".V\n")
-		return nil
-	}
-	// `let x = e catch err { … }` — the catch preamble (like try, but a
-	// custom diverging handler), then bind the unwrapped Ok value. Lowered
-	// this way, not as a value-position match, so the handler's `return`
-	// escapes the enclosing function (catch.go §emitCatchPreamble).
-	if m, ok := value.(*ast.MatchExpr); ok && m.FromCatch {
-		tmp, err := g.emitCatchPreamble(m)
+	// `let/var x = try e` / `= e catch err { … }` — emit the bail preamble
+	// (try: early-return on Err/None; catch: a custom diverging handler that
+	// escapes the enclosing function — lowered as a statement, not a
+	// value-position match), then bind the unwrapped Ok value.
+	if tmp, isBail, err := g.emitBailPreamble(value); isBail {
 		if err != nil {
 			return err
 		}
