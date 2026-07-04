@@ -3,7 +3,7 @@ package sema
 import "github.com/aril-lang/aril/internal/binding"
 
 // predeclaredSymbols seeds the bottom scope.
-// Source: lang-spec/keywords.md §Built-in identifiers + binding.StdlibNamespaces.
+// Source: lang-spec/keywords.md §Built-in identifiers + binding.BuiltinModules.
 func predeclaredSymbols() map[string]*Symbol {
 	out := map[string]*Symbol{}
 
