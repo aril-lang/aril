@@ -275,16 +275,18 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	resFiles := files
-	strip := map[string]bool{}
-	if m != nil {
-		res, err := resolvePackages(files, m)
-		if err != nil {
-			return nil, nil, err
-		}
-		resFiles = res.files
-		strip = res.userImports
+	// Always resolve, even for a lone file (m == nil): classifyImport rejects
+	// a genuinely-unknown import path with E0117 rather than letting it leak a
+	// raw `go build` "package X is not in std" against generated Go (D10).
+	// Without a manifest classifyImport never yields importUser, so this only
+	// resolves stdlib / std-aril / rejects unknown — the lone-package file set
+	// is unchanged.
+	res, err := resolvePackages(files, m)
+	if err != nil {
+		return nil, nil, err
 	}
+	resFiles := res.files
+	strip := res.userImports
 	// Inject bundled std modules (manifest-independent — a lone file may
 	// `import std/pred`). The virtual module paths join the build; the import
 	// paths are stripped from the Go import block like a user package.

@@ -385,7 +385,7 @@
     {
       "path": "examples/stdlib-binding/healthcheck_server/healthcheck_server.aril",
       "stage": "sema",
-      "blocker": "error[E0103]: Unknown name http"
+      "blocker": "error[E0117]: unknown import path \"http\""
     },
     {
       "path": "examples/stdlib-binding/http_by_hand/http_by_hand.aril",
