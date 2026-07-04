@@ -87,7 +87,7 @@ func TestStdlibConversionExclusivity(t *testing.T) {
 // Duration constructors (now binding.DurationUnitOf — they lower to
 // `time.Duration(n) * time.<Unit>`) must NOT also resolve as a rename, or the
 // call lowering would diverge. The unit mapping itself is tested in
-// internal/binding (TestMembership).
+// internal/binding (TestMembershipAccessors).
 func TestTimeDurationUnitNotRename(t *testing.T) {
 	if got, ok := binding.DurationUnitOf("milliseconds"); !ok || got != "Millisecond" {
 		t.Errorf(`binding.DurationUnitOf("milliseconds") = (%q,%v); want ("Millisecond",true)`, got, ok)
