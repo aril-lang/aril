@@ -1,0 +1,1 @@
+error[E0202]: Wrong arity in call to mapErr: expects 1 argument (a handler `(e) => …`), got 0

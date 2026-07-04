@@ -442,6 +442,13 @@ func (c *checker) inferCall(call *ast.Call) Type {
 	if rt, handled := c.inferResultMapErr(call); handled {
 		return rt
 	}
+	// `mapErr` on a Result with the wrong arity: it is a real method (exactly
+	// one handler arg), but inferResultMapErr only claims the 1-arg shape, so a
+	// 0- or 2-arg call would otherwise leak a go/types error from the MapErr
+	// helper. Report arity in Aril coordinates (E0202); result stays Unknown.
+	if c.isMapErrArityMiss(call) {
+		c.report("E0202", "Wrong arity in call to mapErr: expects 1 argument (a handler `(e) => …`), got "+strconv.Itoa(len(call.Args)), call.Span)
+	}
 	args := make([]Type, len(call.Args))
 	for i, a := range call.Args {
 		args[i] = c.inferExpr(a)
@@ -577,6 +584,20 @@ func (c *checker) inferResultMapErr(call *ast.Call) (Type, bool) {
 		e2 = fn.Return
 	}
 	return &Result{T: res.T, E: e2}, true
+}
+
+// isMapErrArityMiss reports whether call is `r.mapErr(...)` on a Result receiver
+// with an argument count other than 1 — the shape inferResultMapErr does not
+// claim (it requires exactly one handler). The receiver type is read from cache
+// (inferCall's callee walk already typed it). The 1-arg shape returns false here
+// (it is handled by inferResultMapErr); this only catches the 0-/2+-arg misuse.
+func (c *checker) isMapErrArityMiss(call *ast.Call) bool {
+	f, ok := call.Callee.(*ast.Field)
+	if !ok || f.Name != "mapErr" || len(call.Args) == 1 {
+		return false
+	}
+	_, ok = c.info.Type[f.Receiver].(*Result)
+	return ok
 }
 
 // staticMethodType returns the Func type of a user-class static method
@@ -739,6 +760,18 @@ func (c *checker) inferField(f *ast.Field) Type {
 	}
 	named, ok := recv.(*Named)
 	if !ok {
+		// A builtin-generic receiver (Map/Set/Stack/[]T/Option/Result/channel)
+		// has a fully-known method set, resolved by channelMethodType /
+		// containerMethodType above; a miss here is a real unknown-member error.
+		// Report it in Aril coordinates (E0214) rather than falling through to
+		// Unknown, which leaks a go/types `type arilrt.… has no field or method`
+		// against generated Go (D10). `mapErr` is the one Result method not in
+		// containerMethodType (its E2 result is dynamic — typed in inferCall), so
+		// exclude it here; its arity is checked in inferCall. Sound-over-complete
+		// (D38): only these fully-known kinds fire; Unknown/other stay silent.
+		if hasKnownBuiltinMethodSet(recv) && !isResultMapErr(recv, f.Name) {
+			c.report("E0214", "Type "+recv.String()+" has no member `"+f.Name+"`", f.Span)
+		}
 		return &Unknown{}
 	}
 	// Value-handle method access — `re.matchString(s)` on a stdlib handle

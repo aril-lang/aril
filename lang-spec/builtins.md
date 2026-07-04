@@ -231,7 +231,7 @@ class Map<K, V> {
   delete(k: K): unit
   keys(): []K
   values(): []V
-  entries(): [](K, V)
+  entries(): [](K, V)              [deferred — not implemented in v1; iterate with `for (k, v) in m`]
 }
 ```
 
@@ -247,8 +247,8 @@ explicitly the **total**-API path is `m.get(k): Option<V>`
 followed by a `match`.
 
 `m[k] = v` (index-assign) lowers to `m.set(k, v)` — the wrapper
-keeps insertion order in sync with the backing map so later
-`m.entries()` / `m.keys()` iterates in the order keys were
+keeps insertion order in sync with the backing map so a later
+`m.keys()` (or `for (k, v) in m`) iterates in the order keys were
 first written.
 
 Iteration: `for (k, v) in m { ... }` (`IterElem(Map<K, V>) =

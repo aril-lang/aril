@@ -1,0 +1,11 @@
+--- error_handling.aril
++++ error_handling.aril
+@@ -22,7 +22,7 @@
+ // error type is ConfigError — `.mapErr` bridges the boundary so a plain `try`
+ // still applies (no hand-written `match`).
+ func parsePort(raw: string): Result<int, ConfigError> {
+-  let n = try strconv.atoi(strings.trimSpace(raw)).mapErr((e) => ConfigError{ field: "port", detail: e.error() })
++  let n = try strconv.atoi(strings.trimSpace(raw)).mapErr()
+   if n < 1 || n > 65535 {
+     return Err(ConfigError{ field: "port", detail: "out of range: " + raw })
+   }

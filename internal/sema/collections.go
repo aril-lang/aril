@@ -294,9 +294,11 @@ func containerMethodType(recv Type, name string) *Func {
 			return &Func{Return: &Slice{Elem: r.Key}}
 		case "values":
 			return &Func{Return: &Slice{Elem: r.Val}}
-			// `entries()` is in builtins.md but has no prelude method in
-			// codegen yet — left out so the sema table stays in lockstep
-			// with what codegen can lower (no spec-ahead typing).
+			// `entries()` is marked *deferred* in builtins.md §Map (no
+			// prelude method in codegen) — left out so the sema table stays
+			// in lockstep with what codegen can lower (no spec-ahead typing).
+			// A call to it now reports E0214 (unknown member), which agrees
+			// with the deferred spec; iterate via `for (k, v) in m`.
 		}
 	case *Set:
 		switch name {
@@ -368,6 +370,30 @@ func containerMethodType(recv Type, name string) *Func {
 		}
 	}
 	return nil
+}
+
+// hasKnownBuiltinMethodSet reports whether recv is a builtin-generic type whose
+// method set is fully enumerated by containerMethodType / channelMethodType — a
+// container (`Map`/`Set`/`Stack`/`[]T`), a sum (`Option`/`Result`), or a channel
+// kind. For these an unresolved method name is a genuine unknown-member error
+// (E0214), not an incomplete-model abstention. A `*Named`, a bare type
+// parameter, `Unknown`, or a primitive `*Builtin` is NOT in this set (their
+// member miss is handled — or deliberately not — elsewhere).
+func hasKnownBuiltinMethodSet(recv Type) bool {
+	switch recv.(type) {
+	case *Map, *Set, *Stack, *Slice, *Option, *Result, *Channel, *SendChan, *RecvChan:
+		return true
+	}
+	return false
+}
+
+// isResultMapErr reports whether recv.name is the `mapErr` combinator on a
+// Result — the one Result method absent from containerMethodType (its E2 result
+// type is read from the handler, so it is typed in inferCall, not as a fixed
+// Func). Callers use it to spare `mapErr` from the unknown-member check.
+func isResultMapErr(recv Type, name string) bool {
+	_, ok := recv.(*Result)
+	return ok && name == "mapErr"
 }
 
 // channelMethodType returns the Func type of a channel method
