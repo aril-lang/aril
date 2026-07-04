@@ -294,9 +294,11 @@ func containerMethodType(recv Type, name string) *Func {
 			return &Func{Return: &Slice{Elem: r.Key}}
 		case "values":
 			return &Func{Return: &Slice{Elem: r.Val}}
-			// `entries()` is in builtins.md but has no prelude method in
-			// codegen yet — left out so the sema table stays in lockstep
-			// with what codegen can lower (no spec-ahead typing).
+			// `entries()` is marked *deferred* in builtins.md §Map (no
+			// prelude method in codegen) — left out so the sema table stays
+			// in lockstep with what codegen can lower (no spec-ahead typing).
+			// A call to it now reports E0214 (unknown member), which agrees
+			// with the deferred spec; iterate via `for (k, v) in m`.
 		}
 	case *Set:
 		switch name {

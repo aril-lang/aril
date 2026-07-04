@@ -60,6 +60,22 @@ func TestUnknownMapMemberFiresE0214(t *testing.T) {
 	}
 }
 
+func TestUnknownSliceMemberFiresE0214(t *testing.T) {
+	src := `func use(xs: []int) { let _ = xs.nope() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown slice member), got %v", codes)
+	}
+}
+
+// A deferred-but-documented Map method (entries, unimplemented in v1) is an
+// unknown member today — the diagnostic agrees with the spec's `deferred` mark.
+func TestDeferredMapEntriesFiresE0214(t *testing.T) {
+	src := `func use(m: Map<int, int>) { let _ = m.entries() }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (deferred Map.entries), got %v", codes)
+	}
+}
+
 // The known builtin-generic methods must NOT fire E0214 (they resolve through
 // containerMethodType/channelMethodType) — the false-positive guard.
 func TestKnownContainerMembersNoE0214(t *testing.T) {
