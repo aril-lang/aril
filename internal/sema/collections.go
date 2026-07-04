@@ -269,13 +269,14 @@ func channelWidens(want, got Type) bool {
 	return false
 }
 
-// containerMethodType returns the Func type of a predeclared-container
-// method (`Map`/`Set`/`Stack`/`[]T`) for the given receiver, or nil
-// when recv is not such a container or has no method of that name.
-// Signatures mirror the prelude methods emitted by codegen exactly
-// (builtins.md §Slice/Map/Set/Stack); without this, a container-method
-// call types Unknown, so a match payload over `m.get(k)` is untyped
-// (T-Container-Method, type-system.md).
+// containerMethodType returns the Func type of a builtin-type method for the
+// given receiver, or nil when recv has no such method. Covers the predeclared
+// containers (`Map`/`Set`/`Stack`/`[]T`), the sum types (`Option`/`Result`
+// query/defaulting methods), and the closed-method-set primitives (`string`
+// len/bytes/runes, `error` error()). Signatures mirror what codegen lowers
+// exactly (builtins.md §Slice/Map/Set/Stack/Option/Result/Lowering pointers);
+// without this a builtin-method call types Unknown, so e.g. a match payload
+// over `m.get(k)` is untyped (T-Container-Method, type-system.md).
 func containerMethodType(recv Type, name string) *Func {
 	switch r := recv.(type) {
 	case *Map:
