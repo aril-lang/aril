@@ -187,6 +187,14 @@ func TestHTTPHeaderMethods(t *testing.T) {
 	if values.GoName != "Values" || values.Return != "[]string" {
 		t.Errorf("http.Header.values = %+v; want Values → []string", values)
 	}
+	set, _ := HandleMethodOf("http.Header", "set")
+	if set.GoName != "Set" || set.Return != "unit" {
+		t.Errorf("http.Header.set = %+v; want Set → unit", set)
+	}
+	add, _ := HandleMethodOf("http.Header", "add")
+	if add.GoName != "Add" || add.Return != "unit" {
+		t.Errorf("http.Header.add = %+v; want Add → unit", add)
+	}
 	if _, ok := HandleFieldOf("http.Header", "get"); ok {
 		t.Error("http.Header is method-only; it has no field axis")
 	}
