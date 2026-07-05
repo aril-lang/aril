@@ -51,6 +51,11 @@ var Manifest = map[string][]string{
 	// body drains through io.readAll). http.do (needs http.Client) and
 	// http.newRequest (Option<io.Reader> body) are idioms, deferred.
 	"net/http": {"ListenAndServe", "Serve", "Get"},
+	// net/url (HTTP-CLIENT epoch). Parse returns (*url.URL, error) — a mechanical
+	// (T, error) row; the deriver spells the *url.URL return as the handle Named
+	// url.URL (whose fields url.scheme/host/path are read via the handle-field
+	// table). The registry namespace derives as `url` (path.Base of "net/url").
+	"net/url": {"Parse"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed

@@ -18,7 +18,7 @@ package binding
 var stdlibNamespaces = []string{
 	"errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 	"time", "sync", "io", "log", "net", "encoding", "math",
-	"unicode", "sort", "json", "slices", "regexp", "http",
+	"unicode", "sort", "json", "slices", "regexp", "http", "url",
 }
 
 // runtimeNamespaces are arilrt-backed builtin modules — importable, but not

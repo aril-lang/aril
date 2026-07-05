@@ -89,6 +89,11 @@ var handleTypes = map[string]HandleType{
 	// from http.get/do; a Header from a Response/Request field).
 	"http.Response": {GoType: "*http.Response", GoPkg: "http"},
 	"http.Header":   {GoType: "http.Header", GoPkg: "http"},
+	// net/url (HTTP-CLIENT epoch). url.URL is a pointer handle (*url.URL) with a
+	// field axis (scheme/host/path) + a string() method; obtained from url.parse
+	// or an http.Request's url field. GoPkg is the Aril import name `url` (→ net/url
+	// via goImportPath), like http.
+	"url.URL": {GoType: "*url.URL", GoPkg: "url"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -191,6 +196,11 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"add":    {GoName: "Add", Params: []string{"string", "string"}, Return: "unit"},
 		"delete": {GoName: "Del", Params: []string{"string"}, Return: "unit"},
 	},
+	// net/url URL method set (binding-surface §net/url). string() reassembles the
+	// URL (Go's (*url.URL).String); the components are read as fields (handleFields).
+	"url.URL": {
+		"string": {GoName: "String", Params: nil, Return: "string"},
+	},
 }
 
 // handleFields maps a handle type spelling (`pkg.Type`) to its bound *field* set
@@ -209,6 +219,23 @@ var handleFields = map[string]map[string]HandleBinding{
 		"status":     {GoName: "Status", Return: "string"},
 		"header":     {GoName: "Header", Return: "http.Header"},
 		"body":       {GoName: "Body", Return: "io.ReadCloser"},
+	},
+	// net/url URL fields (binding-surface §net/url) — all capitalize identically
+	// to their Go struct field (scheme→Scheme, …).
+	"url.URL": {
+		"scheme":   {GoName: "Scheme", Return: "string"},
+		"host":     {GoName: "Host", Return: "string"},
+		"path":     {GoName: "Path", Return: "string"},
+		"rawQuery": {GoName: "RawQuery", Return: "string"},
+		"fragment": {GoName: "Fragment", Return: "string"},
+	},
+	// http.Request's url field (binding-surface §net/http). `url` → Go `URL` is the
+	// first *divergent-name* handle field: exportFieldName(url) would be `Url`, but
+	// Go's field is `URL` — so this exercises the handleFieldGoName table lookup
+	// distinctly from the generic export path (the field yields a url.URL handle).
+	"http.Request": {
+		"method": {GoName: "Method", Return: "string"},
+		"url":    {GoName: "URL", Return: "url.URL"},
 	},
 }
 

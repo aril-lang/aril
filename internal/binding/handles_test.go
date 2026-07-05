@@ -200,6 +200,43 @@ func TestHTTPHeaderMethods(t *testing.T) {
 	}
 }
 
+// TestHTTPRequestDivergentURLField locks the first *divergent-name* handle field:
+// http.Request.url → Go `URL` (exportFieldName would give `Url`), yielding a
+// url.URL handle so `r.url.path` chains; `method` is the identical-capitalization
+// control.
+func TestHTTPRequestDivergentURLField(t *testing.T) {
+	u, ok := HandleFieldOf("http.Request", "url")
+	if !ok || u.GoName != "URL" || u.Return != "url.URL" {
+		t.Errorf("http.Request.url = %+v ok=%v; want URL → url.URL (divergent from capitalize=Url)", u, ok)
+	}
+	if u.GoName == "Url" {
+		t.Error("http.Request.url must NOT be exportFieldName(url)=Url — the whole point is the divergent Go name URL")
+	}
+	m, _ := HandleFieldOf("http.Request", "method")
+	if m.GoName != "Method" || m.Return != "string" {
+		t.Errorf("http.Request.method = %+v; want Method → string", m)
+	}
+}
+
+// TestURLHandle locks the net/url URL handle: a pointer handle with a field axis
+// (scheme/host/path, capitalizing identically) plus a string() method.
+func TestURLHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("url.URL")
+	if !ok || ht.GoType != "*url.URL" || ht.GoPkg != "url" {
+		t.Fatalf("url.URL lowering = %+v ok=%v; want *url.URL / url", ht, ok)
+	}
+	for aril, goName := range map[string]string{"scheme": "Scheme", "host": "Host", "path": "Path", "rawQuery": "RawQuery", "fragment": "Fragment"} {
+		f, ok := HandleFieldOf("url.URL", aril)
+		if !ok || f.GoName != goName || f.Return != "string" {
+			t.Errorf("url.URL.%s = %+v ok=%v; want %s → string", aril, f, ok, goName)
+		}
+	}
+	s, ok := HandleMethodOf("url.URL", "string")
+	if !ok || s.GoName != "String" || s.Return != "string" {
+		t.Errorf("url.URL.string = %+v ok=%v; want String → string", s, ok)
+	}
+}
+
 // TestNetSocketHandles locks the net socket layer: Conn/Listener/Addr are
 // external Go-interface handles (bare interface GoType, no pointer, GoPkg net),
 // and the read/write/accept/close methods carry a Result<…> return — the first

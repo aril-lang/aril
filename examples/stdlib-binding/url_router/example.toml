@@ -1,0 +1,10 @@
+description = "request routing on the URL path — the http.Handler reads r.url.path (http.Request's url → Go URL, the first divergent-name handle field, yielding a url.URL handle whose path field is the request path); driven in-process by an http.get client (run_ok proof of divergent handle-field lowering + net/url)."
+source   = "HTTP-CLIENT epoch"
+category = "stdlib-binding"
+showcase = true
+forces   = []
+since    = "0.11"
+status   = "running"
+expects  = "run-pass"
+entry    = "url_router.aril"
+expected_output = "expected-output.txt"

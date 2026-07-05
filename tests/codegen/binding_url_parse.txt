@@ -1,0 +1,58 @@
+--- TITLE ---
+net/url: url.parse(rawURL) is a mechanical (T, error) row → ResultOf(url.Parse(rawURL)) yielding the url.URL handle, whose scheme/host/path fields lower to the exported Go struct fields Scheme/Host/Path (all capitalize identically) and whose string() method lowers to (*url.URL).String(); import url → net/url.
+
+--- INPUT ---
+import fmt
+import url
+
+func main() {
+  match url.parse("https://example.com/a/b?q=1") {
+    Ok(u) => {
+      fmt.println(u.scheme)
+      fmt.println(u.host)
+      fmt.println(u.path)
+      fmt.println(u.string())
+    },
+    Err(_) => fmt.println("parse failed"),
+  }
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"net/url"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func main() {
+	__aril_match_1 := ResultOf(url.Parse("https://example.com/a/b?q=1"))
+	switch __aril_match_1.Tag {
+	case 0:
+		u := __aril_match_1.V
+		fmt.Println(u.Scheme)
+		fmt.Println(u.Host)
+		fmt.Println(u.Path)
+		fmt.Println(u.String())
+	case 1:
+		fmt.Println("parse failed")
+	}
+}

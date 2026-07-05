@@ -72,4 +72,5 @@ var registry = map[[2]string]Fact{
 	{"unicode", "isDigit"}:     {Pkg: "unicode", ArilName: "isDigit", GoName: "IsDigit", Kind: Rename, Return: "bool"},
 	{"unicode", "isLetter"}:    {Pkg: "unicode", ArilName: "isLetter", GoName: "IsLetter", Kind: Rename, Return: "bool"},
 	{"unicode", "isSpace"}:     {Pkg: "unicode", ArilName: "isSpace", GoName: "IsSpace", Kind: Rename, Return: "bool"},
+	{"url", "parse"}:           {Pkg: "url", ArilName: "parse", GoName: "Parse", Kind: ResultWrap, Return: "Result<url.URL, error>"},
 }

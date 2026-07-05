@@ -1,0 +1,29 @@
+--- TITLE ---
+Divergent-name handle field: http.Request's `url` field lowers to Go's `URL` (not exportFieldName's `Url`) — the first field whose Go name diverges from the capitalized Aril name, so it exercises the handleFieldGoName table lookup distinctly from the generic export path. r.url yields a url.URL handle, so r.url.path chains to r.URL.Path; r.method → r.Method (identical-capitalization control).
+
+--- INPUT ---
+import fmt
+import http
+
+func route(r: http.Request): string {
+  return fmt.sprintf("%s %s", r.method, r.url.path)
+}
+
+func main() {
+  fmt.println("request routing")
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func route(r *http.Request) string {
+	return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+}
+func main() {
+	fmt.Println("request routing")
+}

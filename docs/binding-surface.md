@@ -396,6 +396,13 @@ class url.Values {
 url.parse(rawURL: string): Result<url.URL, error>
 ```
 
+**Bound today:** `import url` resolves (→ Go `net/url`). `url.parse(rawURL)` is a
+mechanical `Result<url.URL, error>` row (Go's `url.Parse`). `url.URL` is a bound
+value-handle with a **field axis** — `scheme`/`host`/`path`/`rawQuery`/`fragment`
+lower to Go's `Scheme`/`Host`/`Path`/`RawQuery`/`Fragment` — plus a `string()`
+method (→ Go's `(*url.URL).String`). `query()` / `url.Values` remain on the target
+surface above.
+
 ## net/http
 
 ```aril
@@ -476,8 +483,11 @@ reports a mismatch in Aril coordinates (E0219); the class lowers so `serveHTTP`
 becomes Go's exported `ServeHTTP` and the class value (`&HealthHandler{}`)
 satisfies Go's `http.Handler` structurally. `http.ResponseWriter` is a value
 handle with `write` / `writeString` / `writeHeader` (`writeString` lowers to
-`Write([]byte(s))`, since ResponseWriter is an io.Writer); `http.Request` is an
-opaque handle (its field surface is a carry-forward). `http.listenAndServe(addr,
+`Write([]byte(s))`, since ResponseWriter is an io.Writer); `http.Request` exposes
+its `method` (→ Go `Method`) and `url` (→ Go **`URL`** — the first *divergent-name*
+handle field, yielding a `url.URL` handle so `r.url.path` routes; `url_router`
+proves it) fields via the field axis, the rest of its surface a carry-forward.
+`http.listenAndServe(addr,
 handler)` and `http.serve(listener, handler)` are bound (mechanical `Result<unit,
 error>` rows). `listenAndServe` blocks (so `healthcheck_server` builds but is
 `no-run`); `serve` over a `net.Listen` listener is stoppable by closing the
