@@ -498,7 +498,11 @@ func cmdRun(args []string) int {
 // compiledSource bundles the path to a temporary directory that
 // contains main.go + go.mod ready for `go build` / `go run`.
 type compiledSource struct {
-	dir string // caller is responsible for RemoveAll
+	// dir is the module directory to `go build`/`go run` in. For the REPL
+	// (writeTempModule) it is a throwaway temp the caller RemoveAlls; for
+	// build/run (writeProjectModule) it is the persisted <out-dir>/gen — do NOT
+	// remove it, or the incremental-build cache win is lost (RFC-0009).
+	dir string
 }
 
 // compileToProjectGo lexes / parses / lowers the given build target (a file or

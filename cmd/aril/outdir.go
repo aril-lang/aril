@@ -34,12 +34,13 @@ func resolveOutDir(srcPath, flagOutDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	envOut := os.Getenv("ARIL_OUT")
 	var chosen string
 	switch {
 	case flagOutDir != "":
 		chosen = flagOutDir
-	case os.Getenv("ARIL_OUT") != "":
-		chosen = os.Getenv("ARIL_OUT")
+	case envOut != "":
+		chosen = envOut
 	case manifest != nil && manifest.buildOutDir != "":
 		chosen = filepath.Join(root, manifest.buildOutDir)
 	default:
