@@ -1,0 +1,10 @@
+description = "An Aril project depending on an external pure-Aril library (RFC-0008 kind=\"aril\", via a local `replace`); its exported functions are compiled into the build."
+source   = "RFC-0008 EXTERNAL-MODULES: the [dependencies] external-module build"
+category = "external-modules"
+showcase = true
+forces   = ["external-module resolution", "multi-module import graph"]
+since    = "0.12"
+status   = "running"
+expects  = "run-pass"
+entry    = "greeter.aril"
+expected_output = "expected_output"

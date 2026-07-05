@@ -91,6 +91,12 @@ Go, which has no sum types.
 | `parallel_fetcher` ★ | **structured concurrency**, channels, `context` cancellation, timeouts |
 | `graceful_server` ★ | `net/http` + `os/signal` + `context` + `select`: graceful shutdown |
 
+## `external-modules/` — depending on another Aril module
+
+| Example | Forces |
+|---|---|
+| `greeter` ★ | a project depending on an external pure-Aril library (`[dependencies]`, `kind = "aril"`, RFC-0008); external-module resolution + the multi-module import graph |
+
 ## Adding an example
 
 An example earns its place if it **forces** a construct or interaction not yet

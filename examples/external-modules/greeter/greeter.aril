@@ -1,0 +1,7 @@
+import fmt
+import greetlib
+
+func main() {
+  fmt.println(Greeting("Aril"))
+  fmt.println(Shout("external modules work"))
+}
