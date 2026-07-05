@@ -182,6 +182,13 @@ func cmdBuild(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// Serialize lowering + go build on the out-dir (RFC-0009 §Concurrent builds).
+	release, err := acquireBuildLock(outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
 	src, err := compileToProjectGo(srcPath, !*inlineRT, *contracts, outDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -470,6 +477,13 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// Serialize lowering + go run on the out-dir (RFC-0009 §Concurrent builds).
+	release, err := acquireBuildLock(outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
 	src, err := compileToProjectGo(fs.Arg(0), !*inlineRT, *contracts, outDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
