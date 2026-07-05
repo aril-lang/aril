@@ -184,9 +184,8 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"writeString": {GoName: "", Params: []string{"string"}, Return: "Result<int, error>"},
 		"writeHeader": {GoName: "WriteHeader", Params: []string{"int"}, Return: "unit"},
 	},
-	// http.Request is opaque in v1 (a handler may ignore it); its field/method
-	// surface (method/url/header/body) is a carry-forward. Registered as a handle
-	// type above so `r: http.Request` annotations resolve; no methods bound yet.
+	// http.Request has no bound methods; its `method`/`url` fields are bound via
+	// the field axis (handleFields below), the rest (header/body) a carry-forward.
 	// net/http Header method set (binding-surface §net/http). Go's http.Header is
 	// a map type with value methods; Aril `delete` maps to Go's `Del` (not Delete).
 	"http.Header": {
