@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0008 |
-| Status | draft |
+| Status | accepted |
 | Created | 2026-07-05 |
 | Supersedes | — |
 
@@ -571,3 +571,6 @@ and a **user-facing test surface** (its own RFC), each with its own prior-art pa
   cache to **coordinate-addressed, content-verified**; added the **binding-uniqueness**
   rule and the **implicit-`binds-go` drift** warning; and made the **staged delivery**
   (kind 1 → kind 3 → kind 2) explicit so the resolver subtleties gate later stages.
+- 2026-07-05 — `draft → accepted`. The revised design and the M1–M10 review round
+  are signed off; implementation follows the staged delivery. The status flips to
+  `implemented` as the paired `lang-spec` / `cmd/aril` edits land.
