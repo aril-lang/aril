@@ -114,12 +114,13 @@ path    = "table/pq.aril"                  # kind=go: the co-located binding tab
 
 Fields per dependency:
 
-- **`source`** *(required)* — the fetch location: a Git path, GitHub the default
-  host (D5). The transport is `git`; a tag/commit at `source` is the unit of
-  fetch. (A future registry/proxy is an optional accelerator, not required — D5
-  is decentralized-first.)
-- **`version`** *(required)* — an **exact pin**: a Git tag (`v1.2.0`) or a commit
-  SHA. v0.x does **not** do SemVer range-solving (see *Version resolution*).
+- **`source`** *(required unless `replace`)* — the fetch location: a Git path,
+  GitHub the default host (D5). The transport is `git`; a tag/commit at `source`
+  is the unit of fetch. (A future registry/proxy is an optional accelerator, not
+  required — D5 is decentralized-first.)
+- **`version`** *(required unless `replace`)* — an **exact pin**: a Git tag
+  (`v1.2.0`) or a commit SHA. v0.x does **not** do SemVer range-solving (see
+  *Version resolution*).
 - **`kind`** *(optional, default `aril`)* — one of:
   - **`aril`** — a pure-Aril library (kind 1). Its `.aril` source compiles into
     the build.
@@ -132,8 +133,9 @@ Fields per dependency:
   `internal/binding.Manifest`). For kind `binding` the table is published *by the
   dependency*; for kind `go` the consumer owns it.
 - **`replace`** *(optional, any kind)* — a local filesystem path that overrides
-  `source` for this build (the `go.mod replace` analog). The dev/offline/vendor
-  escape hatch; a `replace`d dependency is not fetched.
+  `source`/`version` for this build (the `go.mod replace` analog). The
+  dev/offline/vendor escape hatch; a `replace`d dependency is not fetched, so it
+  needs neither `source` nor `version`.
 
 The closed-schema reader (`cmd/aril/manifest.go`) grows one capability: a
 **dotted section header** `[dependencies.<name>]`. The line-shapes stay
