@@ -239,7 +239,8 @@ concern with its own RFC.
   *coordinate-addressed, content-verified* (aligning with RFC-0008).
 - 2026-07-05 — `draft → accepted`, alongside RFC-0008 as its pair. The status
   flips to `implemented` when the `aril-out/` layout lands in `cmd/aril`.
-- 2026-07-05 — `accepted → implemented`. Landed in `cmd/aril` over five PRs:
+- 2026-07-05 — `accepted → implemented`. Landed in `cmd/aril` over four
+  implementation PRs (plus this status close):
   the persisted `aril-out/{bin,gen}` layout + out-dir resolution precedence
   (the default binary moved from a loose `./<basename>` to `aril-out/bin/<name>`);
   emitted-files-manifest orphan synchronization of `gen/`; the exclusive
