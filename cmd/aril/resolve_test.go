@@ -118,6 +118,41 @@ func TestResolveExternalKindGoDeferred(t *testing.T) {
 	}
 }
 
+func TestResolveExternalModuleWithoutManifest(t *testing.T) {
+	// The external module root has no aril.toml (even though an ancestor dir
+	// does) — it must be E0121 (not fetched / no module), never silently bound
+	// to the ancestor's manifest.
+	root := t.TempDir()
+	writeFile(t, root, "aril.toml", "[project]\nname = \"workspace\"\n") // ancestor manifest
+	app := filepath.Join(root, "app")
+	greet := filepath.Join(root, "lib", "greet")
+	mkdirAll(t, app)
+	mkdirAll(t, greet)
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
+	writeFile(t, app, "main.aril", "import lib/greet\n\nfunc main() {}\n")
+	// ../lib deliberately has NO aril.toml of its own.
+	writeFile(t, greet, "greet.aril", "func Hello(): string {\n  return \"hi\"\n}\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	if err == nil || !strings.Contains(err.Error(), "E0121") {
+		t.Fatalf("a module without its own aril.toml must be E0121, got: %v", err)
+	}
+}
+
+func TestResolveExternalMissingSubPackage(t *testing.T) {
+	// The module is present (has aril.toml), but the imported sub-package does
+	// not exist → E0117 (an unknown path within a present module), not E0121
+	// ("run aril get" cannot fix a typo'd package name).
+	root := t.TempDir()
+	app := buildTwoModuleProject(t, root) // provides lib with package greet
+	writeFile(t, app, "main.aril", "import lib/nope\n\nfunc main() {}\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	if err == nil || !strings.Contains(err.Error(), "E0117") {
+		t.Fatalf("a missing sub-package of a present module must be E0117, got: %v", err)
+	}
+}
+
 func TestResolveCrossModuleCycle(t *testing.T) {
 	// app depends on lib and lib depends back on app (each via replace); the
 	// import graph is cyclic across module boundaries → E0116 (D20).

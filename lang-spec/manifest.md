@@ -118,6 +118,11 @@ filesystem root), each `import P` resolves as:
 5. **Failure.** Neither local, a declared external module, bundled, nor a
    known binding namespace → **E0117 Unknown import path**.
 
+(A bundled `std/*` path is recognised independently of this ordering — it
+is an exact-path match that cannot collide with a project name or a
+dependency root, so its step number reflects grouping, not strict
+precedence.)
+
 Without a `aril.toml`, step 1 is skipped entirely: the program is a
 single package resolved against the stdlib registry — the zero-config
 path for scripts and quick experiments.

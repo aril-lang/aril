@@ -100,17 +100,24 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 					if d.kind != "aril" {
 						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; only kind=\"aril\" external modules are resolved so far", p, d.kind)
 					}
-					r.userImports[p] = true
-					sub, err := gatherSources(target)
-					if err != nil {
-						return fmt.Errorf("aril: error[E0121]: dependency %q is declared but not present (run `aril get`); no module at %s", p, target)
-					}
-					subMod, err := findProjectManifest(target)
+					// The module manifest is anchored at the module root, not
+					// found by walking up from the package dir (which could
+					// bind an ancestor's aril.toml). A module absent or without
+					// its own aril.toml is "not fetched" → E0121; a *present*
+					// module missing this sub-package is an unknown path within
+					// it → E0117 (running `aril get` cannot fix a typo).
+					moduleRoot := externalModuleRoot(d, mod)
+					subMod, err := manifestAt(moduleRoot)
 					if err != nil {
 						return err
 					}
 					if subMod == nil {
-						return fmt.Errorf("aril: error[E0121]: external module for import %q has no aril.toml (at or above %s)", p, target)
+						return fmt.Errorf("aril: error[E0121]: dependency %q is not present (run `aril get`); no module (aril.toml) at %s", p, moduleRoot)
+					}
+					r.userImports[p] = true
+					sub, err := gatherSources(target)
+					if err != nil {
+						return fmt.Errorf("aril: error[E0117]: unknown import path %q (no package in the %q module at %s)", p, d.name, target)
 					}
 					if err := visit(target, sub, append(trail, dir), subMod); err != nil {
 						return err
@@ -231,6 +238,17 @@ func externalModuleRoot(d *dependency, m *projectManifest) string {
 	return cacheModuleDir(d.source, d.version)
 }
 
+// manifestAt loads the aril.toml directly in dir (not by walking up, unlike
+// findProjectManifest) — the anchor for an external module, whose manifest must
+// live at its own root. Returns (nil, nil) when dir has no aril.toml.
+func manifestAt(dir string) (*projectManifest, error) {
+	p := filepath.Join(dir, "aril.toml")
+	if _, err := os.Stat(p); err != nil {
+		return nil, nil
+	}
+	return parseProjectManifest(p)
+}
+
 // arilCacheDir is the root of the hermetic module cache: $ARIL_CACHE, else the
 // per-user cache dir, else a temp fallback (RFC-0008 §fetch & the cache).
 func arilCacheDir() string {
@@ -243,11 +261,15 @@ func arilCacheDir() string {
 	return filepath.Join(os.TempDir(), "aril-cache")
 }
 
-// cacheModuleDir is where a fetched module version lives in the cache. The
-// source path's slashes are flattened so the entry is one directory level.
+// cacheModuleDir is where a fetched module version lives in the cache. Path
+// separators in the source and version are flattened so the entry is one
+// directory level. This layout is provisional — the fetch step (later work)
+// settles a collision-free content-addressed key.
 func cacheModuleDir(source, version string) string {
-	safe := strings.ReplaceAll(strings.ReplaceAll(source, "/", "_"), string(filepath.Separator), "_")
-	return filepath.Join(arilCacheDir(), safe+"@"+version)
+	flat := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, "/", "_"), string(filepath.Separator), "_")
+	}
+	return filepath.Join(arilCacheDir(), flat(source)+"@"+flat(version))
 }
 
 func dedupeSorted(xs []string) []string {
