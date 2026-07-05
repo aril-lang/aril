@@ -11,7 +11,7 @@
 
 Define how an Aril project **depends on code it does not contain** — another
 project's Aril library, a published Go-binding package, or a raw Go module
-plus a binding table. A new `[dependencies]` section in `aril.toml` declares
+plus a binding table. A new `[dep]` section in `aril.toml` declares
 each dependency by **source** (a Git/GitHub path, D5), a **pinned version**,
 and a **kind** (one of three). A new step, `aril get`, fetches the pinned
 dependencies into a **hermetic content-addressed cache** and records the exact
@@ -27,7 +27,7 @@ this RFC gives an Aril project the ability to *depend on* an external module, an
 makes `aril import` module-aware so it can bind a fetched non-stdlib Go package.
 
 Single-file scripts and single-project builds are unaffected — a project with
-no `[dependencies]` behaves exactly as today.
+no `[dep]` behaves exactly as today.
 
 ## Motivation
 
@@ -77,7 +77,7 @@ that rides the existing `thirdparty.go` machinery, generalized from
 hand-vendored paths to fetched-cache paths.
 
 ```
-   aril.toml [dependencies]  ──►  aril get  ──►  hermetic cache  +  aril.lock
+   aril.toml [dep]  ──►  aril get  ──►  hermetic cache  +  aril.lock
         (declared, pinned)         (network,        ($ARIL_CACHE/          (committed,
                                     once)            <src>@<ver>/)          reproducible)
                                                           │
@@ -88,7 +88,7 @@ hand-vendored paths to fetched-cache paths.
         └─ kind 3 (raw .go+table): aril import (module-aware) over the fetched pkg → bindings + require
 ```
 
-### The manifest — `[dependencies]`
+### The manifest — `[dep]`
 
 A dependency is a **dotted sub-section** whose name is the dependency's
 **import-path root** — the `[project] name` the dependency declares in *its own*
@@ -100,12 +100,12 @@ to reach package `store` of the dependency rooted at `kv`.
 [project]
 name = "myapp"
 
-[dependencies.kv]                          # import root `kv` → `import kv/...`
+[dep.kv]                          # import root `kv` → `import kv/...`
 source  = "github.com/alice/aril-kv"       # where to fetch (Git/GitHub, D5)
 version = "v1.2.0"                          # a pinned tag or commit (hermetic, D19)
 kind    = "aril"                            # aril | binding | go   (default: aril)
 
-[dependencies.pq]
+[dep.pq]
 source  = "github.com/lib/pq"
 version = "v1.10.9"
 kind    = "go"                             # raw Go module + binding table
@@ -138,7 +138,7 @@ Fields per dependency:
   needs neither `source` nor `version`.
 
 The closed-schema reader (`cmd/aril/manifest.go`) grows one capability: a
-**dotted section header** `[dependencies.<name>]`. The line-shapes stay
+**dotted section header** `[dep.<name>]`. The line-shapes stay
 `key = "value"`; no inline-table parser is needed. The `<name>` binds the same
 last-segment collision rule `[bindings] extra` already enforces.
 
@@ -160,8 +160,8 @@ reader family); its exact shape is an implementation detail settled in PR4.
 
 `aril get`:
 
-1. Reads `[dependencies]`, resolves the transitive closure (each fetched
-   module's own `aril.toml` `[dependencies]` are read recursively).
+1. Reads `[dep]`, resolves the transitive closure (each fetched
+   module's own `aril.toml` `[dep]` are read recursively).
 2. Fetches each pinned `source@version` via `git` into a **content-addressed
    cache** — `$ARIL_CACHE/<source>@<version>/` (default `~/.cache/aril/`,
    overridable by `$ARIL_CACHE`; `std/vendor` is the special-cased in-tree cache
@@ -171,7 +171,7 @@ reader family); its exact shape is an implementation detail settled in PR4.
 `aril get` is the **only** network step. A CI or offline build populates the
 cache once (or vendors via `replace`), commits the lock, and thereafter builds
 hermetically. This is the D19 guardrail restated for fetched code: an external
-dependency enters generated output **only** when *declared* in `[dependencies]`,
+dependency enters generated output **only** when *declared* in `[dep]`,
 *version-pinned*, and *lock-verified against the cache* — never an ambient or
 transitive network pull. `aril get` fetches; `aril build`/`run` are offline.
 
@@ -190,7 +190,7 @@ rule mirrors Go's "one major version, one module" at a coarser grain.
 
 `classifyImport` (`resolve.go`) gains a category between local-user and unknown:
 after the `[project] name` local check fails, the head segment is matched against
-the declared `[dependencies]` roots. A match resolves to the dependency's module
+the declared `[dep]` roots. A match resolves to the dependency's module
 directory **in the cache** (per the lock), and cross-module `.aril` resolution
 proceeds exactly as cross-package does today — the DFS in `resolvePackages`
 walks into the external module's package tree, and the acyclic-graph check (D20,
@@ -249,7 +249,7 @@ importer proves insufficient for module graphs.
 - **`E0123`** — lockfile out of date / hash mismatch (the cache does not match
   `aril.lock`; re-run `aril get`). Guards against a tampered or partial cache.
 - `E0116` (cyclic import) and `E0117` (unknown import) extend across module
-  boundaries unchanged. A manifest-level error (bad `[dependencies]` shape,
+  boundaries unchanged. A manifest-level error (bad `[dep]` shape,
   unknown `kind`, colliding roots) surfaces at manifest-parse time in
   `aril.toml` coordinates, mirroring the existing manifest errors.
 
@@ -281,13 +281,13 @@ importer proves insufficient for module graphs.
 
 ## Transition / compatibility
 
-Strictly additive. A project with no `[dependencies]` — every corpus example
+Strictly additive. A project with no `[dep]` — every corpus example
 today — builds unchanged (the resolver's new category is skipped, `aril get` is a
 no-op, no lockfile is needed). `aril.toml`, `aril.lock`, and the cache are all
 opt-in, activated only when a dependency is declared. No existing program
 changes; no user migration. The existing hand-vendored third-party FFI path
 (`std/bindings.json` + `std/vendor`) keeps working and is superseded
-*incrementally* — each hand-vendored dep can move to a `[dependencies]`
+*incrementally* — each hand-vendored dep can move to a `[dep]`
 declaration behaviour-preservingly (the `build_ok` ratchet guards this), until
 the hand-list is empty.
 

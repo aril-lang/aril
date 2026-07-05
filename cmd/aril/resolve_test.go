@@ -8,7 +8,7 @@ import (
 )
 
 // Coverage for external-module resolution (RFC-0008 §Resolution): a declared
-// [dependencies.<name>] import resolves into that module's package tree, its
+// [dep.<name>] import resolves into that module's package tree, its
 // source joins the build, and its own imports resolve against its manifest.
 
 func mkdirAll(t *testing.T, dir string) {
@@ -51,7 +51,7 @@ func buildTwoModuleProject(t *testing.T, root string) string {
 	greet := filepath.Join(root, "lib", "greet")
 	mkdirAll(t, app)
 	mkdirAll(t, greet)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import lib/greet\n\nfunc main() {}\n")
 	writeFile(t, filepath.Join(root, "lib"), "aril.toml", "[project]\nname = \"lib\"\n")
 	writeFile(t, greet, "greet.aril", "func Hello(): string {\n  return \"hi\"\n}\n")
@@ -90,7 +90,7 @@ func TestResolveExternalNotFetched(t *testing.T) {
 	app := filepath.Join(root, "app")
 	mkdirAll(t, app)
 	t.Setenv("ARIL_CACHE", filepath.Join(root, "empty-cache"))
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.kv]\nsource = \"github.com/x/kv\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.kv]\nsource = \"github.com/x/kv\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import kv\n\nfunc main() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
@@ -107,7 +107,7 @@ func TestResolveExternalKindGoDeferred(t *testing.T) {
 	dep := filepath.Join(root, "pq")
 	mkdirAll(t, app)
 	mkdirAll(t, dep)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.pq]\nreplace = \"../pq\"\nkind = \"go\"\npath = \"t.aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.pq]\nreplace = \"../pq\"\nkind = \"go\"\npath = \"t.aril\"\n")
 	writeFile(t, app, "main.aril", "import pq\n\nfunc main() {}\n")
 	writeFile(t, dep, "aril.toml", "[project]\nname = \"pq\"\n")
 	writeFile(t, dep, "pq.aril", "func X() {}\n")
@@ -128,7 +128,7 @@ func TestResolveExternalModuleWithoutManifest(t *testing.T) {
 	greet := filepath.Join(root, "lib", "greet")
 	mkdirAll(t, app)
 	mkdirAll(t, greet)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import lib/greet\n\nfunc main() {}\n")
 	// ../lib deliberately has NO aril.toml of its own.
 	writeFile(t, greet, "greet.aril", "func Hello(): string {\n  return \"hi\"\n}\n")
@@ -161,9 +161,9 @@ func TestResolveCrossModuleCycle(t *testing.T) {
 	lib := filepath.Join(root, "lib")
 	mkdirAll(t, app)
 	mkdirAll(t, lib)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nreplace = \"../lib\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import lib\n\nfunc main() {}\n")
-	writeFile(t, lib, "aril.toml", "[project]\nname = \"lib\"\n[dependencies.app]\nreplace = \"../app\"\nkind = \"aril\"\n")
+	writeFile(t, lib, "aril.toml", "[project]\nname = \"lib\"\n[dep.app]\nreplace = \"../app\"\nkind = \"aril\"\n")
 	writeFile(t, lib, "lib.aril", "import app\n\nfunc helper() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
