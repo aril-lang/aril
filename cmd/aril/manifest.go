@@ -21,6 +21,7 @@ type projectManifest struct {
 	toolchainGo   string       // [toolchain] go — pinned Go version
 	bindingsExtra []string     // [bindings] extra — extra Go import paths
 	deps          []dependency // [dep.<name>] — external module deps (RFC-0008)
+	buildOutDir   string       // [build] out-dir — build-artifact directory (RFC-0009)
 }
 
 // dependency is one [dep.<name>] entry (RFC-0008 §The manifest). The
@@ -60,9 +61,10 @@ func findProjectManifest(startDir string) (*projectManifest, error) {
 }
 
 // parseProjectManifest reads the closed-schema `aril.toml`. It accepts
-// `[project]` / `[toolchain]` / `[bindings]` sections, `key = "value"`
-// and `key = ["a", "b"]` lines, `#` comments, and blank lines; anything
-// else is an error (the schema is closed in v0.x).
+// `[project]` / `[toolchain]` / `[bindings]` / `[build]` sections plus
+// `[dep.<name>]`, `key = "value"` and `key = ["a", "b"]` lines, `#`
+// comments, and blank lines; anything else is an error (the schema is
+// closed in v0.x).
 func parseProjectManifest(path string) (*projectManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -105,9 +107,9 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 				continue
 			}
 			switch section {
-			case "project", "toolchain", "bindings":
+			case "project", "toolchain", "bindings", "build":
 			default:
-				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected project / toolchain / bindings / dep.<name>)", section))
+				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected project / toolchain / bindings / build / dep.<name>)", section))
 			}
 			continue
 		}
@@ -160,6 +162,12 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 				return nil, bail(ln, err.Error())
 			}
 			m.bindingsExtra = items
+		case [2]string{"build", "out-dir"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.buildOutDir = s
 		default:
 			if section == "" {
 				return nil, bail(ln, "key outside any [section]")

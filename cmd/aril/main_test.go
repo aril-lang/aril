@@ -67,6 +67,11 @@ func runAril(t *testing.T, args ...string) (string, string, int) {
 	bin := arilBinary(t)
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = projectRoot(t)
+	// Route build/run artifacts to a throwaway per-call out-dir (RFC-0009) so a
+	// `run`/`build` of a real example never persists an aril-out/ into the
+	// source tree. A test that asserts a specific out-dir passes -out-dir, which
+	// beats this env var (resolveOutDir precedence).
+	cmd.Env = append(os.Environ(), "ARIL_OUT="+t.TempDir())
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

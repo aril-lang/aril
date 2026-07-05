@@ -1,0 +1,149 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestResolveOutDirPrecedence checks RFC-0009's resolution order:
+// --out-dir flag › ARIL_OUT env › [build] out-dir manifest › ./aril-out.
+func TestResolveOutDirPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "main.aril")
+	writeFile(t, dir, "main.aril", "func main() {}\n")
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"p\"\n\n[build]\nout-dir = \"from-manifest\"\n")
+
+	// Default: no flag, no env, but a manifest key → the manifest dir's from-manifest.
+	t.Run("manifest", func(t *testing.T) {
+		t.Setenv("ARIL_OUT", "")
+		got, err := resolveOutDir(src, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join(dir, "from-manifest")
+		if got != want {
+			t.Errorf("manifest out-dir: got %q want %q", got, want)
+		}
+	})
+
+	// Env beats the manifest.
+	t.Run("env-beats-manifest", func(t *testing.T) {
+		t.Setenv("ARIL_OUT", filepath.Join(dir, "from-env"))
+		got, err := resolveOutDir(src, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != filepath.Join(dir, "from-env") {
+			t.Errorf("env out-dir: got %q", got)
+		}
+	})
+
+	// The flag beats env and manifest.
+	t.Run("flag-wins", func(t *testing.T) {
+		t.Setenv("ARIL_OUT", filepath.Join(dir, "from-env"))
+		got, err := resolveOutDir(src, filepath.Join(dir, "from-flag"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != filepath.Join(dir, "from-flag") {
+			t.Errorf("flag out-dir: got %q", got)
+		}
+	})
+}
+
+// TestResolveOutDirDefault: with no flag/env/manifest key, the default is
+// <project-root>/aril-out — and with no manifest the root is the target's dir.
+func TestResolveOutDirDefault(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "main.aril")
+	writeFile(t, dir, "main.aril", "func main() {}\n")
+	t.Setenv("ARIL_OUT", "")
+
+	got, err := resolveOutDir(src, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(dir, "aril-out") {
+		t.Errorf("default out-dir: got %q want %q", got, filepath.Join(dir, "aril-out"))
+	}
+}
+
+func TestBinaryBaseName(t *testing.T) {
+	cases := map[string]string{
+		"a/b/hello.aril": "hello",
+		"hello.aril":     "hello",
+		"pkgdir":         "pkgdir",
+		"a/b/greeter":    "greeter",
+	}
+	for in, want := range cases {
+		if got := binaryBaseName(filepath.FromSlash(in)); got != want {
+			t.Errorf("binaryBaseName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestWriteProjectModulePersists checks the persisted layout: gen/main.go +
+// gen/go.mod + the auto .gitignore, and that a second write reuses the same
+// path (persistence — the basis of Go's incremental build cache, RFC-0009).
+func TestWriteProjectModulePersists(t *testing.T) {
+	outDir := filepath.Join(t.TempDir(), "aril-out")
+	goSrc := "package main\n\nfunc main() {}\n"
+
+	src, err := writeProjectModule(goSrc, outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	genDir := filepath.Join(outDir, "gen")
+	if src.dir != genDir {
+		t.Errorf("gen dir: got %q want %q", src.dir, genDir)
+	}
+	for _, f := range []string{"gen/main.go", "gen/go.mod"} {
+		if _, err := os.Stat(filepath.Join(outDir, f)); err != nil {
+			t.Errorf("missing %s: %v", f, err)
+		}
+	}
+	gi, err := os.ReadFile(filepath.Join(outDir, ".gitignore"))
+	if err != nil {
+		t.Fatalf("missing .gitignore: %v", err)
+	}
+	if strings.TrimSpace(string(gi)) != "*" {
+		t.Errorf(".gitignore = %q, want \"*\"", gi)
+	}
+
+	// A second write persists to the same path (no fresh temp dir).
+	src2, err := writeProjectModule(goSrc, outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src2.dir != genDir {
+		t.Errorf("second write moved gen: got %q want %q", src2.dir, genDir)
+	}
+}
+
+// TestBuildDefaultLayoutE2E builds a real example through the aril binary and
+// asserts RFC-0009's default layout: the binary lands at <out-dir>/bin/<name>,
+// gen/ is persisted, and the .gitignore is written. Built into a temp -out-dir
+// so the test never litters the source tree.
+func TestBuildDefaultLayoutE2E(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skips the go-toolchain build in -short")
+	}
+	outDir := t.TempDir()
+	ex := filepath.Join(projectRoot(t), "examples", "core-language", "hello", "hello.aril")
+	_, stderr, code := runAril(t, "build", "-out-dir", outDir, ex)
+	if code != 0 {
+		t.Fatalf("aril build failed (exit %d): %s", code, stderr)
+	}
+	bin := filepath.Join(outDir, "bin", "hello")
+	if _, err := os.Stat(bin); err != nil {
+		t.Errorf("binary not at %s: %v", bin, err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "gen", "main.go")); err != nil {
+		t.Errorf("gen/main.go not persisted: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, ".gitignore")); err != nil {
+		t.Errorf(".gitignore not written: %v", err)
+	}
+}
