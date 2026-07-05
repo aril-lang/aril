@@ -122,6 +122,54 @@ func TestWriteProjectModulePersists(t *testing.T) {
 	}
 }
 
+// TestGenOrphanSync checks that a persisted gen/ prunes files a later lowering
+// no longer emits: a vendored build writes arilrt/, and a following inline build
+// (no runtime import) must delete arilrt/ + update the manifest, so `go build`
+// never compiles a phantom (RFC-0009 §Persisted).
+func TestGenOrphanSync(t *testing.T) {
+	outDir := filepath.Join(t.TempDir(), "aril-out")
+	genDir := filepath.Join(outDir, "gen")
+
+	// Vendored: the program imports the runtime → arilrt/ is emitted.
+	vendored := "package main\n\nimport _ \"" + runtimeImportPath + "\"\n\nfunc main() {}\n"
+	if _, err := writeProjectModule(vendored, outDir); err != nil {
+		t.Fatal(err)
+	}
+	rt, err := listGoFiles(filepath.Join(genDir, "arilrt"))
+	if err != nil || len(rt) == 0 {
+		t.Fatalf("vendored build did not emit arilrt/: files=%v err=%v", rt, err)
+	}
+	man, err := readEmittedManifest(genDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(man) <= 2 { // main.go + go.mod + arilrt files
+		t.Errorf("manifest should list arilrt files, got %v", man)
+	}
+
+	// Inline: no runtime import → arilrt/ must be pruned.
+	inline := "package main\n\nfunc main() {}\n"
+	if _, err := writeProjectModule(inline, outDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(genDir, "arilrt")); !os.IsNotExist(err) {
+		t.Errorf("arilrt/ not pruned after inline build (stat err=%v)", err)
+	}
+	man2, err := readEmittedManifest(genDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(man2) != 2 {
+		t.Errorf("inline manifest should be [main.go go.mod], got %v", man2)
+	}
+	// The staple files survive.
+	for _, f := range []string{"main.go", "go.mod"} {
+		if _, err := os.Stat(filepath.Join(genDir, f)); err != nil {
+			t.Errorf("%s missing after prune: %v", f, err)
+		}
+	}
+}
+
 // TestBuildDefaultLayoutE2E builds a real example through the aril binary and
 // asserts RFC-0009's default layout: the binary lands at <out-dir>/bin/<name>,
 // gen/ is persisted, and the .gitignore is written. Built into a temp -out-dir

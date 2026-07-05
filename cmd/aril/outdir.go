@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	aril "github.com/aril-lang/aril"
@@ -109,6 +110,9 @@ func writeProjectModule(goSrc, outDir string) (*compiledSource, error) {
 	if err := os.MkdirAll(genDir, 0o755); err != nil {
 		return nil, fmt.Errorf("aril: mkdir gen: %w", err)
 	}
+	// emitted collects the gen-relative paths this lowering produced, so the
+	// next lowering can prune whatever it no longer emits (RFC-0009 §Persisted).
+	emitted := []string{"main.go", "go.mod"}
 	if err := os.WriteFile(filepath.Join(genDir, "main.go"), []byte(goSrc), 0o644); err != nil {
 		return nil, fmt.Errorf("aril: write main.go: %w", err)
 	}
@@ -117,15 +121,111 @@ func writeProjectModule(goSrc, outDir string) (*compiledSource, error) {
 	}
 	// Vendored-mode programs import the arilrt runtime as a subpackage; copy the
 	// embedded sources into <gen>/arilrt so `go build/run .` resolves it (D18
-	// CT2). Keyed on the actual import so the two stay in step. A stale arilrt/
-	// left by a prior vendored build is not compiled by `go build .` (it is not
-	// imported); orphan pruning of gen/ is its own follow-up.
+	// CT2). Keyed on the actual import so the two stay in step.
 	if strings.Contains(goSrc, `"`+runtimeImportPath+`"`) {
 		if _, err := aril.WriteVendoredRuntime(genDir); err != nil {
 			return nil, fmt.Errorf("aril: vendor runtime: %w", err)
 		}
+		rt, err := listGoFiles(filepath.Join(genDir, "arilrt"))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range rt {
+			emitted = append(emitted, filepath.Join("arilrt", f))
+		}
+	}
+	// Prune orphans: a persisted gen/ must delete the .go a prior lowering wrote
+	// but this one no longer emits (a vendored→inline switch drops arilrt/; a
+	// removed/renamed source drops its file), or `go build ./...` compiles a
+	// phantom from source that no longer exists (RFC-0009 §Persisted).
+	if err := syncEmitted(genDir, emitted); err != nil {
+		return nil, err
 	}
 	return &compiledSource{dir: genDir}, nil
+}
+
+// emittedManifest is the dotfile under gen/ recording the set of files the last
+// lowering emitted. A leading dot keeps the Go tool from compiling it as source
+// (cmd/go ignores files beginning with "." or "_").
+const emittedManifest = ".aril-emitted"
+
+// listGoFiles returns the *.go file names (not paths) directly in dir, sorted.
+func listGoFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("aril: read %s: %w", dir, err)
+	}
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+// syncEmitted removes every gen-relative path the previous lowering recorded
+// but the current one (emitted) did not, empties the arilrt/ dir when it goes
+// unused, then rewrites the manifest. Orphan removal is best-effort: a file
+// already gone is not an error.
+func syncEmitted(genDir string, emitted []string) error {
+	current := make(map[string]bool, len(emitted))
+	for _, p := range emitted {
+		current[p] = true
+	}
+	prev, err := readEmittedManifest(genDir)
+	if err != nil {
+		return err
+	}
+	for _, p := range prev {
+		if current[p] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(genDir, p)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("aril: prune orphan %s: %w", p, err)
+		}
+		// Drop a now-empty parent (e.g. arilrt/ after a vendored→inline switch);
+		// os.Remove only succeeds on an empty dir, so a still-used one is kept.
+		if dir := filepath.Dir(p); dir != "." {
+			_ = os.Remove(filepath.Join(genDir, dir))
+		}
+	}
+	return writeEmittedManifest(genDir, emitted)
+}
+
+// readEmittedManifest returns the gen-relative paths recorded by the last
+// lowering (nil when the manifest is absent — a fresh gen/).
+func readEmittedManifest(genDir string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(genDir, emittedManifest))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("aril: read emitted manifest: %w", err)
+	}
+	var paths []string
+	for _, ln := range strings.Split(string(data), "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			paths = append(paths, filepath.FromSlash(ln))
+		}
+	}
+	return paths, nil
+}
+
+// writeEmittedManifest records the emitted set (slash-normalized, sorted) so the
+// manifest is stable across platforms.
+func writeEmittedManifest(genDir string, emitted []string) error {
+	slashed := make([]string, len(emitted))
+	for i, p := range emitted {
+		slashed[i] = filepath.ToSlash(p)
+	}
+	sort.Strings(slashed)
+	body := strings.Join(slashed, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(genDir, emittedManifest), []byte(body), 0o644); err != nil {
+		return fmt.Errorf("aril: write emitted manifest: %w", err)
+	}
+	return nil
 }
 
 // writeOutDirGitignore writes <outDir>/.gitignore = "*" so every artifact stays
