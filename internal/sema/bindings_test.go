@@ -97,6 +97,22 @@ func TestNetHandleMethodSigType(t *testing.T) {
 	}
 }
 
+// TestURLParseReturn locks the net/url binding: url.parse types as
+// Result<url.URL, error> — a url.URL handle Named inside a Result, so
+// `match url.parse(s) { Ok(u) => … }` propagates the handle to `u.scheme`
+// (field axis) and `u.string()` (method).
+func TestURLParseReturn(t *testing.T) {
+	c := &checker{}
+	got := c.stdlibBindingReturn("url", "parse")
+	r, ok := got.(*Result)
+	if !ok {
+		t.Fatalf("stdlibBindingReturn(url, parse) = %v; want *Result", got)
+	}
+	if n, ok := r.T.(*Named); !ok || n.N != "url.URL" {
+		t.Errorf("url.parse Result payload = %v; want Named url.URL", r.T)
+	}
+}
+
 // TestSemaTypeFromSpelling round-trips the binding-registry return spellings
 // through the bridge: spelling → sema Type → String() must reproduce the
 // spelling, over every construct the stdlib registry uses. This locks the

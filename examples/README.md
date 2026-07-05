@@ -74,6 +74,7 @@ Go, which has no sum types.
 | `healthcheck_server` ★ | `net/http`; **Go interface conformance** (an Aril `class implements http.Handler`, checked structurally — E0219) + `http.listenAndServe` |
 | `http_server` ★ | the same conformance **proven at runtime** — an Aril `http.Handler` served over a real socket via `http.serve`, driven in-process by a raw `net` client under a `scope` (run-checkable) |
 | `http_client` ★ | the **HTTP client** — `http.get` fetches a response whose fields (`resp.statusCode`) are read through the value-handle **field axis**, body drained via `io.readAll(resp.body)`; run against an in-process `http.serve` server (run-checkable) |
+| `url_router` ★ | request routing on the URL path — the handler reads `r.url.path` (`net/url` + the **divergent** `http.Request.url → URL` handle field, yielding a `url.URL` handle); driven by an `http.get` client (run-checkable) |
 | `todo_api` | JSON CRUD over an actor-serialised store (concurrent client goroutines); DTO structs; `Result` mapped to HTTP status codes |
 | `counterstack` | sum-typed JSON wire protocol over an in-process channel transport, `encoding/json` round-trip, concurrent reader/writer, a `class implements Strategy` |
 

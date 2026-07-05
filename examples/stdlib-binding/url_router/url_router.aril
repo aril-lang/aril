@@ -1,0 +1,63 @@
+// Showcase: request routing on the URL path — the http.Handler reads
+// `r.url.path`, exercising the value-handle field axis across two handles:
+// http.Request's `url` field (Aril `url` → Go `URL`, the first *divergent-name*
+// handle field — exportFieldName would give `Url`) yields a url.URL handle,
+// whose `path` field gives the request path.
+//
+// Driven in-process (like http_client): an http.serve server runs the
+// RouteHandler over a net.Listen socket on a loopback port; an http.get client
+// requests a path and asserts the handler echoed it back.
+
+import fmt
+import net
+import http
+import io
+import strings
+
+class RouteHandler implements http.Handler {
+  serveHTTP(w: http.ResponseWriter, r: http.Request) {
+    // r.url : url.URL  (r.URL — the divergent url→URL field); .path : string
+    let _ = w.writeString(fmt.sprintf("routed:%s", r.url.path))
+  }
+}
+
+func main() {
+  let ln = net.listen("tcp", "127.0.0.1:0") catch e {
+    fmt.println("listen failed")
+    return
+  }
+  let addr = ln.addr().string()
+  let handler = RouteHandler{}
+
+  let outcome = scope<unit, error> {
+    // Server: drives the Aril handler until the listener closes.
+    spawn {
+      match http.serve(ln, handler) {
+        Ok(_)  => {},
+        Err(_) => {},   // listener closed → serve returns cleanly
+      }
+    }
+    // Client: request a path; the handler routes on r.url.path and echoes it.
+    spawn {
+      let target = fmt.sprintf("http://%s/hello/world", addr)
+      match http.get(target) {
+        Ok(resp) => {
+          match io.readAll(resp.body) {
+            Ok(bytes) => {
+              let body = strings.fromBytes(bytes)
+              if resp.statusCode == 200 && body == "routed:/hello/world" {
+                fmt.println(body)
+              } else {
+                fmt.println("unexpected response")
+              }
+            },
+            Err(_) => { fmt.println("read failed") },
+          }
+        },
+        Err(_) => { fmt.println("get failed") },
+      }
+      match ln.close() { Ok(_) => {}, Err(_) => {} }
+    }
+  }
+  match outcome { Ok(_) => {}, Err(_) => {} }
+}
