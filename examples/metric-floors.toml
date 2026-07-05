@@ -20,13 +20,13 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 91   # current build_ok; strict ratchet (raised 89→91 in the
-                    # HTTP-CLIENT epoch — http_client fetches via http.get; url_router
-                    # routes on r.url.path (net/url + the divergent http.Request.url field))
+build_ok_min = 92   # current build_ok; strict ratchet (raised 91→92 in the
+                    # EXTERNAL-MODULES epoch — the greeter example depends on an
+                    # external pure-Aril library via [dependencies] (RFC-0008))
 diag_ok_min  = 88   # headroom below current diag_ok (98) so an
                     # individual imprecise message is a penalty, not a red
                     # (raised 82→88 at the BINDING-HARDENING close as E0217/E0218
                     # coverage grew diag_ok 94→97)
-run_ok_min   = 89   # current run_ok; strict ratchet (raised 87→89 in the
-                    # HTTP-CLIENT epoch — http_client (http.get) and url_router
-                    # (r.url.path routing) run against in-process http.serve servers)
+run_ok_min   = 90   # current run_ok; strict ratchet (raised 89→90 in the
+                    # EXTERNAL-MODULES epoch — the greeter example runs, printing
+                    # output from its external-library dependency (RFC-0008))

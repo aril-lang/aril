@@ -1,0 +1,10 @@
+[project]
+name = "greeter"
+
+# A pure-Aril library dependency (RFC-0008 kind="aril"). `replace` points at a
+# local, in-repo copy of the module — the vendored/dev form of a dependency
+# (the fetch form pins `source`/`version` instead). Its exported source is
+# compiled into this build; there is no separate Go module.
+[dependencies.greetlib]
+replace = "../../../testdata/aril-modules/greetlib"
+kind    = "aril"

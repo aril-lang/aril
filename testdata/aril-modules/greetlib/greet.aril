@@ -1,0 +1,11 @@
+import strings
+
+// Greeting returns a friendly greeting for name.
+func Greeting(name: string): string {
+  return "Hello, " + name + "!"
+}
+
+// Shout upper-cases a message.
+func Shout(msg: string): string {
+  return strings.toUpper(msg)
+}

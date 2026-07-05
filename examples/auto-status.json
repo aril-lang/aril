@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 92,
+    "total": 93,
     "parse_fail": 0,
     "sema_fail": 0,
     "emit_fail": 1,
-    "build_ok": 91,
+    "build_ok": 92,
     "diag_ok": 98,
     "diag_total": 121,
-    "run_ok": 89,
-    "run_total": 91
+    "run_ok": 90,
+    "run_total": 92
   },
   "files": [
     {
@@ -294,6 +294,11 @@
     },
     {
       "path": "examples/core-language/word_frequency/word_frequency.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/external-modules/greeter/greeter.aril",
       "stage": "build",
       "blocker": ""
     },
