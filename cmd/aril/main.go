@@ -4,7 +4,7 @@
 // pipeline:
 //
 //	aril emit  <file.aril>             print the lowered Go source to stdout
-//	aril build [-o out] <file.aril>    compile to a Go binary (default: ./<basename>)
+//	aril build [-o out] <file.aril>    compile to a Go binary (default: aril-out/bin/<name>)
 //	aril run   <file.aril>             compile and execute (stdio passed through,
 //	                                 exit code propagated)
 package main
@@ -152,11 +152,12 @@ func cmdImport(args []string) int {
 func cmdBuild(args []string) int {
 	fs := flag.NewFlagSet("aril build", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	out := fs.String("o", "", "output binary path (default: ./<basename>)")
+	out := fs.String("o", "", "output binary path (default: <out-dir>/bin/<name>)")
+	outDirFlag := fs.String("out-dir", "", "build-artifact directory (default: ./aril-out; RFC-0009)")
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-out-dir <dir>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -176,19 +177,30 @@ func cmdBuild(args []string) int {
 		return 2
 	}
 	srcPath := fs.Arg(0)
-	src, err := compileToTempGo(srcPath, !*inlineRT, *contracts)
+	outDir, err := resolveOutDir(srcPath, *outDirFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	defer os.RemoveAll(src.dir)
+	src, err := compileToProjectGo(srcPath, !*inlineRT, *contracts, outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	// gen/ is persisted (RFC-0009 §Persisted) — do not remove it.
 
+	// The default binary lives at <out-dir>/bin/<name>; an explicit -o sets the
+	// path outright and may sit outside aril-out/ (RFC-0009 §aril-out).
 	outPath := *out
 	if outPath == "" {
-		outPath = outputBinaryName(srcPath)
+		outPath = filepath.Join(outDir, "bin", binaryBaseName(srcPath))
 	}
 	absOut, err := filepath.Abs(outPath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "aril build: %v\n", err)
+		return 1
+	}
+	if err := os.MkdirAll(filepath.Dir(absOut), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "aril build: %v\n", err)
 		return 1
 	}
@@ -430,10 +442,11 @@ func emitGoFromText(src, file string) (string, error) {
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("aril run", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	outDirFlag := fs.String("out-dir", "", "build-artifact directory (default: ./aril-out; RFC-0009)")
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril run [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril run [-out-dir <dir>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -452,12 +465,17 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril run: expected exactly one <file.aril>")
 		return 2
 	}
-	src, err := compileToTempGo(fs.Arg(0), !*inlineRT, *contracts)
+	outDir, err := resolveOutDir(fs.Arg(0), *outDirFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	defer os.RemoveAll(src.dir)
+	src, err := compileToProjectGo(fs.Arg(0), !*inlineRT, *contracts, outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	// gen/ is persisted (RFC-0009 §Persisted) — do not remove it.
 
 	// Run the root main package (".") not "./..." — vendored mode adds
 	// the arilrt subpackage and `go run ./...` would try to run multiple
@@ -483,11 +501,12 @@ type compiledSource struct {
 	dir string // caller is responsible for RemoveAll
 }
 
-// compileToTempGo lexes / parses / lowers the given build target (a
-// file or a package directory) and writes main.go + go.mod into a fresh
-// temp dir. The caller must RemoveAll the returned dir. Unlike emit, a
-// runnable build requires exactly one `func main` (RFC-0002).
-func compileToTempGo(path string, vendored bool, contractMode string) (*compiledSource, error) {
+// compileToProjectGo lexes / parses / lowers the given build target (a file or
+// a package directory) and writes main.go + go.mod into the persisted
+// <outDir>/gen module (RFC-0009). The returned dir is NOT removed by the caller
+// — persistence unlocks Go's incremental build cache. Unlike emit, a runnable
+// build requires exactly one `func main` (RFC-0002).
+func compileToProjectGo(path string, vendored bool, contractMode, outDir string) (*compiledSource, error) {
 	files, userImports, err := buildUnit(path)
 	if err != nil {
 		return nil, err
@@ -496,7 +515,7 @@ func compileToTempGo(path string, vendored bool, contractMode string) (*compiled
 	if err != nil {
 		return nil, err
 	}
-	return writeTempModule(goSrc)
+	return writeProjectModule(goSrc, outDir)
 }
 
 // compileSourceToTempGo is the in-memory variant used by the
@@ -545,15 +564,6 @@ func writeTempModule(goSrc string) (*compiledSource, error) {
 	return &compiledSource{dir: dir}, nil
 }
 
-// outputBinaryName turns "examples/core-language/hello/hello.aril" → "./hello".
-func outputBinaryName(path string) string {
-	base := filepath.Base(path)
-	if i := strings.LastIndexByte(base, '.'); i > 0 {
-		base = base[:i]
-	}
-	return filepath.Join(".", base)
-}
-
 func usage(w io.Writer) {
 	fmt.Fprintln(w, `Aril - modern TypeScript-style syntax on the Go runtime.
 
@@ -562,7 +572,7 @@ Usage:
 
 Commands:
   emit   [-no-line] <file.aril>  print the lowered Go source to stdout
-  build  [-o out] <file.aril>    compile to a native binary (default: ./<basename>)
+  build  [-o out] <file.aril>    compile to a native binary (default: aril-out/bin/<name>)
   run    <file.aril>             compile and execute (stdio passed through)
   repl                         interactive prompt (RFC-0003 skeleton)
   import <go/import/path>      generate Aril foreign bindings from a Go package

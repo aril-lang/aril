@@ -122,7 +122,9 @@ func errorCode(line: string): string {
 // --- classify one file ---
 
 func classify(aril: string, file: string, out: string): Row {
-  let r = run(aril, ["build", "-o", out, file])
+  // -out-dir redirects the persisted gen/ into scratch (RFC-0009); without it
+  // each example accretes an aril-out/ under examples/ (source-tree litter).
+  let r = run(aril, ["build", "-o", out, "-out-dir", out + "-gen", file])
   if r.code() == 0 {
     return Row{ path: file, stage: "build", blocker: "" }
   }
@@ -401,7 +403,7 @@ func evalNegatives(aril: string): EvalResult {
         fmt.println(ap.out())
         os.exit(1)
       }
-      let r = run(aril, ["build", "-o", pathJoin(tmp, "out.bin"), staged])
+      let r = run(aril, ["build", "-o", pathJoin(tmp, "out.bin"), "-out-dir", pathJoin(tmp, "gen"), staged])
       let combined = r.out()
       var want = ""
       if c.matches != "" {
@@ -673,7 +675,9 @@ func runOutcome(aril: string, outBin: string, spec: RunSpec): RunRow {
   // the RFC-0006 "examples + contracts = executable spec" payoff — run_ok now
   // means "runs, exits/prints as expected, AND every contract held." An
   // example with no contract lowers byte-identically, so this is inert for it.
-  let b = run(aril, ["build", "-o", outBin, "--contracts=panic", entryPath])
+  // -out-dir points the persisted gen/ at scratch (per-worker unique, so
+  // concurrent run_ok builders don't collide on one gen/) — RFC-0009.
+  let b = run(aril, ["build", "-o", outBin, "-out-dir", outBin + "-gen", "--contracts=panic", entryPath])
   if b.code() != 0 {
     return RunRow{ path: spec.dir, status: "build-fail", code: b.code() }
   }
