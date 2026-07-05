@@ -11,9 +11,9 @@ mirror is `../docs/language-spec.md`. On disagreement this file wins (D17).
 
 ## Schema
 
-`aril.toml` is the **only** v0.x configuration surface — no build flags,
-no external-dependency version pinning (pre-alpha ships no package
-manager). It has exactly three tables:
+`aril.toml` is the **only** v0.x configuration surface — no build flags.
+It has four tables — three scalar/list tables plus the repeatable
+`[dependencies.<name>]` sub-table:
 
 ```toml
 [project]
@@ -31,12 +31,48 @@ extra = []               # optional — extra Go import paths exposed as
                          # segment collide and are rejected at start.
 ```
 
+### `[dependencies]` — external modules (RFC-0008)
+
+Each external-module dependency is a **named sub-table** whose name is the
+dependency's import-path root — the `[project] name` it declares in *its
+own* `aril.toml` — so a consumer writes `import <name>/<pkg>`:
+
+```toml
+[dependencies.kv]                    # import root `kv` → `import kv/...`
+source  = "github.com/alice/aril-kv" # required — the Git/GitHub fetch location (D5)
+version = "v1.2.0"                   # required — an exact pin: a tag or commit (D19)
+kind    = "aril"                     # optional — aril | binding | go (default aril)
+
+[dependencies.pq]
+source  = "github.com/lib/pq"
+version = "v1.10.9"
+kind    = "go"                       # a raw Go module bound via a local table
+path    = "table/pq.aril"            # kind="go" only — the binding table in this project
+
+[dependencies.local]
+replace = "../aril-kv"               # optional — a local path overriding source
+                                     # (source/version then not required)
+```
+
+Fields: **`source`** and **`version`** are required unless **`replace`**
+(a local filesystem override) is given. **`kind`** is one of `aril` (a
+pure-Aril library, its source compiled in), `binding` (a published
+`.go`→`.aril` binding package), or `go` (a raw Go module bound via a
+consumer-owned **`path`** binding table); it defaults to `aril`, and
+`kind = "go"` requires `path`. A dependency name that duplicates another
+`[dependencies.<name>]`, or collides with the project's own `[project]
+name`, is rejected. **This is the declared schema; fetching and resolving
+these dependencies is later work** — v0.x reads and validates the table,
+and the resolver's external-module category is forthcoming.
+
 **Parser.** The reader is a deliberately tiny, closed-schema parser: the
 compiler core stays dependency-free (no third-party TOML library — D19),
-so only the line shapes above are accepted — `[section]` headers, `key =
-"string"`, `key = ["a", "b"]` single-line arrays, `#` comments, and blank
-lines. Anything else (an unknown section/key, a missing `[project]
-name`, a malformed value) is a manifest error reported at compiler start.
+so only the line shapes above are accepted — `[section]` and
+`[dependencies.<name>]` headers, `key = "string"`, `key = ["a", "b"]`
+single-line arrays, `#` comments, and blank lines. Anything else (an
+unknown section/key, a missing `[project] name`, a malformed value, a
+dependency missing a required field) is a manifest error reported at
+compiler start.
 
 ## Resolution
 

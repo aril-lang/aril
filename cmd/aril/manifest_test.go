@@ -60,6 +60,77 @@ func TestParseManifestErrors(t *testing.T) {
 	}
 }
 
+func TestParseManifestDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", `[project]
+name = "myapp"
+
+[dependencies.kv]
+source  = "github.com/alice/aril-kv"
+version = "v1.2.0"
+# kind omitted → defaults to "aril"
+
+[dependencies.pq]
+source  = "github.com/lib/pq"
+version = "v1.10.9"
+kind    = "go"
+path    = "table/pq.aril"
+
+[dependencies.local]
+replace = "../aril-kv"
+kind    = "binding"
+`)
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(m.deps) != 3 {
+		t.Fatalf("deps = %d; want 3 (%+v)", len(m.deps), m.deps)
+	}
+	kv := m.deps[0]
+	if kv.name != "kv" || kv.source != "github.com/alice/aril-kv" || kv.version != "v1.2.0" || kv.kind != "aril" {
+		t.Errorf("kv dep = %+v; want name=kv source=github.com/alice/aril-kv version=v1.2.0 kind=aril (default)", kv)
+	}
+	pq := m.deps[1]
+	if pq.kind != "go" || pq.path != "table/pq.aril" {
+		t.Errorf("pq dep = %+v; want kind=go path=table/pq.aril", pq)
+	}
+	loc := m.deps[2]
+	if loc.replace != "../aril-kv" || loc.kind != "binding" || loc.source != "" {
+		t.Errorf("local dep = %+v; want replace=../aril-kv kind=binding source=\"\"", loc)
+	}
+}
+
+func TestParseManifestDependencyErrors(t *testing.T) {
+	cases := map[string]string{
+		"bare dependencies section": "[project]\nname = \"p\"\n[dependencies]\nsource = \"x\"\n",
+		"duplicate dep":             "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\n[dependencies.kv]\nsource=\"t\"\nversion=\"v2\"\n",
+		"unknown kind":              "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\nkind=\"rust\"\n",
+		"missing source":            "[project]\nname = \"p\"\n[dependencies.kv]\nversion=\"v1\"\n",
+		"missing version":           "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\n",
+		"go kind without path":      "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\nkind=\"go\"\n",
+		"dep collides with project": "[project]\nname = \"p\"\n[dependencies.p]\nsource=\"s\"\nversion=\"v1\"\n",
+		"unknown dep key":           "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\nbogus=\"x\"\n",
+		"non-string dep value":      "[project]\nname = \"p\"\n[dependencies.kv]\nsource=5\nversion=\"v1\"\n",
+	}
+	for desc, body := range cases {
+		dir := t.TempDir()
+		writeFile(t, dir, "aril.toml", body)
+		if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err == nil {
+			t.Errorf("%s: expected an error, got none", desc)
+		}
+	}
+}
+
+func TestParseManifestReplaceSkipsSourceVersion(t *testing.T) {
+	// A `replace`d dependency needs neither source nor version (resolved locally).
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"p\"\n[dependencies.kv]\nreplace = \"../kv\"\n")
+	if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err != nil {
+		t.Fatalf("a replace-only dep should parse without source/version: %v", err)
+	}
+}
+
 func TestFindProjectManifestWalksUp(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "aril.toml", "[project]\nname = \"p\"\n")
