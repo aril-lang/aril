@@ -155,7 +155,7 @@ service.
 cold start, which this does not solve.
 
 **Status.** Realized for pure-Aril libraries (RFC-0008): a project declares
-dependencies in `aril.toml` (`[dependencies.<name>]` — a Git source, a pinned
+dependencies in `aril.toml` (`[dep.<name>]` — a Git source, a pinned
 version, a kind), `aril get` fetches them into a hermetic content-addressed
 cache and writes a committed `aril.lock`, and `aril build`/`run` resolve
 offline against the cache. Version resolution is **exact-pin** today (a tag or

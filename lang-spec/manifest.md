@@ -13,7 +13,7 @@ mirror is `../docs/language-spec.md`. On disagreement this file wins (D17).
 
 `aril.toml` is the **only** v0.x configuration surface — no build flags.
 It has four tables — three scalar/list tables plus the repeatable
-`[dependencies.<name>]` sub-table:
+`[dep.<name>]` sub-table:
 
 ```toml
 [project]
@@ -31,25 +31,25 @@ extra = []               # optional — extra Go import paths exposed as
                          # segment collide and are rejected at start.
 ```
 
-### `[dependencies]` — external modules (RFC-0008)
+### `[dep]` — external modules (RFC-0008)
 
 Each external-module dependency is a **named sub-table** whose name is the
 dependency's import-path root — the `[project] name` it declares in *its
 own* `aril.toml` — so a consumer writes `import <name>/<pkg>`:
 
 ```toml
-[dependencies.kv]                    # import root `kv` → `import kv/...`
+[dep.kv]                    # import root `kv` → `import kv/...`
 source  = "github.com/alice/aril-kv" # required — the Git/GitHub fetch location (D5)
 version = "v1.2.0"                   # required — an exact pin: a tag or commit (D19)
 kind    = "aril"                     # optional — aril | binding | go (default aril)
 
-[dependencies.pq]
+[dep.pq]
 source  = "github.com/lib/pq"
 version = "v1.10.9"
 kind    = "go"                       # a raw Go module bound via a local table
 path    = "table/pq.aril"            # kind="go" only — the binding table in this project
 
-[dependencies.local]
+[dep.local]
 replace = "../aril-kv"               # optional — a local path overriding source
                                      # (source/version then not required)
 ```
@@ -62,7 +62,7 @@ pure-Aril library, its source compiled in), `binding` (a published
 `.go`→`.aril` binding package), or `go` (a raw Go module bound via a
 consumer-owned **`path`** binding table); it defaults to `aril`, and
 `kind = "go"` requires `path`. A dependency name that duplicates another
-`[dependencies.<name>]`, or collides with the project's own `[project]
+`[dep.<name>]`, or collides with the project's own `[project]
 name`, is rejected. **This is the declared schema; fetching and resolving
 these dependencies is later work** — v0.x reads and validates the table,
 and the resolver's external-module category is forthcoming.
@@ -70,7 +70,7 @@ and the resolver's external-module category is forthcoming.
 **Parser.** The reader is a deliberately tiny, closed-schema parser: the
 compiler core stays dependency-free (no third-party TOML library — D19),
 so only the line shapes above are accepted — `[section]` and
-`[dependencies.<name>]` headers, `key = "string"`, `key = ["a", "b"]`
+`[dep.<name>]` headers, `key = "string"`, `key = ["a", "b"]`
 single-line arrays, `#` comments, and blank lines. Anything else (an
 unknown section/key, a missing `[project] name`, a malformed value, a
 dependency missing a required field) is a manifest error reported at
@@ -94,14 +94,14 @@ filesystem root), each `import P` resolves as:
    visibility are specified in `name-resolution.md` §Cross-package
    imports).
 2. **External module.** If `P`'s root segment names a declared
-   `[dependencies.<name>]`, the import resolves into that module's package
+   `[dep.<name>]`, the import resolves into that module's package
    tree: the module root is the dependency's `replace` local path (else its
    fetch-cache location), and the package is the remaining path (`import
    kv/store` → `<kv-root>/store`; bare `import kv` → the module root). A
    `kind = "aril"` module's `.aril` source joins the build and its import is
    stripped from the Go output like a local package; **the module's own
    imports resolve against its `aril.toml`** (its `[project] name` root and
-   its own `[dependencies]`), so the import graph — and the acyclic check
+   its own `[dep]`), so the import graph — and the acyclic check
    (D20) — span module boundaries. A declared dependency whose module is
    absent (not fetched), lacks an `aril.toml`, or has a not-yet-wired `kind`
    is **E0121** (distinct from E0117, which is an *undeclared* path).
@@ -143,7 +143,7 @@ recommended.
 ## Fetch — `aril get`
 
 `aril get` is the **only** step that touches the network. It reads the
-project's `[dependencies]`, and for each dependency without a `replace`
+project's `[dep]`, and for each dependency without a `replace`
 override it fetches the pinned `source@version` via `git` into a **hermetic
 module cache** — `$ARIL_CACHE/<source>@<version>/` (default the per-user
 cache dir; `$ARIL_CACHE` overrides). A `source` with no scheme is a
@@ -152,7 +152,7 @@ GitHub-style host/path fetched over `https` (D5); a scheme
 entry is source-only (git metadata is stripped) and immutable once written.
 
 `aril get` resolves the **transitive** closure (each fetched module's own
-`[dependencies]` are fetched recursively). Because v0.x is **exact-pin with
+`[dep]` are fetched recursively). Because v0.x is **exact-pin with
 no minimal-version selection**, two modules pinning one dependency to
 different versions is a conflict — **E0122**.
 

@@ -76,7 +76,7 @@ func TestFetchAndResolveOffline(t *testing.T) {
 	// A consumer declaring it as a source/version dep (no replace → fetched).
 	app := filepath.Join(root, "app")
 	mkdirAll(t, app)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.greetlib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.greetlib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import greetlib\n\nfunc main() {}\n")
 
 	m, err := parseProjectManifest(filepath.Join(app, "aril.toml"))
@@ -133,7 +133,7 @@ func TestFetchVersionConflict(t *testing.T) {
 	// libb depends on liba@v2.0.0.
 	libb := filepath.Join(root, "libb")
 	gitInit(t, libb, map[string]string{
-		"aril.toml": "[project]\nname = \"libb\"\n[dependencies.liba]\nsource = \"" + liba + "\"\nversion = \"v2.0.0\"\nkind = \"aril\"\n",
+		"aril.toml": "[project]\nname = \"libb\"\n[dep.liba]\nsource = \"" + liba + "\"\nversion = \"v2.0.0\"\nkind = \"aril\"\n",
 		"b.aril":    "func B(): int {\n  return 2\n}\n",
 	}, "v1.0.0")
 
@@ -142,8 +142,8 @@ func TestFetchVersionConflict(t *testing.T) {
 	mkdirAll(t, app)
 	writeFile(t, app, "aril.toml",
 		"[project]\nname = \"app\"\n"+
-			"[dependencies.liba]\nsource = \""+liba+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n"+
-			"[dependencies.libb]\nsource = \""+libb+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
+			"[dep.liba]\nsource = \""+liba+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n"+
+			"[dep.libb]\nsource = \""+libb+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 	_, err := fetchAll(m)
 	if err == nil || !strings.Contains(err.Error(), "E0122") {
@@ -178,7 +178,7 @@ func TestGetPreservesResolvedOnReRun(t *testing.T) {
 	gitInit(t, repo, map[string]string{"aril.toml": "[project]\nname = \"lib\"\n", "x.aril": "func X(): int {\n  return 1\n}\n"}, "v1.0.0")
 	app := filepath.Join(root, "app")
 	mkdirAll(t, app)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 
 	first, err := fetchAll(m)
@@ -212,7 +212,7 @@ func TestGetRejectsBranchAsVersion(t *testing.T) {
 	app := filepath.Join(root, "app")
 	mkdirAll(t, app)
 	// A branch name is not an exact pin — must be rejected.
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nsource = \""+repo+"\"\nversion = \"feature-x\"\nkind = \"aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \""+repo+"\"\nversion = \"feature-x\"\nkind = \"aril\"\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 	if _, err := fetchAll(m); err == nil || !strings.Contains(err.Error(), "exact pin") {
 		t.Fatalf("want exact-pin rejection of a branch, got: %v", err)

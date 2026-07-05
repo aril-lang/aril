@@ -20,16 +20,16 @@ type projectManifest struct {
 	name          string       // [project] name — import-path root prefix
 	toolchainGo   string       // [toolchain] go — pinned Go version
 	bindingsExtra []string     // [bindings] extra — extra Go import paths
-	deps          []dependency // [dependencies.<name>] — external module deps (RFC-0008)
+	deps          []dependency // [dep.<name>] — external module deps (RFC-0008)
 }
 
-// dependency is one [dependencies.<name>] entry (RFC-0008 §The manifest). The
+// dependency is one [dep.<name>] entry (RFC-0008 §The manifest). The
 // section name is the dependency's import-path root — the [project] name it
 // declares in its own aril.toml — so a consumer writes `import <name>/<pkg>`.
 // Resolution/fetch of these deps is later work (this reader only parses +
 // validates the schema); the fields carry the whole declared shape.
 type dependency struct {
-	name    string // import-path root — the [dependencies.<name>] key
+	name    string // import-path root — the [dep.<name>] key
 	source  string // Git/GitHub fetch location (D5)
 	version string // exact pin: a tag or commit (hermetic, D19)
 	kind    string // "aril" | "binding" | "go" (default "aril")
@@ -70,7 +70,7 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	}
 	m := &projectManifest{dir: filepath.Dir(path)}
 	section := ""
-	curDep := -1 // index into m.deps while inside a [dependencies.<name>], else -1
+	curDep := -1 // index into m.deps while inside a [dep.<name>], else -1
 	bail := func(line int, msg string) error {
 		return fmt.Errorf("aril: %s:%d: %s", path, line, msg)
 	}
@@ -86,18 +86,18 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			}
 			section = strings.TrimSpace(line[1 : len(line)-1])
 			curDep = -1
-			// [dependencies.<name>] — a named external-module dependency
-			// (RFC-0008). The bare [dependencies] container is rejected: a
+			// [dep.<name>] — a named external-module dependency
+			// (RFC-0008). The bare [dep] container is rejected: a
 			// dependency must carry its import-path-root name.
-			if section == "dependencies" || strings.HasPrefix(section, "dependencies.") {
-				depName := strings.TrimSpace(strings.TrimPrefix(section, "dependencies"))
+			if section == "dep" || strings.HasPrefix(section, "dep.") {
+				depName := strings.TrimSpace(strings.TrimPrefix(section, "dep"))
 				depName = strings.TrimSpace(strings.TrimPrefix(depName, "."))
 				if depName == "" {
-					return nil, bail(ln, "[dependencies] must be a named sub-section: [dependencies.<name>]")
+					return nil, bail(ln, "[dep] must be a named sub-section: [dep.<name>]")
 				}
 				for j := range m.deps {
 					if m.deps[j].name == depName {
-						return nil, bail(ln, fmt.Sprintf("duplicate [dependencies.%s] section", depName))
+						return nil, bail(ln, fmt.Sprintf("duplicate [dep.%s] section", depName))
 					}
 				}
 				m.deps = append(m.deps, dependency{name: depName, kind: "aril"})
@@ -107,7 +107,7 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			switch section {
 			case "project", "toolchain", "bindings":
 			default:
-				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected project / toolchain / bindings / dependencies.<name>)", section))
+				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected project / toolchain / bindings / dep.<name>)", section))
 			}
 			continue
 		}
@@ -118,7 +118,7 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 		key = strings.TrimSpace(key)
 		val = strings.TrimSpace(val)
 		if curDep >= 0 {
-			// Inside a [dependencies.<name>] section: every value is a scalar
+			// Inside a [dep.<name>] section: every value is a scalar
 			// string. Unknown keys are rejected (the schema is closed).
 			s, err := tomlString(val)
 			if err != nil {
@@ -137,7 +137,7 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			case "replace":
 				d.replace = s
 			default:
-				return nil, bail(ln, fmt.Sprintf("unknown key %q in [dependencies.%s] (want source / version / kind / path / replace)", key, d.name))
+				return nil, bail(ln, fmt.Sprintf("unknown key %q in [dep.%s] (want source / version / kind / path / replace)", key, d.name))
 			}
 			continue
 		}
@@ -186,28 +186,28 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	for i := range m.deps {
 		d := &m.deps[i]
 		if d.name == m.name {
-			return nil, fmt.Errorf("aril: %s: [dependencies.%s] collides with the project's own [project] name", path, d.name)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] collides with the project's own [project] name", path, d.name)
 		}
 		switch d.kind {
 		case "aril", "binding", "go":
 		default:
-			return nil, fmt.Errorf("aril: %s: [dependencies.%s] unknown kind %q (want aril | binding | go)", path, d.name, d.kind)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] unknown kind %q (want aril | binding | go)", path, d.name, d.kind)
 		}
 		// A `replace`d dependency is resolved locally, so source/version are
 		// not required; otherwise both pin the fetch (D5/D19).
 		if d.replace == "" {
 			if d.source == "" {
-				return nil, fmt.Errorf("aril: %s: [dependencies.%s] requires `source` (or a `replace` override)", path, d.name)
+				return nil, fmt.Errorf("aril: %s: [dep.%s] requires `source` (or a `replace` override)", path, d.name)
 			}
 			if d.version == "" {
-				return nil, fmt.Errorf("aril: %s: [dependencies.%s] requires `version` (an exact tag or commit)", path, d.name)
+				return nil, fmt.Errorf("aril: %s: [dep.%s] requires `version` (an exact tag or commit)", path, d.name)
 			}
 		}
 		if d.kind == "go" && d.path == "" {
-			return nil, fmt.Errorf("aril: %s: [dependencies.%s] kind=\"go\" requires `path` (the binding table)", path, d.name)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] kind=\"go\" requires `path` (the binding table)", path, d.name)
 		}
 		if d.kind != "go" && d.path != "" {
-			return nil, fmt.Errorf("aril: %s: [dependencies.%s] `path` is only valid for kind=\"go\"", path, d.name)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] `path` is only valid for kind=\"go\"", path, d.name)
 		}
 	}
 	return m, nil

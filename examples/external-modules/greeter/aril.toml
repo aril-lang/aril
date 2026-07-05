@@ -5,6 +5,6 @@ name = "greeter"
 # local, in-repo copy of the module — the vendored/dev form of a dependency
 # (the fetch form pins `source`/`version` instead). Its exported source is
 # compiled into this build; there is no separate Go module.
-[dependencies.greetlib]
+[dep.greetlib]
 replace = "../../../testdata/aril-modules/greetlib"
 kind    = "aril"
