@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // cmdClean removes a project's build-artifact directory — the counterpart to
@@ -37,8 +38,22 @@ func cmdClean(args []string) int {
 	if fs.NArg() == 1 {
 		target = fs.Arg(0)
 	}
+	root, _, err := projectOutputRoot(target)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	outDir, err := resolveOutDir(target, *outDirFlag)
 	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	// Guard the destructive RemoveAll: a misconfigured `[build] out-dir = "."`
+	// (or "..") resolves the out-dir to the project root (or its parent), and
+	// clean would then delete the sources. build/run only *write* into the
+	// out-dir, so the same typo is harmless there; clean is not. Refuse when the
+	// out-dir is the project root or an ancestor of it.
+	if err := refuseUnsafeClean(outDir, root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
@@ -63,4 +78,19 @@ func cmdClean(args []string) int {
 		}
 	}
 	return 0
+}
+
+// refuseUnsafeClean rejects cleaning an out-dir that is the project root or an
+// ancestor of it — the blast radius of a `[build] out-dir = "."`/".." typo. The
+// out-dir is safe iff the path from it *down* to the root goes upward (a
+// leading ".."), i.e. the root is not at or below the out-dir.
+func refuseUnsafeClean(outDir, root string) error {
+	rel, err := filepath.Rel(filepath.Clean(outDir), filepath.Clean(root))
+	if err != nil {
+		return nil // unrelated paths (e.g. distinct volumes) — out-dir is not above root
+	}
+	if !strings.HasPrefix(rel, "..") {
+		return fmt.Errorf("aril clean: refusing to remove %q — it is the project root or an ancestor of it (check `[build] out-dir`)", outDir)
+	}
+	return nil
 }

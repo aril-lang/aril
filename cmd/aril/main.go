@@ -600,7 +600,7 @@ Commands:
   repl                         interactive prompt (RFC-0003 skeleton)
   import <go/import/path>      generate Aril foreign bindings from a Go package
   get                          fetch the project's declared [dependencies] into the cache
-  clean  [-gen|-bin] [<dir>]   remove the aril-out build-artifact directory
+  clean  [-gen] [-bin] [<dir>] remove the aril-out build-artifact directory
   version                      print the compiler version
   help                         print this message
 
