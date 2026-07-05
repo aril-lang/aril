@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -109,6 +110,7 @@ func TestParseManifestDependencyErrors(t *testing.T) {
 		"missing source":            "[project]\nname = \"p\"\n[dependencies.kv]\nversion=\"v1\"\n",
 		"missing version":           "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\n",
 		"go kind without path":      "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\nkind=\"go\"\n",
+		"path on non-go kind":       "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\npath=\"t.aril\"\n",
 		"dep collides with project": "[project]\nname = \"p\"\n[dependencies.p]\nsource=\"s\"\nversion=\"v1\"\n",
 		"unknown dep key":           "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nversion=\"v1\"\nbogus=\"x\"\n",
 		"non-string dep value":      "[project]\nname = \"p\"\n[dependencies.kv]\nsource=5\nversion=\"v1\"\n",
@@ -119,6 +121,19 @@ func TestParseManifestDependencyErrors(t *testing.T) {
 		if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err == nil {
 			t.Errorf("%s: expected an error, got none", desc)
 		}
+	}
+}
+
+func TestParseManifestDependencyErrorCoordinates(t *testing.T) {
+	// An in-loop error (unknown key on line 5) carries aril.toml:<line> (D10).
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"p\"\n[dependencies.kv]\nsource=\"s\"\nbogus=\"x\"\n")
+	_, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), "aril.toml:5") {
+		t.Errorf("error should carry the aril.toml line coordinate, got: %v", err)
 	}
 }
 

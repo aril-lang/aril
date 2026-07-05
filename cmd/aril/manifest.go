@@ -91,12 +91,12 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			// dependency must carry its import-path-root name.
 			if section == "dependencies" || strings.HasPrefix(section, "dependencies.") {
 				depName := strings.TrimSpace(strings.TrimPrefix(section, "dependencies"))
-				depName = strings.TrimPrefix(depName, ".")
+				depName = strings.TrimSpace(strings.TrimPrefix(depName, "."))
 				if depName == "" {
 					return nil, bail(ln, "[dependencies] must be a named sub-section: [dependencies.<name>]")
 				}
-				for i := range m.deps {
-					if m.deps[i].name == depName {
+				for j := range m.deps {
+					if m.deps[j].name == depName {
 						return nil, bail(ln, fmt.Sprintf("duplicate [dependencies.%s] section", depName))
 					}
 				}
@@ -205,6 +205,9 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 		}
 		if d.kind == "go" && d.path == "" {
 			return nil, fmt.Errorf("aril: %s: [dependencies.%s] kind=\"go\" requires `path` (the binding table)", path, d.name)
+		}
+		if d.kind != "go" && d.path != "" {
+			return nil, fmt.Errorf("aril: %s: [dependencies.%s] `path` is only valid for kind=\"go\"", path, d.name)
 		}
 	}
 	return m, nil
