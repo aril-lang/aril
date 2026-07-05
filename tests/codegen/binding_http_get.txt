@@ -1,0 +1,74 @@
+--- TITLE ---
+HTTP client entry point: http.get(url) is a mechanical (T, error) row → ResultOf(http.Get(url)) yielding the http.Response handle, whose statusCode field is read through the field axis (resp.StatusCode) and whose body drains via io.readAll(resp.body) → ResultOf(io.ReadAll(resp.Body)).
+
+--- INPUT ---
+import fmt
+import http
+import io
+
+func fetch(url: string): int {
+  match http.get(url) {
+    Ok(resp) => {
+      match io.readAll(resp.body) {
+        Ok(bytes) => return resp.statusCode,
+        Err(_) => return 0,
+      }
+    },
+    Err(_) => return 0,
+  }
+}
+
+func main() {
+  fmt.println(fetch("http://example.com"))
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func fetch(url string) int {
+	__aril_match_1 := ResultOf(http.Get(url))
+	switch __aril_match_1.Tag {
+	case 0:
+		resp := __aril_match_1.V
+		__aril_match_2 := ResultOf(io.ReadAll(resp.Body))
+		switch __aril_match_2.Tag {
+		case 0:
+			bytes := __aril_match_2.V
+			_ = bytes
+			return resp.StatusCode
+		case 1:
+			return 0
+		}
+		panic("unreachable: non-exhaustive match")
+	case 1:
+		return 0
+	}
+	panic("unreachable: non-exhaustive match")
+}
+func main() {
+	fmt.Println(fetch("http://example.com"))
+}

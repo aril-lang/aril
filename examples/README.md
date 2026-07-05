@@ -73,6 +73,7 @@ Go, which has no sum types.
 | `http_by_hand` ★ | **HTTP/1.1 built by hand** over raw `net.Conn` — request-line parsing (`bufio`) + a hand-assembled response; proves a protocol the stdlib does *not* bind is buildable on the socket base |
 | `healthcheck_server` ★ | `net/http`; **Go interface conformance** (an Aril `class implements http.Handler`, checked structurally — E0219) + `http.listenAndServe` |
 | `http_server` ★ | the same conformance **proven at runtime** — an Aril `http.Handler` served over a real socket via `http.serve`, driven in-process by a raw `net` client under a `scope` (run-checkable) |
+| `http_client` ★ | the **HTTP client** — `http.get` fetches a response whose fields (`resp.statusCode`) are read through the value-handle **field axis**, body drained via `io.readAll(resp.body)`; run against an in-process `http.serve` server (run-checkable) |
 | `todo_api` | JSON CRUD over an actor-serialised store (concurrent client goroutines); DTO structs; `Result` mapped to HTTP status codes |
 | `counterstack` | sum-typed JSON wire protocol over an in-process channel transport, `encoding/json` round-trip, concurrent reader/writer, a `class implements Strategy` |
 
