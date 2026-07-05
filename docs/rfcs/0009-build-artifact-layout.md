@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0009 |
-| Status | draft |
+| Status | accepted |
 | Created | 2026-07-05 |
 | Supersedes | — |
 
@@ -237,3 +237,5 @@ concern with its own RFC.
   compiles a phantom); an `aril clean` command; a reserved cross-compilation slot
   (`bin/<target>/`); and corrected the `$ARIL_CACHE` description to
   *coordinate-addressed, content-verified* (aligning with RFC-0008).
+- 2026-07-05 — `draft → accepted`, alongside RFC-0008 as its pair. The status
+  flips to `implemented` when the `aril-out/` layout lands in `cmd/aril`.

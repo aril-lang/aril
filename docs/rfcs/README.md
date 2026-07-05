@@ -30,8 +30,8 @@ This directory holds:
 | 0005 | accepted | Go FFI: the foreign-binding interface |
 | 0006 | accepted | Optional runtime contracts |
 | 0007 | accepted | Channel contracts (trace contracts) |
-| 0008 | draft | External modules: the dependency & build system |
-| 0009 | draft | Build-artifact layout |
+| 0008 | accepted | External modules: the dependency & build system |
+| 0009 | accepted | Build-artifact layout |
 
 ## How to write an RFC
 
