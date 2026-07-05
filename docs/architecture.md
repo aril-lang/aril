@@ -31,6 +31,23 @@ lives in [`docs/design-decisions.md`](design-decisions.md).
 The Aril compiler's job ends at emitting Go. The Go toolchain produces the
 binary.
 
+### Build-artifact layout
+
+`aril build`/`run` write into a per-project **`aril-out/`** directory (visible,
+auto-git-ignored via an `aril-out/.gitignore` = `*`): the binary lands at
+`aril-out/bin/<name>` and the lowered Go persists in `aril-out/gen/`. Persisting
+`gen/` (rather than lowering to a throwaway temp dir) keeps the source path
+stable so an unchanged rebuild hits Go's `$GOCACHE` — Go stays an IR the
+developer never works in (D1), its on-disk presence incidental. `gen/` is kept
+in sync with the sources by an emitted-files manifest (a removed source's `.go`
+is pruned, or `go build` would compile a phantom). The output directory is
+resolved by, in order, `--out-dir` › the `ARIL_OUT` env var › a `[build]
+out-dir` manifest key › the default `./aril-out`; an explicitly-set (shared)
+out-dir is namespaced per project (`<out>/<project-id>/…`). A build takes an
+exclusive lock on the out-dir for the span of lowering + `go build`. `aril
+clean` removes the directory. The dependency cache is separate and global
+(`$ARIL_CACHE`). The REPL, being projectless, keeps a throwaway temp module.
+
 ## 2. Go as the intermediate representation
 
 Go is an IR (decision D1), with these consequences:
