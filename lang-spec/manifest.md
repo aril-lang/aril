@@ -55,7 +55,9 @@ replace = "../aril-kv"               # optional — a local path overriding sour
 ```
 
 Fields: **`source`** and **`version`** are required unless **`replace`**
-(a local filesystem override) is given. **`kind`** is one of `aril` (a
+(a local filesystem override) is given. `version` is an **exact pin** — a
+Git tag or a full 40-character commit SHA; a mutable branch is rejected by
+`aril get` (v0.x has no minimal-version selection). **`kind`** is one of `aril` (a
 pure-Aril library, its source compiled in), `binding` (a published
 `.go`→`.aril` binding package), or `go` (a raw Go module bound via a
 consumer-owned **`path`** binding table); it defaults to `aril`, and

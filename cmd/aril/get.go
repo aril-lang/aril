@@ -59,8 +59,17 @@ func cmdGet(args []string) int {
 // binding/go deps (a Go require) are later work. Two pins of one module to
 // different versions are a conflict (E0122) — v0.x is exact-pin, no MVS.
 func fetchAll(root *projectManifest) ([]lockEntry, error) {
+	// The prior lock carries the resolved commit forward on a cache-hit: the
+	// cache is source-only (git metadata stripped), so the commit cannot be
+	// re-derived from a cached tree — the lock is its only home.
+	prevResolved := map[string]string{} // "source@version" → resolved commit
+	if prev, err := readLock(root.dir); err == nil {
+		for _, e := range prev {
+			prevResolved[e.source+"@"+e.version] = e.resolved
+		}
+	}
 	locked := map[string]lockEntry{}
-	pinned := map[string]string{} // dep name → "source@version"
+	pinned := map[string]string{} // dep name → "source@version" — also the module-graph cycle guard (a re-seen name short-circuits before recursing)
 	var walk func(m *projectManifest) error
 	walk = func(m *projectManifest) error {
 		for i := range m.deps {
@@ -81,6 +90,9 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 			resolved, err := ensureFetched(d.source, d.version, dest)
 			if err != nil {
 				return err
+			}
+			if resolved == "" {
+				resolved = prevResolved[key] // cache-hit: keep the recorded pin
 			}
 			hash, err := hashTree(dest)
 			if err != nil {
@@ -136,6 +148,14 @@ func fetchModule(source, version, dest string) (string, error) {
 		os.RemoveAll(tmp)
 		return "", fmt.Errorf("aril get: fetching %q: git clone failed: %v", source, err)
 	}
+	// Enforce the exact-pin contract (RFC-0008: v0.x is exact-pin): a `version`
+	// must be a tag or a full commit SHA, never a mutable branch (a branch
+	// would silently freeze in the immutable cache as a stale non-pin).
+	isTag := runGit(tmp, "show-ref", "--verify", "--quiet", "refs/tags/"+version) == nil
+	if !isTag && !isFullCommitSHA(version) {
+		os.RemoveAll(tmp)
+		return "", fmt.Errorf("aril get: %q@%q: version must be an exact pin — a tag or a full 40-character commit SHA, not a branch or short ref", source, version)
+	}
 	if err := runGit(tmp, "checkout", "--quiet", version); err != nil {
 		os.RemoveAll(tmp)
 		return "", fmt.Errorf("aril get: fetching %q@%q: git checkout failed (is %q a valid tag/commit?): %v", source, version, version, err)
@@ -163,6 +183,19 @@ func gitURL(source string) string {
 		return source
 	}
 	return "https://" + source
+}
+
+// isFullCommitSHA reports whether s is a full 40-hex-character git commit SHA.
+func isFullCommitSHA(s string) bool {
+	if len(s) != 40 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func runGit(dir string, args ...string) error {

@@ -151,4 +151,72 @@ func TestFetchVersionConflict(t *testing.T) {
 	}
 }
 
+func TestLockRoundtripBackslashSource(t *testing.T) {
+	// A local/Windows source path with backslashes must survive the write/read
+	// roundtrip (writer and reader agree on literal, non-escaped quoting).
+	dir := t.TempDir()
+	in := []lockEntry{{name: "a", source: `C:\pkg\lib`, version: "v1.0.0", resolved: "abc", hash: "h"}}
+	if err := writeLock(dir, in); err != nil {
+		t.Fatalf("writeLock: %v", err)
+	}
+	out, err := readLock(dir)
+	if err != nil {
+		t.Fatalf("readLock: %v", err)
+	}
+	if len(out) != 1 || out[0].source != `C:\pkg\lib` {
+		t.Errorf("backslash source not preserved: %+v", out)
+	}
+}
+
+func TestGetPreservesResolvedOnReRun(t *testing.T) {
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+	repo := filepath.Join(root, "lib-repo")
+	gitInit(t, repo, map[string]string{"aril.toml": "[project]\nname = \"lib\"\n", "x.aril": "func X(): int {\n  return 1\n}\n"}, "v1.0.0")
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+
+	first, err := fetchAll(m)
+	if err != nil {
+		t.Fatalf("first fetch: %v", err)
+	}
+	if err := writeLock(m.dir, first); err != nil {
+		t.Fatal(err)
+	}
+	// A second `get` hits the immutable cache; it must NOT blank `resolved`.
+	second, err := fetchAll(m)
+	if err != nil {
+		t.Fatalf("second fetch: %v", err)
+	}
+	if len(second) != 1 || second[0].resolved == "" || second[0].resolved != first[0].resolved {
+		t.Errorf("re-get lost the resolved pin: first=%q second=%q", first[0].resolved, second[0].resolved)
+	}
+}
+
+func TestGetRejectsBranchAsVersion(t *testing.T) {
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+	repo := filepath.Join(root, "lib-repo")
+	gitInit(t, repo, map[string]string{"aril.toml": "[project]\nname = \"lib\"\n", "x.aril": "func X(): int {\n  return 1\n}\n"}, "v1.0.0")
+	if err := runGit(repo, "branch", "feature-x"); err != nil {
+		t.Fatalf("branch: %v", err)
+	}
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	// A branch name is not an exact pin — must be rejected.
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dependencies.lib]\nsource = \""+repo+"\"\nversion = \"feature-x\"\nkind = \"aril\"\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	if _, err := fetchAll(m); err == nil || !strings.Contains(err.Error(), "exact pin") {
+		t.Fatalf("want exact-pin rejection of a branch, got: %v", err)
+	}
+}
+
 func runGitVersion() (string, error) { return gitOutput("", "version") }
