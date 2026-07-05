@@ -147,7 +147,13 @@ func TestGenOrphanSync(t *testing.T) {
 		t.Errorf("manifest should list arilrt files, got %v", man)
 	}
 
-	// Inline: no runtime import → arilrt/ must be pruned.
+	// Plant a stray non-.go file in arilrt/ (models a future embedded asset that
+	// listGoFiles wouldn't enumerate) — the whole dir must still be dropped.
+	if err := os.WriteFile(filepath.Join(genDir, "arilrt", "LICENSE"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Inline: no runtime import → arilrt/ must be pruned (stray and all).
 	inline := "package main\n\nfunc main() {}\n"
 	if _, err := writeProjectModule(inline, outDir); err != nil {
 		t.Fatal(err)

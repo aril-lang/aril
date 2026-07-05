@@ -134,10 +134,10 @@ func writeProjectModule(goSrc, outDir string) (*compiledSource, error) {
 			emitted = append(emitted, filepath.Join("arilrt", f))
 		}
 	}
-	// Prune orphans: a persisted gen/ must delete the .go a prior lowering wrote
-	// but this one no longer emits (a vendored→inline switch drops arilrt/; a
-	// removed/renamed source drops its file), or `go build ./...` compiles a
-	// phantom from source that no longer exists (RFC-0009 §Persisted).
+	// Prune orphans: a persisted gen/ must delete what a prior lowering wrote but
+	// this one no longer emits (a vendored→inline switch drops arilrt/) — keeping
+	// gen/ in sync with the sources and forward-proofing multi-file emission
+	// against a stale `.go` compiling as a phantom (RFC-0009 §Persisted).
 	if err := syncEmitted(genDir, emitted); err != nil {
 		return nil, err
 	}
@@ -185,13 +185,34 @@ func syncEmitted(genDir string, emitted []string) error {
 		if err := os.Remove(filepath.Join(genDir, p)); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("aril: prune orphan %s: %w", p, err)
 		}
-		// Drop a now-empty parent (e.g. arilrt/ after a vendored→inline switch);
-		// os.Remove only succeeds on an empty dir, so a still-used one is kept.
-		if dir := filepath.Dir(p); dir != "." {
-			_ = os.Remove(filepath.Join(genDir, dir))
+	}
+	// Drop any subdirectory the previous emit used but the current one does not
+	// (arilrt/ after a vendored→inline switch). RemoveAll, not a per-file Remove,
+	// so a stray non-tracked file can't strand a half-pruned dir — the enumerated
+	// set (listGoFiles) is `.go`-only, but the dir must go whole. A dir still
+	// referenced by the current emit is kept.
+	curDirs := dirSet(emitted)
+	for d := range dirSet(prev) {
+		if curDirs[d] {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(genDir, d)); err != nil {
+			return fmt.Errorf("aril: prune orphan dir %s: %w", d, err)
 		}
 	}
 	return writeEmittedManifest(genDir, emitted)
+}
+
+// dirSet returns the set of parent directories (gen-relative, excluding ".")
+// referenced by a set of emitted paths.
+func dirSet(paths []string) map[string]bool {
+	dirs := map[string]bool{}
+	for _, p := range paths {
+		if d := filepath.Dir(p); d != "." {
+			dirs[d] = true
+		}
+	}
+	return dirs
 }
 
 // readEmittedManifest returns the gen-relative paths recorded by the last
