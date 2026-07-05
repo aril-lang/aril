@@ -19,6 +19,7 @@ import (
 //	  bin/<name>     the final native binary (default `aril build` target)
 //	  gen/           the lowered Go module (the IR), persisted across builds
 //	  .gitignore     "*" — auto-generated, so artifacts stay untracked
+//	  .lock          the exclusive build lock (flock handle; RFC-0009 PR3)
 //
 // Persisting `gen/` (rather than lowering to a throwaway temp dir) holds the
 // source path stable so Go's $GOCACHE makes an unchanged rebuild incremental
