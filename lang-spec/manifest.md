@@ -91,7 +91,19 @@ filesystem root), each `import P` resolves as:
    `utils.…`; the qualified-reference surface and cross-package
    visibility are specified in `name-resolution.md` §Cross-package
    imports).
-2. **Bundled std module.** A path naming a compiler-bundled Aril module
+2. **External module.** If `P`'s root segment names a declared
+   `[dependencies.<name>]`, the import resolves into that module's package
+   tree: the module root is the dependency's `replace` local path (else its
+   fetch-cache location), and the package is the remaining path (`import
+   kv/store` → `<kv-root>/store`; bare `import kv` → the module root). A
+   `kind = "aril"` module's `.aril` source joins the build and its import is
+   stripped from the Go output like a local package; **the module's own
+   imports resolve against its `aril.toml`** (its `[project] name` root and
+   its own `[dependencies]`), so the import graph — and the acyclic check
+   (D20) — span module boundaries. A declared dependency whose module is
+   absent (not fetched), lacks an `aril.toml`, or has a not-yet-wired `kind`
+   is **E0121** (distinct from E0117, which is an *undeclared* path).
+3. **Bundled std module.** A path naming a compiler-bundled Aril module
    (`std/pred` — the contract predicate vocabulary, RFC-0006) resolves to
    the module's **embedded source**, not a directory. Its `.aril` decls
    join the build under a stable virtual path (so `//line` blame and the
@@ -99,20 +111,27 @@ filesystem root), each `import P` resolves as:
    package, and the import is stripped from the Go output. This branch is
    **manifest-independent** — a lone file with no `aril.toml` may
    `import std/pred`.
-3. **Stdlib / extra binding.** Otherwise, if the path's head is a known
+4. **Stdlib / extra binding.** Otherwise, if the path's head is a known
    stdlib namespace or matches a `[bindings] extra` entry's last segment,
    it resolves through the binding registry (no package directory to
    gather).
-4. **Failure.** Neither local, bundled, nor a known binding namespace →
-   **E0117 Unknown import path**.
+5. **Failure.** Neither local, a declared external module, bundled, nor a
+   known binding namespace → **E0117 Unknown import path**.
+
+(A bundled `std/*` path is recognised independently of this ordering — it
+is an exact-path match that cannot collide with a project name or a
+dependency root, so its step number reflects grouping, not strict
+precedence.)
 
 Without a `aril.toml`, step 1 is skipped entirely: the program is a
 single package resolved against the stdlib registry — the zero-config
 path for scripts and quick experiments.
 
-**Acyclic graph (D20).** The user-package import graph must be acyclic;
-a cycle (`a` imports `b` imports `a`) is **E0116 Cyclic package import**,
-rejected before sema runs. Shared code is extracted into a third package.
+**Acyclic graph (D20).** The import graph — across local packages *and*
+external modules — must be acyclic; a cycle (`a` imports `b` imports `a`,
+whether in one project or spanning a dependency edge) is **E0116 Cyclic
+package import**, rejected before sema runs. Shared code is extracted into
+a third package.
 
 **Edge case — `name` collides with a stdlib package** (e.g. `name =
 "fmt"`): the local lookup wins for paths under that name; the manifest is

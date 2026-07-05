@@ -30,17 +30,27 @@ type resolved struct {
 //   - a path under the project name → a local user package (its
 //     directory's .aril files join the build); a missing directory is
 //     E0117.
+//   - a path whose root names a declared [dependencies.<name>] → an
+//     external module; its .aril source (kind="aril") joins the build and
+//     its own imports resolve against its manifest. A declared-but-absent
+//     module is E0121.
 //   - a stdlib / [bindings] extra path → left for the binding registry.
 //   - anything else → E0117 unknown import path.
 //
-// Cycles in the user-package import graph are E0116.
+// Cycles in the import graph (across modules) are E0116.
 func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 	r := &resolved{userImports: map[string]bool{}}
 	seenDir := map[string]bool{} // package dirs already gathered
 	onStack := map[string]bool{} // dirs on the current DFS path (cycle detection)
 
-	var visit func(dir string, files []string, trail []string) error
-	visit = func(dir string, files []string, trail []string) error {
+	// visit carries `mod`, the manifest that governs the imports of the files
+	// it is walking — the entry project's manifest, or, once the DFS crosses
+	// into an external dependency, that dependency's own manifest (so its
+	// imports resolve against its `[project] name` root and its own deps). The
+	// acyclic-graph check (D20, E0116) spans module boundaries via the shared
+	// abs-dir stack.
+	var visit func(dir string, files []string, trail []string, mod *projectManifest) error
+	visit = func(dir string, files []string, trail []string, mod *projectManifest) error {
 		abs, _ := filepath.Abs(dir)
 		if onStack[abs] {
 			return fmt.Errorf("aril: error[E0116]: cyclic package import: %s", strings.Join(append(trail, dir), " -> "))
@@ -60,7 +70,7 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 				continue
 			}
 			for _, p := range imps {
-				kind, target := classifyImport(p, m)
+				kind, target := classifyImport(p, mod)
 				switch kind {
 				case importStdlib:
 					// resolved by the binding registry; nothing to gather.
@@ -79,7 +89,37 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 					if err != nil {
 						return fmt.Errorf("aril: error[E0117]: unknown import path %q (no package directory at %s)", p, target)
 					}
-					if err := visit(target, sub, append(trail, dir)); err != nil {
+					if err := visit(target, sub, append(trail, dir), mod); err != nil {
+						return err
+					}
+				case importExternal:
+					// A declared external dependency. Only kind="aril" (pure
+					// Aril source, compiled into the build) is wired today;
+					// binding/go deps (a Go `require`) are later work.
+					d := lookupDep(mod, p)
+					if d.kind != "aril" {
+						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; only kind=\"aril\" external modules are resolved so far", p, d.kind)
+					}
+					// The module manifest is anchored at the module root, not
+					// found by walking up from the package dir (which could
+					// bind an ancestor's aril.toml). A module absent or without
+					// its own aril.toml is "not fetched" → E0121; a *present*
+					// module missing this sub-package is an unknown path within
+					// it → E0117 (running `aril get` cannot fix a typo).
+					moduleRoot := externalModuleRoot(d, mod)
+					subMod, err := manifestAt(moduleRoot)
+					if err != nil {
+						return err
+					}
+					if subMod == nil {
+						return fmt.Errorf("aril: error[E0121]: dependency %q is not present (run `aril get`); no module (aril.toml) at %s", p, moduleRoot)
+					}
+					r.userImports[p] = true
+					sub, err := gatherSources(target)
+					if err != nil {
+						return fmt.Errorf("aril: error[E0117]: unknown import path %q (no package in the %q module at %s)", p, d.name, target)
+					}
+					if err := visit(target, sub, append(trail, dir), subMod); err != nil {
 						return err
 					}
 				case importUnknown:
@@ -91,7 +131,7 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 		return nil
 	}
 
-	if err := visit(filepath.Dir(entry[0]), entry, nil); err != nil {
+	if err := visit(filepath.Dir(entry[0]), entry, nil, m); err != nil {
 		return nil, err
 	}
 	r.files = dedupeSorted(r.files)
@@ -104,7 +144,8 @@ const (
 	importStdlib importKind = iota
 	importUser
 	importUnknown
-	importStd // a compiler-bundled Aril module (`std/pred`), injected in buildUnit
+	importStd      // a compiler-bundled Aril module (`std/pred`), injected in buildUnit
+	importExternal // a declared [dependencies.<name>] external module (RFC-0008)
 )
 
 // classifyImport decides how an import path resolves (RFC-0002
@@ -118,6 +159,14 @@ func classifyImport(p string, m *projectManifest) (importKind, string) {
 	if m != nil && (p == m.name || strings.HasPrefix(p, m.name+"/")) {
 		rest := strings.TrimPrefix(strings.TrimPrefix(p, m.name), "/")
 		return importUser, filepath.Join(m.dir, filepath.FromSlash(rest))
+	}
+	// An import whose root names a declared [dependencies.<name>] resolves into
+	// that external module's package tree (RFC-0002 order: after the local
+	// project name, before the builtin binding surface). The module root is the
+	// `replace` local path or the fetch cache; the package is the remaining path.
+	if d := lookupDep(m, p); d != nil {
+		rest := strings.TrimPrefix(strings.TrimPrefix(p, d.name), "/")
+		return importExternal, filepath.Join(externalModuleRoot(d, m), filepath.FromSlash(rest))
 	}
 	if binding.IsBuiltinModule(head) {
 		return importStdlib, ""
@@ -152,6 +201,75 @@ func fileImports(path string) ([]string, error) {
 		out = append(out, im.Path)
 	}
 	return out, nil
+}
+
+// lookupDep returns the declared dependency whose import-path root heads `p`
+// (`kv` matches `import kv` and `import kv/store`), or nil. The longest-root
+// match wins so a more specific root is preferred, though roots do not nest in
+// practice (each is a distinct project name).
+func lookupDep(m *projectManifest, p string) *dependency {
+	if m == nil {
+		return nil
+	}
+	var best *dependency
+	for i := range m.deps {
+		d := &m.deps[i]
+		if p == d.name || strings.HasPrefix(p, d.name+"/") {
+			if best == nil || len(d.name) > len(best.name) {
+				best = d
+			}
+		}
+	}
+	return best
+}
+
+// externalModuleRoot is the on-disk directory of a dependency's module: the
+// `replace` local path (relative to the declaring manifest's dir) when given,
+// else the fetch cache location. The cache layout is provisional (RFC-0008
+// leaves it to the fetch step); today only `replace` deps exist on disk.
+func externalModuleRoot(d *dependency, m *projectManifest) string {
+	if d.replace != "" {
+		r := filepath.FromSlash(d.replace)
+		if !filepath.IsAbs(r) && m != nil {
+			r = filepath.Join(m.dir, r)
+		}
+		return r
+	}
+	return cacheModuleDir(d.source, d.version)
+}
+
+// manifestAt loads the aril.toml directly in dir (not by walking up, unlike
+// findProjectManifest) — the anchor for an external module, whose manifest must
+// live at its own root. Returns (nil, nil) when dir has no aril.toml.
+func manifestAt(dir string) (*projectManifest, error) {
+	p := filepath.Join(dir, "aril.toml")
+	if _, err := os.Stat(p); err != nil {
+		return nil, nil
+	}
+	return parseProjectManifest(p)
+}
+
+// arilCacheDir is the root of the hermetic module cache: $ARIL_CACHE, else the
+// per-user cache dir, else a temp fallback (RFC-0008 §fetch & the cache).
+func arilCacheDir() string {
+	if c := os.Getenv("ARIL_CACHE"); c != "" {
+		return c
+	}
+	if h, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(h, "aril")
+	}
+	return filepath.Join(os.TempDir(), "aril-cache")
+}
+
+// cacheModuleDir is where a fetched module version lives in the cache. Path
+// separators in the source and version are flattened so the entry is one
+// directory level. This layout is provisional — the fetch step (later work)
+// settles a collision-free content-addressed key.
+func cacheModuleDir(source, version string) string {
+	flat := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, "/", "_"), string(filepath.Separator), "_")
+	}
+	return filepath.Join(arilCacheDir(), flat(source)+"@"+flat(version))
 }
 
 func dedupeSorted(xs []string) []string {
