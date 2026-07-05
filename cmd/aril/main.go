@@ -182,6 +182,13 @@ func cmdBuild(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// Serialize lowering + go build on the out-dir (RFC-0009 §Concurrent builds).
+	release, err := acquireBuildLock(outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
 	src, err := compileToProjectGo(srcPath, !*inlineRT, *contracts, outDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -470,6 +477,16 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// Serialize on the out-dir (RFC-0009 §Concurrent builds). `go run` fuses
+	// compile+exec, so the lock is held across execution too — two `aril run` of
+	// one long-running project thus serialize on the *run*, not just the build.
+	// Narrowing it (build-under-lock → exec-unlocked) is a follow-up.
+	release, err := acquireBuildLock(outDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
 	src, err := compileToProjectGo(fs.Arg(0), !*inlineRT, *contracts, outDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

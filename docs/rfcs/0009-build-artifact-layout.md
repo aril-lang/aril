@@ -132,7 +132,7 @@ concern" discipline of `CARGO_TARGET_DIR` / `GOCACHE` / `DENO_DIR`.
 **A shared output directory is namespaced per project.** When `ARIL_OUT` or
 `--out-dir` points several projects at *one* directory — the example-corpus runner
 is the motivating case — the layout gains a project segment,
-`<out>/<project-id>/{bin,gen}`, where `<project-id>` is the project's `[package]
+`<out>/<project-id>/{bin,gen}`, where `<project-id>` is the project's `[project]
 name` plus a short hash of its root path. Without it, co-located projects would
 overwrite each other's `gen/` and collide in one `bin/` on a name clash. Under the
 default `./aril-out` (one project, one directory) the segment is omitted. Cargo

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 //	  bin/<name>     the final native binary (default `aril build` target)
 //	  gen/           the lowered Go module (the IR), persisted across builds
 //	  .gitignore     "*" — auto-generated, so artifacts stay untracked
+//	  .lock          the exclusive build lock (flock handle; RFC-0009 PR3)
 //
 // Persisting `gen/` (rather than lowering to a throwaway temp dir) holds the
 // source path stable so Go's $GOCACHE makes an unchanged rebuild incremental
@@ -30,6 +33,13 @@ import (
 // the cwd (mirroring Cargo's --target-dir / CARGO_TARGET_DIR); the manifest key
 // and the default are relative to the project root (the manifest dir, or the
 // target's own directory when there is no manifest).
+//
+// An explicitly-set out-dir (flag or env) may be shared by several projects
+// (the corpus runner is the motivating case), so its layout is namespaced per
+// project — <out>/<project-id>/{bin,gen} — or co-located projects would collide
+// in one bin/ and overwrite each other's gen/. The project-local locations (the
+// manifest key and the default ./aril-out) are already unique, so they take no
+// segment (RFC-0009 §Configuration).
 func resolveOutDir(srcPath, flagOutDir string) (string, error) {
 	root, manifest, err := projectOutputRoot(srcPath)
 	if err != nil {
@@ -37,11 +47,12 @@ func resolveOutDir(srcPath, flagOutDir string) (string, error) {
 	}
 	envOut := os.Getenv("ARIL_OUT")
 	var chosen string
+	shared := false
 	switch {
 	case flagOutDir != "":
-		chosen = flagOutDir
+		chosen, shared = flagOutDir, true
 	case envOut != "":
-		chosen = envOut
+		chosen, shared = envOut, true
 	case manifest != nil && manifest.buildOutDir != "":
 		chosen = filepath.Join(root, manifest.buildOutDir)
 	default:
@@ -51,7 +62,32 @@ func resolveOutDir(srcPath, flagOutDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("aril: resolve out-dir: %w", err)
 	}
+	if shared {
+		abs = filepath.Join(abs, projectID(root, manifest, srcPath))
+	}
 	return abs, nil
+}
+
+// projectID identifies a project within a shared output directory: its
+// [project] name (or the target's base name with no manifest) plus a short hash
+// of the absolute root path, so two same-named projects at different paths stay
+// distinct (RFC-0009 §Configuration). The name is reduced to one path segment.
+func projectID(root string, manifest *projectManifest, srcPath string) string {
+	name := ""
+	if manifest != nil {
+		name = manifest.name
+	}
+	if name == "" {
+		name = binaryBaseName(srcPath)
+	}
+	name = strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == filepath.Separator {
+			return '_'
+		}
+		return r
+	}, name)
+	sum := sha256.Sum256([]byte(root))
+	return name + "-" + hex.EncodeToString(sum[:])[:8]
 }
 
 // projectOutputRoot returns the project root for a build target and its
