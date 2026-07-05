@@ -21,47 +21,45 @@ imports against that cache **offline** — the network is touched only by
 (D20), now spanning modules rather than only the packages of one project.
 
 This is the dependency half of the **cold-start problem** — binding the stdlib
-gives a usable language but not an ecosystem, and the ecosystem starts empty. The
-binding generator (`aril import`, RFC-0005) already exists but is stdlib-only;
-this RFC gives an Aril project the ability to *depend on* an external module, and
-makes `aril import` module-aware so it can bind a fetched non-stdlib Go package.
+gives a usable language but not an ecosystem, and the ecosystem starts empty.
+RFC-0005's `aril import` binding generator is stdlib-only; external modules give
+an Aril project the ability to *depend on* code it does not contain, and a
+module-aware `aril import` binds a fetched non-stdlib Go package.
 
 Single-file scripts and single-project builds are unaffected — a project with
-no `[dep]` behaves exactly as today.
+no `[dep]` resolves exactly as one without dependencies.
 
 ## Motivation
 
-Three forces, in order.
+Three durable problems this design answers.
 
-1. **There is no ecosystem without this.** D5 declares a *decentralized*,
-   GitHub-hosted Aril package ecosystem. Today nothing implements it: the
-   resolver (`cmd/aril/resolve.go`) classifies an import as a compiler-bundled
-   `std/*` module, a **local** package under the single project's `[project]
-   name`, a builtin Go/runtime module, or a `[bindings] extra` Go path —
-   anything else is `E0117 unknown import path`. There is no category for a
-   package that lives in *another* project. RFC-0002 explicitly parked this:
-   *"Versioned dependencies. Out of scope; pre-alpha has no package manager."*
-   That parking ends here.
+1. **An ecosystem needs a way to depend on another project's code.** D5 makes
+   Aril's package ecosystem *decentralized* and GitHub-hosted. Resolution
+   (`cmd/aril/resolve.go`) classifies an import as a compiler-bundled `std/*`
+   module, a **local** package under the project's own `[project] name`, a builtin
+   Go/runtime module, or a `[bindings] extra` Go path — with no category for a
+   package that lives in *another* project (`E0117 unknown import path`). A
+   decentralized ecosystem *is* that missing category. (RFC-0002 scopes versioned
+   dependencies out — *"pre-alpha has no package manager"* — and defers to this
+   design.)
 
-2. **The third-party FFI path is hand-plumbed and does not scale.** RFC-0005
-   shipped the generator and a hermetic third-party path, but the mechanics are
-   manual: the Go module is **hand-vendored** under `std/vendor/`, **hand-listed**
-   in `std/bindings.json`, and the `extern` bindings are **hand-authored**. The
-   go.mod `require`+`replace` is derived by string-scanning the emitted Go
-   (`cmd/aril/thirdparty.go`). This is exactly the "vendored, hermetic,
-   hand-curated" path the roadmap says must generalize into a *fetched, resolved,
-   reproducible* dependency system. RFC-0005 flagged the mechanism as an open
-   question (Open-Q5: *replace-to-vendored vs a committed module cache vs an
-   `aril.toml`-declared dependency set*); this RFC answers it: **all three,
-   layered** — a manifest-declared set, resolved into a committed-lock + cache,
-   with `replace` as the local-override escape hatch.
+2. **A dependency system must scale past hand-curation.** The hermetic
+   third-party FFI path (`cmd/aril/thirdparty.go`) is manual: the Go module is
+   **hand-vendored** under `std/vendor/`, **hand-listed** in `std/bindings.json`,
+   the `extern` bindings **hand-authored**, and the go.mod `require`+`replace`
+   derived by string-scanning the emitted Go. A real dependency system generalizes
+   that "vendored, hermetic, hand-curated" shape into a *fetched, resolved,
+   reproducible* one. RFC-0005 leaves the mechanism open (Open-Q5:
+   *replace-to-vendored vs a committed module cache vs an `aril.toml`-declared
+   dependency set*); the answer is **all three, layered** — a manifest-declared
+   set, resolved into a committed lock + cache, with `replace` as the
+   local-override escape hatch.
 
 3. **The hard bindings need a driver.** `database/sql` — the canonical hard
-   binding — is *not stdlib-only*: a working database needs a
-   third-party **driver** (`github.com/lib/pq`, …), a raw-Go external dependency.
-   It cannot be reached by binding the stdlib; it requires exactly the capability
-   this RFC adds (a raw-Go dependency, kind 3) plus a module-aware `aril import`.
-   The DB-with-driver case is this epoch's north star.
+   binding — is *not stdlib-only*: a working database needs a third-party
+   **driver** (`github.com/lib/pq`, …), a raw-Go external dependency. Binding the
+   stdlib cannot reach it; it needs a raw-Go dependency (kind 3) plus a
+   module-aware `aril import`. The DB-with-driver case is the north star.
 
 ## Design
 
@@ -69,7 +67,7 @@ Three forces, in order.
 
 The load-bearing simplification: **Aril's module system is a *source-composition*
 concept, resolved entirely at the Aril layer; the whole program still lowers to
-one Go module** (`aril-output`, as today). An Aril `.aril`-library dependency
+one Go module** (`aril-output`). An Aril `.aril`-library dependency
 does not become a separate Go module — its Aril source is compiled into the same
 emitted Go tree as the consumer, as an additional package subtree. Only a
 dependency that *binds Go code* (kinds 2–3) introduces a Go-level `require`, and
@@ -140,7 +138,7 @@ Fields per dependency:
 The closed-schema reader (`cmd/aril/manifest.go`) grows one capability: a
 **dotted section header** `[dep.<name>]`. The line-shapes stay
 `key = "value"`; no inline-table parser is needed. The `<name>` binds the same
-last-segment collision rule `[bindings] extra` already enforces.
+last-segment collision rule `[bindings] extra` enforces.
 
 ### The lockfile — `aril.lock`
 
@@ -192,7 +190,7 @@ rule mirrors Go's "one major version, one module" at a coarser grain.
 after the `[project] name` local check fails, the head segment is matched against
 the declared `[dep]` roots. A match resolves to the dependency's module
 directory **in the cache** (per the lock), and cross-module `.aril` resolution
-proceeds exactly as cross-package does today — the DFS in `resolvePackages`
+proceeds exactly as cross-package resolution does — the DFS in `resolvePackages`
 walks into the external module's package tree, and the acyclic-graph check (D20,
 `E0116`) now spans module boundaries. An import whose head matches no local
 package, no builtin module, and no declared dependency is still `E0117`; a
@@ -228,11 +226,11 @@ parked it), promoted when the first real conflict lands.
 
 ### Module-aware generic-bindgen
 
-`aril import` today uses `go/importer` source mode (D22), which loads a package
+`aril import` uses `go/importer` source mode (D22), which loads a package
 from GOROOT/GOPATH source and is **not module-graph-aware** — so it reliably
 binds only the stdlib (`lang-spec/ffi.md` flags module-aware loading as a
-follow-up). This RFC provides what that follow-up needs: the fetched dependency
-lives in the cache as real module source, so a **module-aware load against the
+follow-up). A fetched dependency supplies what that loading needs: it lives in
+the cache as real module source, so a **module-aware load against the
 cache** (rooted at the fetched module, with its `go.mod` resolved through the
 lock) can introspect a non-stdlib package's types. The loader change is scoped
 to `internal/bindgen`; the D22 "no `x/tools/go/packages` in the compiler core"
@@ -257,7 +255,7 @@ importer proves insufficient for module graphs.
 
 - **A SemVer/MVS solver from day one** (Go-style minimal version selection).
   Rejected for v0.x: the ecosystem is empty, so there is nothing to solve; a
-  solver is complexity with no payload today. Exact-pin + conflict-is-an-error is
+  solver is complexity with no payload for an empty ecosystem. Exact-pin + conflict-is-an-error is
   honest and hermetic, and the lockfile means the upgrade to MVS later is
   behaviour-adding, not breaking.
 - **A central registry/proxy as the primary source** (npm/crates.io/GOPROXY
@@ -266,7 +264,7 @@ importer proves insufficient for module graphs.
   layered on top later, not the ground truth.
 - **Each Aril module → its own Go module** (mirror Aril modules onto Go modules
   1:1). Rejected: it forces a multi-`go.mod` build tree, `init()` glue, and Go's
-  module resolver into a problem Aril already solves at the source layer. Aril
+  module resolver into a problem Aril solves at the source layer. Aril
   modules compose as *source*; one Go module out keeps the emitted tree and the
   `//line` blame model unchanged.
 - **Extend `std/bindings.json` into the dependency system** (grow the existing
@@ -281,18 +279,16 @@ importer proves insufficient for module graphs.
 
 ## Transition / compatibility
 
-Strictly additive. A project with no `[dep]` — every corpus example
-today — builds unchanged (the resolver's new category is skipped, `aril get` is a
-no-op, no lockfile is needed). `aril.toml`, `aril.lock`, and the cache are all
-opt-in, activated only when a dependency is declared. No existing program
-changes; no user migration. The existing hand-vendored third-party FFI path
-(`std/bindings.json` + `std/vendor`) keeps working and is superseded
-*incrementally* — each hand-vendored dep can move to a `[dep]`
-declaration behaviour-preservingly (the `build_ok` ratchet guards this), until
-the hand-list is empty.
+Strictly additive. A project with no `[dep]` builds unchanged (the resolver's
+external category is skipped, `aril get` is a no-op, no lockfile is needed).
+`aril.toml`, `aril.lock`, and the cache are all opt-in, activated only when a
+dependency is declared — no source-level migration. The hand-vendored
+third-party FFI path (`std/bindings.json` + `std/vendor`) remains valid and is
+superseded *incrementally* — a hand-vendored dep moves to a `[dep]` declaration
+behaviour-preservingly (the `build_ok` ratchet guards this).
 
-At the decision level this **realizes D5** (previously aspirational) and
-**restates the D19 guardrail** (already amended by RFC-0005 to admit pinned
+At the decision level this **realizes D5** and
+**restates the D19 guardrail** (amended by RFC-0005 to admit pinned
 hermetic third-party deps) for the fetched-cache mechanism — no new decision
 conflict; the guardrails (declared, pinned, lock-verified, `get`-only network)
 are exactly D19's intent.
