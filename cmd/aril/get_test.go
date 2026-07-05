@@ -123,7 +123,7 @@ func TestFetchVersionConflict(t *testing.T) {
 		"aril.toml": "[project]\nname = \"liba\"\n",
 		"a.aril":    "func A(): int {\n  return 1\n}\n",
 	}, "v1.0.0")
-	if err := runGit(liba, "commit", "-q", "--allow-empty", "-m", "v2", "--author=t <t@example.com>"); err != nil {
+	if err := runGit(liba, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "v2"); err != nil {
 		t.Fatalf("second commit: %v", err)
 	}
 	if err := runGit(liba, "tag", "v2.0.0"); err != nil {
