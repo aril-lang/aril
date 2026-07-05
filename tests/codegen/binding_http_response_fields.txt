@@ -1,0 +1,61 @@
+--- TITLE ---
+Value-handle field access: http.Response exposes fields (the first handle with a field axis, not just methods). resp.statusCode/status/header/body lower to the exported Go struct fields resp.StatusCode/Status/Header/Body; the header field types as http.Header (a method-only handle) so h.get(k) lowers to Header.Get(k) and h.delete(k) to Header.Del(k); resp.body types as io.ReadCloser so io.readAll(resp.body) → ResultOf(io.ReadAll(resp.Body)).
+
+--- INPUT ---
+import fmt
+import http
+import io
+
+func summarize(resp: http.Response): Result<[]byte, error> {
+  let code = resp.statusCode
+  let status = resp.status
+  let h = resp.header
+  let ct = h.get("Content-Type")
+  h.delete("Set-Cookie")
+  fmt.println(fmt.sprintf("%d %s %s", code, status, ct))
+  return io.readAll(resp.body)
+}
+
+func main() {
+  fmt.println("http response field access")
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func summarize(resp *http.Response) Result[[]byte, error] {
+	var code = resp.StatusCode
+	var status = resp.Status
+	var h = resp.Header
+	var ct = h.Get("Content-Type")
+	h.Del("Set-Cookie")
+	fmt.Println(fmt.Sprintf("%d %s %s", code, status, ct))
+	return ResultOf(io.ReadAll(resp.Body))
+}
+func main() {
+	fmt.Println("http response field access")
+}

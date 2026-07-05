@@ -483,10 +483,15 @@ error>` rows). `listenAndServe` blocks (so `healthcheck_server` builds but is
 `no-run`); `serve` over a `net.Listen` listener is stoppable by closing the
 listener — the `http_server` example uses it for a run-checkable in-process
 server driven by a raw `net` client (the runtime proof of the conformance
-machinery). The HTTP **client** (`http.get` /
-`http.do` / `http.newRequest`, `http.Response` fields, `http.Header`), the
-`http.Server` handle with `shutdown` (for a run-checkable server), and `net/url`
-remain on the target surface above.
+machinery). **`http.Response` is a bound value-handle with a field axis** — the
+first handle to expose *fields*, not just methods: `resp.statusCode` (int),
+`resp.status` (string), `resp.header` (http.Header), `resp.body` (io.ReadCloser,
+drained via `io.readAll`) lower to Go's exported `StatusCode`/`Status`/`Header`/
+`Body` struct fields. **`http.Header`** is a bound method-only handle
+(`get`/`values`/`set`/`add`/`delete`; Aril `delete` → Go's `Del`). The HTTP
+client **entry points** (`http.get` / `http.do` / `http.newRequest`) that *return*
+a Response, the `http.Server` handle with `shutdown` (for a run-checkable
+server), and `net/url` remain on the target surface above.
 
 ## sync
 

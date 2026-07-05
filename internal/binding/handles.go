@@ -81,6 +81,14 @@ var handleTypes = map[string]HandleType{
 	// selector in GoType (`http.`) is already correct.
 	"http.ResponseWriter": {GoType: "http.ResponseWriter", GoPkg: "http"},
 	"http.Request":        {GoType: "*http.Request", GoPkg: "http"},
+	// net/http client-path handles (HTTP-CLIENT epoch). Response is a pointer
+	// handle (*http.Response) that exposes *fields* (statusCode/status/header/
+	// body) read through the handle-field table (handleFields) — the first handle
+	// with a field axis, not just methods. Header is Go's `http.Header` (a map
+	// type with value methods), method-only. Both obtain-only (a Response comes
+	// from http.get/do; a Header from a Response/Request field).
+	"http.Response": {GoType: "*http.Response", GoPkg: "http"},
+	"http.Header":   {GoType: "http.Header", GoPkg: "http"},
 }
 
 // HandleTypeOf returns the lowering of the handle type spelled `spelled`
@@ -174,6 +182,45 @@ var handleMethods = map[string]map[string]HandleBinding{
 	// http.Request is opaque in v1 (a handler may ignore it); its field/method
 	// surface (method/url/header/body) is a carry-forward. Registered as a handle
 	// type above so `r: http.Request` annotations resolve; no methods bound yet.
+	// net/http Header method set (binding-surface §net/http). Go's http.Header is
+	// a map type with value methods; Aril `delete` maps to Go's `Del` (not Delete).
+	"http.Header": {
+		"get":    {GoName: "Get", Params: []string{"string"}, Return: "string"},
+		"values": {GoName: "Values", Params: []string{"string"}, Return: "[]string"},
+		"set":    {GoName: "Set", Params: []string{"string", "string"}, Return: "unit"},
+		"add":    {GoName: "Add", Params: []string{"string", "string"}, Return: "unit"},
+		"delete": {GoName: "Del", Params: []string{"string"}, Return: "unit"},
+	},
+}
+
+// handleFields maps a handle type spelling (`pkg.Type`) to its bound *field* set
+// (Aril field name → binding: GoName is the exported Go struct field, Return the
+// Aril type spelling of the field). This is the field axis of the handle table —
+// the mirror of handleMethods for a handle that exposes struct fields, not just
+// methods (http.Response is the first). `Params` is unused for a field. Read by
+// sema (field-access typing) and codegen (Go field-name lowering), so the two
+// can never drift (the D33/D37 single-source discipline).
+var handleFields = map[string]map[string]HandleBinding{
+	// net/http Response fields (binding-surface §net/http). Go's *http.Response
+	// exposes StatusCode/Status/Header/Body; Body is an io.ReadCloser the caller
+	// drains via io.readAll.
+	"http.Response": {
+		"statusCode": {GoName: "StatusCode", Return: "int"},
+		"status":     {GoName: "Status", Return: "string"},
+		"header":     {GoName: "Header", Return: "http.Header"},
+		"body":       {GoName: "Body", Return: "io.ReadCloser"},
+	},
+}
+
+// HandleFieldOf returns the binding for field `arilName` on the handle type
+// spelled `handle` (`pkg.Type`), or ok=false when it is not a bound field.
+func HandleFieldOf(handle, arilName string) (HandleBinding, bool) {
+	m, ok := handleFields[handle]
+	if !ok {
+		return HandleBinding{}, false
+	}
+	b, ok := m[arilName]
+	return b, ok
 }
 
 // HandleCtorOf returns the binding for a handle constructor `pkg.arilName`, or

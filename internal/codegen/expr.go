@@ -701,7 +701,32 @@ func (g *gen) goFieldName(receiver ast.Expr, name string) string {
 	if id, ok := receiver.(*ast.Ident); ok && g.isBuiltinModule(id) {
 		return mapFieldName(receiver, name)
 	}
+	// Value-handle field access — `resp.statusCode` on a stdlib handle typed by
+	// sema (http.Response) takes the exported Go field name from the shared
+	// binding.handleFields table (D37), not the generic exported-Aril form.
+	if gf, ok := g.handleFieldGoName(receiver, name); ok {
+		return gf
+	}
 	return exportFieldName(name)
+}
+
+// handleFieldGoName returns the exported Go struct-field name for `receiver.name`
+// when sema typed receiver as a bound stdlib value-handle that exposes fields
+// (http.Response), reading the shared binding.handleFields table. The field-axis
+// mirror of handleMethodGoName.
+func (g *gen) handleFieldGoName(receiver ast.Expr, name string) (string, bool) {
+	if g.info == nil {
+		return "", false
+	}
+	named, ok := g.info.Type[receiver].(*sema.Named)
+	if !ok {
+		return "", false
+	}
+	hf, ok := binding.HandleFieldOf(named.N, name)
+	if !ok {
+		return "", false
+	}
+	return hf.GoName, true
 }
 
 // isDataFieldSelector reports whether `recv.name` names a *data field*

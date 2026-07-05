@@ -74,6 +74,29 @@ func TestUnknownChannelMemberFiresE0214(t *testing.T) {
 	}
 }
 
+// A handle's *field* axis (HTTP-CLIENT epoch): a bound field on http.Response
+// resolves (no E0214), while an unknown field on the same handle still fires
+// E0214 — the field lookup slots in before the unknown-member path, and the
+// header field chains to a further method call on the http.Header it yields.
+func TestUnknownHandleFieldFiresE0214(t *testing.T) {
+	src := `import http
+func use(resp: http.Response): int { return resp.noSuchField }`
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (unknown handle field), got %v", codes)
+	}
+}
+
+func TestKnownHandleFieldNoE0214(t *testing.T) {
+	src := `import http
+func use(resp: http.Response): string {
+  let code = resp.statusCode
+  return resp.header.get("Content-Type")
+}`
+	if codes := runCheck(t, src); contains(codes, "E0214") {
+		t.Errorf("bound http.Response fields + http.Header.get should not fire E0214, got %v", codes)
+	}
+}
+
 // A deferred-but-documented Map method (entries, unimplemented in v1) is an
 // unknown member today — the diagnostic agrees with the spec's `deferred` mark.
 func TestDeferredMapEntriesFiresE0214(t *testing.T) {
