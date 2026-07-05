@@ -55,6 +55,8 @@ func main() {
 		os.Exit(cmdRepl(os.Args[2:]))
 	case "import":
 		os.Exit(cmdImport(os.Args[2:]))
+	case "get":
+		os.Exit(cmdGet(os.Args[2:]))
 	case "help", "-h", "--help":
 		usage(os.Stdout)
 	default:
@@ -564,6 +566,7 @@ Commands:
   run    <file.aril>             compile and execute (stdio passed through)
   repl                         interactive prompt (RFC-0003 skeleton)
   import <go/import/path>      generate Aril foreign bindings from a Go package
+  get                          fetch the project's declared [dependencies] into the cache
   version                      print the compiler version
   help                         print this message
 

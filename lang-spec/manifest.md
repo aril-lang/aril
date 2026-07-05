@@ -137,3 +137,34 @@ a third package.
 "fmt"`): the local lookup wins for paths under that name; the manifest is
 authoritative for the local project. Choosing a non-colliding name is
 recommended.
+
+## Fetch — `aril get`
+
+`aril get` is the **only** step that touches the network. It reads the
+project's `[dependencies]`, and for each dependency without a `replace`
+override it fetches the pinned `source@version` via `git` into a **hermetic
+module cache** — `$ARIL_CACHE/<source>@<version>/` (default the per-user
+cache dir; `$ARIL_CACHE` overrides). A `source` with no scheme is a
+GitHub-style host/path fetched over `https` (D5); a scheme
+(`https://`/`file://`/`ssh://`) or a local path is used verbatim. The cache
+entry is source-only (git metadata is stripped) and immutable once written.
+
+`aril get` resolves the **transitive** closure (each fetched module's own
+`[dependencies]` are fetched recursively). Because v0.x is **exact-pin with
+no minimal-version selection**, two modules pinning one dependency to
+different versions is a conflict — **E0122**.
+
+`aril build` / `aril run` never fetch: they resolve declared dependencies
+against the already-populated cache (a `replace` dependency needs no fetch;
+an unfetched one is **E0121**, directing the user to run `aril get`).
+
+## Lockfile — `aril.lock`
+
+`aril get` writes a **committed** `aril.lock` recording, for every module in
+the resolved closure, its `source`, declared `version`, the exact commit the
+version resolved to at fetch time, and a content hash of the fetched tree —
+the reproducibility record (a later build can verify the cache against it).
+The format is the same closed-schema line shapes as `aril.toml`
+(`[[module]]` blocks of `key = "value"`), so no third-party TOML library
+enters the compiler core (D19). It is generated — deterministic, sorted by
+module name — and not edited by hand.
