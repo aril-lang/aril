@@ -1013,11 +1013,13 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				(v.Name == "fromInt" || v.Name == "fromInt64") {
 				g.usesBigInt = true
 			}
-			// A value-handle method call `re.matchString(…)` / `a.add(…)` on a
-			// handle-typed receiver references either the handle's Go package
-			// (regexp) or its runtime wrapper (BigInt) — the receiver is a local
-			// value, not the namespace, so no `pkg.method` reference marks it
-			// (D37).
+			// A value-handle method call `re.matchString(…)` / `a.add(…)` OR a
+			// value-handle field access `resp.statusCode` on a handle-typed
+			// receiver references either the handle's Go package (regexp,
+			// net/http) or its runtime wrapper (BigInt) — the receiver is a local
+			// value, not the namespace, so no `pkg.method` reference marks it. This
+			// fires for any `*ast.Field` with a handle receiver (method or field),
+			// so a handle used only through field access keeps its import (D37).
 			if g.info != nil {
 				if named, ok := g.info.Type[v.Receiver].(*sema.Named); ok {
 					if ht, ok := binding.HandleTypeOf(named.N); ok {

@@ -135,6 +135,25 @@ call site spells it with the exported **field** form (`handler.Fn(x)`),
 not the method form — the two lowering paths are kept distinct so this
 does not collapse to a method-name spelling.
 
+**Value-handle field access.** A field read on a bound stdlib
+value-handle (D37) — `resp.statusCode` where `resp : http.Response` — is
+a *third* `goFieldName` spelling source, alongside the export path and
+the package-namespace rename. The Go field name comes from the handle
+table's **field axis** (`binding.handleFields`, the mirror of the
+method table `binding.handleMethods`), keyed on the receiver's sema
+handle type: `resp.statusCode → resp.StatusCode`, `resp.header →
+resp.Header`, `resp.body → resp.Body`. Like a package-namespace member,
+the spelling is a curated boundary correspondence, not the generic
+`exportFieldName` capitalisation — so a handle whose Go field name is
+not the capitalised Aril name still lowers correctly. Sema types the
+field access from the same table (the field's declared Aril type is its
+tabled return spelling), so a field yielding a further handle
+(`resp.header : http.Header`) chains into a method call
+(`resp.header.get(k) → resp.Header.Get(k)`) and a field yielding an
+`io.ReadCloser` (`resp.body`) flows into `io.readAll` unchanged. A field
+miss on the handle is **E0214** (the same unknown-member diagnostic as a
+method miss), never a raw `go build` leak (D10).
+
 **Known limitation — non-injective export.** `exportFieldName` is not
 injective: two field names differing only in first letter case
 (`port` / `Port`) both map to `Port`, and `_x` / `X_x` both map to

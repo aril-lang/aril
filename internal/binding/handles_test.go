@@ -134,6 +134,72 @@ func TestDurationHandle(t *testing.T) {
 	}
 }
 
+// TestHTTPResponseFields locks the handle *field* axis (HTTP-CLIENT epoch): the
+// first handle to expose struct fields, not just methods. http.Response fields
+// resolve to their exported Go name + Aril type spelling; an unbound field and a
+// non-field-bearing handle both miss.
+func TestHTTPResponseFields(t *testing.T) {
+	ht, ok := HandleTypeOf("http.Response")
+	if !ok || ht.GoType != "*http.Response" || ht.GoPkg != "http" {
+		t.Fatalf("http.Response lowering = %+v ok=%v; want *http.Response / http", ht, ok)
+	}
+	cases := map[string][2]string{ // arilName → {GoName, Return}
+		"statusCode": {"StatusCode", "int"},
+		"status":     {"Status", "string"},
+		"header":     {"Header", "http.Header"},
+		"body":       {"Body", "io.ReadCloser"},
+	}
+	for aril, want := range cases {
+		f, ok := HandleFieldOf("http.Response", aril)
+		if !ok {
+			t.Fatalf("http.Response.%s should be a bound field", aril)
+		}
+		if f.GoName != want[0] || f.Return != want[1] {
+			t.Errorf("http.Response.%s = %+v; want %s → %s", aril, f, want[0], want[1])
+		}
+	}
+	if _, ok := HandleFieldOf("http.Response", "nope"); ok {
+		t.Error("http.Response.nope should not be a bound field")
+	}
+	// A method-only handle has no field axis (regexp.Regexp is not field-bearing).
+	if _, ok := HandleFieldOf("regexp.Regexp", "statusCode"); ok {
+		t.Error("regexp.Regexp has no bound fields")
+	}
+}
+
+// TestHTTPHeaderMethods locks the http.Header method-only handle: Go's http.Header
+// is a map type with value methods, and Aril `delete` maps to Go's `Del` (not
+// Delete). Header carries no field axis.
+func TestHTTPHeaderMethods(t *testing.T) {
+	ht, ok := HandleTypeOf("http.Header")
+	if !ok || ht.GoType != "http.Header" || ht.GoPkg != "http" {
+		t.Fatalf("http.Header lowering = %+v ok=%v; want http.Header / http", ht, ok)
+	}
+	get, _ := HandleMethodOf("http.Header", "get")
+	if get.GoName != "Get" || get.Return != "string" {
+		t.Errorf("http.Header.get = %+v; want Get → string", get)
+	}
+	del, ok := HandleMethodOf("http.Header", "delete")
+	if !ok || del.GoName != "Del" {
+		t.Errorf("http.Header.delete = %+v; want Del (Go's method is Del, not Delete)", del)
+	}
+	values, _ := HandleMethodOf("http.Header", "values")
+	if values.GoName != "Values" || values.Return != "[]string" {
+		t.Errorf("http.Header.values = %+v; want Values → []string", values)
+	}
+	set, _ := HandleMethodOf("http.Header", "set")
+	if set.GoName != "Set" || set.Return != "unit" {
+		t.Errorf("http.Header.set = %+v; want Set → unit", set)
+	}
+	add, _ := HandleMethodOf("http.Header", "add")
+	if add.GoName != "Add" || add.Return != "unit" {
+		t.Errorf("http.Header.add = %+v; want Add → unit", add)
+	}
+	if _, ok := HandleFieldOf("http.Header", "get"); ok {
+		t.Error("http.Header is method-only; it has no field axis")
+	}
+}
+
 // TestNetSocketHandles locks the net socket layer: Conn/Listener/Addr are
 // external Go-interface handles (bare interface GoType, no pointer, GoPkg net),
 // and the read/write/accept/close methods carry a Result<…> return — the first

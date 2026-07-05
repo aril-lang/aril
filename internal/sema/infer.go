@@ -804,6 +804,14 @@ func (c *checker) inferField(f *ast.Field) Type {
 	if hm, ok := binding.HandleMethodOf(named.N, f.Name); ok {
 		return handleMethodSigType(hm)
 	}
+	// Value-handle field access — `resp.statusCode` on a stdlib handle type
+	// that exposes fields (http.Response). The field set is the handle table's
+	// field axis (binding.handleFields, shared with codegen, D37), keyed on the
+	// handle's Aril spelling; the field's declared type comes from its return
+	// spelling. A miss falls through to the E0214 unknown-member path below.
+	if hf, ok := binding.HandleFieldOf(named.N, f.Name); ok {
+		return semaTypeFromSpelling(hf.Return)
+	}
 	// Record field access — `p.x` on a record type.
 	if ft := c.recordFieldType(named, f.Name); ft != nil {
 		return ft
