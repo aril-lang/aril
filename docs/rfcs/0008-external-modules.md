@@ -6,7 +6,6 @@
 | Status | draft |
 | Created | 2026-07-05 |
 | Supersedes | — |
-| Target | `lang-spec/manifest.md` (`[dependencies]` schema, the lockfile, the resolver algorithm across modules), `lang-spec/diagnostics.md` (new dependency-resolution codes), `docs/design-decisions.md` (D5 realized; the D19 hermeticity guardrail restated for fetched deps), `cmd/aril` (manifest reader, resolver, `aril get`, multi-module build), `internal/bindgen` (module-aware loading for kinds 2–3) |
 
 ## Summary
 
@@ -21,10 +20,11 @@ imports against that cache **offline** — the network is touched only by
 `aril get`. Cross-module `.aril` imports join the existing acyclic import graph
 (D20), now spanning modules rather than only the packages of one project.
 
-This is the dependency half of the **cold-start engine** (Open Problem #1). The
-generic binding generator (`aril import`, RFC-0005) already exists; this RFC
-gives an Aril project the ability to *depend on* an external module, and makes
-`aril import` module-aware so it can bind a fetched non-stdlib Go package.
+This is the dependency half of the **cold-start problem** — binding the stdlib
+gives a usable language but not an ecosystem, and the ecosystem starts empty. The
+binding generator (`aril import`, RFC-0005) already exists but is stdlib-only;
+this RFC gives an Aril project the ability to *depend on* an external module, and
+makes `aril import` module-aware so it can bind a fetched non-stdlib Go package.
 
 Single-file scripts and single-project builds are unaffected — a project with
 no `[dependencies]` behaves exactly as today.
@@ -57,7 +57,7 @@ Three forces, in order.
    with `replace` as the local-override escape hatch.
 
 3. **The hard bindings need a driver.** `database/sql` — the canonical hard
-   binding (Open Problem #2) — is *not stdlib-only*: a working database needs a
+   binding — is *not stdlib-only*: a working database needs a
    third-party **driver** (`github.com/lib/pq`, …), a raw-Go external dependency.
    It cannot be reached by binding the stdlib; it requires exactly the capability
    this RFC adds (a raw-Go dependency, kind 3) plus a module-aware `aril import`.
@@ -178,10 +178,10 @@ transitive network pull. `aril get` fetches; `aril build`/`run` are offline.
 v0.x resolution is deliberately minimal: **exact pins, no range-solving.** Each
 declared `version` is a tag or commit; transitive dependencies carry their own
 exact pins. If two modules in the closure require *different* versions of the
-same module, that is an **error** in v0.x (`E0121` dependency version conflict),
+same module, that is an **error** in v0.x (`E0122` dependency version conflict),
 not an automatic minimal-version-selection. This keeps the first cut tractable,
-hermetic, and honest; a SemVer/MVS solver is a later refinement (Open question
-1), added only when the ecosystem is large enough to need it. The single-version
+hermetic, and honest; a SemVer/MVS solver is a later refinement, added only when
+the ecosystem is large enough to need it. The single-version
 rule mirrors Go's "one major version, one module" at a coarser grain.
 
 ### Resolution — a new `importExternal` category
@@ -195,7 +195,15 @@ walks into the external module's package tree, and the acyclic-graph check (D20,
 `E0116`) now spans module boundaries. An import whose head matches no local
 package, no builtin module, and no declared dependency is still `E0117`; a
 declared dependency that is not present in the cache/lock is a new,
-directed-at-`aril get` diagnostic (`E0120`), distinct from `E0117`.
+directed-at-`aril get` diagnostic (`E0121`), distinct from `E0117`.
+
+Spanning modules broadens the last-segment binding surface (RFC-0002: a package
+binds under its final path segment). Two dependencies exposing same-named
+sub-packages (`kv/store` and `db/store` both bind `store`), or a dependency
+package colliding with a local one, is a new collision case RFC-0002 has no
+aliasing form for yet. v0.x makes a collision an error at resolution rather than
+silently shadowing; an `import … as` alias is the eventual escape hatch (RFC-0002
+parked it), promoted when the first real conflict lands.
 
 ### The three kinds at build time
 
@@ -232,11 +240,11 @@ importer proves insufficient for module graphs.
 
 ### Diagnostics (new codes, `.aril`-coordinate, D10)
 
-- **`E0120`** — declared dependency not fetched (run `aril get`). Names the
+- **`E0121`** — declared dependency not fetched (run `aril get`). Names the
   dependency and the missing cache entry.
-- **`E0121`** — dependency version conflict (two pins for one module) in the
+- **`E0122`** — dependency version conflict (two pins for one module) in the
   transitive closure. Names both requirers and both versions.
-- **`E0122`** — lockfile out of date / hash mismatch (the cache does not match
+- **`E0123`** — lockfile out of date / hash mismatch (the cache does not match
   `aril.lock`; re-run `aril get`). Guards against a tampered or partial cache.
 - `E0116` (cyclic import) and `E0117` (unknown import) extend across module
   boundaries unchanged. A manifest-level error (bad `[dependencies]` shape,
@@ -249,7 +257,7 @@ importer proves insufficient for module graphs.
   Rejected for v0.x: the ecosystem is empty, so there is nothing to solve; a
   solver is complexity with no payload today. Exact-pin + conflict-is-an-error is
   honest and hermetic, and the lockfile means the upgrade to MVS later is
-  behaviour-adding, not breaking (Open question 1).
+  behaviour-adding, not breaking.
 - **A central registry/proxy as the primary source** (npm/crates.io/GOPROXY
   shape). Rejected as the *primary* path: D5 is decentralized-first (Git/GitHub,
   like Go modules pre-proxy). A proxy is a legitimate *optional accelerator*
@@ -269,30 +277,6 @@ importer proves insufficient for module graphs.
   The `get`/`build` split (fetch-once, build-offline) is the Go/Cargo/npm
   consensus and the only one compatible with the hermeticity guardrail.
 
-## Paired edits
-
-On acceptance / implementation, these land (per PR, D17 spec-mirror discipline):
-
-- **`lang-spec/manifest.md`** — the `[dependencies]` schema (the three kinds,
-  `source`/`version`/`kind`/`path`/`replace`), the `aril.lock` contract, the
-  cross-module resolver algorithm, the exact-pin + conflict rule.
-- **`lang-spec/diagnostics.md`** — `E0120`/`E0121`/`E0122`; note E0116/E0117 now
-  span modules.
-- **`docs/design-decisions.md`** — D5 realized (the decentralized ecosystem now
-  has a build system); the D19 hermeticity guardrail restated for fetched deps
-  (declared + pinned + lock-verified; `aril get` is the sole network step).
-- **`docs/binding-surface.md`** / **`lang-spec/ffi.md`** — module-aware
-  `aril import` for non-stdlib packages; kind-2/3 auto-consume replaces the
-  stdout-only, hand-vendored flow.
-- **`cmd/aril`** — `[dependencies]` reader, `importExternal` resolution, `aril
-  get`, the lockfile, multi-module build; **`internal/bindgen`** — module-aware
-  loading.
-
-Each spec-touching construct owes ≥ 1 atomic fixture (the manifest-parse cases,
-the resolver cases, the new diagnostics) per the atomic-coverage rule; live
-coverage is the kind-1 external-Aril-lib corpus example (PR5) and, if reached,
-the DB-with-driver kind-3 example (PR6).
-
 ## Transition / compatibility
 
 Strictly additive. A project with no `[dependencies]` — every corpus example
@@ -311,44 +295,9 @@ hermetic third-party deps) for the fetched-cache mechanism — no new decision
 conflict; the guardrails (declared, pinned, lock-verified, `get`-only network)
 are exactly D19's intent.
 
-## Open questions
-
-Flagged for resolution during stabilisation; an RFC may be accepted with them
-open, resolved before `implemented`.
-
-1. **SemVer / MVS.** When (if) does exact-pin grow into range-solving with
-   minimal-version selection? Bias: defer until the ecosystem has real transitive
-   depth; the lockfile makes the later upgrade non-breaking.
-2. **Transitive Go-module conflicts across kind-2/3 deps.** Two binding deps that
-   bind *different versions of the same Go module* collide at the go.mod layer
-   (Go allows only one). Is that `E0121` (reuse the Aril-level conflict), or does
-   Go's own resolver handle it? Likely the former, pinned in PR6.
-3. **Cache location & sharing.** `$ARIL_CACHE` default (`~/.cache/aril`), and
-   whether the in-tree `std/vendor` is folded into the same cache abstraction or
-   stays special-cased for the compiler's own fixtures.
-4. **Lockfile format.** TOML sub-tables vs a flat line table vs reusing the
-   closed-schema reader; and whether the content hash is a tree hash or a
-   per-file Merkle root. Settled in PR4.
-5. **`aril import` loader vs D22.** Whether module-aware loading can stay on the
-   stdlib `go/importer` (D22) or must adopt `x/tools/go/packages` for the module
-   graph — a candidate D22 amendment. Settled in PR6.
-6. **Kind-2 published-binding manifest shape.** What a published `.go`→`.aril`
-   binding package carries (its bound Go module+version, its `extern` surface,
-   its own transitive deps) and how it declares itself — the durable, distributable
-   form of `aril import` output.
-7. **Aril↔Go import-path collision.** A dependency root that collides with a
-   builtin module name (`import net` where a dep is rooted `net`). RFC-0002's
-   local-wins rule for `[project] name` suggests dependency-root-wins with a
-   documented warning; confirm and add a diagnostic if the collision is silent.
-8. **Runtime trust boundary.** A fetched third-party module executes with full Go
-   privileges at runtime (RFC-0005 Open-Q10, now broadened from vendored to
-   fetched). No sandboxing is proposed (correct for pre-alpha); flagged so the
-   trust assumption is explicit.
-
 ## History
 
 - 2026-07-05 — drafted. Opens the EXTERNAL-MODULES epoch as its contract, on a
   live reconnaissance of the existing manifest/resolver/FFI/bindgen machinery.
   Resolves RFC-0002's parked "versioned dependencies" and RFC-0005's Open-Q5
-  (hermeticity mechanism). Eight open questions flagged, not blockers (they
-  resolve before `implemented`). Implementation is the epoch's PR2–PR6.
+  (hermeticity mechanism). Implementation is the epoch's PR2–PR6.
