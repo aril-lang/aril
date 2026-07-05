@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 89 / 90 examples build end-to-end** (floor 89).
+- **build_ok — 90 / 91 examples build end-to-end** (floor 90).
 - **diag_ok — 98 / 121 negative cases produce their expected diagnostic** (floor 88).
-- **run_ok — 87 / 89 run-pass examples build and run as specified** (floor 87; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 88 / 90 run-pass examples build and run as specified** (floor 88; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 89 |
+| ✅ build (full pipeline) | 90 |
 | emit / codegen fail | 1 |
 | sema fail | 0 |
 | parse fail | 0 |
@@ -94,6 +94,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/env_config/env_config.aril` | build | — |
 | `examples/stdlib-binding/healthcheck_server/healthcheck_server.aril` | build | — |
 | `examples/stdlib-binding/http_by_hand/http_by_hand.aril` | build | — |
+| `examples/stdlib-binding/http_client/http_client.aril` | build | — |
 | `examples/stdlib-binding/http_server/http_server.aril` | build | — |
 | `examples/stdlib-binding/leveled_log/leveled_log.aril` | build | — |
 | `examples/stdlib-binding/line_numberer/line_numberer.aril` | build | — |
@@ -146,7 +147,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**2 of 89 run-pass examples fall short of run_ok.**
+**2 of 90 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

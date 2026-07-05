@@ -488,10 +488,14 @@ first handle to expose *fields*, not just methods: `resp.statusCode` (int),
 `resp.status` (string), `resp.header` (http.Header), `resp.body` (io.ReadCloser,
 drained via `io.readAll`) lower to Go's exported `StatusCode`/`Status`/`Header`/
 `Body` struct fields. **`http.Header`** is a bound method-only handle
-(`get`/`values`/`set`/`add`/`delete`; Aril `delete` → Go's `Del`). The HTTP
-client **entry points** (`http.get` / `http.do` / `http.newRequest`) that *return*
-a Response, the `http.Server` handle with `shutdown` (for a run-checkable
-server), and `net/url` remain on the target surface above.
+(`get`/`values`/`set`/`add`/`delete`; Aril `delete` → Go's `Del`). **`http.get(url)`**
+is bound — a mechanical `Result<http.Response, error>` row (Go's `http.Get`); the
+`http_client` example fetches an in-process `http.serve` server, reads
+`resp.statusCode` through the field axis, and drains `resp.body` via `io.readAll`.
+The other client entry points (`http.do`, which needs `http.Client`/
+`DefaultClient.Do`; `http.newRequest`, whose `Option<io.Reader>` body is an idiom),
+the `http.Server` handle with `shutdown` (for a run-checkable server), and
+`net/url` remain on the target surface above.
 
 ## sync
 

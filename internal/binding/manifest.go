@@ -44,7 +44,13 @@ var Manifest = map[string][]string{
 	// Aril class `implements http.Handler` (E0219 conformance, D14). The registry
 	// namespace derives as `http` (path.Base of "net/http"), so sema/codegen key
 	// on `http.listenAndServe`.
-	"net/http": {"ListenAndServe", "Serve"},
+	// net/http client entry point (HTTP-CLIENT epoch). Get returns
+	// (*http.Response, error) — a mechanical (T, error) row; the deriver spells
+	// the *http.Response return as the handle Named http.Response (whose fields
+	// resp.statusCode/header/body are read via the handle-field table, and whose
+	// body drains through io.readAll). http.do (needs http.Client) and
+	// http.newRequest (Option<io.Reader> body) are idioms, deferred.
+	"net/http": {"ListenAndServe", "Serve", "Get"},
 }
 
 // Curation note — `errors.New` and `fmt.Errorf` are deliberately NOT listed

@@ -1,0 +1,10 @@
+description = "the HTTP client — http.get fetches a response whose fields (resp.statusCode) are read through the value-handle field axis; the body drains via io.readAll(resp.body). Driven in-process against an Aril http.serve server on a loopback port (run_ok proof of field-access-on-a-handle)."
+source   = "HTTP-CLIENT epoch"
+category = "stdlib-binding"
+showcase = true
+forces   = []
+since    = "0.11"
+status   = "running"
+expects  = "run-pass"
+entry    = "http_client.aril"
+expected_output = "expected-output.txt"
