@@ -154,6 +154,17 @@ service.
 **Note.** The hard part of losing npm was never the plumbing — it is the
 cold start, which this does not solve.
 
+**Status.** Realized for pure-Aril libraries (RFC-0008): a project declares
+dependencies in `aril.toml` (`[dependencies.<name>]` — a Git source, a pinned
+version, a kind), `aril get` fetches them into a hermetic content-addressed
+cache and writes a committed `aril.lock`, and `aril build`/`run` resolve
+offline against the cache. Version resolution is **exact-pin** today (a tag or
+commit); the Claim's MVS-style selection is deferred until the ecosystem has the
+transitive depth to need it (the lockfile makes that a non-breaking upgrade).
+Aril modules compose as source (one Go module out).
+Binding *Go* modules as dependencies (published binding packages; raw Go +
+module-aware generation) is the remaining half — the cold-start bindgen work.
+
 ### D6 — Bindings are generated from `go/packages`, not hand-written
 
 **Claim.** Binding *signatures* are derived mechanically from the Go type
