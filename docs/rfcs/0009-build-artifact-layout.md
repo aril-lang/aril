@@ -59,8 +59,12 @@ myproj/
 ```
 
 - **`aril-out/bin/<name>`** — the final binary, the default target of
-  `aril build`. An explicit `-o <path>` overrides it to an arbitrary path.
-- **`aril-out/gen/`** — the lowered Go module. Aril lowers here and **keeps it**
+  `aril build`. An explicit `-o <path>` sets the binary path outright (it may sit
+  outside `aril-out/`); the directory knobs below relocate only the housing
+  directory, not the `-o` target.
+- **`aril-out/gen/`** — the lowered Go module (whose go.mod module path is the
+  distinct constant `aril-output` — the *directory* `aril-out/` and the *module
+  name* `aril-output` are not the same string). Aril lowers here and **keeps it**
   between builds rather than lowering to a throwaway temporary directory.
 - **`aril-out/.gitignore`** — auto-generated, containing `*`, so every artifact
   is ignored even if the developer forgets to add `/aril-out` to the project's
@@ -73,10 +77,15 @@ discoverability for a TypeScript-refugee audience that already reads a top-level
 ### Persisted lowered Go — the incremental-build payoff
 
 The lowered Go in `aril-out/gen/` is retained across builds. Go's build cache
-(`$GOCACHE`) is content-addressed, so an unchanged `gen/` yields a cache hit and
-the rebuild is incremental instead of a full recompile of a fresh temporary
-module. Go remains an intermediate representation (D1) — persisting it makes it
-*present* (a debugging window into the IR), not readable-as-a-goal.
+(`$GOCACHE`) keys the program's own package on its absolute source path, so
+lowering to a fresh temporary directory each build misses the cache and
+recompiles that package; a persisted `gen/` holds the path stable, so an
+unchanged lowering hits the cache and the rebuild is incremental. Persistence is
+justified by that incremental-build payoff **alone**. Go remains an intermediate
+representation the developer never works in (D1/D16) — that the IR happens to sit
+on disk is an incidental consequence, neither a goal nor a supported interface;
+the debugging path is `//line` back to `.aril` coordinates (D8), not reading the
+generated Go.
 
 ### The dependency cache — global and content-addressed
 
@@ -117,8 +126,9 @@ Grounded in a prior-art pass over Cargo, Go, npm/pnpm/Yarn, Bazel, Deno, Nix, an
 Zig.
 
 - **A per-project build dir (Cargo `target/`) vs. no project dir (Go).** Go's
-  no-directory model drops the binary in the working directory (or `$GOBIN`),
-  which is the source-tree-litter problem; it has no obvious `.gitignore` target.
+  no-directory model drops the binary in the working directory (`go build`;
+  `go install` targets `$GOBIN` instead), which is the source-tree-litter
+  problem, and it has no obvious `.gitignore` target.
   Cargo's `target/` gives one discoverable, ignorable home. Aril takes `target/`'s
   discoverability **without** its notorious disk bloat: Cargo's `target/` is heavy
   mostly with *per-project compiled dependency objects*, but Aril compiles through
@@ -137,12 +147,13 @@ Zig.
   `node_modules` duplication the TypeScript audience is fleeing. A single global
   content-addressed store (`$ARIL_CACHE`) is chosen; dependencies are never copied
   per-project.
-- **Persisting the lowered Go vs. a throwaway temp directory.** Lowering to
-  `os.MkdirTemp` and deleting it keeps generated Go fully out of sight (strict
-  IR-opacity) but forces a full recompile every build and offers no IR-debugging
-  window. Persisting to `aril-out/gen/` unlocks Go's incremental `$GOCACHE` and a
-  debugging window, at the cost of a cleanup surface. Persisting is chosen; Go
-  stays an IR (D1) — present, not advertised as readable.
+- **Persisting the lowered Go vs. a throwaway temp directory.** Lowering to an OS
+  temp directory and deleting it keeps generated Go fully out of sight but forces
+  a full recompile every build (a fresh path defeats Go's cache). Persisting to
+  `aril-out/gen/` keeps the source path stable and so unlocks Go's incremental
+  `$GOCACHE`, at the cost of a cleanup surface. Persisting is chosen for that
+  build-speed payoff; Go stays an IR the developer never works in (D1/D16), and
+  its on-disk presence is incidental, not an interface.
 - **One cache variable vs. splitting module and build caches now.** Go separates
   `$GOCACHE` (build) from `$GOMODCACHE` (module). Aril rides Go's `$GOCACHE` for
   build caching, so `$ARIL_CACHE` need only be the module cache — one variable. A
@@ -165,9 +176,10 @@ which removes the source-tree litter. `aril run` writes its intermediate Go to
 required (the `[build] out-dir` key is optional).
 
 Tooling that builds many projects in one tree — the example-corpus runner — sets
-`ARIL_OUT` to a scratch directory so it does not create an `aril-out/` beside
-each example (which the corpus enumeration would otherwise see). This is the one
-integration point the persisted default introduces.
+`ARIL_OUT` to a scratch directory so the persisted default does not accrete an
+untracked `aril-out/` under each example (litter in the source tree; the binary
+is already redirected by `-o`, but persisted `gen/` is independent of it). This
+is the one integration point the persisted default introduces.
 
 This RFC is the build-artifact peer of RFC-0008 (the dependency & build system);
 RFC-0008 owns `$ARIL_CACHE` and the dependency model, this one owns the
