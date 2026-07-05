@@ -110,7 +110,7 @@ module is a *package* whether it is an application root or a library.)
 
 ```toml
 [package]
-name    = "aril-kv"          # required — the import-path root for this module
+name    = "kv"               # required — the module's canonical import root (a consumer may alias it)
 edition = "2026"             # the project-file/build-system format this manifest targets
 kind    = "aril"             # aril | binding  — self-declared (a raw Go module can't; see kind=go)
 min-aril = "0.14"            # optional — minimum Aril toolchain this module needs
@@ -127,13 +127,24 @@ convention: identity and nature are the package's to declare.
 
 #### `[dep.<name>]` — a consumer's requirement
 
-A dependency is a dotted sub-section whose name is the dependency's import-path
-root (the `[package] name` it declares in its own manifest), so a consumer writes
-`import kv/store` to reach package `store` of the dependency rooted at `kv`.
+The section key `<name>` is the **import root the consumer uses** — `import
+<name>/…`. It defaults to the dependency's self-declared `[package] name`, and a
+consumer may key it differently to **alias** the module locally (the Cargo
+`package = "…"` rename). Resolution *identity* is the `source`, not the name: one
+`source` at one resolved version is one module however it is keyed.
+
+Two aliases matter because the two are on different axes — identity is by
+`source`, the import namespace is by name — so two independent sources may both
+self-declare `name = "kv"`. Within one manifest the keys are unique (TOML), so a
+consumer disambiguates by keying them apart (`[dep.kv]`, `[dep.kv2]`). When the
+collision is *between two modules' own dependencies* deeper in the graph, it is a
+**hard error** at build composition until per-module import namespacing lands (the
+cross-package-visibility work carried forward from RFC-0002); the interim contract
+is one import root, one module, per build.
 
 ```toml
-[dep.kv]
-source  = "github.com/alice/aril-kv"   # required (unless replace) — the git source
+[dep.kv]                                # import root `kv` → `import kv/store`
+source  = "github.com/alice/aril-kv"   # required (unless replace) — the git source (identity)
 version = "^1.3"                        # required (unless replace) — a version constraint
 
 [dep.pq]
@@ -165,7 +176,15 @@ Fields:
   self-declared bound-Go-module floor (the consumer may bind a newer Go module
   against an existing binding, accepting the ABI-drift risk).
 - **`replace`** *(optional, any kind)* — a local filesystem path overriding
-  `source`/`version` (dev/vendor escape hatch; not fetched, so needs neither).
+  `source`/`version` (dev/vendor escape hatch; not fetched, so needs neither). A
+  `replace` is **root-only**: a dependency's own `replace` entries are ignored in a
+  consuming build (the Go/Cargo rule — only the top-level project may redirect a
+  source, so a library cannot rewrite a consumer's graph).
+
+*Dev/test-only dependencies* (a dependency needed to build a module's tests but
+not its consumers) have no place in `[dep]` yet — they arrive with the test-surface
+RFC (`aril test`), which extends `[dep]` with a dev-scoped table rather than
+overloading this one.
 
 #### `[about]` — reserved, free-form, human-only
 
@@ -225,7 +244,11 @@ Go's heavier machinery:
   `/vN`-in-path). Go needs `/vN` because two majors must link in one binary;
   under source-composition the same collision would surface at Go-codegen, so
   side-by-side majors are a future *codegen-namespacing* decision, not a tag
-  convention — deferred until v2s appear.
+  convention — deferred until v2s appear. The deferral has a price to name: once
+  the ecosystem publishes v2s, a cross-major requirement (`A` needs `C ^1`, `B`
+  needs `C ^2`) has no resolution under one-version-per-source and fails closed —
+  an ecosystem split — so the codegen-namespacing work turns from deferred to
+  urgent exactly when the first widely-depended-on library ships a v2.
 - **One module per repository root** (subdirectory-module tag prefixes deferred).
 
 ### Version constraints — caret / tilde / exact
@@ -273,6 +296,23 @@ within each constraint's window on demand (Go's `-u`, wearing caret clothing), s
 default builds stay minimal and reproducible while "give me newest-compatible" is
 an explicit, reviewable action.
 
+**The upper-bound gate is complete for a *fixed* graph, but MVS + ranges is not a
+complete resolver over the whole solution space — an accepted incompleteness.**
+For a fixed set of selected versions, a shared module's feasible window is
+`[max floor, min ceiling)`; once the max-of-floors reaches a ceiling, every higher
+version violates it too, so fail-closed is honest. But the graph is *not* fixed —
+a module's floors depend on which version of it is selected. Take root requiring
+`A ^1.0` and `B ^1.0`, with `A@1.0` requiring `C ^1.0` and `B@1.0` requiring
+`C ^2.0`: the gate reports a `C` conflict — yet if `A@1.1` requires `C ^2.0`, a
+backtracking resolver (Cargo, PubGrub) would satisfy everyone by *raising `A`
+above its floor*. MVS never considers a version above a module's minimum, so it
+does not find that solution. The caret surface thus offers the spelling a
+TypeScript audience reads as newest-compatible, while the engine deliberately
+delivers only the *minimal* selection — the Go trade (Go forgoes ranges entirely
+for the same simplicity and reproducibility). The manual substitute for
+backtracking is **raising a floor by hand** — `aril upgrade A` lifts `A`'s floor
+so MVS reconsiders it — and the conflict diagnostic (E0122) points there.
+
 ### Compatibility axes
 
 **The Aril *language* commits to backward-compatibility, so the design carries no
@@ -306,30 +346,58 @@ and the *project-file / build-system format*:
   floor*; the **root decides the actual version as the maximum of all floors**
   (mirroring Go's max-of-`go`-directives).
 - **Bound Go-module version** (binding kind) — the binding self-declares
-  `binds-go` as a **floor** the consumer may override (`binds-go` in the `[dep]`),
-  accepting ABI-drift risk. This is the one axis with no clean lineage precedent
-  (it is the Cargo `links` / ABI problem).
+  `binds-go` as a **floor**. A consumer may raise it explicitly (`binds-go` in the
+  `[dep]`), accepting ABI-drift risk. But the floor can also be exceeded
+  *implicitly*: because every Go-binding dependency lowers into the one emitted Go
+  module, Go's own module resolution takes the **max** `binds-go` across all
+  binding dependencies, so one binding may run against a Go module newer than the
+  version it was generated against with no consumer action. That implicit case is
+  the more common drift, so it earns a **warning diagnostic** (above) rather than
+  passing silently. This is the one axis with no clean lineage precedent (the Cargo
+  `links` / ABI problem); the uniqueness rule (one table per Go module) bounds it.
 
 ### Fetch & the cache — `aril get`
 
-`aril get` is the only step that touches the network. It reads the manifest's
-`[dep]` constraints, resolves the transitive closure by MVS (enumerating each
-`source`'s tags via `git ls-remote`, filtering valid `vX.Y.Z`), fetches each
-selected `source@version` via git into a **content-addressed cache**
-(`$ARIL_CACHE/<source>@<version>/`, immutable, git-metadata stripped), and writes
-`aril.lock`. An optional cache-index may serve tag lists and content faster, but
-`aril get` falls back to direct git and never requires it.
+`aril get` is the only step that touches the network. It resolves the transitive
+closure by MVS and fetches the selected modules into a local module cache.
+
+**Resolution reads candidate manifests.** MVS needs each module's own `[dep]`
+floors at the versions it considers, and `git ls-remote` yields only tag *names*,
+not file contents. The direct-git path therefore takes a **blobless partial clone
+per `source`** (`--filter=blob:none`) and reads each candidate version's
+`aril.toml` locally — the principal cost of a registry-less model. An optional
+**cache-index** can serve manifests (and tag lists and content) directly, the way
+Go's module proxy serves `.mod` files without a full clone; `aril get` uses it
+when present and falls back to the clone path otherwise, so a build works fully
+without any index.
+
+**The cache is coordinate-addressed, content-verified.** A fetched module lands at
+`$ARIL_CACHE/<source>@<version>/` — keyed by its *coordinate* (source + resolved
+version), immutable, git metadata stripped. This is a shared per-machine module
+cache (the pnpm-store / Go-module-cache role of avoiding per-project copies), *not*
+a content-addressed store in the pnpm/Nix sense where the key *is* the content
+hash; integrity is a separate check against the lock's recorded hash.
+
+**Trust is first-use.** With no central authority — D5 forbids a curated registry,
+so a Go-`sumdb`-style global checksum database cannot exist — the *first* `aril
+get` **trusts the git host** at resolution time (trust-on-first-use). Once
+`aril.lock` records each module's resolved commit and content hash, every later
+build and every other machine is pinned to those exact bytes (a mismatch is
+`E0123`). Accepting the first-fetch trust is the deliberate cost of
+decentralization; a committed, reviewed lock is the mitigation.
 
 ### The lockfile — `aril.lock` (verify-lock)
 
 `aril.lock` is a **committed verify-lock**, not a select-lock. Under MVS the
 manifests alone determine the selection, so the lockfile does **not** pick — it
 **verifies and freezes the git reality**: per resolved module, its `source`, the
-resolved `version`, the **exact commit the version's tag pointed at**, and a
-content hash. Pinning tag→commit is *more* valuable than a hash-only lock because
-git tags are mutable — a re-tag or force-push cannot silently change the bytes a
-build compiles. The format is the closed-schema line shapes the manifest reader
-uses (no third-party TOML library, D19), generated and sorted.
+resolved `version`, the **exact commit the tag pointed at**, and a **content
+hash** — a SHA-256 over the module's normalized file tree (git metadata stripped,
+paths sorted), *not* the commit's SHA-1 alone (a weak primitive that identifies
+the ref, not the delivered bytes). Pinning tag→commit is *more* valuable than a
+hash-only lock because git tags are mutable — a re-tag or force-push cannot
+silently change what a build compiles. The format is the closed-schema line shapes
+the manifest reader uses (no third-party TOML library, D19), generated and sorted.
 
 ### Offline builds
 
@@ -345,12 +413,22 @@ directs the user to run `aril get`.
 - **E0121** — a declared dependency that is not resolvable (absent from the cache,
   no `aril.toml`, or a not-yet-wired kind).
 - **E0122** — a version-compatibility conflict the upper-bound gate rejects (the
-  max-of-floors violates a declared ceiling), naming both requirers.
+  max-of-floors violates a declared ceiling), naming both requirers **and pointing
+  at the manual backtracking substitute** — raising a floor (`aril upgrade <dep>`)
+  may move a module to a version whose constraints reconcile (the accepted
+  MVS-incompleteness, above).
 - **E0123** — `aril.lock` stale or a cache hash mismatch (re-run `aril get`).
+- **A binding-uniqueness diagnostic** — at most one binding table (a `binding`
+  package or a `kind = "go"` table) may bind a given Go module across a build
+  graph; a second binding of the same Go module is a hard error (the Cargo `links`
+  invariant), because two tables would emit duplicate `extern` declarations of the
+  same Go symbols into the one lowered module.
 - Further Aril-coordinate diagnostics — a bare tag missing its `v`, a manifest
   `edition` the toolchain does not support, a `min-aril` above the running
-  toolchain, and a `[dep].kind` guard disagreeing with the fetched
-  `[package].kind` — are allocated in `diagnostics.md` at implementation.
+  toolchain, a `[dep].kind` guard disagreeing with the fetched `[package].kind`,
+  and a **warning** when Go-level resolution raises a bound Go module above a
+  binding's `binds-go` floor (implicit ABI drift, below) — are allocated in
+  `diagnostics.md` at implementation.
 
 ## Alternatives considered
 
@@ -378,7 +456,13 @@ and Dart/uv.
   reads `^1.3` fluently, so the caret/tilde surface is kept — but resolved by its
   *lower bound* through MVS, with the upper bound as a gate. This grants the
   familiar spelling over the simpler engine, and keeps a real upper-bound check
-  Go's bare-minimum model lacks.
+  Go's bare-minimum model lacks. **The trade is an accepted incompleteness**
+  (spelled out under *Resolution*): the caret surface reads as newest-compatible,
+  but MVS never raises a module above its floor, so a conflict a backtracking
+  resolver would solve by lifting an intermediate dependency instead fails closed —
+  the manual `aril upgrade` is the substitute. Chosen deliberately: Go's evidence
+  is that reproducibility + no-solver is worth forgoing backtracking, and a young
+  ecosystem rarely hits the pathological case.
 - **Library-side vs. consumer-declared `kind`.** No mainstream system makes a
   consumer re-assert what a dependency *is* (Cargo `crate-type`/`links`, npm
   `type`, Go's per-module `go.mod`). Kind is self-declared; the consumer restates
@@ -394,6 +478,14 @@ and Dart/uv.
   edition has no purpose. Two axes remain, repurposed to what actually evolves: a
   **build-system-format `edition`** and a **toolchain `min-aril` floor** — distinct
   granularities (coarse format epoch vs. fine toolchain floor), both library-side.
+  `min-aril` is a build-time check, never a resolution input — but Cargo trod
+  exactly this path and reconsidered: its **MSRV-aware resolver** (resolver v3,
+  default since Rust 1.84) *prefers* dependency versions compatible with the
+  declared toolchain floor, because a max-of-floors demanding a newer toolchain
+  than the user has — when an older in-window version would build — is an annoying
+  failure. Hard-error is right for a first version (exact-window resolution leaves
+  little to prefer); the precedent is recorded so a later "consider `min-aril`
+  during resolution" starts with context rather than from scratch.
 - **`/vN` major-in-path (Go SIV) vs. one version per source.** Go's semantic
   import versioning lets two majors link in one binary because they are distinct
   import paths. Under source-composition the collision moves to Go-codegen, so
@@ -403,13 +495,16 @@ and Dart/uv.
   off under range ordering across tagged and untagged points; a full SHA already
   gives identity and reproducibility, so untagged commits use the SHA, and Go's
   pseudo-version format is adopted only if commit-ordering is ever needed.
-- **Global content-addressed cache (pnpm store, Go module cache, Nix) vs.
+- **A single shared module cache (pnpm store, Go module cache, Nix) vs.
   per-project vendored copies (npm `node_modules`).** Per-project copies are the
   `node_modules` bloat the TS audience is fleeing. The dependency cache is a single
-  global content-addressed store (`$ARIL_CACHE`); dependencies are never copied
-  per-project. (Because Aril compiles through Go, whose build/module caches are
-  already global, a project's own emitted output stays small — the artifact-layout
-  choice is RFC-0009.)
+  global, per-machine cache (`$ARIL_CACHE`) — *coordinate*-addressed
+  (`<source>@<version>`) and content-*verified* against the lock, a lighter scheme
+  than pnpm's/Nix's fully content-addressed store but with the same
+  no-per-project-copy payoff; dependencies are never copied per-project. (Because
+  Aril compiles through Go, whose build/module caches are already global, a
+  project's own emitted output stays small — the artifact-layout choice is
+  RFC-0009.)
 - **Select-lock vs. verify-lock.** Under newest-compatible the lockfile must both
   pick and verify; under MVS it only verifies. The verify-lock is chosen, extended
   to pin tag→commit (guarding against mutable git tags) — strictly more than a
@@ -425,6 +520,22 @@ surface has a single consumer (the `greeter` example, via `replace` with no
 version), migration is a one-file edit at implementation. The hand-vendored FFI
 path (`std/bindings.json` + `std/vendor`) remains valid and is superseded
 incrementally.
+
+**Staged delivery.** The design admits an incremental rollout that lets the first
+increment ship before the harder resolver questions bind — the discipline the
+concrete `database/sql` north star affords a system that is otherwise
+adult-ecosystem-scale at zero external users. **Stage 1** — `kind = "aril"`
+libraries via `replace`/exact pins with the verify-lock — is useful with no fetch
+or ranged-MVS machinery, and MVS is degenerate there (all floors come from one
+manifest), so the range-resolution incompleteness, the git-direct manifest-read
+cost, and the binding-coherence rules do not yet apply. **Stage 2** — `kind =
+"go"` (a raw Go module + a consumer table) under the `database/sql`-with-a-driver
+north star — introduces real Go-binding dependencies, and with them the
+binding-uniqueness rule and the implicit-`binds-go` drift. **Stage 3** — `kind =
+"binding"`, strictly *sugar* over stage 2 (a published table rather than a
+consumer-owned one) — lands last. Multi-source fetch and full ranged MVS layer in
+where they first earn their keep (multi-source graphs), so the resolver subtleties
+gate later stages rather than the first increment.
 
 At the decision level this **realizes D5** (a decentralized ecosystem with a real
 build system) and **restates the D19 guardrail** (amended by RFC-0005 to admit
@@ -448,3 +559,15 @@ and a **user-facing test surface** (its own RFC), each with its own prior-art pa
   format `edition` + a `min-aril` toolchain floor, not a language dialect); the
   git-direct + optional-proxy ecosystem model; and a tag→commit verify-lock.
   Build-artifact layout split to RFC-0009; a test surface deferred to its own RFC.
+- 2026-07-05 — resolver/supply-chain review pass. Named the **accepted
+  incompleteness** of MVS-over-ranges (the graph is not fixed; a floor-only engine
+  cannot raise an intermediate dependency, so the caret surface is not a complete
+  newest-compatible resolver — `aril upgrade` is the manual substitute, and E0122
+  points there); made the `[dep.<name>]` key an **alias-capable import root**
+  (identity by `source`; a name collision is a hard error resolvable by re-keying);
+  named the git-direct **pre-fetch manifest-read** cost (a blobless clone per
+  source, or an optional manifest-serving cache-index); stated **trust-on-first-use**
+  and specified the content hash (SHA-256 over the normalized tree); corrected the
+  cache to **coordinate-addressed, content-verified**; added the **binding-uniqueness**
+  rule and the **implicit-`binds-go` drift** warning; and made the **staged delivery**
+  (kind 1 → kind 3 → kind 2) explicit so the resolver subtleties gate later stages.

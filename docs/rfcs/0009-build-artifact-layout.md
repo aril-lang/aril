@@ -12,8 +12,8 @@
 Define **where Aril writes build artifacts** and **where it caches
 dependencies**. A per-project **`aril-out/`** directory (visible, git-ignored)
 holds the final binary (`aril-out/bin/<name>`) and the persisted lowered Go
-(`aril-out/gen/`). The dependency cache is the **global content-addressed
-`$ARIL_CACHE`** (RFC-0008) — shared across projects, never copied per-project.
+(`aril-out/gen/`). The dependency cache is the **global `$ARIL_CACHE`**
+(RFC-0008) — shared across projects, never copied per-project.
 The output location is configured, in precedence order, by `--out-dir`, the
 `ARIL_OUT` environment variable, a `[build] out-dir` manifest key, and the
 default `./aril-out`.
@@ -87,14 +87,23 @@ on disk is an incidental consequence, neither a goal nor a supported interface;
 the debugging path is `//line` back to `.aril` coordinates (D8), not reading the
 generated Go.
 
-### The dependency cache — global and content-addressed
+Persistence obliges Aril to keep `gen/` **in sync** with the sources. When a
+`.aril` file is renamed or removed, its previously-emitted `.go` must be deleted —
+otherwise `go build` compiles the stale file and the developer sees phantom errors
+from a source that no longer exists (the most likely first-week bug of a naive
+persistent cache). Aril records the set of files it emits (a manifest under
+`aril-out/`) and removes orphans on each lowering; wiping `gen/` wholesale per
+build would be simpler but would discard the very incremental-cache win this
+section exists for.
 
-Fetched dependency modules live in the **global** content-addressed
-`$ARIL_CACHE` (RFC-0008), shared across every project on the machine and **never
-copied into `aril-out/`**. This is the pnpm-store / Go-module-cache / Nix-store
-model — the relief from the per-project duplication of `node_modules`. If
-per-project visibility of dependencies is ever wanted, the answer is to *link*
-(pnpm-style), never to copy.
+### The dependency cache — global, coordinate-addressed
+
+Fetched dependency modules live in the **global** `$ARIL_CACHE` (RFC-0008) —
+coordinate-addressed (`<source>@<version>`) and content-verified against the lock,
+shared across every project on the machine and **never copied into `aril-out/`**.
+This is the pnpm-store / Go-module-cache / Nix-store role — the relief from the
+per-project duplication of `node_modules`. If per-project visibility of
+dependencies is ever wanted, the answer is to *link* (pnpm-style), never to copy.
 
 ### The build cache — delegated to Go
 
@@ -120,6 +129,34 @@ the two locations a developer may need to relocate: **`ARIL_OUT`** (build output
 and **`ARIL_CACHE`** (the module cache) — the "one memorable variable per
 concern" discipline of `CARGO_TARGET_DIR` / `GOCACHE` / `DENO_DIR`.
 
+**A shared output directory is namespaced per project.** When `ARIL_OUT` or
+`--out-dir` points several projects at *one* directory — the example-corpus runner
+is the motivating case — the layout gains a project segment,
+`<out>/<project-id>/{bin,gen}`, where `<project-id>` is the project's `[package]
+name` plus a short hash of its root path. Without it, co-located projects would
+overwrite each other's `gen/` and collide in one `bin/` on a name clash. Under the
+default `./aril-out` (one project, one directory) the segment is omitted. Cargo
+keys a shared `CARGO_TARGET_DIR` the same way.
+
+### Concurrent builds
+
+A build takes an **exclusive lock** on its output directory (`aril-out/`, or the
+per-project segment under a shared out-dir) for the span of lowering plus
+`go build`. Two concurrent `aril build`/`run` in one project — a parallel corpus
+run is exactly the in-house case — thus serialize on `gen/` rather than corrupting
+each other's intermediate Go; the second waits for the lock. Cargo locks `target/`
+for the same reason.
+
+### Cleaning and reserved slots
+
+`aril clean` removes `aril-out/` — the whole tree, or `gen/`/`bin/` selectively —
+the counterpart to a persisted layout.
+
+Cross-compilation is deferred, but the layout **reserves its slot** the way it
+reserves one for build profiles: per-`GOOS`/`GOARCH` outputs land under a
+target-triple segment (`aril-out/bin/<target>/<name>`, `gen/<target>/`), so adding
+cross-compilation later needs no relayout.
+
 ## Alternatives considered
 
 Grounded in a prior-art pass over Cargo, Go, npm/pnpm/Yarn, Bazel, Deno, Nix, and
@@ -142,11 +179,11 @@ Zig.
   runtime are profile-*like* axes but not a fixed pair. A profile sub-directory
   (`aril-out/<profile>/`) is the idiomatic slot should a profile distinction ever
   land; it is deferred, and adding it later costs no redesign.
-- **A global content-addressed cache (pnpm store, Go module cache, Nix) vs.
+- **A single global module cache (pnpm store, Go module cache, Nix) vs.
   per-project vendored copies (npm `node_modules`).** Per-project copies are the
   `node_modules` duplication the TypeScript audience is fleeing. A single global
-  content-addressed store (`$ARIL_CACHE`) is chosen; dependencies are never copied
-  per-project.
+  cache (`$ARIL_CACHE`, coordinate-addressed and content-verified — RFC-0008) is
+  chosen; dependencies are never copied per-project.
 - **Persisting the lowered Go vs. a throwaway temp directory.** Lowering to an OS
   temp directory and deleting it keeps generated Go fully out of sight but forces
   a full recompile every build (a fresh path defeats Go's cache). Persisting to
@@ -192,3 +229,11 @@ concern with its own RFC.
   a prior-art pass over Cargo `target/` + `CARGO_HOME`, Go's `$GOCACHE` /
   `$GOMODCACHE` / `$GOBIN`, npm `node_modules` + the pnpm content-addressed store,
   Bazel, Deno (`DENO_DIR`), Nix (`/nix/store`), and Zig (`zig-out/`).
+- 2026-07-05 — review pass: an **exclusive lock** on the output directory for
+  concurrent builds (Cargo locks `target/`); a **per-project segment**
+  (`<out>/<project-id>/…`) when the output directory is shared, so co-located
+  projects do not collide; **orphan synchronization** of `gen/` via an emitted-files
+  manifest (a persisted cache must delete the `.go` of a removed `.aril`, or Go
+  compiles a phantom); an `aril clean` command; a reserved cross-compilation slot
+  (`bin/<target>/`); and corrected the `$ARIL_CACHE` description to
+  *coordinate-addressed, content-verified* (aligning with RFC-0008).
