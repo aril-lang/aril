@@ -33,13 +33,14 @@ dependency that binds *Go* code introduces a Go-level `require`.
 
 Three durable problems this design answers.
 
-1. **A decentralized ecosystem needs a way to depend on another project's code.**
-   D5 makes Aril's package ecosystem decentralized and GitHub-hosted. Import
-   resolution classifies an import as a compiler-bundled `std/*` module, a local
-   package under the project's own name, a builtin Go/runtime module, or a
-   `[bindings] extra` Go path — with no category for a package that lives in
-   *another* project. A decentralized ecosystem *is* that missing category, plus
-   the fetch/resolve/pin machinery that makes depending on it reproducible.
+1. **A decentralized ecosystem requires depending on another project's code,
+   reproducibly.** D5 makes Aril's package ecosystem decentralized and
+   GitHub-hosted — which is meaningful only if a project can *depend on* a module
+   that lives in another repository: resolve a compatible version of it against a
+   version constraint, fetch it without a central authority, and pin the result so
+   every build is identical. A cross-project dependency category in resolution,
+   version constraints, a resolution algorithm, a fetch step, and a lockfile are
+   what a decentralized ecosystem is made of — the subject of this design.
 
 2. **A dependency system must scale past hand-curation, without a central
    authority.** The alternative to a real dependency system is per-package manual
@@ -175,7 +176,8 @@ its internal shape stays unspecified and humans read it as-is. Reserving the
 *name* now prevents a future clash; a formal descriptive-metadata schema
 (license/repository/keywords) lands in `[package]` when a real need arises,
 where — with no central registry to hold it — the manifest is its only home.
-An `authors` field is admissible for a user's own package.
+An `authors` field is admissible for a user's own package (the Aril repository's
+own manifests leave it unset, per the no-author-metadata rule).
 
 #### Retained sections
 
@@ -197,7 +199,12 @@ bare-ident bindings) are unchanged.
    runs **module-aware** over the fetched Go package to produce `extern` bindings,
    guided by the consumer's `path` table; output is auto-consumed, and the bound
    Go module rides the same `require`+`replace` machinery. This is the
-   `database/sql`-driver path.
+   `database/sql`-driver path. Module-aware loading is the surface D22 already
+   carves out for the third-party-plumbing work (`x/tools/go/packages` where the
+   stdlib `go/importer` cannot reach a module graph). Having no `aril.toml`, a
+   `kind = "go"` dependency declares no Aril floors — it is a **leaf** of the Aril
+   MVS graph, and its transitive *Go* dependencies resolve through Go's own
+   `require`/`replace`, not Aril resolution.
 
 ### Version identifiers — the git-ref convention
 
