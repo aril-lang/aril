@@ -92,18 +92,63 @@ func TestUsedThirdParty(t *testing.T) {
 func TestGoModText(t *testing.T) {
 	dep := thirdPartyDep{ImportPath: "example.com/arilkv", Module: "example.com/arilkv", Version: "v0.0.0", Vendor: "std/vendor/arilkv"}
 
-	bare := goModText("/repo", nil)
+	bare := goModText("/repo", nil, "")
 	if strings.Contains(bare, "require") || strings.Contains(bare, "replace") {
 		t.Errorf("stdlib-only go.mod should be require-free:\n%s", bare)
 	}
+	if !strings.Contains(bare, "\ngo "+defaultGoVersion+"\n") {
+		t.Errorf("go.mod should carry the default Go floor %q:\n%s", defaultGoVersion, bare)
+	}
 
-	withDep := goModText("/repo", []thirdPartyDep{dep})
+	withDep := goModText("/repo", []thirdPartyDep{dep}, "")
 	for _, want := range []string{
 		"require example.com/arilkv v0.0.0",
 		"replace example.com/arilkv => /repo/std/vendor/arilkv",
 	} {
 		if !strings.Contains(withDep, want) {
 			t.Errorf("go.mod missing %q:\n%s", want, withDep)
+		}
+	}
+}
+
+// TestMaxGoVersion — the emitted Go floor is the max of the default floor, the
+// root [toolchain] go, and each Go-binding dep's own go.mod `go` directive
+// (RFC-0008 §Compatibility axes — one Go module, the root picks max-of-floors).
+func TestMaxGoVersion(t *testing.T) {
+	if got := maxGoVersion(nil, nil); got != defaultGoVersion {
+		t.Errorf("no floors → default %q, got %q", defaultGoVersion, got)
+	}
+	if got := maxGoVersion(&projectManifest{toolchainGo: "1.21"}, nil); got != defaultGoVersion {
+		t.Errorf("a below-default root floor must not lower it: got %q", got)
+	}
+	if got := maxGoVersion(&projectManifest{toolchainGo: "1.24"}, nil); got != "1.24" {
+		t.Errorf("root [toolchain] go should raise the floor: got %q", got)
+	}
+	// A dep whose go.mod declares a higher floor raises the emitted version.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := maxGoVersion(nil, []thirdPartyDep{{Vendor: dir}}); got != "1.23" {
+		t.Errorf("dep go directive should raise the floor: got %q", got)
+	}
+}
+
+func TestGoVersionLess(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"1.22", "1.23", true},
+		{"1.23", "1.22", false},
+		{"1.22", "1.22", false},
+		{"1.22", "1.22.1", true},
+		{"1.22.1", "1.22", false},
+		{"1.9", "1.22", true}, // numeric, not lexical
+	}
+	for _, c := range cases {
+		if got := goVersionLess(c.a, c.b); got != c.want {
+			t.Errorf("goVersionLess(%q,%q) = %v; want %v", c.a, c.b, got, c.want)
 		}
 	}
 }

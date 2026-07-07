@@ -134,8 +134,8 @@ func binaryBaseName(srcPath string) string {
 // out-dir root. Unlike writeTempModule it does not create a throwaway temp dir
 // and the caller must NOT remove it — persistence is the whole point (Go's
 // build cache keys on the stable path). Returns the gen dir as the build cwd.
-func writeProjectModule(goSrc, outDir string) (*compiledSource, error) {
-	goMod, err := thirdPartyGoMod(goSrc)
+func writeProjectModule(goSrc, outDir string, goDeps []thirdPartyDep, goVersion string) (*compiledSource, error) {
+	goMod, err := thirdPartyGoMod(goSrc, goDeps, goVersion)
 	if err != nil {
 		return nil, err
 	}

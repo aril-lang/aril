@@ -23,6 +23,7 @@ import (
 type resolved struct {
 	files       []string        // all .aril files, deterministic order
 	userImports map[string]bool // import paths that name a user package
+	goDeps      []thirdPartyDep // require+replace entries for kind="go"/"binding" Go-binding deps (RFC-0010)
 }
 
 // resolvePackages computes the build unit for an entry target. Without a
@@ -95,10 +96,53 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 						return err
 					}
 				case importExternal:
-					// A declared external dependency. Only kind="aril" (pure
-					// Aril source, compiled into the build) is wired today;
-					// binding/go deps (a Go `require`) are later work.
+					// A declared external dependency.
 					d := lookupDep(mod, p)
+					// kind="go" (RFC-0010): a raw Go module bound through a
+					// consumer-owned table. The table (extern decls) is a file in
+					// *this* project; compile it into the build and strip the
+					// import. The bound Go module rides require+replace
+					// (thirdparty.go), replace-target = the fetched cache (or a
+					// local `replace`). It is a leaf — no aril.toml to expand.
+					if d.kind == "go" {
+						if d.path == "" {
+							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\") declares no binding table (`path`)", p)
+						}
+						table := filepath.Join(mod.dir, filepath.FromSlash(d.path))
+						tableFiles, err := gatherSources(table)
+						if err != nil {
+							return fmt.Errorf("aril: error[E0121]: dependency %q: cannot read its binding table %q: %v", p, d.path, err)
+						}
+						r.userImports[p] = true
+						r.files = append(r.files, tableFiles...)
+						replaceDir, _ := filepath.Abs(externalModuleRoot(d, mod, resolvedVers))
+						// A non-replace kind="go" dep must be fetched first — its
+						// cache dir carries the module's go.mod (the authoritative
+						// module path). An absent dir means it was never fetched.
+						if _, err := os.Stat(replaceDir); err != nil {
+							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\") is not present (run `aril get`, or point `replace` at a local copy)", p)
+						}
+						// The Go module path — the require/replace key and the @go
+						// prefix the table binds — is the module's *own* go.mod
+						// `module` directive (authoritative: a repo's git URL may
+						// differ from its module path — vanity imports, gopkg.in).
+						// Fall back to the declared `source` only if the go.mod is
+						// unreadable.
+						modulePath := readGoModuleName(replaceDir)
+						if modulePath == "" {
+							modulePath = d.source
+						}
+						if modulePath == "" {
+							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\"): cannot determine the bound Go module path — set `source`, or ensure %q has a go.mod", p, replaceDir)
+						}
+						r.goDeps = append(r.goDeps, thirdPartyDep{
+							ImportPath: modulePath,
+							Module:     modulePath,
+							Version:    depConcreteVersion(d, resolvedVers),
+							Vendor:     replaceDir,
+						})
+						continue
+					}
 					// The module manifest is anchored at the module root, not
 					// found by walking up from the package dir (which could
 					// bind an ancestor's aril.toml). A module absent or without

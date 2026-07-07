@@ -221,6 +221,7 @@ func cmdBuild(args []string) int {
 	// arilrt is pulled in as main's dependency either way.
 	cmd := exec.Command("go", "build", "-o", absOut, ".")
 	cmd.Dir = src.dir
+	cmd.Env = hermeticGoEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -274,7 +275,7 @@ func emitGoSource(path string) (string, error) {
 // still point at Aril source coordinates. `emit` does not require a
 // `func main` (it lowers any package for inspection); build / run do.
 func emitGoSourceOpts(path string, stripLine, vendored bool, contractMode string) (string, error) {
-	files, userImports, err := buildUnit(path)
+	files, userImports, _, _, err := buildUnit(path)
 	if err != nil {
 		return "", err
 	}
@@ -287,10 +288,10 @@ func emitGoSourceOpts(path string, stripLine, vendored bool, contractMode string
 // §Resolution). Without a manifest the target is a lone package. Returns
 // the file set and the set of user-package import paths (which codegen
 // strips — they are satisfied by merged sources, not a Go import).
-func buildUnit(path string) ([]string, map[string]bool, error) {
+func buildUnit(path string) ([]string, map[string]bool, []thirdPartyDep, string, error) {
 	files, err := gatherSources(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, "", err
 	}
 	anchor := path
 	if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
@@ -298,7 +299,7 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	}
 	m, err := findProjectManifest(anchor)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, "", err
 	}
 	// The committed lock maps each ranged dependency's `source` to its resolved
 	// concrete version, so the build reads the right cache dir offline (an exact
@@ -312,13 +313,13 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 		// (nil, nil): fine, there is nothing to verify.
 		lock, err := readLock(m.dir)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, "", err
 		}
 		// Verify the cache against the lock before building offline: a present
 		// cache tree whose content hash differs from the lock is E0123 (tampered
 		// cache or a stale lock).
 		if err := verifyLockedCache(lock); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, "", err
 		}
 		for _, e := range lock {
 			resolvedVers[e.source] = e.version
@@ -332,7 +333,7 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	// is unchanged.
 	res, err := resolvePackages(files, m, resolvedVers)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, "", err
 	}
 	resFiles := res.files
 	strip := res.userImports
@@ -344,7 +345,7 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	for p := range stdStrip {
 		strip[p] = true
 	}
-	return resFiles, strip, nil
+	return resFiles, strip, res.goDeps, maxGoVersion(m, res.goDeps), nil
 }
 
 // compilePackage lexes / parses / sema-checks / lowers a whole package
@@ -527,6 +528,7 @@ func cmdRun(args []string) int {
 	// packages. arilrt is compiled as main's dependency.
 	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = src.dir
+	cmd.Env = hermeticGoEnv()
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -556,7 +558,7 @@ type compiledSource struct {
 // — persistence unlocks Go's incremental build cache. Unlike emit, a runnable
 // build requires exactly one `func main` (RFC-0002).
 func compileToProjectGo(path string, vendored bool, contractMode, outDir string) (*compiledSource, error) {
-	files, userImports, err := buildUnit(path)
+	files, userImports, goDeps, goVersion, err := buildUnit(path)
 	if err != nil {
 		return nil, err
 	}
@@ -564,7 +566,7 @@ func compileToProjectGo(path string, vendored bool, contractMode, outDir string)
 	if err != nil {
 		return nil, err
 	}
-	return writeProjectModule(goSrc, outDir)
+	return writeProjectModule(goSrc, outDir, goDeps, goVersion)
 }
 
 // compileSourceToTempGo is the in-memory variant used by the
@@ -582,7 +584,7 @@ func writeTempModule(goSrc string) (*compiledSource, error) {
 	// Resolve any third-party FFI bindings the program uses into a
 	// go.mod with hermetic require + replace (ffi.md §"Dependency
 	// model"); a stdlib-only program gets the plain require-free module.
-	goMod, err := thirdPartyGoMod(goSrc)
+	goMod, err := thirdPartyGoMod(goSrc, nil, "")
 	if err != nil {
 		return nil, err
 	}

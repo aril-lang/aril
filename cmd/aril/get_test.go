@@ -110,6 +110,44 @@ func TestFetchAndResolveOffline(t *testing.T) {
 	}
 }
 
+func TestFetchKindGoModule(t *testing.T) {
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	cache := filepath.Join(root, "cache")
+	t.Setenv("ARIL_CACHE", cache)
+
+	// A raw Go module (no aril.toml — a leaf of the Aril MVS graph), tagged.
+	repo := filepath.Join(root, "greet-repo")
+	gitInit(t, repo, map[string]string{
+		"go.mod":   "module example.com/greet\n\ngo 1.22\n",
+		"greet.go": "package greet\n\nfunc Hello() string { return \"hi\" }\n",
+	}, "v1.0.0")
+
+	// A consumer depending on it as a kind="go" module (fetched, not replaced).
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml",
+		"[package]\nname = \"app\"\n[dep.greet]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"go\"\npath = \"table.aril\"\n")
+
+	m, err := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := resolveGraph(m)
+	if err != nil {
+		t.Fatalf("resolveGraph: %v", err)
+	}
+	// The raw Go module is fetched + locked (as a leaf — no aril.toml to expand).
+	if len(entries) != 1 || entries[0].source != repo || entries[0].version != "v1.0.0" || entries[0].hash == "" {
+		t.Fatalf("kind=go lock entry = %+v", entries)
+	}
+	if _, err := os.Stat(filepath.Join(cacheModuleDir(repo, "v1.0.0"), "greet.go")); err != nil {
+		t.Fatalf("kind=go module not cached: %v", err)
+	}
+}
+
 func TestFetchVersionConflict(t *testing.T) {
 	if _, err := runGitVersion(); err != nil {
 		t.Skip("git not available")

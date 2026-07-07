@@ -91,8 +91,9 @@ consumer-owned **`path`** binding table. A dependency name that duplicates
 another `[dep.<name>]`, or collides with the project's own `[package] name`,
 is rejected. The three kinds are `aril` (a pure-Aril library, its source
 compiled in), `binding` (a published `.go`→`.aril` binding package), and `go`
-(a raw Go module bound via a `path` table). **Only `kind = "aril"` is resolved
-today**; `binding`/`go` fetch + module-aware binding is later work.
+(a raw Go module bound via a `path` table). `kind = "aril"` and `kind = "go"`
+are resolved (§Resolution); `kind = "binding"` fetch is wired but its published
+binding surface is later work (RFC-0010).
 
 **Parser.** The reader is a deliberately tiny, closed-schema parser: the
 compiler core stays dependency-free (no third-party TOML library — D19),
@@ -164,9 +165,11 @@ whole build (RFC-0008 §Compatibility axes):
   a newer Aril than the running one is a **hard error** (the Go/Cargo lineage,
   not npm's soft warn). With exact resolution there is nothing to *select* on it.
 
-*(The Go-toolchain axis — one Go compiler for the whole program, the root
-deciding the version as the max of every module's `[toolchain] go` floor — is
-reserved; the emitted `go` directive is not yet floor-driven.)*
+The **Go-toolchain axis** — one Go compiler for the whole program — is
+floor-driven: the emitted `go` directive is the **maximum** of a default floor
+(Aril's minimum Go, D36), the root's `[toolchain] go`, and every fetched
+Go-binding dependency's own `go.mod` `go` directive (RFC-0008 §Compatibility
+axes — the root decides the version as the max of all floors).
 
 ## Resolution
 
@@ -194,9 +197,17 @@ filesystem root), each `import P` resolves as:
    stripped from the Go output like a local package; **the module's own
    imports resolve against its `aril.toml`** (its `[package] name` root and
    its own `[dep]`), so the import graph — and the acyclic check
-   (D20) — span module boundaries. A declared dependency whose module is
-   absent (not fetched), lacks an `aril.toml`, or has a not-yet-wired `kind`
-   is **E0121** (distinct from E0117, which is an *undeclared* path).
+   (D20) — span module boundaries. A **`kind = "go"`** dependency (RFC-0010)
+   resolves differently: the import pulls the consumer-owned **`path`** binding
+   table (a file of `extern` declarations, in *this* project) into the build and
+   strips the import; the bound Go module — the dependency's `source`, else the
+   module path in its `replace`d/fetched `go.mod` — is emitted as a `require` +
+   `replace` (target: the fetched cache, or a local `replace`), so its exported
+   API is reached through the table's `@go` bindings. A raw Go module has no
+   `aril.toml`, so it is a **leaf** of the Aril import graph. A declared
+   dependency whose module is absent (not fetched), lacks an `aril.toml` (for
+   `kind = "aril"`/`"binding"`), or whose `kind = "go"` table is missing is
+   **E0121** (distinct from E0117, which is an *undeclared* path).
 3. **Bundled std module.** A path naming a compiler-bundled Aril module
    (`std/pred` — the contract predicate vocabulary, RFC-0006) resolves to
    the module's **embedded source**, not a directory. Its `.aril` decls
