@@ -396,6 +396,24 @@ func mvsSelect(module string, reqs []requirement, candidates []semver) (semver, 
 	return floor, nil
 }
 
+// highestSatisfying returns the largest candidate a constraint admits — the
+// newest-compatible version in its window, which `aril upgrade` raises the floor
+// to (RFC-0008 §Resolution — `aril upgrade` is the explicit newest-compatible
+// action). Returns false when no candidate satisfies the constraint.
+func highestSatisfying(candidates []semver, c constraint) (semver, bool) {
+	var best semver
+	found := false
+	for _, v := range candidates {
+		if !c.admits(v) {
+			continue
+		}
+		if !found || v.compare(best) > 0 {
+			best, found = v, true
+		}
+	}
+	return best, found
+}
+
 // lowestSatisfying returns the smallest candidate that admits every requirement
 // — the MVS pick (admits-all is max-of-floors ∩ under every ceiling).
 func lowestSatisfying(candidates []semver, reqs []requirement) (semver, bool) {

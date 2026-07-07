@@ -144,6 +144,13 @@ for backtracking — the accepted MVS-over-ranges incompleteness). `aril get`
 enumerates a source's released tags (`git ls-remote --tags`) to make the
 selection; exact tags and commit SHAs are the degenerate case (no enumeration).
 
+Because MVS selects the *minimum* satisfying version, default builds stay
+minimal and reproducible — "give me newest-compatible" is the explicit
+**`aril upgrade [<dep>...]`** action: it raises each ranged (caret/tilde)
+dependency's floor to the **highest tag within its window** (`^1.2` → `^1.5.2`),
+rewrites that floor in `aril.toml`, and re-locks. An exact pin, wildcard, or SHA
+has no raisable floor and is left unchanged.
+
 ## Compatibility axes
 
 Two library-side floors are **build-time checks** (never resolution inputs),
