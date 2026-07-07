@@ -79,7 +79,11 @@ func LoadModulePackage(importPath, moduleDir, modulePath, version string) (*type
 	if err := os.Chdir(ctx); err != nil {
 		return nil, fmt.Errorf("bindgen: enter module context: %w", err)
 	}
-	defer os.Chdir(prev)
+	// Deferred LAST so it runs FIRST (LIFO), before Unlock: cwd is restored to
+	// `prev` while the lock is still held, so the next lock-holder's os.Getwd
+	// can never capture this call's temp `ctx` as its own restore target. Keep
+	// this defer after the Lock's — the ordering is load-bearing.
+	defer os.Chdir(prev) //nolint:errcheck // best-effort restore for a one-shot CLI
 
 	imp := importer.ForCompiler(token.NewFileSet(), "source", nil)
 	pkg, err := imp.Import(importPath)
