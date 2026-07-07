@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0010 |
-| Status | draft |
+| Status | accepted |
 | Created | 2026-07-07 |
 | Supersedes | — |
 
@@ -358,3 +358,7 @@ Go module is declared, version-pinned, lock-verified, and reached only through
   formats; consumer-owned binding tables; module-aware Go loading) and an
   empirical loader probe (stdlib source-mode `go/importer` resolves a third-party
   module through a `replace` target given a blank-import anchor, on go1.22).
+- 2026-07-07 — draft → accepted. The loader fork is settled toward option C (the
+  stdlib source-context loader, behind a swappable interface, with the go-list
+  successor and x/tools an un-taken escape hatch). Implementation follows the
+  staged delivery (kind=go first, kind=binding as sugar).
