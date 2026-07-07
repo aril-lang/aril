@@ -304,16 +304,22 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	// exact pins resolve (a ranged dep then directs the user to `aril get`).
 	resolvedVers := map[string]string{}
 	if m != nil {
-		if lock, err := readLock(m.dir); err == nil {
-			// Verify the cache against the lock before building offline (RFC-0008
-			// §Offline builds): a present cache tree whose content hash differs
-			// from the lock is E0123 (tampered cache or a stale lock).
-			if err := verifyLockedCache(lock); err != nil {
-				return nil, nil, err
-			}
-			for _, e := range lock {
-				resolvedVers[e.source] = e.version
-			}
+		// A corrupt/truncated lock must fail closed, not be silently skipped —
+		// the E0123 verify below is a trust check (RFC-0008 §Offline builds), so
+		// a lock we cannot read means we cannot verify. A *missing* lock is
+		// (nil, nil): fine, there is nothing to verify.
+		lock, err := readLock(m.dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		// Verify the cache against the lock before building offline: a present
+		// cache tree whose content hash differs from the lock is E0123 (tampered
+		// cache or a stale lock).
+		if err := verifyLockedCache(lock); err != nil {
+			return nil, nil, err
+		}
+		for _, e := range lock {
+			resolvedVers[e.source] = e.version
 		}
 	}
 	// Always resolve, even for a lone file (m == nil): classifyImport rejects
