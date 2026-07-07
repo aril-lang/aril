@@ -26,6 +26,15 @@ type resolved struct {
 	goDeps      []thirdPartyDep // require+replace entries for kind="go"/"binding" Go-binding deps (RFC-0010)
 }
 
+// bindingOwner identifies the binding table that binds a Go module (E0124
+// uniqueness): the dep name for the message, and the table's absolute path as
+// the identity — so the same table reached from two files dedups, while two
+// distinct tables binding one Go module conflict even if identically named.
+type bindingOwner struct {
+	name  string
+	table string
+}
+
 // resolvePackages computes the build unit for an entry target. Without a
 // manifest (m == nil) the entry is a lone package — its files, no
 // cross-package resolution (RFC-0002 §Resolution: step 1 skipped). With
@@ -43,9 +52,9 @@ type resolved struct {
 // Cycles in the import graph (across modules) are E0116.
 func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string]string) (*resolved, error) {
 	r := &resolved{userImports: map[string]bool{}}
-	seenDir := map[string]bool{}   // package dirs already gathered
-	onStack := map[string]bool{}   // dirs on the current DFS path (cycle detection)
-	boundBy := map[string]string{} // Go module path → the [dep] name that binds it (E0124 uniqueness)
+	seenDir := map[string]bool{}         // package dirs already gathered
+	onStack := map[string]bool{}         // dirs on the current DFS path (cycle detection)
+	boundBy := map[string]bindingOwner{} // Go module path → the table that binds it (E0124 uniqueness)
 
 	// visit carries `mod`, the manifest that governs the imports of the files
 	// it is walking — the entry project's manifest, or, once the DFS crosses
@@ -143,12 +152,12 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 						// import of the *same* dep is a no-op; a *different* dep
 						// binding the same module is E0124.
 						if prev, ok := boundBy[modulePath]; ok {
-							if prev != d.name {
-								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", modulePath, prev, d.name)
+							if prev.table != table {
+								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", modulePath, prev.name, d.name)
 							}
-							continue // same dep reached again (e.g. imported from two files)
+							continue // the same table reached again (e.g. imported from two files)
 						}
-						boundBy[modulePath] = d.name
+						boundBy[modulePath] = bindingOwner{name: d.name, table: table}
 						r.goDeps = append(r.goDeps, thirdPartyDep{
 							ImportPath: modulePath,
 							Module:     modulePath,

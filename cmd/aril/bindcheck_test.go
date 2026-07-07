@@ -58,6 +58,12 @@ func TestValidateGoBindingTableDrift(t *testing.T) {
 
 // TestValidateGoBindingTableClean — a table whose every symbol exists validates.
 func TestValidateGoBindingTableClean(t *testing.T) {
+	if !moduleLoadingAvailable(t) {
+		// Guard symmetrically with the drift test: without loading, validation
+		// skips every package and returns nil vacuously — a pass that proves
+		// nothing (dev-insights §6). Only assert clean when loading genuinely ran.
+		t.Skip("module loading unavailable in this environment (no GOROOT source tree)")
+	}
 	m := setupGoBindingProject(t,
 		"package lib\n\nfunc A() int { return 1 }\n\nfunc B() string { return \"\" }\n",
 		"extern func a(): int @go(\"example.com/lib.A\")\n"+

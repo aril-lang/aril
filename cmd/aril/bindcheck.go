@@ -113,13 +113,24 @@ func splitGoRef(ref *ast.GoRef, arilName string) (importPath, symbol string, ok 
 	return raw, exportedGoName(arilName), true
 }
 
-// exportedGoName upper-cases the first rune (the default Go referent for a bare
-// `@go("pkg")` — a lower-cased Aril name maps back to its exported Go spelling).
-func exportedGoName(s string) string {
-	if s == "" {
-		return s
+// exportedGoName is the default Go referent for a bare `@go("pkg")` (no
+// `.Symbol`): the exported spelling of the Aril name. It MUST match codegen's
+// `exportFieldName` byte-for-byte — a divergence would validate a different
+// symbol than codegen emits (lower→upper first letter; upper unchanged;
+// non-letter first prefixed `X`).
+func exportedGoName(name string) string {
+	if name == "" {
+		return name
 	}
-	return strings.ToUpper(s[:1]) + s[1:]
+	c := name[0]
+	switch {
+	case c >= 'a' && c <= 'z':
+		return string(c-'a'+'A') + name[1:]
+	case c >= 'A' && c <= 'Z':
+		return name
+	default:
+		return "X" + name
+	}
 }
 
 // validateRefs loads each referenced package of the module and checks every
