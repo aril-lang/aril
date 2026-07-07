@@ -40,7 +40,7 @@ func cmdGet(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril get: no aril.toml found (a project manifest declares [dependencies])")
 		return 1
 	}
-	entries, err := fetchAll(m)
+	entries, err := resolveGraph(m)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -51,103 +51,6 @@ func cmdGet(args []string) int {
 	}
 	fmt.Printf("aril: %d dependency module(s) resolved; wrote %s\n", len(entries), lockFileName)
 	return 0
-}
-
-// fetchAll resolves the transitive dependency closure, fetching each non-replace
-// module into the cache, and returns the lock entries. A `replace`d dependency
-// is local (not fetched). Only kind="aril" modules are fetched end-to-end today;
-// binding/go deps (a Go require) are later work. Two pins of one module to
-// different versions are a conflict (E0122) — v0.x is exact-pin, no MVS.
-func fetchAll(root *projectManifest) ([]lockEntry, error) {
-	// The prior lock carries the resolved commit forward on a cache-hit: the
-	// cache is source-only (git metadata stripped), so the commit cannot be
-	// re-derived from a cached tree — the lock is its only home.
-	prevResolved := map[string]string{} // "source@version" → resolved commit
-	if prev, err := readLock(root.dir); err == nil {
-		for _, e := range prev {
-			prevResolved[e.source+"@"+e.version] = e.resolved
-		}
-	}
-	locked := map[string]lockEntry{}
-	pinned := map[string]string{} // dep name → "source@version" — also the module-graph cycle guard (a re-seen name short-circuits before recursing)
-	var walk func(m *projectManifest) error
-	walk = func(m *projectManifest) error {
-		for i := range m.deps {
-			d := &m.deps[i]
-			// A consumer's kind is optional ("" ⇒ aril, read from the fetched
-			// [package]); only an explicit binding/go dep is skipped (a Go
-			// `require`, later work). A `replace` dep is local, not fetched.
-			// An *implicit* dep (kind="") whose [package] self-declares
-			// binding/go is fetched-then-guarded — the real kind is unknowable
-			// until the source is on disk — and rejected later at build.
-			if d.replace != "" || (d.kind != "" && d.kind != "aril") {
-				continue
-			}
-			// The version is a constraint (RFC-0008 §Version constraints). This
-			// increment fetches an *exact* pin (an exact tag or a commit SHA);
-			// resolving a ranged constraint by git-tag enumeration + MVS is the
-			// next increment. A range therefore gets a targeted staged
-			// diagnostic rather than a confusing raw `git checkout ^1.3`.
-			cons, err := parseConstraint(d.version)
-			if err != nil {
-				return fmt.Errorf("aril: [dep.%s] version: %v", d.name, err)
-			}
-			pin, ok := cons.exactPin()
-			if !ok {
-				return fmt.Errorf("aril: error[E0122]: dependency %q: the ranged version constraint %q is not yet resolvable by `aril get` (git-tag enumeration lands in the next increment); pin an exact `vX.Y.Z` tag or a commit SHA for now", d.name, d.version)
-			}
-			// The cache/lock key stays the raw declared `version` so the offline
-			// resolver (resolve.go, keyed the same) finds the same entry; `pin`
-			// is only the concrete git ref to check out (normalising `=v1.2.0`).
-			key := d.source + "@" + d.version
-			if prev, ok := pinned[d.name]; ok {
-				if prev != key {
-					return fmt.Errorf("aril: error[E0122]: dependency %q is pinned to two versions in the dependency graph: %s and %s", d.name, prev, key)
-				}
-				continue
-			}
-			pinned[d.name] = key
-
-			dest := cacheModuleDir(d.source, d.version)
-			resolved, err := ensureFetched(d.source, pin, dest)
-			if err != nil {
-				return err
-			}
-			if resolved == "" {
-				resolved = prevResolved[key] // cache-hit: keep the recorded pin
-			}
-			hash, err := hashTree(dest)
-			if err != nil {
-				return err
-			}
-			locked[d.name] = lockEntry{name: d.name, source: d.source, version: d.version, resolved: resolved, hash: hash}
-
-			// Recurse into the fetched module's own dependencies.
-			sub, err := manifestAt(dest)
-			if err != nil {
-				return err
-			}
-			if sub != nil {
-				// The fetched module self-declares its kind; a consumer's
-				// [dep].kind guard must agree (RFC-0008 §`[dep.<name>]`).
-				if err := depKindGuard(d.name, d.kind, sub.packageKind); err != nil {
-					return err
-				}
-				if err := walk(sub); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-	if err := walk(root); err != nil {
-		return nil, err
-	}
-	out := make([]lockEntry, 0, len(locked))
-	for _, e := range locked {
-		out = append(out, e)
-	}
-	return out, nil
 }
 
 // ensureFetched makes sure source@version is present in the cache at dest,

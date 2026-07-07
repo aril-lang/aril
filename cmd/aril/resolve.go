@@ -38,7 +38,7 @@ type resolved struct {
 //   - anything else → E0117 unknown import path.
 //
 // Cycles in the import graph (across modules) are E0116.
-func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
+func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string]string) (*resolved, error) {
 	r := &resolved{userImports: map[string]bool{}}
 	seenDir := map[string]bool{} // package dirs already gathered
 	onStack := map[string]bool{} // dirs on the current DFS path (cycle detection)
@@ -70,7 +70,7 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 				continue
 			}
 			for _, p := range imps {
-				kind, target := classifyImport(p, mod)
+				kind, target := classifyImport(p, mod, resolvedVers)
 				switch kind {
 				case importStdlib:
 					// resolved by the binding registry; nothing to gather.
@@ -103,7 +103,7 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 					// its own aril.toml is "not fetched" → E0121; a *present*
 					// module missing this sub-package is an unknown path within
 					// it → E0117 (running `aril get` cannot fix a typo).
-					moduleRoot := externalModuleRoot(d, mod)
+					moduleRoot := externalModuleRoot(d, mod, resolvedVers)
 					subMod, err := manifestAt(moduleRoot)
 					if err != nil {
 						return err
@@ -157,7 +157,7 @@ const (
 // classifyImport decides how an import path resolves (RFC-0002
 // §Resolution). For a user package it also returns the directory the
 // package lives in (relative to the manifest root).
-func classifyImport(p string, m *projectManifest) (importKind, string) {
+func classifyImport(p string, m *projectManifest, resolvedVers map[string]string) (importKind, string) {
 	head := strings.SplitN(p, "/", 2)[0]
 	if isStdModule(p) {
 		return importStd, ""
@@ -172,7 +172,7 @@ func classifyImport(p string, m *projectManifest) (importKind, string) {
 	// `replace` local path or the fetch cache; the package is the remaining path.
 	if d := lookupDep(m, p); d != nil {
 		rest := strings.TrimPrefix(strings.TrimPrefix(p, d.name), "/")
-		return importExternal, filepath.Join(externalModuleRoot(d, m), filepath.FromSlash(rest))
+		return importExternal, filepath.Join(externalModuleRoot(d, m, resolvedVers), filepath.FromSlash(rest))
 	}
 	if binding.IsBuiltinModule(head) {
 		return importStdlib, ""
@@ -231,9 +231,12 @@ func lookupDep(m *projectManifest, p string) *dependency {
 
 // externalModuleRoot is the on-disk directory of a dependency's module: the
 // `replace` local path (relative to the declaring manifest's dir) when given,
-// else the fetch cache location. The cache layout is provisional (RFC-0008
-// leaves it to the fetch step); today only `replace` deps exist on disk.
-func externalModuleRoot(d *dependency, m *projectManifest) string {
+// else the fetch cache location keyed by the *resolved concrete version*. An
+// exact pin is self-describing; a ranged constraint's resolved version comes
+// from the root lock (resolvedVers, source → version), which `aril get` wrote.
+// An unlocked ranged dep resolves to an absent cache dir → E0121 (run `aril
+// get`) downstream.
+func externalModuleRoot(d *dependency, m *projectManifest, resolvedVers map[string]string) string {
 	if d.replace != "" {
 		r := filepath.FromSlash(d.replace)
 		if !filepath.IsAbs(r) && m != nil {
@@ -241,7 +244,19 @@ func externalModuleRoot(d *dependency, m *projectManifest) string {
 		}
 		return r
 	}
-	return cacheModuleDir(d.source, d.version)
+	return cacheModuleDir(d.source, depConcreteVersion(d, resolvedVers))
+}
+
+// depConcreteVersion is the concrete version keying a dependency's cache dir:
+// an exact pin (tag or SHA) verbatim, else the version the root lock recorded
+// for its `source` ("" when unlocked).
+func depConcreteVersion(d *dependency, resolvedVers map[string]string) string {
+	if cons, err := parseConstraint(d.version); err == nil {
+		if pin, ok := cons.exactPin(); ok {
+			return pin
+		}
+	}
+	return resolvedVers[d.source]
 }
 
 // manifestAt loads the aril.toml directly in dir (not by walking up, unlike

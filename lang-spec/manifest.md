@@ -135,14 +135,14 @@ tag is still accepted as an exact pin (the pre-revision spelling).
 
 **Resolution — MVS.** Selection is **minimal version selection**: the chosen
 version of a module is the **maximum of the lower bounds (floors)** required for
-it anywhere in the graph — one traversal, no backtracking — then a single-pass
-**upper-bound gate** asserts every declared ceiling holds. A genuine conflict
-(the max-of-floors violates a declared upper bound) **fails closed** as
-**E0122**, naming both requirers and pointing at **`aril upgrade`** (raising a
-floor by hand is the manual substitute for backtracking — the accepted
-MVS-over-ranges incompleteness). *The constraint grammar and the MVS engine are
-implemented; `aril get` resolves exact pins today and grows ranged git-tag
-enumeration incrementally.*
+it anywhere in the graph — realized as the **lowest released tag that satisfies
+every requirement** — one traversal to a fixpoint, no backtracking. A genuine
+conflict (no version satisfies all constraints — the max-of-floors violates a
+declared upper bound) **fails closed** as **E0122**, naming the requirers and
+pointing at **`aril upgrade`** (raising a floor by hand is the manual substitute
+for backtracking — the accepted MVS-over-ranges incompleteness). `aril get`
+enumerates a source's released tags (`git ls-remote --tags`) to make the
+selection; exact tags and commit SHAs are the degenerate case (no enumeration).
 
 ## Resolution
 
@@ -219,12 +219,14 @@ GitHub-style host/path fetched over `https` (D5); a scheme
 (`https://`/`file://`/`ssh://`) or a local path is used verbatim. The cache
 entry is source-only (git metadata is stripped) and immutable once written.
 
-`aril get` resolves the **transitive** closure (each fetched module's own
-`[dep]` are fetched recursively). A dependency's `version` is resolved by MVS
-(§Version constraints); a version-compatibility conflict — the max-of-floors
-violating a declared upper bound, or two incompatible exact pins — is **E0122**.
-Ranged git-tag enumeration is added incrementally; an exact-pin graph resolves
-today.
+`aril get` resolves the **transitive** closure by MVS (§Version constraints):
+it enumerates each source's released tags, selects the lowest version satisfying
+every requirement across the graph, and fetches the selected versions (each
+fetched module's own `[dep]` join the graph and can raise a shared module's
+selection to a fixpoint). A version-compatibility conflict — no version
+satisfies all constraints, or two incompatible exact pins — is **E0122**. The
+cache dir is keyed by the **resolved concrete version**, and `aril.lock` records
+it so `aril build`/`run` locate the same module offline.
 
 `aril build` / `aril run` never fetch: they resolve declared dependencies
 against the already-populated cache (a `replace` dependency needs no fetch;
@@ -233,9 +235,11 @@ an unfetched one is **E0121**, directing the user to run `aril get`).
 ## Lockfile — `aril.lock`
 
 `aril get` writes a **committed** `aril.lock` recording, for every module in
-the resolved closure, its `source`, declared `version`, the exact commit the
-version resolved to at fetch time, and a content hash of the fetched tree —
-the reproducibility record (a later build can verify the cache against it).
+the resolved closure, its `source`, the **resolved concrete `version`** (the
+tag or commit the constraint selected — so a ranged `^1.2` locks the tag it
+picked), the exact commit that version resolved to, and a content hash of the
+fetched tree — the reproducibility record (a later build can verify the cache
+against it, and reads the resolved version to locate each module offline).
 The format is the same closed-schema line shapes as `aril.toml`
 (`[[module]]` blocks of `key = "value"`), so no third-party TOML library
 enters the compiler core (D19). It is generated — deterministic, sorted by

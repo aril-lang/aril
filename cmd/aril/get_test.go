@@ -83,9 +83,9 @@ func TestFetchAndResolveOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := fetchAll(m)
+	entries, err := resolveGraph(m)
 	if err != nil {
-		t.Fatalf("fetchAll: %v", err)
+		t.Fatalf("resolveGraph: %v", err)
 	}
 	if len(entries) != 1 || entries[0].name != "greetlib" || entries[0].resolved == "" || entries[0].hash == "" {
 		t.Fatalf("lock entry = %+v", entries)
@@ -95,7 +95,7 @@ func TestFetchAndResolveOffline(t *testing.T) {
 		t.Fatalf("module not cached: %v", err)
 	}
 	// The resolver finds it offline — greet.aril joins the build.
-	res, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	res, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err != nil {
 		t.Fatalf("offline resolve after get: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestFetchVersionConflict(t *testing.T) {
 			"[dep.liba]\nsource = \""+liba+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n"+
 			"[dep.libb]\nsource = \""+libb+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := fetchAll(m)
+	_, err := resolveGraph(m)
 	if err == nil || !strings.Contains(err.Error(), "E0122") {
 		t.Fatalf("want E0122 version conflict, got: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestGetPreservesResolvedOnReRun(t *testing.T) {
 	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 
-	first, err := fetchAll(m)
+	first, err := resolveGraph(m)
 	if err != nil {
 		t.Fatalf("first fetch: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestGetPreservesResolvedOnReRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A second `get` hits the immutable cache; it must NOT blank `resolved`.
-	second, err := fetchAll(m)
+	second, err := resolveGraph(m)
 	if err != nil {
 		t.Fatalf("second fetch: %v", err)
 	}
@@ -210,17 +210,97 @@ func TestGetRejectsBranchAsVersion(t *testing.T) {
 	}
 }
 
-func TestGetRejectsRangeConstraint(t *testing.T) {
-	// A ranged constraint parses in the manifest but is not yet fetchable by
-	// `aril get` (git-tag enumeration is the next increment) — a staged E0122.
-	dir := t.TempDir()
-	writeFile(t, dir, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \"github.com/x/lib\"\nversion = \"^1.3\"\nkind = \"aril\"\n")
-	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
-	if err != nil {
-		t.Fatalf("a ranged constraint should parse in the manifest: %v", err)
+// tagAt adds a fresh commit + semver tag to an existing local repo.
+func tagAt(t *testing.T, repo, tag string) {
+	t.Helper()
+	if err := runGit(repo, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", tag); err != nil {
+		t.Fatalf("commit %s: %v", tag, err)
 	}
-	if _, err := fetchAll(m); err == nil || !strings.Contains(err.Error(), "ranged version constraint") {
-		t.Fatalf("want a staged range-not-fetchable rejection, got: %v", err)
+	if err := runGit(repo, "tag", tag); err != nil {
+		t.Fatalf("tag %s: %v", tag, err)
+	}
+}
+
+func TestResolveRangedConstraint(t *testing.T) {
+	// A caret constraint resolves to the lowest satisfying released tag (MVS),
+	// via git-tag enumeration — hermetically, from a local multi-tag repo.
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+	repo := filepath.Join(root, "kv-repo")
+	gitInit(t, repo, map[string]string{
+		"aril.toml": "[package]\nname = \"kv\"\n",
+		"kv.aril":   "func Get(): int {\n  return 1\n}\n",
+	}, "v1.0.0")
+	tagAt(t, repo, "v1.2.0")
+	tagAt(t, repo, "v1.3.0")
+	tagAt(t, repo, "v2.0.0")
+
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[package]\nname = \"app\"\n[dep.kv]\nsource = \""+repo+"\"\nversion = \"^1.2\"\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	entries, err := resolveGraph(m)
+	if err != nil {
+		t.Fatalf("resolveGraph: %v", err)
+	}
+	// ^1.2 admits [1.2.0, 2.0.0); the lowest released tag ≥ floor is v1.2.0.
+	if len(entries) != 1 || entries[0].version != "v1.2.0" {
+		t.Fatalf("want kv resolved to v1.2.0 (lowest satisfying ^1.2), got %+v", entries)
+	}
+}
+
+func TestResolveTransitiveMaxOfFloors(t *testing.T) {
+	// Two dependencies require a shared module at different floors; MVS selects
+	// the maximum — the lowest tag satisfying both (RFC-0008 §Resolution).
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+
+	// Shared module `core` with three releases.
+	core := filepath.Join(root, "core")
+	gitInit(t, core, map[string]string{
+		"aril.toml": "[package]\nname = \"core\"\n",
+		"c.aril":    "func C(): int {\n  return 0\n}\n",
+	}, "v1.0.0")
+	tagAt(t, core, "v1.1.0")
+	tagAt(t, core, "v1.2.0")
+
+	// liba needs core ^1.0; libb needs core ^1.1.
+	liba := filepath.Join(root, "liba")
+	gitInit(t, liba, map[string]string{
+		"aril.toml": "[package]\nname = \"liba\"\n[dep.core]\nsource = \"" + core + "\"\nversion = \"^1.0\"\n",
+		"a.aril":    "func A(): int {\n  return 1\n}\n",
+	}, "v1.0.0")
+	libb := filepath.Join(root, "libb")
+	gitInit(t, libb, map[string]string{
+		"aril.toml": "[package]\nname = \"libb\"\n[dep.core]\nsource = \"" + core + "\"\nversion = \"^1.1\"\n",
+		"b.aril":    "func B(): int {\n  return 2\n}\n",
+	}, "v1.0.0")
+
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[package]\nname = \"app\"\n"+
+		"[dep.liba]\nsource = \""+liba+"\"\nversion = \"^1.0\"\n"+
+		"[dep.libb]\nsource = \""+libb+"\"\nversion = \"^1.0\"\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	entries, err := resolveGraph(m)
+	if err != nil {
+		t.Fatalf("resolveGraph: %v", err)
+	}
+	var coreVer string
+	for _, e := range entries {
+		if e.name == "core" {
+			coreVer = e.version
+		}
+	}
+	// max(^1.0 floor 1.0.0, ^1.1 floor 1.1.0) = 1.1.0 → lowest satisfying = v1.1.0.
+	if coreVer != "v1.1.0" {
+		t.Fatalf("want core resolved to v1.1.0 (max of floors), got %q (entries %+v)", coreVer, entries)
 	}
 }
 

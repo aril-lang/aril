@@ -301,7 +301,7 @@ func TestClassifyImport(t *testing.T) {
 		{"totally/unknown", importUnknown},
 	}
 	for _, c := range cases {
-		got, _ := classifyImport(c.path, m)
+		got, _ := classifyImport(c.path, m, nil)
 		if got != c.want {
 			t.Errorf("classifyImport(%q) = %v; want %v", c.path, got, c.want)
 		}
