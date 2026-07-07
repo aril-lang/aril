@@ -70,7 +70,10 @@ func cmdGet(args []string) int {
 // re-run — the version is the pin). Returns the commit for a fresh fetch, or ""
 // when reusing a cache entry (the lock keeps the original pin either way).
 func ensureFetched(source, version, dest string) (string, error) {
-	if fi, err := os.Stat(filepath.Join(dest, "aril.toml")); err == nil && fi.Mode().IsRegular() {
+	// The cache entry is written atomically (fetchModule renames into place), so
+	// dest existing as a directory means a complete fetch — for a raw Go module
+	// (no aril.toml) as much as an Aril one (RFC-0010 kind=go/binding).
+	if fi, err := os.Stat(dest); err == nil && fi.IsDir() {
 		return "", nil // already fetched (immutable cache entry)
 	}
 	return fetchModule(source, version, dest)

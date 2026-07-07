@@ -99,6 +99,26 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 					if err := depKindGuard(d.name, d.kind, subM.packageKind); err != nil {
 						return nil, err
 					}
+					// A published binding package (kind="binding") self-declares the
+					// bound Go module it wraps; fetch that module too (RFC-0010), keyed
+					// by its exact binds-go pin, so the build's require+replace finds
+					// it offline. It is a Go module (no aril.toml) — a leaf.
+					if subM.binds != "" && subM.bindsGo != "" {
+						if name[subM.binds] == "" {
+							name[subM.binds] = lastSegment(subM.binds)
+						}
+						if sel[subM.binds] != subM.bindsGo {
+							sel[subM.binds] = subM.bindsGo
+							bdest := cacheModuleDir(subM.binds, subM.bindsGo)
+							bcommit, err := ensureFetched(subM.binds, subM.bindsGo, bdest)
+							if err != nil {
+								return nil, err
+							}
+							if bcommit != "" {
+								commitOf[subM.binds+"@"+subM.bindsGo] = bcommit
+							}
+						}
+					}
 					queue = append(queue, subM)
 				}
 			}

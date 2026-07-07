@@ -148,6 +148,60 @@ func TestFetchKindGoModule(t *testing.T) {
 	}
 }
 
+func TestFetchKindBindingBoundModule(t *testing.T) {
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	cache := filepath.Join(root, "cache")
+	t.Setenv("ARIL_CACHE", cache)
+
+	// The bound raw Go module (a git repo tagged at binds-go).
+	boundRepo := filepath.Join(root, "bound-repo")
+	gitInit(t, boundRepo, map[string]string{
+		"go.mod":   "module example.com/bound\n\ngo 1.22\n",
+		"bound.go": "package bound\n\nfunc F() int { return 1 }\n",
+	}, "v0.0.1")
+
+	// The published binding package (a git repo) that self-declares the bound
+	// module via binds/binds-go.
+	bindRepo := filepath.Join(root, "bind-repo")
+	gitInit(t, bindRepo, map[string]string{
+		"aril.toml":  "[package]\nname = \"greet\"\nkind = \"binding\"\nbinds = \"" + boundRepo + "\"\nbinds-go = \"v0.0.1\"\n",
+		"greet.aril": "extern func f(): int @go(\"example.com/bound.F\")\n",
+	}, "v1.0.0")
+
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml",
+		"[package]\nname = \"app\"\n[dep.greet]\nsource = \""+bindRepo+"\"\nversion = \"v1.0.0\"\n")
+
+	m, err := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := resolveGraph(m)
+	if err != nil {
+		t.Fatalf("resolveGraph: %v", err)
+	}
+	// Both the binding package AND its bound Go module are fetched + locked.
+	var haveBinding, haveBound bool
+	for _, e := range entries {
+		if e.source == bindRepo && e.version == "v1.0.0" {
+			haveBinding = true
+		}
+		if e.source == boundRepo && e.version == "v0.0.1" {
+			haveBound = true
+		}
+	}
+	if !haveBinding || !haveBound {
+		t.Fatalf("want both binding pkg + bound module locked, got %+v", entries)
+	}
+	if _, err := os.Stat(filepath.Join(cacheModuleDir(boundRepo, "v0.0.1"), "bound.go")); err != nil {
+		t.Errorf("bound Go module not cached: %v", err)
+	}
+}
+
 func TestFetchVersionConflict(t *testing.T) {
 	if _, err := runGitVersion(); err != nil {
 		t.Skip("git not available")
