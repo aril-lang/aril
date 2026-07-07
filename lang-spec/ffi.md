@@ -185,10 +185,21 @@ any residual error at build (verify-don't-trust).
 
 Introspection uses the **stdlib `go/importer` in "source" mode**, not
 `golang.org/x/tools/go/packages` — source-mode importing gives the same
-full `go/types` information for the stdlib targets this epoch needs while
-keeping the compiler dependency-free (the project's stdlib-only ethos).
-The third-party / module-aware loading `go/packages` provides lands with
-the third-party plumbing, if needed.
+full `go/types` information while keeping the compiler dependency-free
+(the project's stdlib-only ethos, D22).
+
+Without `--from`, the target is resolved against GOROOT (stdlib). With
+**`aril import --from <module-dir> <go/import/path>`** the generator is
+**module-aware** (RFC-0010): it introspects a package in a fetched/local Go
+module — the raw-Go dependency a `kind = "go"` binding table binds. The
+loader keeps the stdlib importer by synthesizing the module context it needs
+— a throwaway module whose `go.mod` requires the target and `replace`s it to
+`<module-dir>`, plus a blank-import anchor — so source-mode import resolves the
+package through the `replace`. This reaches a pure-Go module (its ceiling — a
+cgo-defined surface is invisible to source-mode type-checking — is why the
+loader is isolated, swappable for a `go list`-driven successor). The generated
+table is a *starting point the consumer owns and commits*; `@go` targets name
+the module's real symbols.
 
 Each symbol is rendered with its translated signature and the boundary
 lifts; the generator marks what the curator must review inline:
@@ -241,12 +252,12 @@ gets the plain require-free module. The toolchain locates the manifest
 via `$ARIL_ROOT`, else the nearest ancestor of the cwd holding
 `std/bindings.json`.
 
-The proving case is `examples/ffi/config_reader` binding the vendored
-`example.com/arilkv` module; a real third-party library
-(`github.com/BurntSushi/toml`) plugs into the same mechanism once
-vendored — its `toml.parse<T>` would mirror `json.parse<T>`, differing
-only in the underlying package and the manifest `require`. Generating
-bindings for a *non-stdlib* package (module-aware loading, which
-`go/importer` source mode does not do) is a separate follow-up — the
-plumbing here is independent of how the binding `.aril` is authored
-(hand-curated, as the proving case is).
+This `std/bindings.json` path is the original vendored surface (the proving
+case is `examples/ffi/config_reader` binding the vendored `example.com/arilkv`
+module). The **`aril.toml` `[dep]` path** (RFC-0008/RFC-0010) supersedes it
+incrementally: a `kind = "go"` dependency declares the same `require` + `replace`
+against the *fetched cache* (or a local `replace`) instead of a hand-listed
+vendored copy (`manifest.md` §Resolution). Bindings for such a non-stdlib module
+are generated **module-aware** by `aril import --from` (above); the emitted
+`.aril` table is still consumer-owned and committed, so the plumbing is
+independent of how the table is authored (hand-curated or generated).

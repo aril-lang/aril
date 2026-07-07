@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -47,5 +48,28 @@ func TestKindGoDependencyBuildsAndRuns(t *testing.T) {
 	}
 	if stdout != "Hello, world!\n" {
 		t.Errorf("kind=go run stdout = %q; want \"Hello, world!\\n\"", stdout)
+	}
+}
+
+// TestArilImportFromModule — `aril import --from <module-dir> <path>` introspects
+// a local Go module (module-aware, RFC-0010) and prints a curated binding table.
+func TestArilImportFromModule(t *testing.T) {
+	mod := t.TempDir()
+	write := func(p, s string) {
+		t.Helper()
+		if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(mod, "go.mod"), "module example.com/kv\n\ngo 1.22\n")
+	write(filepath.Join(mod, "kv.go"), "package kv\n\nfunc Get(k string) string { return k }\n")
+
+	stdout, stderr, exit := runAril(t, "import", "--from", mod, "example.com/kv")
+	if exit != 0 {
+		t.Fatalf("aril import --from exited %d\nstderr: %s", exit, stderr)
+	}
+	want := `extern func get(k: string): string @go("example.com/kv.Get")`
+	if !strings.Contains(stdout, want) {
+		t.Errorf("aril import --from output missing %q:\n%s", want, stdout)
 	}
 }
