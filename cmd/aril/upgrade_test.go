@@ -91,6 +91,39 @@ func TestUpgradeRaisesFloorAndRelocks(t *testing.T) {
 	}
 }
 
+func TestUpgradeNoOpWhenAlreadyNewest(t *testing.T) {
+	// `^1.5` with the newest in-window tag v1.5.0 is already at its floor: no
+	// spurious rewrite/re-lock, no "upgraded" claim (PR#145 review WARNING).
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+	repo := filepath.Join(root, "kv-repo")
+	gitInit(t, repo, map[string]string{
+		"aril.toml": "[package]\nname = \"kv\"\n",
+		"kv.aril":   "func Get(): int {\n  return 1\n}\n",
+	}, "v1.5.0")
+
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[package]\nname = \"app\"\n[dep.kv]\nsource = \""+repo+"\"\nversion = \"^1.5\"\n")
+	restore := chdir(t, app)
+	defer restore()
+	if code := cmdUpgrade(nil); code != 0 {
+		t.Fatalf("aril upgrade exited %d", code)
+	}
+	// The floor spelling is untouched (^1.5, not re-spelled to ^1.5.0).
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	if m.deps[0].version != "^1.5" {
+		t.Errorf("no-op upgrade rewrote the floor: %q", m.deps[0].version)
+	}
+	// No lock was written (nothing changed).
+	if _, err := os.Stat(filepath.Join(app, lockFileName)); err == nil {
+		t.Error("no-op upgrade wrote a lock")
+	}
+}
+
 // chdir switches the working directory for a test and returns a restore func.
 func chdir(t *testing.T, dir string) func() {
 	t.Helper()

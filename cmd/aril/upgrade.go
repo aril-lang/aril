@@ -75,9 +75,16 @@ func cmdUpgrade(args []string) int {
 			fmt.Printf("aril: [dep.%s] no released tag satisfies %q — left unchanged\n", d.name, d.version)
 			continue
 		}
+		// Compare the *floor semver*, not the text: only a genuine raise
+		// (highest strictly above the current floor) is an upgrade — a merely
+		// re-spelled floor (`^1.5` with newest v1.5.0) is a no-op, so it must not
+		// trigger a spurious re-lock or a misleading "upgraded" message.
+		if curFloor, ok := cons.floor(); ok && highest.compare(curFloor) <= 0 {
+			continue
+		}
 		raised := newText(highest)
 		if raised == d.version {
-			continue // already at the newest-compatible floor
+			continue
 		}
 		if err := rewriteDepVersion(manifestPath, d.name, raised); err != nil {
 			fmt.Fprintln(os.Stderr, err)
