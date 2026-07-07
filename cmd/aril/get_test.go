@@ -199,23 +199,28 @@ func TestGetPreservesResolvedOnReRun(t *testing.T) {
 }
 
 func TestGetRejectsBranchAsVersion(t *testing.T) {
-	if _, err := runGitVersion(); err != nil {
-		t.Skip("git not available")
+	// A branch name is neither a range constraint, an exact `vX.Y.Z` tag, nor a
+	// commit SHA — so it is rejected at manifest parse (earlier and clearer than
+	// the fetch-time "exact pin" check, which still guards a valid-looking ref).
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \"github.com/x/lib\"\nversion = \"feature-x\"\nkind = \"aril\"\n")
+	_, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err == nil || !strings.Contains(err.Error(), "constraint") {
+		t.Fatalf("want a version-constraint rejection of a branch name, got: %v", err)
 	}
-	root := t.TempDir()
-	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
-	repo := filepath.Join(root, "lib-repo")
-	gitInit(t, repo, map[string]string{"aril.toml": "[project]\nname = \"lib\"\n", "x.aril": "func X(): int {\n  return 1\n}\n"}, "v1.0.0")
-	if err := runGit(repo, "branch", "feature-x"); err != nil {
-		t.Fatalf("branch: %v", err)
+}
+
+func TestGetRejectsRangeConstraint(t *testing.T) {
+	// A ranged constraint parses in the manifest but is not yet fetchable by
+	// `aril get` (git-tag enumeration is the next increment) — a staged E0122.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \"github.com/x/lib\"\nversion = \"^1.3\"\nkind = \"aril\"\n")
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("a ranged constraint should parse in the manifest: %v", err)
 	}
-	app := filepath.Join(root, "app")
-	mkdirAll(t, app)
-	// A branch name is not an exact pin — must be rejected.
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.lib]\nsource = \""+repo+"\"\nversion = \"feature-x\"\nkind = \"aril\"\n")
-	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	if _, err := fetchAll(m); err == nil || !strings.Contains(err.Error(), "exact pin") {
-		t.Fatalf("want exact-pin rejection of a branch, got: %v", err)
+	if _, err := fetchAll(m); err == nil || !strings.Contains(err.Error(), "ranged version constraint") {
+		t.Fatalf("want a staged range-not-fetchable rejection, got: %v", err)
 	}
 }
 

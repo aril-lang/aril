@@ -78,9 +78,10 @@ replace = "../aril-kv"               # optional — a local path overriding sour
 ```
 
 Fields: **`source`** and **`version`** are required unless **`replace`**
-(a local filesystem override) is given. `version` is an **exact pin** — a
-Git tag or a full 40-character commit SHA; a mutable branch is rejected by
-`aril get` (v0.x has no minimal-version selection). **`kind`** is a
+(a local filesystem override) is given. `version` is a **version constraint**
+(§Version constraints, below) — a caret/tilde/wildcard/compound range, an exact
+`vX.Y.Z` tag, or a full 40-character commit SHA. A bare `1.2.3` (no `v`, no
+operator) is a targeted diagnostic. **`kind`** is a
 *consumer-side* field: for an `aril`/`binding` dependency it is **omitted** —
 the kind is read from the dependency's own `[package]` — and, when present,
 acts as an **assert-verify guard** (a mismatch against the fetched
@@ -103,6 +104,45 @@ Anything else (an unknown section/key, a missing `[package] name`, a
 malformed value, a dependency missing a required field) is a manifest error
 reported at
 compiler start.
+
+## Version identifiers
+
+Releases are **`vX.Y.Z` semver tags** — the `v` prefix is **required**, the
+core is valid semver (an optional `-pre` lowers precedence, `+meta` is accepted
+and ignored for ordering). A bare `1.2.3` is a targeted diagnostic (*"a version
+tag is written `v1.2.3`"*). An **untagged commit** is referenced by its full
+40-character commit SHA (Go's pseudo-versions are not adopted). One `source`
+resolves to **one version per build** (no `/vN` side-by-side majors).
+
+## Version constraints
+
+A `version` is a **constraint** the TS audience reads fluently, resolved by its
+**lower bound** through minimal version selection (below):
+
+| Constraint | Range | Note |
+|---|---|---|
+| `^1.3` | `>=1.3.0, <2.0.0` | caret — up to the next breaking axis |
+| `^0.4.2` | `>=0.4.2, <0.5.0` | 0.x: the **minor** is the breaking axis |
+| `^0.0.5` | `>=0.0.5, <0.0.6` | effectively exact |
+| `~1.3.2` | `>=1.3.2, <1.4.0` | tilde — patch-only |
+| `1.3.*` | `>=1.3.0, <1.4.0` | wildcard |
+| `>=1.3, <1.6` | as written | compound |
+| `=v1.3.0` / a SHA | exact | the degenerate pin |
+
+The 0.x rule is **strict left-most-non-zero** (npm/Cargo caret): each 0.x minor
+is potentially breaking, so `^0.4.2` will not adopt `0.5.0`. A bare `vX.Y.Z`
+tag is still accepted as an exact pin (the pre-revision spelling).
+
+**Resolution — MVS.** Selection is **minimal version selection**: the chosen
+version of a module is the **maximum of the lower bounds (floors)** required for
+it anywhere in the graph — one traversal, no backtracking — then a single-pass
+**upper-bound gate** asserts every declared ceiling holds. A genuine conflict
+(the max-of-floors violates a declared upper bound) **fails closed** as
+**E0122**, naming both requirers and pointing at **`aril upgrade`** (raising a
+floor by hand is the manual substitute for backtracking — the accepted
+MVS-over-ranges incompleteness). *The constraint grammar and the MVS engine are
+implemented; `aril get` resolves exact pins today and grows ranged git-tag
+enumeration incrementally.*
 
 ## Resolution
 
@@ -180,9 +220,11 @@ GitHub-style host/path fetched over `https` (D5); a scheme
 entry is source-only (git metadata is stripped) and immutable once written.
 
 `aril get` resolves the **transitive** closure (each fetched module's own
-`[dep]` are fetched recursively). Because v0.x is **exact-pin with
-no minimal-version selection**, two modules pinning one dependency to
-different versions is a conflict — **E0122**.
+`[dep]` are fetched recursively). A dependency's `version` is resolved by MVS
+(§Version constraints); a version-compatibility conflict — the max-of-floors
+violating a declared upper bound, or two incompatible exact pins — is **E0122**.
+Ranged git-tag enumeration is added incrementally; an exact-pin graph resolves
+today.
 
 `aril build` / `aril run` never fetch: they resolve declared dependencies
 against the already-populated cache (a `replace` dependency needs no fetch;

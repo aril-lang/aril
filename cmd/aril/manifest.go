@@ -306,7 +306,14 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 				return nil, fmt.Errorf("aril: %s: [dep.%s] requires `source` (or a `replace` override)", path, d.name)
 			}
 			if d.version == "" {
-				return nil, fmt.Errorf("aril: %s: [dep.%s] requires `version` (an exact tag or commit)", path, d.name)
+				return nil, fmt.Errorf("aril: %s: [dep.%s] requires `version` (a constraint like `^1.3`, an exact `vX.Y.Z` tag, or a commit)", path, d.name)
+			}
+			// The version is a constraint (RFC-0008 §Version constraints):
+			// caret/tilde/wildcard/compound/exact ranges, an exact tag, or a
+			// commit SHA. A bare `1.2.3` gets the targeted `v`-prefix
+			// diagnostic here.
+			if _, err := parseConstraint(d.version); err != nil {
+				return nil, fmt.Errorf("aril: %s: [dep.%s] version: %v", path, d.name, err)
 			}
 		}
 		if d.kind == "go" && d.path == "" {
