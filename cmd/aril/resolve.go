@@ -186,8 +186,9 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 					if err := depKindGuard(d.name, d.kind, subMod.packageKind); err != nil {
 						return err
 					}
-					if k := effectiveDepKind(d.kind, subMod.packageKind); k != "aril" {
-						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; only kind=\"aril\" external modules are resolved so far", p, k)
+					k := effectiveDepKind(d.kind, subMod.packageKind)
+					if k != "aril" && k != "binding" {
+						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; not a resolvable external module", p, k)
 					}
 					r.userImports[p] = true
 					sub, err := gatherSources(target)
@@ -196,6 +197,43 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 					}
 					if err := visit(target, sub, append(trail, dir), subMod); err != nil {
 						return err
+					}
+					// kind="binding" (RFC-0010): a published binding package —
+					// kind="aril"-style source composition (its `extern` .aril source
+					// joined the build above) *plus* a Go `require`+`replace` for the
+					// bound Go module it self-declares (`[package] binds`/`binds-go`),
+					// so the extern `@go` targets resolve. Registered once per bound
+					// module (E0124 uniqueness spans kind=go and kind=binding).
+					if k == "binding" && subMod.binds != "" {
+						// The bound module is fetched by its `binds` git source but
+						// cached by that same coordinate; its require/replace *key* is
+						// the module's own go.mod `module` directive (authoritative —
+						// a vanity path like golang.org/x/… differs from its repo URL,
+						// and E0124 must key on the same path kind=go uses).
+						boundDir, _ := filepath.Abs(cacheModuleDir(subMod.binds, subMod.bindsGo))
+						if _, err := os.Stat(boundDir); err != nil {
+							return fmt.Errorf("aril: error[E0121]: dependency %q binds Go module %q@%q, not present (run `aril get`)", p, subMod.binds, subMod.bindsGo)
+						}
+						modulePath := readGoModuleName(boundDir)
+						if modulePath == "" {
+							modulePath = subMod.binds
+						}
+						// The binding package's own aril.toml is its binding identity
+						// (a kind=binding dep has no consumer `path` table).
+						ident := filepath.Join(subMod.dir, "aril.toml")
+						if prev, ok := boundBy[modulePath]; ok {
+							if prev.table != ident {
+								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", modulePath, prev.name, d.name)
+							}
+						} else {
+							boundBy[modulePath] = bindingOwner{name: d.name, table: ident}
+							r.goDeps = append(r.goDeps, thirdPartyDep{
+								ImportPath: modulePath,
+								Module:     modulePath,
+								Version:    subMod.bindsGo,
+								Vendor:     boundDir,
+							})
+						}
 					}
 				case importUnknown:
 					return fmt.Errorf("aril: error[E0117]: unknown import path %q", p)

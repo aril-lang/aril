@@ -273,6 +273,16 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	default:
 		return nil, fmt.Errorf("aril: %s: [package] unknown kind %q (want aril | binding)", path, m.packageKind)
 	}
+	// A binding package must self-declare the Go module it wraps and its version
+	// (RFC-0010 — the require+replace target); `binds`/`binds-go` are meaningless
+	// on any other kind.
+	if m.packageKind == "binding" {
+		if m.binds == "" || m.bindsGo == "" {
+			return nil, fmt.Errorf("aril: %s: [package] kind = \"binding\" requires both `binds` (the bound Go module) and `binds-go` (its version)", path)
+		}
+	} else if m.binds != "" || m.bindsGo != "" {
+		return nil, fmt.Errorf("aril: %s: [package] `binds`/`binds-go` are valid only for kind = \"binding\"", path)
+	}
 	// Compatibility axes (RFC-0008 §Compatibility axes) — enforced on every
 	// manifest read (root + each dependency), so a floor a *dependency* declares
 	// binds the whole build.

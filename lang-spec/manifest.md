@@ -89,11 +89,11 @@ acts as an **assert-verify guard** (a mismatch against the fetched
 raw Go module has no `aril.toml` to self-declare in) and then requires the
 consumer-owned **`path`** binding table. A dependency name that duplicates
 another `[dep.<name>]`, or collides with the project's own `[package] name`,
-is rejected. The three kinds are `aril` (a pure-Aril library, its source
-compiled in), `binding` (a published `.go`→`.aril` binding package), and `go`
-(a raw Go module bound via a `path` table). `kind = "aril"` and `kind = "go"`
-are resolved (§Resolution); `kind = "binding"` fetch is wired but its published
-binding surface is later work (RFC-0010).
+is rejected. All three kinds resolve (§Resolution): `aril` (a pure-Aril library,
+its source compiled in), `go` (a raw Go module bound via a consumer-owned `path`
+table), and `binding` (a published `.go`→`.aril` binding package — its `extern`
+source compiled in *and* a `require`+`replace` for the Go module it self-declares
+via `[package] binds`/`binds-go`).
 
 **Parser.** The reader is a deliberately tiny, closed-schema parser: the
 compiler core stays dependency-free (no third-party TOML library — D19),
@@ -171,6 +171,14 @@ floor-driven: the emitted `go` directive is the **maximum** of a default floor
 Go-binding dependency's own `go.mod` `go` directive (RFC-0008 §Compatibility
 axes — the root decides the version as the max of all floors).
 
+- **`binds-go`** — a `kind = "binding"` package self-declares the version of the
+  Go module it wraps as a floor; the bound module is fetched and `require`d at
+  that pin. Because every Go-binding dependency lowers into the one emitted Go
+  module, Go's own module resolution takes the **max** `binds-go` across all
+  bindings of a shared Go module, so a binding may run against a newer module than
+  it was generated against — implicit ABI drift, reserved as a **warning (E0125)**
+  once two binding packages share a bound module (a single binding cannot drift).
+
 ## Resolution
 
 A package is a directory of `.aril` files (`name-resolution.md` §Scopes —
@@ -209,9 +217,15 @@ filesystem root), each `import P` resolves as:
    module across the build graph (**E0124** otherwise — two tables would emit
    duplicate `extern` decls); a table naming a symbol the pinned module does not
    export is **E0126** (validated at `aril get`, so drift is a loud diagnostic,
-   not a raw `go build` miss). A declared dependency whose module is absent (not
-   fetched), lacks an `aril.toml` (for `kind = "aril"`/`"binding"`), or whose
-   `kind = "go"` table is missing is **E0121** (distinct from E0117, an
+   not a raw `go build` miss). A **`kind = "binding"`** dependency is a published
+   binding package: its `extern` `.aril` source joins the build exactly like a
+   `kind = "aril"` module, *and* the Go module it self-declares (`[package]
+   binds`/`binds-go`) rides the same `require`+`replace` as a `kind = "go"` bound
+   module — `aril get` fetches that bound module alongside the package, keyed by
+   the exact `binds-go` pin. The one-table-per-Go-module rule (E0124) spans
+   `kind = "go"` and `kind = "binding"` alike. A declared dependency whose module
+   is absent (not fetched), lacks an `aril.toml` (for `kind = "aril"`/`"binding"`),
+   or whose `kind = "go"` table is missing is **E0121** (distinct from E0117, an
    *undeclared* path).
 3. **Bundled std module.** A path naming a compiler-bundled Aril module
    (`std/pred` — the contract predicate vocabulary, RFC-0006) resolves to

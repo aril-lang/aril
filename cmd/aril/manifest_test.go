@@ -329,3 +329,25 @@ func TestClassifyImport(t *testing.T) {
 		}
 	}
 }
+
+func TestBindingPackageRequiresBinds(t *testing.T) {
+	cases := []struct {
+		name string
+		toml string
+		want string
+	}{
+		{"binding without binds", "[package]\nname = \"b\"\nkind = \"binding\"\n", "requires both `binds`"},
+		{"binding without binds-go", "[package]\nname = \"b\"\nkind = \"binding\"\nbinds = \"example.com/x\"\n", "requires both `binds`"},
+		{"binds on aril kind", "[package]\nname = \"a\"\nbinds = \"example.com/x\"\n", "valid only for kind = \"binding\""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, dir, "aril.toml", c.toml)
+			_, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want error containing %q, got: %v", c.want, err)
+			}
+		})
+	}
+}
