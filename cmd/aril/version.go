@@ -365,55 +365,51 @@ type requirement struct {
 	c  constraint
 }
 
-// mvsSelect applies minimal version selection to one module's requirements: the
-// selected version is the maximum of the declared floors, and the upper-bound
-// gate then asserts every requirement admits it (RFC-0008 §Resolution). A gate
-// violation returns a conflict error naming the requirers and pointing at the
-// `aril upgrade` manual-backtracking substitute (the accepted MVS
-// incompleteness). candidates, when non-empty, snaps the selection up to the
-// lowest real tag ≥ the floor (git-tag enumeration passes them in; the pure
-// core works without them).
+// mvsSelect applies minimal version selection to one module's requirements.
+// With a candidate tag list (git-tag enumeration passes it in), the selection
+// is the **lowest released tag that satisfies every requirement** — which is
+// exactly the max-of-floors under every declared ceiling, and correctly
+// excludes an exclusive `>X` floor's own boundary version. Without candidates
+// (the pure-core path), it returns the max-of-floors and gates it. A genuine
+// conflict returns E0122, naming the requirers and pointing at the `aril
+// upgrade` manual-backtracking substitute (the accepted MVS incompleteness,
+// RFC-0008 §Resolution).
 func mvsSelect(module string, reqs []requirement, candidates []semver) (semver, error) {
-	var floor semver
-	haveFloor := false
-	for _, r := range reqs {
-		if lo, ok := r.c.floor(); ok {
-			if !haveFloor || lo.compare(floor) > 0 {
-				floor = lo
-				haveFloor = true
-			}
+	if len(candidates) > 0 {
+		if sel, ok := lowestSatisfying(candidates, reqs); ok {
+			return sel, nil
 		}
+		return semver{}, mvsConflict(module, reqs)
 	}
-	if !haveFloor {
+	// No candidate list: select the max-of-floors and gate it. This is sound
+	// for inclusive floors; an exclusive-only `>X` floor cannot be snapped to a
+	// real tag here (no tag list) and, failing its own gate, reports a conflict.
+	floor, ok := maxFloor(reqs)
+	if !ok {
 		return semver{}, fmt.Errorf("aril: error[E0122]: dependency %q has no lower-bounded version requirement to select from", module)
 	}
-	selected := floor
-	if len(candidates) > 0 {
-		snap, ok := lowestAtLeast(candidates, floor)
-		if !ok {
-			return semver{}, fmt.Errorf("aril: error[E0122]: dependency %q: no released version satisfies the required floor %s", module, floor)
-		}
-		selected = snap
-	}
-	// Upper-bound gate: every requirement must admit the selection.
 	for _, r := range reqs {
-		if !r.c.admits(selected) {
-			return semver{}, fmt.Errorf(
-				"aril: error[E0122]: dependency %q cannot be resolved: the selected version %s (the maximum of the required floors) violates the constraint %q required by %s. "+
-					"Raise a floor with `aril upgrade %s` — under minimal version selection a higher intermediate version may reconcile the constraints (the manual backtracking substitute).",
-				module, selected, r.c.text, requirerName(r.by), module)
+		if !r.c.admits(floor) {
+			return semver{}, mvsConflict(module, reqs)
 		}
 	}
-	return selected, nil
+	return floor, nil
 }
 
-// lowestAtLeast returns the smallest candidate ≥ floor (MVS: the lowest tag
-// that satisfies the floor).
-func lowestAtLeast(candidates []semver, floor semver) (semver, bool) {
+// lowestSatisfying returns the smallest candidate that admits every requirement
+// — the MVS pick (admits-all is max-of-floors ∩ under every ceiling).
+func lowestSatisfying(candidates []semver, reqs []requirement) (semver, bool) {
 	var best semver
 	found := false
 	for _, c := range candidates {
-		if c.compare(floor) < 0 {
+		ok := true
+		for _, r := range reqs {
+			if !r.c.admits(c) {
+				ok = false
+				break
+			}
+		}
+		if !ok {
 			continue
 		}
 		if !found || c.compare(best) < 0 {
@@ -421,6 +417,33 @@ func lowestAtLeast(candidates []semver, floor semver) (semver, bool) {
 		}
 	}
 	return best, found
+}
+
+// maxFloor is the maximum of the requirements' inclusive lower bounds.
+func maxFloor(reqs []requirement) (semver, bool) {
+	var floor semver
+	have := false
+	for _, r := range reqs {
+		if lo, ok := r.c.floor(); ok {
+			if !have || lo.compare(floor) > 0 {
+				floor, have = lo, true
+			}
+		}
+	}
+	return floor, have
+}
+
+// mvsConflict builds the E0122 message: the constraints cannot be jointly
+// satisfied, named by requirer, pointing at `aril upgrade`.
+func mvsConflict(module string, reqs []requirement) error {
+	var terms []string
+	for _, r := range reqs {
+		terms = append(terms, fmt.Sprintf("%q (required by %s)", r.c.text, requirerName(r.by)))
+	}
+	return fmt.Errorf(
+		"aril: error[E0122]: dependency %q cannot be resolved: no version satisfies all constraints [%s]. "+
+			"Raise a floor with `aril upgrade %s` — under minimal version selection a higher intermediate version may reconcile the constraints (the manual backtracking substitute).",
+		module, strings.Join(terms, ", "), module)
 }
 
 func requirerName(by string) string {

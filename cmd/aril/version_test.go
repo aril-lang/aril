@@ -174,3 +174,18 @@ func TestMVSSnapsToCandidateTag(t *testing.T) {
 		t.Errorf("selected = %s; want v1.2.5 (lowest tag ≥ floor)", sel)
 	}
 }
+
+func TestMVSExclusiveFloorSkipsExcludedTag(t *testing.T) {
+	// An exclusive `>1.2.0` floor must NOT select the excluded v1.2.0 itself:
+	// MVS picks the lowest candidate that *satisfies* the constraint (v1.3.0),
+	// not merely the lowest tag ≥ the floor value (regression: PR#142 review).
+	c, _ := parseConstraint(">1.2.0, <2.0.0")
+	candidates := []semver{mustSemver(t, "v1.2.0"), mustSemver(t, "v1.3.0")}
+	sel, err := mvsSelect("m", []requirement{{"root", c}}, candidates)
+	if err != nil {
+		t.Fatalf("a satisfiable `>` range must resolve, got: %v", err)
+	}
+	if sel.compare(mustSemver(t, "v1.3.0")) != 0 {
+		t.Errorf("selected = %s; want v1.3.0 (v1.2.0 is excluded by `>1.2.0`)", sel)
+	}
+}
