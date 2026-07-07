@@ -52,14 +52,36 @@ func TestParseManifestPackageSection(t *testing.T) {
 name     = "kv"
 kind     = "aril"
 edition  = "2026"
-min-aril = "0.14"
+min-aril = "0.13"
 `)
 	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if m.name != "kv" || m.packageKind != "aril" || m.edition != "2026" || m.minAril != "0.14" {
-		t.Errorf("package fields = %+v; want name=kv kind=aril edition=2026 min-aril=0.14", m)
+	if m.name != "kv" || m.packageKind != "aril" || m.edition != "2026" || m.minAril != "0.13" {
+		t.Errorf("package fields = %+v; want name=kv kind=aril edition=2026 min-aril=0.13", m)
+	}
+}
+
+func TestManifestCompatAxes(t *testing.T) {
+	// edition + min-aril are hard build-time checks (RFC-0008 §Compatibility axes).
+	bad := map[string]string{
+		"unknown edition":   "[package]\nname = \"p\"\nedition = \"2099\"\n",
+		"min-aril too high": "[package]\nname = \"p\"\nmin-aril = \"99.0\"\n",
+		"min-aril garbage":  "[package]\nname = \"p\"\nmin-aril = \"soon\"\n",
+	}
+	for desc, body := range bad {
+		dir := t.TempDir()
+		writeFile(t, dir, "aril.toml", body)
+		if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err == nil {
+			t.Errorf("%s: expected a compat-axis error, got none", desc)
+		}
+	}
+	// A satisfiable floor + the supported edition parse cleanly.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[package]\nname = \"p\"\nedition = \"2026\"\nmin-aril = \"0.1\"\n")
+	if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err != nil {
+		t.Errorf("a satisfiable min-aril + supported edition must parse: %v", err)
 	}
 }
 

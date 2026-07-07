@@ -304,4 +304,45 @@ func TestResolveTransitiveMaxOfFloors(t *testing.T) {
 	}
 }
 
+func TestVerifyLockedCacheDetectsTamper(t *testing.T) {
+	// A cached module whose content no longer matches aril.lock is E0123.
+	if _, err := runGitVersion(); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	t.Setenv("ARIL_CACHE", filepath.Join(root, "cache"))
+	repo := filepath.Join(root, "lib-repo")
+	gitInit(t, repo, map[string]string{
+		"aril.toml": "[package]\nname = \"lib\"\n",
+		"x.aril":    "func X(): int {\n  return 1\n}\n",
+	}, "v1.0.0")
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[package]\nname = \"app\"\n[dep.lib]\nsource = \""+repo+"\"\nversion = \"v1.0.0\"\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	entries, err := resolveGraph(m)
+	if err != nil {
+		t.Fatalf("resolveGraph: %v", err)
+	}
+	if err := verifyLockedCache(entries); err != nil {
+		t.Fatalf("a fresh cache must verify: %v", err)
+	}
+	// Tamper the cached tree; the recorded hash no longer matches → E0123.
+	writeFile(t, cacheModuleDir(repo, "v1.0.0"), "x.aril", "func X(): int {\n  return 999\n}\n")
+	err = verifyLockedCache(entries)
+	if err == nil || !strings.Contains(err.Error(), "E0123") {
+		t.Fatalf("want E0123 on a tampered cache, got: %v", err)
+	}
+}
+
+func TestCacheModuleDirNoCollision(t *testing.T) {
+	// Two distinct sources that the old flatten-`/`-to-`_` key would have mapped
+	// to one directory (`a/b` ↔ `a_b`) must get distinct cache dirs.
+	slash := cacheModuleDir("github.com/x/a/b", "v1.0.0")
+	under := cacheModuleDir("github.com/x/a_b", "v1.0.0")
+	if slash == under {
+		t.Errorf("a/b and a_b sources collide on one cache dir: %s", slash)
+	}
+}
+
 func runGitVersion() (string, error) { return gitOutput("", "version") }

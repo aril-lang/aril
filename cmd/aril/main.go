@@ -305,6 +305,12 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	resolvedVers := map[string]string{}
 	if m != nil {
 		if lock, err := readLock(m.dir); err == nil {
+			// Verify the cache against the lock before building offline (RFC-0008
+			// §Offline builds): a present cache tree whose content hash differs
+			// from the lock is E0123 (tampered cache or a stale lock).
+			if err := verifyLockedCache(lock); err != nil {
+				return nil, nil, err
+			}
 			for _, e := range lock {
 				resolvedVers[e.source] = e.version
 			}
