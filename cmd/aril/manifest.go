@@ -273,6 +273,12 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	default:
 		return nil, fmt.Errorf("aril: %s: [package] unknown kind %q (want aril | binding)", path, m.packageKind)
 	}
+	// Compatibility axes (RFC-0008 §Compatibility axes) — enforced on every
+	// manifest read (root + each dependency), so a floor a *dependency* declares
+	// binds the whole build.
+	if err := validateCompat(m, path); err != nil {
+		return nil, err
+	}
 	// Two extra bindings sharing a last segment collide on their local
 	// import name (RFC-0002 §Manifest).
 	seen := map[string]bool{}
@@ -324,6 +330,48 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 		}
 	}
 	return m, nil
+}
+
+// supportedEdition is the one project-file/build-system format v0.x defines
+// (RFC-0008 §Compatibility axes — the field reserves the mechanism for later
+// editions). An empty edition means "the default".
+const supportedEdition = "2026"
+
+// validateCompat enforces the two library-side compatibility axes a manifest
+// carries (RFC-0008 §Compatibility axes): the build-system-format `edition`
+// (an unsupported value is rejected) and the `min-aril` toolchain floor (a
+// module needing a newer Aril than the running one is a hard error — the
+// Go/Cargo lineage, not npm's soft warn). Both are build-time checks, never
+// resolution inputs.
+func validateCompat(m *projectManifest, path string) error {
+	if m.edition != "" && m.edition != supportedEdition {
+		return fmt.Errorf("aril: %s: [package] edition %q is not supported by this toolchain (this version understands edition %q)", path, m.edition, supportedEdition)
+	}
+	if m.minAril != "" {
+		floor, err := parseSemverCore(strings.TrimPrefix(m.minAril, "v"))
+		if err != nil {
+			return fmt.Errorf("aril: %s: [package] min-aril %q is not a valid version", path, m.minAril)
+		}
+		if floor.compare(runningToolchainVersion()) > 0 {
+			return fmt.Errorf("aril: %s: [package] requires Aril >= %s but this toolchain is %s; upgrade the Aril toolchain", path, m.minAril, runningToolchainVersion())
+		}
+	}
+	return nil
+}
+
+// runningToolchainVersion is the semver core of the compiler's `version` const
+// (the `-dev`/`+meta` build-stamp suffix stripped) — the floor `min-aril` is
+// compared against.
+func runningToolchainVersion() semver {
+	base := version
+	if i := strings.IndexAny(base, "-+"); i >= 0 {
+		base = base[:i]
+	}
+	v, err := parseSemverCore(base)
+	if err != nil {
+		return semver{}
+	}
+	return v
 }
 
 // stripComment removes a trailing `#` comment. v0.x has no `#` inside a

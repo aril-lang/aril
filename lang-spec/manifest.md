@@ -144,6 +144,23 @@ for backtracking — the accepted MVS-over-ranges incompleteness). `aril get`
 enumerates a source's released tags (`git ls-remote --tags`) to make the
 selection; exact tags and commit SHAs are the degenerate case (no enumeration).
 
+## Compatibility axes
+
+Two library-side floors are **build-time checks** (never resolution inputs),
+enforced on every manifest read — a floor a *dependency* declares binds the
+whole build (RFC-0008 §Compatibility axes):
+
+- **`edition`** — the project-file/build-system format the manifest targets.
+  v0.x defines one edition (`2026`); an unsupported value is rejected. It is
+  per-manifest, so modules of different editions may interoperate in one build.
+- **`min-aril`** — the minimum Aril toolchain a module needs. A module requiring
+  a newer Aril than the running one is a **hard error** (the Go/Cargo lineage,
+  not npm's soft warn). With exact resolution there is nothing to *select* on it.
+
+*(The Go-toolchain axis — one Go compiler for the whole program, the root
+deciding the version as the max of every module's `[toolchain] go` floor — is
+reserved; the emitted `go` directive is not yet floor-driven.)*
+
 ## Resolution
 
 A package is a directory of `.aril` files (`name-resolution.md` §Scopes —
@@ -212,9 +229,11 @@ recommended.
 
 `aril get` is the **only** step that touches the network. It reads the
 project's `[dep]`, and for each dependency without a `replace`
-override it fetches the pinned `source@version` via `git` into a **hermetic
-module cache** — `$ARIL_CACHE/<source>@<version>/` (default the per-user
-cache dir; `$ARIL_CACHE` overrides). A `source` with no scheme is a
+override it fetches the resolved `source@version` via `git` into a **hermetic
+module cache** — `$ARIL_CACHE/<key>@<version>/`, where `<key>` is the source's
+last path segment plus a hash of the full source (so distinct sources cannot
+collide on one directory) and `<version>` is the resolved concrete tag or commit
+(default the per-user cache dir; `$ARIL_CACHE` overrides). A `source` with no scheme is a
 GitHub-style host/path fetched over `https` (D5); a scheme
 (`https://`/`file://`/`ssh://`) or a local path is used verbatim. The cache
 entry is source-only (git metadata is stripped) and immutable once written.

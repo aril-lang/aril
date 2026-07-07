@@ -47,6 +47,29 @@ func writeLock(dir string, entries []lockEntry) error {
 	return os.WriteFile(filepath.Join(dir, lockFileName), []byte(b.String()), 0o644)
 }
 
+// verifyLockedCache checks each locked module present in the cache against its
+// recorded content hash (RFC-0008 §Offline builds — a build verifies the cache
+// against aril.lock). A hash mismatch is E0123 (the cache was modified or the
+// lock is stale — re-run `aril get`). A module *absent* from the cache is not
+// verified here — it surfaces as E0121 ("run `aril get`") when its import is
+// resolved, so a partially-populated cache still points at the right fix.
+func verifyLockedCache(entries []lockEntry) error {
+	for _, e := range entries {
+		dir := cacheModuleDir(e.source, e.version)
+		if _, err := os.Stat(dir); err != nil {
+			continue // not fetched — deferred to E0121 at import resolution
+		}
+		got, err := hashTree(dir)
+		if err != nil {
+			return err
+		}
+		if got != e.hash {
+			return fmt.Errorf("aril: error[E0123]: dependency %q (%s@%s) in the cache does not match aril.lock (content hash mismatch — the cache was modified or the lock is stale); re-run `aril get`", e.name, e.source, e.version)
+		}
+	}
+	return nil
+}
+
 // readLock parses aril.lock. A missing file yields (nil, nil) — a project with
 // no fetched dependencies has no lock.
 func readLock(dir string) ([]lockEntry, error) {

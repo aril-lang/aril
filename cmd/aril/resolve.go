@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -282,15 +284,17 @@ func arilCacheDir() string {
 	return filepath.Join(os.TempDir(), "aril-cache")
 }
 
-// cacheModuleDir is where a fetched module version lives in the cache. Path
-// separators in the source and version are flattened so the entry is one
-// directory level. This layout is provisional — the fetch step (later work)
-// settles a collision-free content-addressed key.
+// cacheModuleDir is where a fetched module version lives in the cache
+// (RFC-0008 §fetch & the cache — coordinate-addressed by source + resolved
+// version). The key is a readable last-segment prefix plus a hash of the *full*
+// source, so distinct sources that would flatten to the same name — the
+// `a/b` ↔ `a_b` collision — get distinct directories. The version is a resolved
+// concrete tag or commit SHA (RFC-0008: an exact pin normalises via depConcrete-
+// Version before reaching here), so it is already a filesystem-safe token.
 func cacheModuleDir(source, version string) string {
-	flat := func(s string) string {
-		return strings.ReplaceAll(strings.ReplaceAll(s, "/", "_"), string(filepath.Separator), "_")
-	}
-	return filepath.Join(arilCacheDir(), flat(source)+"@"+flat(version))
+	h := sha256.Sum256([]byte(source))
+	key := lastSegment(source) + "-" + hex.EncodeToString(h[:])[:12]
+	return filepath.Join(arilCacheDir(), key+"@"+version)
 }
 
 func dedupeSorted(xs []string) []string {
