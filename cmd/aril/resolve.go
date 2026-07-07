@@ -43,8 +43,9 @@ type resolved struct {
 // Cycles in the import graph (across modules) are E0116.
 func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string]string) (*resolved, error) {
 	r := &resolved{userImports: map[string]bool{}}
-	seenDir := map[string]bool{} // package dirs already gathered
-	onStack := map[string]bool{} // dirs on the current DFS path (cycle detection)
+	seenDir := map[string]bool{}   // package dirs already gathered
+	onStack := map[string]bool{}   // dirs on the current DFS path (cycle detection)
+	boundBy := map[string]string{} // Go module path → the [dep] name that binds it (E0124 uniqueness)
 
 	// visit carries `mod`, the manifest that governs the imports of the files
 	// it is walking — the entry project's manifest, or, once the DFS crosses
@@ -135,6 +136,19 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 						if modulePath == "" {
 							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\"): cannot determine the bound Go module path — set `source`, or ensure %q has a go.mod", p, replaceDir)
 						}
+						// At most one binding table may bind a given Go module
+						// across the build graph — two tables would emit duplicate
+						// `extern` declarations of the same Go symbols into the one
+						// lowered module (the Cargo `links` invariant). A repeated
+						// import of the *same* dep is a no-op; a *different* dep
+						// binding the same module is E0124.
+						if prev, ok := boundBy[modulePath]; ok {
+							if prev != d.name {
+								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", modulePath, prev, d.name)
+							}
+							continue // same dep reached again (e.g. imported from two files)
+						}
+						boundBy[modulePath] = d.name
 						r.goDeps = append(r.goDeps, thirdPartyDep{
 							ImportPath: modulePath,
 							Module:     modulePath,

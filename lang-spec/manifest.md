@@ -200,14 +200,19 @@ filesystem root), each `import P` resolves as:
    (D20) — span module boundaries. A **`kind = "go"`** dependency (RFC-0010)
    resolves differently: the import pulls the consumer-owned **`path`** binding
    table (a file of `extern` declarations, in *this* project) into the build and
-   strips the import; the bound Go module — the dependency's `source`, else the
-   module path in its `replace`d/fetched `go.mod` — is emitted as a `require` +
-   `replace` (target: the fetched cache, or a local `replace`), so its exported
-   API is reached through the table's `@go` bindings. A raw Go module has no
-   `aril.toml`, so it is a **leaf** of the Aril import graph. A declared
-   dependency whose module is absent (not fetched), lacks an `aril.toml` (for
-   `kind = "aril"`/`"binding"`), or whose `kind = "go"` table is missing is
-   **E0121** (distinct from E0117, which is an *undeclared* path).
+   strips the import; the bound Go module — its own `go.mod` `module` directive
+   (authoritative: a repo's git URL may differ from its module path), else the
+   declared `source` — is emitted as a `require` + `replace` (target: the fetched
+   cache, or a local `replace`), so its exported API is reached through the
+   table's `@go` bindings. A raw Go module has no `aril.toml`, so it is a
+   **leaf** of the Aril import graph. At most one table may bind a given Go
+   module across the build graph (**E0124** otherwise — two tables would emit
+   duplicate `extern` decls); a table naming a symbol the pinned module does not
+   export is **E0126** (validated at `aril get`, so drift is a loud diagnostic,
+   not a raw `go build` miss). A declared dependency whose module is absent (not
+   fetched), lacks an `aril.toml` (for `kind = "aril"`/`"binding"`), or whose
+   `kind = "go"` table is missing is **E0121** (distinct from E0117, an
+   *undeclared* path).
 3. **Bundled std module.** A path naming a compiler-bundled Aril module
    (`std/pred` — the contract predicate vocabulary, RFC-0006) resolves to
    the module's **embedded source**, not a directory. Its `.aril` decls
