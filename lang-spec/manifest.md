@@ -11,14 +11,26 @@ mirror is `../docs/language-spec.md`. On disagreement this file wins (D17).
 
 ## Schema
 
-`aril.toml` is the **only** v0.x configuration surface — no build flags.
-It has four tables — three scalar/list tables plus the repeatable
-`[dep.<name>]` sub-table:
+`aril.toml` is the **only** v0.x configuration surface — no build flags. The
+relationship between a consumer and a library is **bidirectional**: a module
+**self-declares what it *is*** (`[package]`); a consumer declares only what it
+**requires** (`[dep.<name>]`, below). The tables are `[package]` (self-declaration),
+`[toolchain]` / `[bindings]` (retained), the reserved free-form `[about]`, and the
+repeatable `[dep.<name>]` sub-table:
 
 ```toml
-[project]
-name = "myproj"          # required — the import-path root prefix for
-                         # this project's own packages.
+[package]
+name     = "myproj"      # required — the import-path root prefix for this
+                         # module's own packages (a consumer may alias it).
+kind     = "aril"        # optional — aril | binding (default aril). A raw Go
+                         # module (kind="go") has no aril.toml to self-declare
+                         # in, so "go" is a consumer's [dep] choice only.
+edition  = "2026"        # optional — the project-file/build-system format this
+                         # manifest targets (per-manifest; v0.x defines one).
+min-aril = "0.14"        # optional — the minimum Aril toolchain this module
+                         # needs (a library-side floor; a build-time check).
+binds    = "github.com/lib/pq"  # kind="binding" only — the bound Go module.
+binds-go = "v1.10.9"            # kind="binding" only — the bound Go version floor.
 
 [toolchain]
 go = "1.22"              # optional — the pinned Go toolchain (matches the
@@ -29,19 +41,30 @@ extra = []               # optional — extra Go import paths exposed as
                          # bare-ident bindings (the local name is the
                          # last path segment). Two entries sharing a last
                          # segment collide and are rejected at start.
+
+[about]                  # optional, reserved, human-only — free-form text
+description = "…"         # (description / links / authorship). The toolchain
+                         # accepts it and ignores its contents entirely.
 ```
+
+`[package]` supersedes the pre-revision `[project]` name; **`[project]` is still
+accepted as a compat alias** (canonical spelling is `[package]`), so pre-revision
+manifests keep parsing. `[about]` is the one deliberate hole in the otherwise
+closed-schema reader: its whole body is accepted and ignored (a following
+`[table]` header ends the block). A module may self-declare `kind = "aril"` or
+`"binding"`; `kind = "go"` in a `[package]` is rejected.
 
 ### `[dep]` — external modules (RFC-0008)
 
 Each external-module dependency is a **named sub-table** whose name is the
-dependency's import-path root — the `[project] name` it declares in *its
+dependency's import-path root — the `[package] name` it declares in *its
 own* `aril.toml` — so a consumer writes `import <name>/<pkg>`:
 
 ```toml
 [dep.kv]                    # import root `kv` → `import kv/...`
 source  = "github.com/alice/aril-kv" # required — the Git/GitHub fetch location (D5)
 version = "v1.2.0"                   # required — an exact pin: a tag or commit (D19)
-kind    = "aril"                     # optional — aril | binding | go (default aril)
+# kind omitted → read from the dependency's own [package]; state it as a guard
 
 [dep.pq]
 source  = "github.com/lib/pq"
@@ -57,23 +80,28 @@ replace = "../aril-kv"               # optional — a local path overriding sour
 Fields: **`source`** and **`version`** are required unless **`replace`**
 (a local filesystem override) is given. `version` is an **exact pin** — a
 Git tag or a full 40-character commit SHA; a mutable branch is rejected by
-`aril get` (v0.x has no minimal-version selection). **`kind`** is one of `aril` (a
-pure-Aril library, its source compiled in), `binding` (a published
-`.go`→`.aril` binding package), or `go` (a raw Go module bound via a
-consumer-owned **`path`** binding table); it defaults to `aril`, and
-`kind = "go"` requires `path`. A dependency name that duplicates another
-`[dep.<name>]`, or collides with the project's own `[project]
-name`, is rejected. **This is the declared schema; fetching and resolving
-these dependencies is later work** — v0.x reads and validates the table,
-and the resolver's external-module category is forthcoming.
+`aril get` (v0.x has no minimal-version selection). **`kind`** is a
+*consumer-side* field: for an `aril`/`binding` dependency it is **omitted** —
+the kind is read from the dependency's own `[package]` — and, when present,
+acts as an **assert-verify guard** (a mismatch against the fetched
+`[package].kind` is a hard error). It is **required only for `kind = "go"`** (a
+raw Go module has no `aril.toml` to self-declare in) and then requires the
+consumer-owned **`path`** binding table. A dependency name that duplicates
+another `[dep.<name>]`, or collides with the project's own `[package] name`,
+is rejected. The three kinds are `aril` (a pure-Aril library, its source
+compiled in), `binding` (a published `.go`→`.aril` binding package), and `go`
+(a raw Go module bound via a `path` table). **Only `kind = "aril"` is resolved
+today**; `binding`/`go` fetch + module-aware binding is later work.
 
 **Parser.** The reader is a deliberately tiny, closed-schema parser: the
 compiler core stays dependency-free (no third-party TOML library — D19),
 so only the line shapes above are accepted — `[section]` and
 `[dep.<name>]` headers, `key = "string"`, `key = ["a", "b"]`
-single-line arrays, `#` comments, and blank lines. Anything else (an
-unknown section/key, a missing `[project] name`, a malformed value, a
-dependency missing a required field) is a manifest error reported at
+single-line arrays, `#` comments, and blank lines (the reserved `[about]`
+table is the exception — its body is free-form and ignored wholesale).
+Anything else (an unknown section/key, a missing `[package] name`, a
+malformed value, a dependency missing a required field) is a manifest error
+reported at
 compiler start.
 
 ## Resolution
@@ -100,7 +128,7 @@ filesystem root), each `import P` resolves as:
    kv/store` → `<kv-root>/store`; bare `import kv` → the module root). A
    `kind = "aril"` module's `.aril` source joins the build and its import is
    stripped from the Go output like a local package; **the module's own
-   imports resolve against its `aril.toml`** (its `[project] name` root and
+   imports resolve against its `aril.toml`** (its `[package] name` root and
    its own `[dep]`), so the import graph — and the acyclic check
    (D20) — span module boundaries. A declared dependency whose module is
    absent (not fetched), lacks an `aril.toml`, or has a not-yet-wired `kind`

@@ -1,2 +1,3 @@
-[project]
+[package]
 name = "greetlib"
+kind = "aril"

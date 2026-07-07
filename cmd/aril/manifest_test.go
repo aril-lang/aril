@@ -44,6 +44,118 @@ extra = ["golang.org/x/exp/slices", "example.com/foo"]
 	}
 }
 
+func TestParseManifestPackageSection(t *testing.T) {
+	// The canonical [package] section with the RFC-0008-revision
+	// self-declaration fields.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", `[package]
+name     = "kv"
+kind     = "aril"
+edition  = "2026"
+min-aril = "0.14"
+`)
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if m.name != "kv" || m.packageKind != "aril" || m.edition != "2026" || m.minAril != "0.14" {
+		t.Errorf("package fields = %+v; want name=kv kind=aril edition=2026 min-aril=0.14", m)
+	}
+}
+
+func TestParseManifestBindingFields(t *testing.T) {
+	// A kind="binding" package self-declares the bound Go module + version floor.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", `[package]
+name     = "aril-pq"
+kind     = "binding"
+binds    = "github.com/lib/pq"
+binds-go = "v1.10.9"
+`)
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if m.packageKind != "binding" || m.binds != "github.com/lib/pq" || m.bindsGo != "v1.10.9" {
+		t.Errorf("binding fields = %+v; want kind=binding binds=github.com/lib/pq binds-go=v1.10.9", m)
+	}
+}
+
+func TestParseManifestProjectAlias(t *testing.T) {
+	// [project] is still accepted as a compat alias for [package].
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[project]\nname = \"legacy\"\n")
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if m.name != "legacy" {
+		t.Errorf("name = %q; want legacy (via [project] alias)", m.name)
+	}
+}
+
+func TestParseManifestAboutIgnored(t *testing.T) {
+	// [about] is reserved + free-form: its whole body is accepted and ignored,
+	// even keys/shapes the closed schema would otherwise reject.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", `[package]
+name = "p"
+
+[about]
+description = "anything goes here"
+whatever    = ["even", "an", "array"]
+bare line with no equals sign
+
+[toolchain]
+go = "1.22"
+`)
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("[about] body must be ignored, got: %v", err)
+	}
+	if m.toolchainGo != "1.22" {
+		t.Errorf("a table after [about] should still parse; toolchainGo = %q", m.toolchainGo)
+	}
+}
+
+func TestParseManifestPackageKindGoRejected(t *testing.T) {
+	// A module cannot self-declare kind="go" (a raw Go module has no aril.toml).
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", "[package]\nname = \"p\"\nkind = \"go\"\n")
+	if _, err := parseProjectManifest(filepath.Join(dir, "aril.toml")); err == nil {
+		t.Error("expected [package] kind=\"go\" to be rejected")
+	}
+}
+
+func TestEffectiveDepKind(t *testing.T) {
+	cases := []struct {
+		consumer, pkg, want string
+	}{
+		{"", "", "aril"},           // both omitted → default
+		{"", "binding", "binding"}, // read from the package
+		{"aril", "", "aril"},       // consumer states it (no package kind)
+		{"go", "", "go"},           // kind=go is consumer-only
+		{"aril", "aril", "aril"},   // agreeing guard
+	}
+	for _, c := range cases {
+		if got := effectiveDepKind(c.consumer, c.pkg); got != c.want {
+			t.Errorf("effectiveDepKind(%q,%q) = %q; want %q", c.consumer, c.pkg, got, c.want)
+		}
+	}
+}
+
+func TestDepKindGuard(t *testing.T) {
+	if err := depKindGuard("kv", "aril", "aril"); err != nil {
+		t.Errorf("agreeing kinds must pass: %v", err)
+	}
+	if err := depKindGuard("kv", "", "binding"); err != nil {
+		t.Errorf("an omitted consumer kind is not a guard: %v", err)
+	}
+	if err := depKindGuard("kv", "aril", "binding"); err == nil {
+		t.Error("a consumer kind disagreeing with the package kind must fail")
+	}
+}
+
 func TestParseManifestErrors(t *testing.T) {
 	cases := map[string]string{
 		"unknown section": "[bogus]\nx = \"y\"\n",
@@ -89,8 +201,10 @@ kind    = "binding"
 		t.Fatalf("deps = %d; want 3 (%+v)", len(m.deps), m.deps)
 	}
 	kv := m.deps[0]
-	if kv.name != "kv" || kv.source != "github.com/alice/aril-kv" || kv.version != "v1.2.0" || kv.kind != "aril" {
-		t.Errorf("kv dep = %+v; want name=kv source=github.com/alice/aril-kv version=v1.2.0 kind=aril (default)", kv)
+	// kind omitted on a consumer dep is now "" (read from the dep's [package]),
+	// not the old hardcoded "aril" default (RFC-0008 revision).
+	if kv.name != "kv" || kv.source != "github.com/alice/aril-kv" || kv.version != "v1.2.0" || kv.kind != "" {
+		t.Errorf("kv dep = %+v; want name=kv source=github.com/alice/aril-kv version=v1.2.0 kind=\"\" (omitted)", kv)
 	}
 	pq := m.deps[1]
 	if pq.kind != "go" || pq.path != "table/pq.aril" {

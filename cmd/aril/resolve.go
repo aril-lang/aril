@@ -97,9 +97,6 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 					// Aril source, compiled into the build) is wired today;
 					// binding/go deps (a Go `require`) are later work.
 					d := lookupDep(mod, p)
-					if d.kind != "aril" {
-						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; only kind=\"aril\" external modules are resolved so far", p, d.kind)
-					}
 					// The module manifest is anchored at the module root, not
 					// found by walking up from the package dir (which could
 					// bind an ancestor's aril.toml). A module absent or without
@@ -113,6 +110,15 @@ func resolvePackages(entry []string, m *projectManifest) (*resolved, error) {
 					}
 					if subMod == nil {
 						return fmt.Errorf("aril: error[E0121]: dependency %q is not present (run `aril get`); no module (aril.toml) at %s", p, moduleRoot)
+					}
+					// The governing kind is the dependency's self-declared
+					// [package].kind; a consumer's [dep].kind, if present, is a
+					// guard that must agree (RFC-0008 §`[dep.<name>]`).
+					if err := depKindGuard(d.name, d.kind, subMod.packageKind); err != nil {
+						return err
+					}
+					if k := effectiveDepKind(d.kind, subMod.packageKind); k != "aril" {
+						return fmt.Errorf("aril: error[E0121]: dependency %q has kind %q; only kind=\"aril\" external modules are resolved so far", p, k)
 					}
 					r.userImports[p] = true
 					sub, err := gatherSources(target)

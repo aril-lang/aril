@@ -7,35 +7,75 @@ import (
 	"strings"
 )
 
-// projectManifest is the parsed `aril.toml` project file (RFC-0002
-// §Manifest). It is the only v0.x configuration surface: project name
-// (the cross-package import-path root), the pinned Go toolchain, and an
-// optional list of extra Go packages exposed as bare-ident bindings.
+// projectManifest is the parsed `aril.toml` project file (RFC-0008
+// §Manifests). A module **self-declares what it *is*** in `[package]` — its
+// import-root name, its `kind`, the build-system-format `edition`, and a
+// `min-aril` toolchain floor — and a consumer declares only what it *requires*
+// in `[dep.<name>]`. `[toolchain] go` (the pinned Go compiler) and `[bindings]
+// extra` are retained; `[about]` is a reserved free-form section the reader
+// accepts and ignores wholesale (the one deliberate hole in the closed schema).
 //
-// The parser below is a deliberately tiny, closed-schema reader — the
-// compiler core stays dependency-free (no third-party TOML library), so
-// only the exact line shapes RFC-0002 §Manifest documents are accepted.
+// `[package]` supersedes the RFC-0002 `[project]` name; `[project]` is still
+// accepted as a compat alias so pre-revision manifests and the corpus keep
+// building (canonical spelling is `[package]`).
+//
+// The parser below is a deliberately tiny, closed-schema reader — the compiler
+// core stays dependency-free (no third-party TOML library, D19), so only the
+// exact line shapes `manifest.md` §Schema documents are accepted.
 type projectManifest struct {
 	dir           string       // directory containing aril.toml (the resolution root)
-	name          string       // [project] name — import-path root prefix
+	name          string       // [package] name — import-path root prefix (was [project] name)
+	packageKind   string       // [package] kind — self-declared "aril" | "binding" ("" ⇒ aril)
+	edition       string       // [package] edition — project-file/build-system format
+	minAril       string       // [package] min-aril — minimum Aril toolchain floor
+	binds         string       // [package] binds — kind="binding" only: the bound Go module
+	bindsGo       string       // [package] binds-go — kind="binding" only: the bound Go version floor
 	toolchainGo   string       // [toolchain] go — pinned Go version
 	bindingsExtra []string     // [bindings] extra — extra Go import paths
 	deps          []dependency // [dep.<name>] — external module deps (RFC-0008)
 	buildOutDir   string       // [build] out-dir — build-artifact directory (RFC-0009)
 }
 
-// dependency is one [dep.<name>] entry (RFC-0008 §The manifest). The
-// section name is the dependency's import-path root — the [project] name it
-// declares in its own aril.toml — so a consumer writes `import <name>/<pkg>`.
-// Resolution/fetch of these deps is later work (this reader only parses +
-// validates the schema); the fields carry the whole declared shape.
+// dependency is one [dep.<name>] entry (RFC-0008 §`[dep.<name>]`). The section
+// name is the import-root the consumer uses (defaulting to the dependency's
+// self-declared [package] name; a consumer may key it differently to alias).
+// `kind` is a *consumer-side* field: for an aril/binding dep it is **omitted**
+// (the kind is read from the fetched [package]) and, when present, acts as an
+// assert-verify guard; it is **required only for kind="go"** (a raw Go module
+// has no aril.toml to self-declare). The fields carry the whole declared shape;
+// version *ranges* + MVS resolution are later work in this epoch.
 type dependency struct {
 	name    string // import-path root — the [dep.<name>] key
 	source  string // Git/GitHub fetch location (D5)
 	version string // exact pin: a tag or commit (hermetic, D19)
-	kind    string // "aril" | "binding" | "go" (default "aril")
+	kind    string // consumer-declared "aril" | "binding" | "go"; "" ⇒ read from the dep's [package]
 	path    string // kind="go": the local binding table, relative to this project
 	replace string // optional local filesystem path overriding source (dev/vendor)
+}
+
+// effectiveDepKind resolves the kind that actually governs a dependency: the
+// consumer's declared kind when given, else the dependency's self-declared
+// [package] kind, else "aril" (RFC-0008 §`[dep.<name>]` — kind is the package's
+// to declare; the consumer restates it only as a guard, or for kind="go").
+func effectiveDepKind(consumerKind, packageKind string) string {
+	if consumerKind != "" {
+		return consumerKind
+	}
+	if packageKind != "" {
+		return packageKind
+	}
+	return "aril"
+}
+
+// depKindGuard reports a mismatch between a consumer's asserted [dep].kind and
+// the dependency's self-declared [package].kind — the assert-verify guard
+// (RFC-0008: a supply-chain check that you pulled what you expected). It is a
+// no-op unless both are given and disagree.
+func depKindGuard(name, consumerKind, packageKind string) error {
+	if consumerKind != "" && packageKind != "" && consumerKind != packageKind {
+		return fmt.Errorf("aril: dependency %q: [dep] declares kind %q but the module's [package] self-declares kind %q (the [dep].kind guard must match)", name, consumerKind, packageKind)
+	}
+	return nil
 }
 
 // findProjectManifest walks up from startDir to the filesystem root
@@ -61,10 +101,11 @@ func findProjectManifest(startDir string) (*projectManifest, error) {
 }
 
 // parseProjectManifest reads the closed-schema `aril.toml`. It accepts
-// `[project]` / `[toolchain]` / `[bindings]` / `[build]` sections plus
-// `[dep.<name>]`, `key = "value"` and `key = ["a", "b"]` lines, `#`
-// comments, and blank lines; anything else is an error (the schema is
-// closed in v0.x).
+// `[package]` (or its `[project]` alias) / `[toolchain]` / `[bindings]` /
+// `[build]` sections plus the repeatable `[dep.<name>]`, `key = "value"` and
+// `key = ["a", "b"]` lines, `#` comments, and blank lines; anything else is an
+// error (the schema is closed in v0.x). `[about]` is reserved and free-form —
+// its whole body is accepted and ignored (RFC-0008 §`[about]`).
 func parseProjectManifest(path string) (*projectManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -72,7 +113,8 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	}
 	m := &projectManifest{dir: filepath.Dir(path)}
 	section := ""
-	curDep := -1 // index into m.deps while inside a [dep.<name>], else -1
+	curDep := -1     // index into m.deps while inside a [dep.<name>], else -1
+	inAbout := false // inside the reserved free-form [about] section (body ignored)
 	bail := func(line int, msg string) error {
 		return fmt.Errorf("aril: %s:%d: %s", path, line, msg)
 	}
@@ -88,6 +130,7 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			}
 			section = strings.TrimSpace(line[1 : len(line)-1])
 			curDep = -1
+			inAbout = false
 			// [dep.<name>] — a named external-module dependency
 			// (RFC-0008). The bare [dep] container is rejected: a
 			// dependency must carry its import-path-root name.
@@ -102,15 +145,27 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 						return nil, bail(ln, fmt.Sprintf("duplicate [dep.%s] section", depName))
 					}
 				}
-				m.deps = append(m.deps, dependency{name: depName, kind: "aril"})
+				m.deps = append(m.deps, dependency{name: depName})
 				curDep = len(m.deps) - 1
 				continue
 			}
-			switch section {
-			case "project", "toolchain", "bindings", "build":
-			default:
-				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected project / toolchain / bindings / build / dep.<name>)", section))
+			// [project] is the pre-revision spelling of [package]; canonicalise
+			// so all downstream key dispatch keys on "package" (compat alias).
+			if section == "project" {
+				section = "package"
 			}
+			switch section {
+			case "package", "toolchain", "bindings", "build":
+			case "about":
+				inAbout = true // reserved + free-form: ignore the whole body
+			default:
+				return nil, bail(ln, fmt.Sprintf("unknown section %q (expected package / toolchain / bindings / build / about / dep.<name>)", section))
+			}
+			continue
+		}
+		// [about] is free-form: its body lines are accepted and ignored
+		// wholesale (a following `[table]` header ends the block, above).
+		if inAbout {
 			continue
 		}
 		key, val, ok := strings.Cut(line, "=")
@@ -144,12 +199,42 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 			continue
 		}
 		switch [2]string{section, key} {
-		case [2]string{"project", "name"}:
+		case [2]string{"package", "name"}:
 			s, err := tomlString(val)
 			if err != nil {
 				return nil, bail(ln, err.Error())
 			}
 			m.name = s
+		case [2]string{"package", "kind"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.packageKind = s
+		case [2]string{"package", "edition"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.edition = s
+		case [2]string{"package", "min-aril"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.minAril = s
+		case [2]string{"package", "binds"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.binds = s
+		case [2]string{"package", "binds-go"}:
+			s, err := tomlString(val)
+			if err != nil {
+				return nil, bail(ln, err.Error())
+			}
+			m.bindsGo = s
 		case [2]string{"toolchain", "go"}:
 			s, err := tomlString(val)
 			if err != nil {
@@ -176,7 +261,17 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 		}
 	}
 	if m.name == "" {
-		return nil, fmt.Errorf("aril: %s: [project] name is required", path)
+		return nil, fmt.Errorf("aril: %s: [package] name is required", path)
+	}
+	// A module self-declares only kind="aril" or "binding": "go" is a raw Go
+	// module with no aril.toml to self-declare in (RFC-0008 §The three kinds),
+	// so it can appear only as a consumer's [dep].kind, never here.
+	switch m.packageKind {
+	case "", "aril", "binding":
+	case "go":
+		return nil, fmt.Errorf("aril: %s: [package] kind = \"go\" is not self-declarable (a raw Go module has no aril.toml); kind=\"go\" is a consumer's [dep] choice", path)
+	default:
+		return nil, fmt.Errorf("aril: %s: [package] unknown kind %q (want aril | binding)", path, m.packageKind)
 	}
 	// Two extra bindings sharing a last segment collide on their local
 	// import name (RFC-0002 §Manifest).
@@ -194,12 +289,15 @@ func parseProjectManifest(path string) (*projectManifest, error) {
 	for i := range m.deps {
 		d := &m.deps[i]
 		if d.name == m.name {
-			return nil, fmt.Errorf("aril: %s: [dep.%s] collides with the project's own [project] name", path, d.name)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] collides with the project's own [package] name", path, d.name)
 		}
+		// The consumer's kind is optional: "" means "read the kind from the
+		// dependency's own [package]" (RFC-0008). A present value is a guard,
+		// or the required self-declaration for kind="go".
 		switch d.kind {
-		case "aril", "binding", "go":
+		case "", "aril", "binding", "go":
 		default:
-			return nil, fmt.Errorf("aril: %s: [dep.%s] unknown kind %q (want aril | binding | go)", path, d.name, d.kind)
+			return nil, fmt.Errorf("aril: %s: [dep.%s] unknown kind %q (want aril | binding | go, or omit to read it from the dependency)", path, d.name, d.kind)
 		}
 		// A `replace`d dependency is resolved locally, so source/version are
 		// not required; otherwise both pin the fetch (D5/D19).

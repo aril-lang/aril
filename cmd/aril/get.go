@@ -74,7 +74,13 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 	walk = func(m *projectManifest) error {
 		for i := range m.deps {
 			d := &m.deps[i]
-			if d.replace != "" || d.kind != "aril" {
+			// A consumer's kind is optional ("" ⇒ aril, read from the fetched
+			// [package]); only an explicit binding/go dep is skipped (a Go
+			// `require`, later work). A `replace` dep is local, not fetched.
+			// An *implicit* dep (kind="") whose [package] self-declares
+			// binding/go is fetched-then-guarded — the real kind is unknowable
+			// until the source is on disk — and rejected later at build.
+			if d.replace != "" || (d.kind != "" && d.kind != "aril") {
 				continue
 			}
 			key := d.source + "@" + d.version
@@ -106,6 +112,11 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 				return err
 			}
 			if sub != nil {
+				// The fetched module self-declares its kind; a consumer's
+				// [dep].kind guard must agree (RFC-0008 §`[dep.<name>]`).
+				if err := depKindGuard(d.name, d.kind, sub.packageKind); err != nil {
+					return err
+				}
 				if err := walk(sub); err != nil {
 					return err
 				}
