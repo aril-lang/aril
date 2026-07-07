@@ -188,9 +188,22 @@ Generated concurrent code must pass `go test -race`.
 
 ## 5. Module system
 
-Aril packages resolve with a decentralized, go-mod-style scheme (D5): import
-path as URL, no central registry, MVS-style version selection, vendoring. Go
-packages do not resolve this way — they enter only through bindings (D4).
+Aril packages resolve with a decentralized, git-direct scheme (D5, RFC-0008):
+import path as URL, no central registry. A module self-declares its identity in
+its own `aril.toml` (`[package]`); a consumer declares only a **requirement**
+(`[dep.<name>]` — a `source` and a version **constraint**). Version constraints
+are caret/tilde/wildcard/compound/exact, resolved by **minimal version
+selection** (max-of-floors over the transitive graph, an upper-bound gate;
+conflicts fail closed with the `aril upgrade` escape). `aril get` is the only
+network step: it enumerates a source's git tags, selects the lowest satisfying
+version to a fixpoint, fetches into a hermetic content-verified cache
+(`$ARIL_CACHE`, coordinate-addressed by source + resolved version), and writes a
+committed tag→commit content-hashed **`aril.lock`**. `aril build`/`run` resolve
+**offline**: they read the lock to locate each module's cache dir and verify its
+content hash (a mismatch is E0123). A pure-Aril dependency's source compiles into
+the one emitted Go module — only a dependency that binds *Go* code introduces a
+Go-level `require` (the raw-Go/binding kinds are successor work). Go packages do
+not resolve this way — they enter only through bindings (D4).
 
 ## 6. Testing — the layered ladder
 

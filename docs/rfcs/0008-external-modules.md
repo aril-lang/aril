@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0008 |
-| Status | accepted |
+| Status | implemented |
 | Created | 2026-07-05 |
 | Supersedes | — |
 
@@ -574,3 +574,15 @@ and a **user-facing test surface** (its own RFC), each with its own prior-art pa
 - 2026-07-05 — `draft → accepted`. The revised design and the M1–M10 review round
   are signed off; implementation follows the staged delivery. The status flips to
   `implemented` as the paired `lang-spec` / `cmd/aril` edits land.
+- 2026-07-07 — `accepted → implemented`. The revision's dependency-system delta
+  landed over five PRs: the bidirectional `[package]`/`[dep]` manifest split with a
+  self-declared/guard `kind`, `edition`, `min-aril`, and reserved `[about]`; the
+  version-constraint grammar (caret/tilde/wildcard/compound/exact) with semver
+  ordering; the MVS engine (max-of-floors + upper-bound gate); ranged resolution in
+  `aril get` (git-tag enumeration + an iterative build-list fixpoint) with a
+  resolved-version-keyed cache and a lock-driven offline build; the E0123 verify-lock
+  build mode + a collision-free cache key + `edition`/`min-aril` enforcement; and
+  `aril upgrade`. The raw-Go and binding *kinds* (2–3) remain the confirmed
+  successor work (module-aware bindgen). Known follow-ups: retract superseded
+  transitive constraints (a fails-closed spurious-conflict edge), pre-release
+  exclusion from range matching, and the Go-toolchain max-of-floors axis.
