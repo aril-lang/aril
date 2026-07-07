@@ -77,6 +77,9 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 			// A consumer's kind is optional ("" ⇒ aril, read from the fetched
 			// [package]); only an explicit binding/go dep is skipped (a Go
 			// `require`, later work). A `replace` dep is local, not fetched.
+			// An *implicit* dep (kind="") whose [package] self-declares
+			// binding/go is fetched-then-guarded — the real kind is unknowable
+			// until the source is on disk — and rejected later at build.
 			if d.replace != "" || (d.kind != "" && d.kind != "aril") {
 				continue
 			}

@@ -63,6 +63,24 @@ min-aril = "0.14"
 	}
 }
 
+func TestParseManifestBindingFields(t *testing.T) {
+	// A kind="binding" package self-declares the bound Go module + version floor.
+	dir := t.TempDir()
+	writeFile(t, dir, "aril.toml", `[package]
+name     = "aril-pq"
+kind     = "binding"
+binds    = "github.com/lib/pq"
+binds-go = "v1.10.9"
+`)
+	m, err := parseProjectManifest(filepath.Join(dir, "aril.toml"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if m.packageKind != "binding" || m.binds != "github.com/lib/pq" || m.bindsGo != "v1.10.9" {
+		t.Errorf("binding fields = %+v; want kind=binding binds=github.com/lib/pq binds-go=v1.10.9", m)
+	}
+}
+
 func TestParseManifestProjectAlias(t *testing.T) {
 	// [project] is still accepted as a compat alias for [package].
 	dir := t.TempDir()
