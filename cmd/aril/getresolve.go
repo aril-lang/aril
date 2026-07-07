@@ -21,6 +21,16 @@ import (
 // registering its own [dep] constraints, which may raise another module's
 // selection and re-enqueue it. Selections only ever rise (MVS is monotone) over
 // a finite tag set, so it terminates.
+//
+// Known limitation (fails closed, follow-up): constraints accumulate per source
+// across *every* expanded version and are never retracted when a module's
+// selection rises past an earlier-expanded version. In the rare graph where a
+// superseded version imposed a now-irrelevant constraint on a shared module,
+// that phantom constraint can force a *spurious* E0122 — a false conflict, never
+// a wrong build, and dissolvable via the `aril upgrade` floor-raise (the
+// accepted MVS-over-ranges incompleteness). Retracting superseded contributions
+// (tag each requirement with its contributing source@version) is a PR5
+// health-pass item.
 func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 	prevResolved := map[string]string{} // source@version → commit, carried across a cache-hit
 	if prev, err := readLock(root.dir); err == nil {
