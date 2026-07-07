@@ -205,20 +205,31 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 					// so the extern `@go` targets resolve. Registered once per bound
 					// module (E0124 uniqueness spans kind=go and kind=binding).
 					if k == "binding" && subMod.binds != "" {
+						// The bound module is fetched by its `binds` git source but
+						// cached by that same coordinate; its require/replace *key* is
+						// the module's own go.mod `module` directive (authoritative —
+						// a vanity path like golang.org/x/… differs from its repo URL,
+						// and E0124 must key on the same path kind=go uses).
 						boundDir, _ := filepath.Abs(cacheModuleDir(subMod.binds, subMod.bindsGo))
 						if _, err := os.Stat(boundDir); err != nil {
 							return fmt.Errorf("aril: error[E0121]: dependency %q binds Go module %q@%q, not present (run `aril get`)", p, subMod.binds, subMod.bindsGo)
 						}
-						table := filepath.Join(subMod.dir, "aril.toml") // the binding package's manifest identifies its table
-						if prev, ok := boundBy[subMod.binds]; ok {
-							if prev.table != table {
-								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", subMod.binds, prev.name, d.name)
+						modulePath := readGoModuleName(boundDir)
+						if modulePath == "" {
+							modulePath = subMod.binds
+						}
+						// The binding package's own aril.toml is its binding identity
+						// (a kind=binding dep has no consumer `path` table).
+						ident := filepath.Join(subMod.dir, "aril.toml")
+						if prev, ok := boundBy[modulePath]; ok {
+							if prev.table != ident {
+								return fmt.Errorf("aril: error[E0124]: Go module %q is bound by two dependencies (%q and %q); at most one binding table may bind a Go module", modulePath, prev.name, d.name)
 							}
 						} else {
-							boundBy[subMod.binds] = bindingOwner{name: d.name, table: table}
+							boundBy[modulePath] = bindingOwner{name: d.name, table: ident}
 							r.goDeps = append(r.goDeps, thirdPartyDep{
-								ImportPath: subMod.binds,
-								Module:     subMod.binds,
+								ImportPath: modulePath,
+								Module:     modulePath,
 								Version:    subMod.bindsGo,
 								Vendor:     boundDir,
 							})

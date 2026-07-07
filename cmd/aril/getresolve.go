@@ -46,6 +46,7 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 	sel := map[string]string{}      // source → the concrete selected version (tag or SHA)
 	commitOf := map[string]string{} // source@version → the commit a fresh fetch resolved to
 	expandedAt := map[string]string{}
+	bound := map[string]string{} // bound Go module source → binds-go pin (kind=binding; a leaf, outside Aril MVS)
 
 	queue := []*projectManifest{root}
 	for len(queue) > 0 {
@@ -101,14 +102,12 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 					}
 					// A published binding package (kind="binding") self-declares the
 					// bound Go module it wraps; fetch that module too (RFC-0010), keyed
-					// by its exact binds-go pin, so the build's require+replace finds
-					// it offline. It is a Go module (no aril.toml) — a leaf.
-					if subM.binds != "" && subM.bindsGo != "" {
-						if name[subM.binds] == "" {
-							name[subM.binds] = lastSegment(subM.binds)
-						}
-						if sel[subM.binds] != subM.bindsGo {
-							sel[subM.binds] = subM.bindsGo
+					// by its exact binds-go pin, so the build's require+replace finds it
+					// offline. It is a Go module (no aril.toml) — a leaf, tracked in its
+					// own `bound` map so it never collides with an Aril MVS selection.
+					if subM.packageKind == "binding" && subM.binds != "" && subM.bindsGo != "" {
+						if bound[subM.binds] == "" {
+							bound[subM.binds] = subM.bindsGo
 							bdest := cacheModuleDir(subM.binds, subM.bindsGo)
 							bcommit, err := ensureFetched(subM.binds, subM.bindsGo, bdest)
 							if err != nil {
@@ -125,15 +124,28 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 		}
 	}
 
-	// Build the lock from the final selection. Sorted by name for a stable diff.
-	sources := make([]string, 0, len(sel))
-	for s := range sel {
+	// Build the lock from the final selection — the Aril MVS deps plus the bound
+	// Go modules (kind=binding). Sorted by source for a stable diff.
+	verOf := map[string]string{} // source → locked version (Aril selection or bound pin)
+	nameOf := map[string]string{}
+	for s, v := range sel {
+		verOf[s] = v
+		nameOf[s] = name[s]
+	}
+	for s, v := range bound {
+		if _, ok := verOf[s]; !ok { // an Aril dep on the same source wins the lock row
+			verOf[s] = v
+			nameOf[s] = lastSegment(s)
+		}
+	}
+	sources := make([]string, 0, len(verOf))
+	for s := range verOf {
 		sources = append(sources, s)
 	}
 	sort.Strings(sources)
 	var out []lockEntry
 	for _, s := range sources {
-		concrete := sel[s]
+		concrete := verOf[s]
 		dest := cacheModuleDir(s, concrete)
 		commit := commitOf[s+"@"+concrete]
 		if commit == "" {
@@ -143,7 +155,7 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, lockEntry{name: name[s], source: s, version: concrete, resolved: commit, hash: hash})
+		out = append(out, lockEntry{name: nameOf[s], source: s, version: concrete, resolved: commit, hash: hash})
 	}
 	return out, nil
 }
