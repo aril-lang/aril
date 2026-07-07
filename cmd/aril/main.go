@@ -130,8 +130,9 @@ func cmdEmit(args []string) int {
 func cmdImport(args []string) int {
 	fs := flag.NewFlagSet("aril import", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	from := fs.String("from", "", "a local Go module directory to introspect (module-aware, RFC-0010); default is stdlib-only")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril import <go/import/path>")
+		fmt.Fprintln(os.Stderr, "usage: aril import [--from <module-dir>] <go/import/path>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -141,14 +142,29 @@ func cmdImport(args []string) int {
 		fmt.Fprintln(os.Stderr, "aril import: expected exactly one <go/import/path>")
 		return 2
 	}
-	src, err := bindgen.Generate(fs.Arg(0))
+	importPath := fs.Arg(0)
+
+	var src string
+	var err error
+	if *from != "" {
+		// Module-aware: introspect the package in a fetched/local Go module. The
+		// module path (require/replace key) is the module's own go.mod directive.
+		modulePath := readGoModuleName(*from)
+		if modulePath == "" {
+			fmt.Fprintf(os.Stderr, "aril import: %s has no readable go.mod (module path unknown)\n", *from)
+			return 1
+		}
+		src, err = bindgen.GenerateFromModule(importPath, *from, modulePath, "")
+	} else {
+		src, err = bindgen.Generate(importPath)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Print(src)
 	if !bindgen.HasBindings(src) {
-		fmt.Fprintf(os.Stderr, "aril import: %s has no bindable symbols (every export bailed)\n", fs.Arg(0))
+		fmt.Fprintf(os.Stderr, "aril import: %s has no bindable symbols (every export bailed)\n", importPath)
 	}
 	return 0
 }
