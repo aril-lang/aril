@@ -83,6 +83,22 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 			if d.replace != "" || (d.kind != "" && d.kind != "aril") {
 				continue
 			}
+			// The version is a constraint (RFC-0008 §Version constraints). This
+			// increment fetches an *exact* pin (an exact tag or a commit SHA);
+			// resolving a ranged constraint by git-tag enumeration + MVS is the
+			// next increment. A range therefore gets a targeted staged
+			// diagnostic rather than a confusing raw `git checkout ^1.3`.
+			cons, err := parseConstraint(d.version)
+			if err != nil {
+				return fmt.Errorf("aril: [dep.%s] version: %v", d.name, err)
+			}
+			pin, ok := cons.exactPin()
+			if !ok {
+				return fmt.Errorf("aril: error[E0122]: dependency %q: the ranged version constraint %q is not yet resolvable by `aril get` (git-tag enumeration lands in the next increment); pin an exact `vX.Y.Z` tag or a commit SHA for now", d.name, d.version)
+			}
+			// The cache/lock key stays the raw declared `version` so the offline
+			// resolver (resolve.go, keyed the same) finds the same entry; `pin`
+			// is only the concrete git ref to check out (normalising `=v1.2.0`).
 			key := d.source + "@" + d.version
 			if prev, ok := pinned[d.name]; ok {
 				if prev != key {
@@ -93,7 +109,7 @@ func fetchAll(root *projectManifest) ([]lockEntry, error) {
 			pinned[d.name] = key
 
 			dest := cacheModuleDir(d.source, d.version)
-			resolved, err := ensureFetched(d.source, d.version, dest)
+			resolved, err := ensureFetched(d.source, pin, dest)
 			if err != nil {
 				return err
 			}
