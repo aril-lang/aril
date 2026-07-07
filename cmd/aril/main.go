@@ -298,13 +298,25 @@ func buildUnit(path string) ([]string, map[string]bool, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	// The committed lock maps each ranged dependency's `source` to its resolved
+	// concrete version, so the build reads the right cache dir offline (an exact
+	// pin is self-describing and needs no lock). Absent lock ⇒ empty map ⇒ only
+	// exact pins resolve (a ranged dep then directs the user to `aril get`).
+	resolvedVers := map[string]string{}
+	if m != nil {
+		if lock, err := readLock(m.dir); err == nil {
+			for _, e := range lock {
+				resolvedVers[e.source] = e.version
+			}
+		}
+	}
 	// Always resolve, even for a lone file (m == nil): classifyImport rejects
 	// a genuinely-unknown import path with E0117 rather than letting it leak a
 	// raw `go build` "package X is not in std" against generated Go (D10).
 	// Without a manifest classifyImport never yields importUser, so this only
 	// resolves stdlib / std-aril / rejects unknown — the lone-package file set
 	// is unchanged.
-	res, err := resolvePackages(files, m)
+	res, err := resolvePackages(files, m, resolvedVers)
 	if err != nil {
 		return nil, nil, err
 	}

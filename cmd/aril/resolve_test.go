@@ -24,7 +24,7 @@ func TestClassifyImportExternal(t *testing.T) {
 		name: "myapp",
 		deps: []dependency{{name: "kv", replace: "../aril-kv", kind: "aril"}},
 	}
-	kind, target := classifyImport("kv/store", m)
+	kind, target := classifyImport("kv/store", m, nil)
 	if kind != importExternal {
 		t.Fatalf("classifyImport(kv/store) kind = %v; want importExternal", kind)
 	}
@@ -34,11 +34,11 @@ func TestClassifyImportExternal(t *testing.T) {
 		t.Errorf("target = %q; want %q", target, want)
 	}
 	// bare `import kv` resolves to the module root.
-	if _, root := classifyImport("kv", m); root != filepath.Join("/proj", "..", "aril-kv") {
+	if _, root := classifyImport("kv", m, nil); root != filepath.Join("/proj", "..", "aril-kv") {
 		t.Errorf("bare-root target = %q", root)
 	}
 	// a non-dep path is unaffected.
-	if kind, _ := classifyImport("totally/unknown", m); kind != importUnknown {
+	if kind, _ := classifyImport("totally/unknown", m, nil); kind != importUnknown {
 		t.Errorf("unknown path misclassified as %v", kind)
 	}
 }
@@ -65,7 +65,7 @@ func TestResolveExternalArilDep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	res, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	res, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestResolveExternalNotFetched(t *testing.T) {
 	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.kv]\nsource = \"github.com/x/kv\"\nversion = \"v1.0.0\"\nkind = \"aril\"\n")
 	writeFile(t, app, "main.aril", "import kv\n\nfunc main() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err == nil || !strings.Contains(err.Error(), "E0121") {
 		t.Fatalf("want E0121 not-fetched, got: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestResolveExternalKindGoDeferred(t *testing.T) {
 	writeFile(t, dep, "aril.toml", "[project]\nname = \"pq\"\n")
 	writeFile(t, dep, "pq.aril", "func X() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err == nil || !strings.Contains(err.Error(), "kind") {
 		t.Fatalf("want a kind-not-wired error, got: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestResolveExternalModuleWithoutManifest(t *testing.T) {
 	// ../lib deliberately has NO aril.toml of its own.
 	writeFile(t, greet, "greet.aril", "func Hello(): string {\n  return \"hi\"\n}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err == nil || !strings.Contains(err.Error(), "E0121") {
 		t.Fatalf("a module without its own aril.toml must be E0121, got: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestResolveExternalMissingSubPackage(t *testing.T) {
 	app := buildTwoModuleProject(t, root) // provides lib with package greet
 	writeFile(t, app, "main.aril", "import lib/nope\n\nfunc main() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err == nil || !strings.Contains(err.Error(), "E0117") {
 		t.Fatalf("a missing sub-package of a present module must be E0117, got: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestResolveCrossModuleCycle(t *testing.T) {
 	writeFile(t, lib, "aril.toml", "[project]\nname = \"lib\"\n[dep.app]\nreplace = \"../app\"\nkind = \"aril\"\n")
 	writeFile(t, lib, "lib.aril", "import app\n\nfunc helper() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
-	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m)
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
 	if err == nil || !strings.Contains(err.Error(), "E0116") {
 		t.Fatalf("want E0116 cyclic import across modules, got: %v", err)
 	}
