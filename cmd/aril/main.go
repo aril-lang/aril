@@ -221,6 +221,7 @@ func cmdBuild(args []string) int {
 	// arilrt is pulled in as main's dependency either way.
 	cmd := exec.Command("go", "build", "-o", absOut, ".")
 	cmd.Dir = src.dir
+	cmd.Env = hermeticGoEnv()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -527,6 +528,7 @@ func cmdRun(args []string) int {
 	// packages. arilrt is compiled as main's dependency.
 	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = src.dir
+	cmd.Env = hermeticGoEnv()
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

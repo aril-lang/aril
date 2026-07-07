@@ -148,6 +148,16 @@ func versionOrZero(v string) string {
 	return v
 }
 
+// hermeticGoEnv is the environment for aril's `go build`/`go run` invocations,
+// pinning GOTOOLCHAIN=local so the emitted go directive (the max-of-floors —
+// possibly raised by a dependency's own floor) never silently downloads a newer
+// toolchain over the network. An unmet floor fails offline with a clear "go.mod
+// requires go >= X" instead — the hermetic/offline contract (RFC-0008), and the
+// D36 posture that a supported toolchain is a precondition, not an auto-fetch.
+func hermeticGoEnv() []string {
+	return append(os.Environ(), "GOTOOLCHAIN=local")
+}
+
 // maxGoVersion resolves the Go-toolchain floor for the emitted go.mod as the
 // maximum of the default floor, the root's `[toolchain] go`, and each fetched
 // Go-binding dep's own `go` directive (RFC-0008 §Compatibility axes — all Aril

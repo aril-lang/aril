@@ -116,12 +116,24 @@ func resolvePackages(entry []string, m *projectManifest, resolvedVers map[string
 						r.userImports[p] = true
 						r.files = append(r.files, tableFiles...)
 						replaceDir, _ := filepath.Abs(externalModuleRoot(d, mod, resolvedVers))
-						// The Go module path (require/replace key, and the @go
-						// prefix the table binds) is `source`; a `replace`-only dep
-						// may omit it, so recover it from the module's own go.mod.
-						modulePath := d.source
+						// A non-replace kind="go" dep must be fetched first — its
+						// cache dir carries the module's go.mod (the authoritative
+						// module path). An absent dir means it was never fetched.
+						if _, err := os.Stat(replaceDir); err != nil {
+							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\") is not present (run `aril get`, or point `replace` at a local copy)", p)
+						}
+						// The Go module path — the require/replace key and the @go
+						// prefix the table binds — is the module's *own* go.mod
+						// `module` directive (authoritative: a repo's git URL may
+						// differ from its module path — vanity imports, gopkg.in).
+						// Fall back to the declared `source` only if the go.mod is
+						// unreadable.
+						modulePath := readGoModuleName(replaceDir)
 						if modulePath == "" {
-							modulePath = readGoModuleName(replaceDir)
+							modulePath = d.source
+						}
+						if modulePath == "" {
+							return fmt.Errorf("aril: error[E0121]: dependency %q (kind=\"go\"): cannot determine the bound Go module path — set `source`, or ensure %q has a go.mod", p, replaceDir)
 						}
 						r.goDeps = append(r.goDeps, thirdPartyDep{
 							ImportPath: modulePath,
