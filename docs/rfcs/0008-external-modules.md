@@ -582,7 +582,7 @@ and a **user-facing test surface** (its own RFC), each with its own prior-art pa
   `aril get` (git-tag enumeration + an iterative build-list fixpoint) with a
   resolved-version-keyed cache and a lock-driven offline build; the E0123 verify-lock
   build mode + a collision-free cache key + `edition`/`min-aril` enforcement; and
-  `aril upgrade`. The three raw-Go/binding *kinds* (2–3) remain the confirmed
+  `aril upgrade`. The raw-Go and binding *kinds* (2–3) remain the confirmed
   successor work (module-aware bindgen). Known follow-ups: retract superseded
   transitive constraints (a fails-closed spurious-conflict edge), pre-release
   exclusion from range matching, and the Go-toolchain max-of-floors axis.
