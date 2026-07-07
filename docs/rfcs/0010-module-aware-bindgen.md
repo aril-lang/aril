@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Number | 0010 |
-| Status | accepted |
+| Status | implemented |
 | Created | 2026-07-07 |
 | Supersedes | — |
 
@@ -362,3 +362,19 @@ Go module is declared, version-pinned, lock-verified, and reached only through
   stdlib source-context loader, behind a swappable interface, with the go-list
   successor and x/tools an un-taken escape hatch). Implementation follows the
   staged delivery (kind=go first, kind=binding as sugar).
+- 2026-07-07 — accepted → implemented. Landed over four PRs. **kind=go** — a raw
+  Go module bound through a consumer-owned `extern` table, fetched to the cache
+  and wired via `require`+`replace` (the go directive floor-driven, `GOTOOLCHAIN=
+  local` keeping the build offline). **Module-aware loading** — the option-C
+  loader (`LoadModulePackage`): the stdlib source-mode importer inside a
+  synthesized module context (a throwaway `go.mod` require+replace→cache + a
+  blank-import anchor), reached by `aril import --from`; no `x/tools` dependency
+  (D22 preserved). **kind=binding** — a published binding package, its `extern`
+  source composed in kind=aril-style plus a `require`+`replace` for the Go module
+  it self-declares (`binds`/`binds-go`), fetched alongside it. **Diagnostics** —
+  **E0124** (one binding per Go module across the graph, spanning both kinds),
+  **E0126** (a table naming an absent Go symbol, validated at `aril get`);
+  **E0125** (implicit `binds-go` drift) reserved until multi-binding graphs exist.
+  Deferred (carry-forward): blank-import driver registration + a live
+  `database/sql`-with-a-driver example (needs a running database, so not a
+  hermetic corpus case); the loader's `go list`-driven successor for cgo modules.

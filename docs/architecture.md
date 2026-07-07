@@ -99,7 +99,17 @@ Only the wrapper layer involves judgment.
 
 The pipeline above feeds the **`extern` / `aril import`** world — a Go package a
 program binds explicitly with `extern func … @go("pkg.Sym")`, where `aril
-import` prints a curatable `.aril` starting point. The **builtin-module** stdlib
+import` prints a curatable `.aril` starting point. Without `--from`, `aril
+import` reaches the stdlib (source-mode importing needs only GOROOT); with **`aril
+import --from <module-dir>`** it is **module-aware** — introspecting a fetched
+third-party Go module by synthesizing the module context the stdlib importer
+needs (a throwaway `go.mod` that `require`s the target and `replace`s it to the
+module tree, plus a blank-import anchor), so the toolchain stays free of
+`golang.org/x/tools`. This is the generator behind a **`kind = "go"`** dependency
+(a raw Go module bound through a consumer-owned table) and a **`kind = "binding"`**
+package (a published table); both, like a pure-Aril dependency, ride the project
+manifest's fetch/resolve, with the bound Go module reached through a
+`require`+`replace` to the fetched cache (RFC-0010). The **builtin-module** stdlib
 surface (`import fmt` / `fmt.println(x)`) is the *same idea, different output*:
 its mechanical binding facts (the Go referent name, the rename-vs-`(T,error)`
 lowering shape, and the Aril return type) are derived from the same
