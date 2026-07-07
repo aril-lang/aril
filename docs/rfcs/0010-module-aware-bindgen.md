@@ -22,8 +22,8 @@ designs the remaining two — the half that lets **Go's ecosystem bootstrap Aril
   `kind = "go"` — a published table rather than a consumer-owned one.
 
 Both introduce a Go-level `require` + `replace` (target: the fetched cache),
-riding the machinery that already binds a vendored third-party module today. The
-north star is `database/sql` with a real driver (`github.com/lib/pq`).
+riding the machinery that binds a vendored third-party module. The north star is
+`database/sql` with a real driver (`github.com/lib/pq`).
 
 The one architectural fork this RFC resolves is **how to introspect a fetched
 third-party module's exported API** — the D22 loader question, which the arrival
@@ -57,11 +57,10 @@ Three durable problems, each unreachable with `kind = "aril"` alone.
    that a second consumer depends on the way it depends on any module. Without it,
    every project re-authors the same `database/sql`-driver table.
 
-The reserved half already exists in shape: `aril.toml` parses `kind`, `path`,
-`binds`, `binds-go`; the manifest resolver classifies a dependency's kind; the
-`extern` + `@go` FFI surface lowers a bound Go call. What is missing is the
-*behaviour* behind the reserved fields — fetch, introspect, emit — which this RFC
-supplies.
+The reserved half exists in shape: `aril.toml` parses `kind`, `path`, `binds`,
+`binds-go`; the manifest resolver classifies a dependency's kind; the `extern` +
+`@go` FFI surface lowers a bound Go call. What this design supplies is the
+*behaviour* behind the reserved fields — fetch, introspect, emit.
 
 ## Design
 
@@ -116,7 +115,10 @@ performs. To introspect a fetched module `M@V` the loader:
    graph.
 3. Runs the stdlib source-mode importer against `M/pkg` inside that directory. It
    resolves the package through the `replace`, type-checks it from source, and
-   yields a `*types.Package` whose exported scope is the binding surface.
+   yields a `*types.Package` whose exported scope is the binding surface. (An
+   empirical probe on go1.22 confirms source-mode resolution through a `replace`
+   target — the mechanism this step relies on; loader reproducibility across Go
+   versions is the one property to re-confirm before implementation.)
 
 This reaches the north star: `github.com/lib/pq` is pure Go, and the north-star
 API surface (`database/sql` + a driver registered via a blank import) type-checks
