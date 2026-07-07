@@ -114,7 +114,7 @@ func TestWriteProjectModulePersists(t *testing.T) {
 	outDir := filepath.Join(t.TempDir(), "aril-out")
 	goSrc := "package main\n\nfunc main() {}\n"
 
-	src, err := writeProjectModule(goSrc, outDir)
+	src, err := writeProjectModule(goSrc, outDir, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestWriteProjectModulePersists(t *testing.T) {
 	}
 
 	// A second write persists to the same path (no fresh temp dir).
-	src2, err := writeProjectModule(goSrc, outDir)
+	src2, err := writeProjectModule(goSrc, outDir, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestGenOrphanSync(t *testing.T) {
 
 	// Vendored: the program imports the runtime → arilrt/ is emitted.
 	vendored := "package main\n\nimport _ \"" + runtimeImportPath + "\"\n\nfunc main() {}\n"
-	if _, err := writeProjectModule(vendored, outDir); err != nil {
+	if _, err := writeProjectModule(vendored, outDir, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	rt, err := listGoFiles(filepath.Join(genDir, "arilrt"))
@@ -178,7 +178,7 @@ func TestGenOrphanSync(t *testing.T) {
 
 	// Inline: no runtime import → arilrt/ must be pruned (stray and all).
 	inline := "package main\n\nfunc main() {}\n"
-	if _, err := writeProjectModule(inline, outDir); err != nil {
+	if _, err := writeProjectModule(inline, outDir, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(genDir, "arilrt")); !os.IsNotExist(err) {

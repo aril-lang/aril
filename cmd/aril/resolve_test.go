@@ -99,23 +99,63 @@ func TestResolveExternalNotFetched(t *testing.T) {
 	}
 }
 
-func TestResolveExternalKindGoDeferred(t *testing.T) {
-	// kind=go/binding external deps are later work; resolving one is a clear
-	// E0121 (only kind=aril wired), never a silent miscompile.
+func TestResolveExternalKindGo(t *testing.T) {
+	// A kind="go" dep (RFC-0010): `import pq` pulls the consumer-owned binding
+	// table into the build (stripped from the Go import block), and the bound Go
+	// module is recorded as a require+replace entry (replace-target = the raw Go
+	// module dir here). The table's module path is recovered from the module's
+	// own go.mod when `source` is omitted.
 	root := t.TempDir()
 	app := filepath.Join(root, "app")
 	dep := filepath.Join(root, "pq")
 	mkdirAll(t, app)
 	mkdirAll(t, dep)
-	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.pq]\nreplace = \"../pq\"\nkind = \"go\"\npath = \"t.aril\"\n")
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.pq]\nreplace = \"../pq\"\nkind = \"go\"\npath = \"table.aril\"\n")
 	writeFile(t, app, "main.aril", "import pq\n\nfunc main() {}\n")
-	writeFile(t, dep, "aril.toml", "[project]\nname = \"pq\"\n")
-	writeFile(t, dep, "pq.aril", "func X() {}\n")
+	writeFile(t, app, "table.aril", "extern func x(): int @go(\"example.com/pq.X\")\n")
+	writeFile(t, dep, "go.mod", "module example.com/pq\n\ngo 1.23\n")
+	writeFile(t, dep, "pq.go", "package pq\n\nfunc X() int { return 1 }\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	res, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
+	if err != nil {
+		t.Fatalf("kind=go resolve failed: %v", err)
+	}
+	if !res.userImports["pq"] {
+		t.Errorf("import pq should be stripped (userImports), got %v", res.userImports)
+	}
+	if !containsSuffix(res.files, "table.aril") {
+		t.Errorf("the binding table should join the build files, got %v", res.files)
+	}
+	if len(res.goDeps) != 1 || res.goDeps[0].Module != "example.com/pq" {
+		t.Fatalf("want one goDep for example.com/pq, got %v", res.goDeps)
+	}
+	if fi, err := os.Stat(res.goDeps[0].Vendor); err != nil || !fi.IsDir() {
+		t.Errorf("replace target should be the raw Go module dir, got %q (%v)", res.goDeps[0].Vendor, err)
+	}
+}
+
+func TestResolveExternalKindGoMissingTable(t *testing.T) {
+	// A kind="go" dep whose declared table file is absent is E0121 (the table is
+	// the binding surface — a missing one cannot build), never a silent miss.
+	root := t.TempDir()
+	app := filepath.Join(root, "app")
+	mkdirAll(t, app)
+	writeFile(t, app, "aril.toml", "[project]\nname = \"app\"\n[dep.pq]\nreplace = \"..\"\nkind = \"go\"\npath = \"nope.aril\"\n")
+	writeFile(t, app, "main.aril", "import pq\n\nfunc main() {}\n")
 	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
 	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
-	if err == nil || !strings.Contains(err.Error(), "kind") {
-		t.Fatalf("want a kind-not-wired error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "E0121") {
+		t.Fatalf("want E0121 for a missing binding table, got: %v", err)
 	}
+}
+
+func containsSuffix(xs []string, suffix string) bool {
+	for _, x := range xs {
+		if strings.HasSuffix(x, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestResolveExternalModuleWithoutManifest(t *testing.T) {

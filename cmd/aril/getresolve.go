@@ -53,9 +53,12 @@ func resolveGraph(root *projectManifest) ([]lockEntry, error) {
 		queue = queue[1:]
 		for i := range m.deps {
 			d := &m.deps[i]
-			// replace / explicit binding|go are not fetched here (a Go require
-			// is later work; a replace is local).
-			if d.replace != "" || (d.kind != "" && d.kind != "aril") {
+			// A `replace` dep is local — nothing to fetch. Every declared kind is
+			// fetched into the cache (RFC-0010): kind="aril"/"binding" self-declare
+			// an aril.toml (expanded below for its own [dep] constraints);
+			// kind="go" is a raw Go module with none — a leaf of the Aril MVS
+			// graph, fetched but not expanded (manifestAt returns nil below).
+			if d.replace != "" {
 				continue
 			}
 			cons, err := parseConstraint(d.version)
