@@ -211,3 +211,27 @@ func TestResolveCrossModuleCycle(t *testing.T) {
 		t.Fatalf("want E0116 cyclic import across modules, got: %v", err)
 	}
 }
+
+func TestResolveKindGoBindingUniqueness(t *testing.T) {
+	// Two different kind="go" deps binding the SAME Go module is E0124 (a Go
+	// module may be bound by at most one table — duplicate extern decls otherwise).
+	root := t.TempDir()
+	app := filepath.Join(root, "app")
+	raw := filepath.Join(root, "raw")
+	mkdirAll(t, app)
+	mkdirAll(t, raw)
+	writeFile(t, raw, "go.mod", "module example.com/dup\n\ngo 1.22\n")
+	writeFile(t, raw, "d.go", "package dup\n\nfunc X() int { return 1 }\n")
+	writeFile(t, app, "aril.toml",
+		"[package]\nname = \"app\"\n"+
+			"[dep.a]\nreplace = \"../raw\"\nkind = \"go\"\npath = \"ta.aril\"\n"+
+			"[dep.b]\nreplace = \"../raw\"\nkind = \"go\"\npath = \"tb.aril\"\n")
+	writeFile(t, app, "ta.aril", "extern func xa(): int @go(\"example.com/dup.X\")\n")
+	writeFile(t, app, "tb.aril", "extern func xb(): int @go(\"example.com/dup.X\")\n")
+	writeFile(t, app, "main.aril", "import a\nimport b\n\nfunc main() {}\n")
+	m, _ := parseProjectManifest(filepath.Join(app, "aril.toml"))
+	_, err := resolvePackages([]string{filepath.Join(app, "main.aril")}, m, nil)
+	if err == nil || !strings.Contains(err.Error(), "E0124") {
+		t.Fatalf("want E0124 for two deps binding one Go module, got: %v", err)
+	}
+}

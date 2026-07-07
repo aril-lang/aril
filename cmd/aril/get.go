@@ -49,6 +49,17 @@ func cmdGet(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// Validate each kind="go" table against its freshly-fetched module (E0126):
+	// drift (a renamed/removed Go symbol) is caught here, at the network step, not
+	// as a raw `go build` miss later.
+	resolvedVers := map[string]string{}
+	for _, e := range entries {
+		resolvedVers[e.source] = e.version
+	}
+	if err := validateGoBindingTables(m, resolvedVers); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	fmt.Printf("aril: %d dependency module(s) resolved; wrote %s\n", len(entries), lockFileName)
 	return 0
 }
