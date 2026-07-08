@@ -1,0 +1,57 @@
+--- TITLE ---
+User `len()` method wins over the slice builtin: a class that declares `len(): int` dispatches `c.len()` as a method call, not Go's `len(c)`. The slice-method shortcut (`xs.len()` → `len(xs)`) is gated on the receiver NOT being a user class/record value (sema tightening), so a user type keeps its own method (builtins.md §Slice methods).
+
+--- INPUT ---
+import fmt
+
+class Ring {
+  var items: []int
+
+  static new(): Ring { return Ring{ items: makeSlice<int>(0) } }
+
+  add(x: int) { items = items.push(x) }
+  len(): int  { return items.len() }
+}
+
+func main() {
+  let r = Ring.new()
+  r.add(10)
+  r.add(20)
+  r.add(30)
+  fmt.println("len:", r.len())
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func MakeSlice[T any](n int) []T { return make([]T, n) }
+
+type Ring struct {
+	Items []int `json:"items"`
+}
+
+func ringNew() *Ring {
+	return &Ring{Items: MakeSlice[int](0)}
+}
+func (_arilSelf *Ring) add(x int) {
+	_arilSelf.Items = append(_arilSelf.Items, x)
+}
+func (_arilSelf *Ring) len() int {
+	return len(_arilSelf.Items)
+}
+func main() {
+	var r = ringNew()
+	r.add(10)
+	r.add(20)
+	r.add(30)
+	fmt.Println("len:", r.len())
+}
+
+--- STDOUT ---
+len: 3
+
+--- EXIT ---
+0

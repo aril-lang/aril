@@ -467,10 +467,12 @@ func (g *gen) emitCall(c *ast.Call) error {
 	//   xs.push(e) → append(xs, e)
 	//   xs.len()   → len(xs)
 	// Triggered when the callee is a Field access whose receiver
-	// is NOT a known stdlib namespace (e.g. fmt, os, strings).
-	// Without sema this is a heuristic: any `.push`/`.len` on a
-	// non-namespace receiver is a slice method. Sema'll tighten.
-	if f, ok := c.Callee.(*ast.Field); ok && !isStdlibNamespace(f.Receiver) && !g.isContainerReceiver(f.Receiver) {
+	// is NOT a known stdlib namespace (e.g. fmt, os, strings), not a
+	// container, and — the sema tightening — not a user class/record
+	// value: a user type may declare its own `len()`/`push()` method, which
+	// must dispatch as a method (`cache.len()`), never the slice builtin
+	// (`len(cache)`, a raw go/types leak — D10).
+	if f, ok := c.Callee.(*ast.Field); ok && !isStdlibNamespace(f.Receiver) && !g.isContainerReceiver(f.Receiver) && !g.isUserNamedReceiver(f.Receiver) {
 		switch f.Name {
 		case "push":
 			if len(c.Args) != 1 {
@@ -728,6 +730,19 @@ func (g *gen) isContainerReceiver(e ast.Expr) bool {
 		return false
 	}
 	return g.varKindOf(id) != ""
+}
+
+// isUserNamedReceiver reports whether e sema-types to a user-declared class or
+// record (a Named in userTypeNames — which, unlike g.class, excludes the
+// codegen-injected Map/Set/Stack). Such a receiver's `.len()`/`.push()`/… are
+// the user's own methods, so they must NOT be captured by the slice-builtin
+// shortcut above. Falls back to false without sema (the pre-sema heuristic).
+func (g *gen) isUserNamedReceiver(e ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	named, ok := g.info.Type[e].(*sema.Named)
+	return ok && g.userTypeNames[named.N]
 }
 
 // isChannelReceiver reports whether e is a channel-typed binding
