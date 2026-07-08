@@ -98,7 +98,7 @@ func (p *parser) parseCatchTail(subject ast.Expr) (ast.Expr, *Diag) {
 	if !p.at(lexer.KindIdent) {
 		t := p.peek()
 		return nil, p.diag("E0112",
-			fmt.Sprintf("expected an error binder identifier after `catch`, got %s %q", t.Kind, t.Lexeme),
+			fmt.Sprintf("expected an error binder identifier after `catch`, got %s", describeToken(t)),
 			t.Line, t.Col)
 	}
 	binder := p.advance()
@@ -355,7 +355,7 @@ func (p *parser) parseSinglePat() (ast.Pattern, *Diag) {
 		}
 	}
 	return nil, p.diag("E0112",
-		fmt.Sprintf("expected pattern, got %s %q", t.Kind, t.Lexeme),
+		fmt.Sprintf("expected pattern, got %s", describeToken(t)),
 		t.Line, t.Col)
 }
 
@@ -372,7 +372,7 @@ func (p *parser) parseRecordPat(qname []string, nameTok lexer.Token) (ast.Patter
 		if !p.at(lexer.KindIdent) {
 			t := p.peek()
 			return nil, p.diag("E0112",
-				fmt.Sprintf("expected record field name in pattern, got %s %q", t.Kind, t.Lexeme),
+				fmt.Sprintf("expected record field name in pattern, got %s", describeToken(t)),
 				t.Line, t.Col)
 		}
 		fnameTok := p.advance()

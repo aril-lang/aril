@@ -151,7 +151,7 @@ func (p *parser) parseTypeExpr() (ast.TypeExpr, *Diag) {
 	if !p.at(lexer.KindIdent) {
 		t := p.peek()
 		return nil, p.diag("E0112",
-			fmt.Sprintf("expected type expression, got %s %q", t.Kind, t.Lexeme),
+			fmt.Sprintf("expected a type, got %s", describeToken(t)),
 			t.Line, t.Col)
 	}
 	first := p.advance()

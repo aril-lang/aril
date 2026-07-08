@@ -544,7 +544,7 @@ func (p *parser) parseSelectCase() (ast.SelectCase, *Diag) {
 	if !p.at(lexer.KindIdent, "case") {
 		t := p.peek()
 		return nil, p.diag("E0112",
-			fmt.Sprintf("expected `case` or `default` in select, got %s %q", t.Kind, t.Lexeme),
+			fmt.Sprintf("expected `case` or `default` in select, got %s", describeToken(t)),
 			t.Line, t.Col)
 	}
 	caseKw := p.advance() // consume 'case'

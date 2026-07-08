@@ -188,8 +188,12 @@ func (p *parser) advance() lexer.Token {
 func (p *parser) expect(k lexer.Kind, lex string) (lexer.Token, *Diag) {
 	t := p.peek()
 	if t.Kind != k || (lex != "" && t.Lexeme != lex) {
-		return t, p.diag("E0112", fmt.Sprintf("expected %s %q, got %s %q",
-			k, lex, t.Kind, t.Lexeme), t.Line, t.Col)
+		want := describeKind(k)
+		if lex != "" {
+			want = spellLiteral(lex)
+		}
+		return t, p.diag("E0112", fmt.Sprintf("expected %s, got %s",
+			want, describeToken(t)), t.Line, t.Col)
 	}
 	p.pos++
 	return t, nil

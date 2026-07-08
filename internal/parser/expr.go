@@ -277,7 +277,7 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 			default:
 				t := p.peek()
 				return nil, p.diag("E0112",
-					fmt.Sprintf("expected `(`, `.`, or `{` after generic type arguments, got %s %q", t.Kind, t.Lexeme),
+					fmt.Sprintf("expected `(`, `.`, or `{` after generic type arguments, got %s", describeToken(t)),
 					t.Line, t.Col)
 			}
 		case p.at(lexer.KindPunct, "."):
@@ -1017,7 +1017,7 @@ func (p *parser) parsePrimary() (ast.Expr, *Diag) {
 			t.Line, t.Col)
 	}
 	return nil, p.diag("E0112",
-		fmt.Sprintf("expected expression, got %s %q", t.Kind, t.Lexeme),
+		fmt.Sprintf("expected an expression, got %s", describeToken(t)),
 		t.Line, t.Col)
 }
 
