@@ -1,33 +1,13 @@
 package ast
 
-// Scope-join placement query — a pure structural walk answering "before which
-// statement of this scope body must the join (`Group.Wait`) be emitted?".
+// Scope-join placement — the structural query codegen's ScopeIR lowering uses to
+// put `Group.Wait` before an in-scope fan-in `close()`, so the drain does not race
+// the spawns (send-after-close, E1203). Rationale + the buffered-fan-in constraint
+// live in lowering-go.md §ScopeIR.
 //
-// The consumer is codegen's ScopeIR lowering (lowering-go.md §ScopeIR). A scope
-// that collects its spawns' results into a channel and *returns* them must drain
-// that channel in-body — the in-scope fan-in idiom:
-//
-//	scope<[]T, error> { …spawns send to ch…; ch.close(); for x in ch {…}; out }
-//
-// The fan-in `ch.close()` must run only after every sibling spawn has finished
-// sending, so the join belongs *immediately before* that close. Emitting the
-// join after the whole body (the naive placement) closes the channel while a
-// sibling is still sending — send-after-close, E1203.
-//
-// The distinguishing signal is the top-level `close()` itself. The *other*
-// in-scope pattern — direct concurrent receives (`let a = ch.recv()`) that must
-// interleave with the still-running sends over an unbuffered channel — has no
-// such close, and its recvs must stay *before* the join (moving the join ahead of
-// them would deadlock: Wait blocks on sends nobody is receiving yet). So: a
-// top-level fan-in close after the spawns ⇒ join before it; otherwise ⇒ join at
-// the body end (the concurrent-recv and external-drain scopes, byte-identical to
-// the pre-fix lowering). The fan-in channel must be buffered ≥ spawn count, or
-// the post-join drain's producers would have blocked before the join could return
-// (§ScopeIR).
-//
-// The walk STOPS at a nested `ScopeExpr`: a spawn inside an inner scope registers
-// on the inner group and is joined by the inner scope's own `Wait`, so it is
-// invisible to the enclosing scope's placement.
+// Invariant (not obvious from the code): the walk STOPS at a nested `ScopeExpr` —
+// a spawn there registers on the inner group and is joined by the inner scope's
+// own `Wait`, so it is invisible to this scope's placement.
 
 // ScopeJoinBeforeIndex reports the index of the statement the join must precede
 // (the fan-in `close()` after the last own spawn), or -1 to place the join after
