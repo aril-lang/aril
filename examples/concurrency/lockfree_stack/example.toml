@@ -1,0 +1,29 @@
+description = "Lock-free Treiber stack: generic atomic.Pointer CAS retry loops, concurrent producer/consumer stress test with a multiset-permutation oracle"
+source   = "concurrency lockfree_stack"
+category = "concurrency"
+showcase = true
+forces   = []
+since    = "0.16"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "lockfree_stack.aril"
+
+# args = [producers, consumers, per-producer]; pushed == popped == producers*per-producer.
+# Output is deterministic despite concurrency — counts and the invariant result,
+# never raw pop order.
+
+[[case]]
+args            = ["4", "4", "1000"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["8", "2", "500"]
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["2", "8", "1000"]
+expected_output = "case3.txt"
+
+[[case]]
+args            = ["1", "1", "100"]
+expected_output = "case4.txt"

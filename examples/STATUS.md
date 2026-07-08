@@ -4,16 +4,16 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 92 / 93 examples build end-to-end** (floor 92).
+- **build_ok — 92 / 97 examples build end-to-end** (floor 92).
 - **diag_ok — 121 / 121 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 92 / 93 run-pass examples build and run as specified** (floor 92; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 92 / 97 run-pass examples build and run as specified** (floor 92; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
 | ✅ build (full pipeline) | 92 |
 | emit / codegen fail | 1 |
-| sema fail | 0 |
-| parse fail | 0 |
+| sema fail | 3 |
+| parse fail | 1 |
 
 ## Per-example
 
@@ -112,6 +112,10 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/url_router/url_router.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
 | `examples/core-language/lru_cache/lru_cache.aril` | emit | go build failed |
+| `examples/concurrency/lockfree_ring/lockfree_ring.aril` | sema | error[E0117]: unknown import path "atomic" |
+| `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | sema | error[E0103]: Unknown name atomic |
+| `examples/concurrency/rcu_tree/rcu_tree.aril` | sema | error[E0103]: Unknown name atomic |
+| `examples/concurrency/lockfree_stack/lockfree_stack.aril` | parse | error[E0112]: generic brace literal requires a bare type name |
 
 ## Diagnostic-quality gaps
 
@@ -126,8 +130,12 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**1 of 93 run-pass examples fall short of run_ok.**
+**5 of 97 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
+| `examples/concurrency/lockfree_ring` | build-fail | 1 |
+| `examples/concurrency/lockfree_stack` | build-fail | 1 |
+| `examples/concurrency/rcu_skiplist` | build-fail | 1 |
+| `examples/concurrency/rcu_tree` | build-fail | 1 |
 | `examples/core-language/lru_cache` | build-fail | 1 |

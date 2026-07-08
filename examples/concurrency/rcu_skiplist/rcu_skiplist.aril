@@ -1,0 +1,539 @@
+// RCU-synchronized ordered set over an immutable SKIP-LIST.
+//
+// The load-bearing idea: readers are *fully lock-free*. A reader `load()`s the
+// atomic root once and walks an immutable skip-list snapshot — no locks, no
+// synchronization, not even a memory barrier past that single atomic load. A
+// writer never mutates a live node: it path-copies the predecessor prefix (every
+// node with key < k), links the fresh prefix to the unchanged, SHARED tail (keys
+// ≥ k), then `compareAndSwap`es the root to publish the new version atomically
+// (read-copy-update), retrying on a lost CAS. Because Aril compiles to Go, the
+// garbage collector *is* the RCU grace period: a superseded prefix stays alive
+// exactly as long as some reader still holds it, and is reclaimed once the last
+// reader drops it. No hazard pointers, no epochs, no `unsafe` — this is what
+// makes lock-free in Aril honest.
+//
+// The skip-list (vs. the balanced-BST sibling): a tower of forward-pointer lanes
+// gives readers an O(log n) express search with no rotation logic. The persistent
+// copy is honest about its cost — a single-root publish must re-thread the whole
+// level-0 chain up to the splice point, so the writer copies the predecessor
+// prefix and shares the suffix (the tree sibling is the O(log n)-copy variant;
+// this one trades that for the rotation-free tower). Heights are assigned
+// deterministically (a random source is unavailable and would break the oracle);
+// membership is height-independent, so this loses no correctness.
+//
+// This is a `target-sketch`: it is written against the forward-looking atomic
+// surface (`atomic.Pointer<T>` / `atomic.Int64`, docs/atomics-lock-free.md) and
+// the generic-class machinery, neither implemented yet. It does NOT build —
+// `atomic` is unbound (and the dotted-generic brace literal `atomic.Pointer<T>{}`
+// has an open parser gap, dodged by the `AtomicRoot` alias below) — and that is
+// the point: it is the acceptance target (demand signal) for the generics +
+// atomics epochs. It must fail *gracefully* (a clean E-code on the unbound
+// name), never panic.
+
+import fmt
+import os
+import sort
+import strconv
+import strings
+
+// Fixed maximum tower height. A skip-list is a correct ordered set at ANY node
+// heights — height affects only search cost, never membership — so a small
+// fixed ceiling is fine.
+let maxLevel = 8
+
+// Probes per reader goroutine: how many independent snapshots each concurrent
+// reader takes while the writer mutates. Enough to interleave, bounded so the
+// run terminates deterministically.
+let readerProbes = 200
+
+// An immutable skip-list node. `next` is the forward-pointer tower; its length
+// is the node's height. RCU discipline: once a node is published (linked into a
+// root that has been CAS'd in), NEITHER field is ever mutated again — a writer
+// that must change a link builds a fresh copy of the node instead. That is what
+// lets a concurrent reader walk an older snapshot and see a frozen, consistent
+// chain.
+class Node {
+  let key:  int
+  let next: []Option<Node>
+}
+
+// The generic atomic cell for the root pointer (docs/atomics-lock-free.md:
+// `atomic.Pointer<T>`). Aliased because the dotted-generic *brace literal*
+// `atomic.Pointer<Node>{}` is not yet parseable — a generics-epoch gap; the
+// alias's bare name `AtomicRoot{}` constructs the same cell and keeps the file
+// syntactically valid, so the sole remaining failure is the unbound `atomic`
+// surface (E0103 "Unknown name atomic") — the atomics-epoch demand signal.
+type AtomicRoot = atomic.Pointer<Node>
+
+// ---- pure skip-list operations (no atomics — the immutable core) ----
+
+// Deterministic tower height for a key. A key divisible by 4^(h-1) rises to
+// height h (≈ ¼ of keys reach each next level), which builds the multi-level
+// express lanes while keeping the whole structure a deterministic function of
+// the insert sequence.
+func heightForKey(k: int): int {
+  var h = 1
+  var x = k
+  while h < maxLevel && x != 0 && x % 4 == 0 {
+    h = h + 1
+    x = x / 4
+  }
+  return h
+}
+
+// The predecessors of a search, captured for the copy-path writer.
+//   * update — update[i] is the rightmost node whose key < k at level i (the node
+//              after which a new key is spliced at that level). Found by the
+//              O(log n) express-lane descent, exactly as `contains` searches.
+//   * path   — the FULL level-0 predecessor prefix: every node with key < k, in
+//              ascending order, sentinel first. This — not merely the
+//              express-advanced nodes — is the clone set: a single-root-publish
+//              persistent structure must re-thread the whole level-0 chain up to
+//              the splice point through fresh copies (a predecessor that stayed
+//              shared would still point at the old, un-spliced tail). It contains
+//              every update[i], since all keys < k sit at or before update[0].
+type SearchPath = {
+  path:   []Node
+  update: []Option<Node>
+}
+
+// Locate a key's insertion neighbourhood: the per-level express predecessors and
+// the level-0 predecessor prefix (see SearchPath). Pure over the snapshot —
+// mutates nothing — so it is safe even as a reader walks the same version.
+func findPath(head: Node, k: int): SearchPath {
+  // Express descent: drop a level whenever the next key is not below k. O(log n).
+  let update = makeSlice<Option<Node>>(maxLevel)
+  var x = head
+  var i = maxLevel - 1
+  while i >= 0 {
+    while true {
+      match x.next[i] {
+        Some(y) => if y.key < k { x = y } else { break },
+        None    => break,
+      }
+    }
+    update[i] = Some(x)
+    i = i - 1
+  }
+  // Full level-0 predecessor prefix — the clone set for the path-copy publish.
+  var path: []Node = [head]
+  var cur = head.next[0]
+  while true {
+    match cur {
+      None    => break,
+      Some(n) => if n.key < k { path = path.push(n); cur = n.next[0] } else { break },
+    }
+  }
+  return SearchPath{ path: path, update: update }
+}
+
+// Index of `t` within `path` by reference identity, or None. Used by the
+// copy-path writer to redirect a forward pointer that targets an already-copied
+// predecessor onto its fresh copy.
+func pathIndexOf(path: []Node, t: Node): Option<int> {
+  var i = 0
+  while i < path.len() {
+    if refEq(path[i], t) { return Some(i) }
+    i = i + 1
+  }
+  return None
+}
+
+// Path-copy for INSERT. Clone every predecessor (the full level-0 prefix, sp.path)
+// right-to-left — so a clone's forward targets, which have larger keys, are
+// already cloned — producing a fresh sentinel that SHARES the entire untouched
+// tail (keys ≥ k) with the old snapshot. Rewiring rule, per level i of a clone p:
+//   * p is the update predecessor at an insertion level (i < node.height)
+//     → point at the new node;
+//   * p's original successor at level i is itself a cloned path node
+//     → redirect to its clone (identity must track the new snapshot);
+//   * otherwise → share the original successor (an unchanged subtree).
+// Never mutates an input node: the old snapshot stays intact for in-flight
+// readers until the GC reclaims it.
+func copyPathInsert(sp: SearchPath, node: Node, h: int): Node {
+  let copies = makeSlice<Option<Node>>(sp.path.len())
+  var j = sp.path.len() - 1
+  while j >= 0 {
+    let p  = sp.path[j]
+    let ph = p.next.len()
+    let nn = makeSlice<Option<Node>>(ph)
+    var i = 0
+    while i < ph {
+      var isPred = false
+      if i < h {
+        match sp.update[i] {
+          Some(u) => if refEq(u, p) { isPred = true },
+          None    => {},
+        }
+      }
+      if isPred {
+        nn[i] = Some(node)
+      } else {
+        match p.next[i] {
+          None    => {},                        // already None from makeSlice
+          Some(t) => match pathIndexOf(sp.path, t) {
+            Some(ti) => nn[i] = copies[ti],     // ti > j → already built
+            None     => nn[i] = Some(t),        // shared, unchanged tail
+          },
+        }
+      }
+      i = i + 1
+    }
+    copies[j] = Some(Node{ key: p.key, next: nn })
+    j = j - 1
+  }
+  match copies[0] {
+    Some(nh) => return nh,
+    None     => return sp.path[0],              // path always holds the sentinel
+  }
+}
+
+// Path-copy for REMOVE. Same clone-the-path discipline, but a predecessor whose
+// level-i successor IS the target node bypasses it — pointing instead at the
+// target's own level-i successor (a key > k, part of the shared tail). The
+// target is simply never cloned; the GC reclaims it once no reader holds it.
+func copyPathRemove(sp: SearchPath, target: Node): Node {
+  let copies = makeSlice<Option<Node>>(sp.path.len())
+  var j = sp.path.len() - 1
+  while j >= 0 {
+    let p  = sp.path[j]
+    let ph = p.next.len()
+    let nn = makeSlice<Option<Node>>(ph)
+    var i = 0
+    while i < ph {
+      match p.next[i] {
+        None    => {},                          // already None from makeSlice
+        Some(t) => {
+          if refEq(t, target) {
+            nn[i] = target.next[i]              // splice the target out
+          } else {
+            match pathIndexOf(sp.path, t) {
+              Some(ti) => nn[i] = copies[ti],
+              None     => nn[i] = Some(t),
+            }
+          }
+        },
+      }
+      i = i + 1
+    }
+    copies[j] = Some(Node{ key: p.key, next: nn })
+    j = j - 1
+  }
+  match copies[0] {
+    Some(nh) => return nh,
+    None     => return sp.path[0],
+  }
+}
+
+// Lock-free descent from the sentinel: is k present? A pure walk of a frozen
+// snapshot — no atomics on this path beyond the caller's single root load, no
+// mutation, no retry.
+func containsFrom(head: Node, k: int): bool {
+  var x = head
+  var i = maxLevel - 1
+  while i >= 0 {
+    while true {
+      match x.next[i] {
+        Some(y) => if y.key < k { x = y } else { break },
+        None    => break,
+      }
+    }
+    i = i - 1
+  }
+  match x.next[0] {
+    Some(y) => return y.key == k,
+    None    => return false,
+  }
+}
+
+// The level-0 key chain of a snapshot, in order (the sentinel's successors).
+func keysFrom(head: Node): []int {
+  var out: []int = []int{}
+  var cur = head.next[0]
+  while true {
+    match cur {
+      None    => return out,
+      Some(n) => { out = out.push(n.key); cur = n.next[0] },
+    }
+  }
+}
+
+// Ordered-set structural invariant over a snapshot: the level-0 chain is
+// strictly increasing (sorted ∧ duplicate-free). A torn version — only possible
+// if RCU were violated by an in-place write on a published node — breaks it.
+func orderedFrom(root: Option<Node>): bool {
+  match root {
+    None       => return true,
+    Some(head) => return isStrictlyIncreasing(keysFrom(head)),
+  }
+}
+
+// ---- the RCU cell ----
+
+// The RCU ordered set. Its whole mutable state is one atomic cell holding the
+// current sentinel; every published version hangs off a sentinel and is frozen.
+class SkipSet {
+  // The single point of contention. Readers `load()` it; the writer
+  // `compareAndSwap`es it to publish. CAS compares by reference identity — RCU
+  // swaps the identity of the *published version*, not its contents.
+  let root: AtomicRoot
+
+  static new(): SkipSet {
+    // Construct with an empty cell, then publish the initial sentinel through
+    // the field — the value-handle is never copied after first use.
+    let set  = SkipSet{ root: AtomicRoot{} }
+    let head = Node{ key: 0, next: makeSlice<Option<Node>>(maxLevel) }
+    set.root.store(head)
+    return set
+  }
+
+  // Lock-free membership test: a single atomic load, then a pure snapshot walk.
+  contains(k: int): bool {
+    match root.load() {
+      None       => return false,
+      Some(head) => return containsFrom(head, k),
+    }
+  }
+
+  // RCU insert (single writer). Snapshot the root, find the update path, and —
+  // if k is absent — publish a path-copied new version with one root CAS. A lost
+  // CAS means a concurrent writer moved the root; reload and retry.
+  insert(k: int) {
+    while true {
+      match root.load() {
+        None       => return,
+        Some(head) => {
+          let sp = findPath(head, k)
+          match sp.update[0] {
+            Some(u0) => match u0.next[0] {
+              Some(succ) => if succ.key == k { return },   // already present → no-op
+              None       => {},
+            },
+            None => {},
+          }
+          let h     = heightForKey(k)
+          let nnext = makeSlice<Option<Node>>(h)
+          var j = 0
+          while j < h {
+            match sp.update[j] {
+              Some(u) => nnext[j] = u.next[j],             // new node's tail: shared successors
+              None    => {},                               // unreachable: update[j] is always Some
+            }
+            j = j + 1
+          }
+          let node    = Node{ key: k, next: nnext }
+          let newHead = copyPathInsert(sp, node, h)
+          if root.compareAndSwap(Some(head), Some(newHead)) { return }
+          // lost the publish race → reload and retry
+        },
+      }
+    }
+  }
+
+  // RCU remove (single writer). Absent key → no-op; present → publish a
+  // path-copied version that splices the node out, via one root CAS.
+  remove(k: int) {
+    while true {
+      match root.load() {
+        None       => return,
+        Some(head) => {
+          let sp = findPath(head, k)
+          var target: Option<Node> = None
+          match sp.update[0] {
+            Some(u0) => match u0.next[0] {
+              Some(succ) => if succ.key == k { target = Some(succ) },
+              None       => {},
+            },
+            None => {},
+          }
+          match target {
+            None         => return,                         // absent → no-op
+            Some(victim) => {
+              let newHead = copyPathRemove(sp, victim)
+              if root.compareAndSwap(Some(head), Some(newHead)) { return }
+              // lost the publish race → reload and retry
+            },
+          }
+        },
+      }
+    }
+  }
+
+  // Lock-free ordered read: snapshot the root and return its level-0 chain. The
+  // returned slice is a consistent view of one published version — a concurrent
+  // writer publishing a newer version cannot tear it.
+  snapshotKeys(): []int {
+    match root.load() {
+      None       => return []int{},
+      Some(head) => return keysFrom(head),
+    }
+  }
+}
+
+// Every published root is a strictly-ordered chain. A broken CAS-publish
+// (linking the copied prefix to the wrong tail) or an in-place link mutation
+// (violating immutability) leaves the level-0 walk non-monotone — this invariant
+// catches it at every method exit. (RFC-0006 class invariant; inert until
+// `--contracts` enforcement.)
+contract SkipSet {
+  invariant orderedFrom(root.load())
+}
+
+// ---- sequential oracle + invariant helpers ----
+
+// The sequential oracle: apply the same op sequence to a plain `Set<int>`
+// (op ≥ 0 inserts, op < 0 removes |op|) and return its sorted membership. A
+// genuinely DIFFERENT implementation from the skip-list, so equality against it
+// is a real cross-check, not a restatement of the body.
+func oracle(ops: []int): []int {
+  let s = Set<int>{}
+  for op in ops {
+    if op >= 0 { s.add(op) } else { s.delete(0 - op) }
+  }
+  return sort.sorted(s.toSlice(), (a, b) => a < b)
+}
+
+// Elementwise equality of two int sequences (slices are reference types, so
+// `==` is unavailable).
+func intSeqEq(a: []int, b: []int): bool {
+  if a.len() != b.len() { return false }
+  var i = 0
+  while i < a.len() {
+    if a[i] != b[i] { return false }
+    i = i + 1
+  }
+  return true
+}
+
+// Strictly increasing ⇒ sorted AND duplicate-free — the ordered-set structural
+// invariant used by both the class invariant and the reader torn-detector.
+func isStrictlyIncreasing(xs: []int): bool {
+  var i = 1
+  while i < xs.len() {
+    if xs[i - 1] >= xs[i] { return false }
+    i = i + 1
+  }
+  return true
+}
+
+// Every expected key is found by the independent lock-free `contains` read path.
+// Ties `contains` (point query) to `snapshotKeys` (full walk): two independent
+// readers of the same published version must agree.
+func allContained(set: SkipSet, expected: []int): bool {
+  for k in expected {
+    if !set.contains(k) { return false }
+  }
+  return true
+}
+
+type RunResult = {
+  set:  SkipSet
+  keys: []int
+  torn: int
+}
+
+// Drive the set under contention: `numReaders` lock-free reader goroutines take
+// repeated snapshots (each checked for a torn structure) while one writer applies
+// `ops` in order — all joined by one structured `scope`. The shared
+// torn-observation count is a scalar `atomic.Int64`. Returns the final set, its
+// sorted membership, and the torn-observation total.
+func run(numReaders: int, ops: []int): Result<RunResult, error> {
+  let set  = SkipSet.new()
+  let torn = atomic.Int64{}
+
+  try scope<unit, error> {
+    var r = 0
+    while r < numReaders {
+      spawn {
+        var probes = 0
+        while probes < readerProbes {
+          // A lock-free snapshot must ALWAYS be strictly sorted; if a reader ever
+          // observed a torn/partial structure, monotonicity would break here.
+          if !isStrictlyIncreasing(set.snapshotKeys()) { torn.add(1) }
+          probes = probes + 1
+        }
+        return Ok(())
+      }
+      r = r + 1
+    }
+
+    // Exactly one writer (the RCU model): many lock-free readers, single mutator.
+    spawn {
+      for op in ops {
+        if op >= 0 { set.insert(op) } else { set.remove(0 - op) }
+      }
+      return Ok(())
+    }
+  }
+
+  return Ok(RunResult{ set: set, keys: set.snapshotKeys(), torn: int(torn.load()) })
+}
+
+func main() {
+  if os.args.len() < 3 {
+    fmt.println("usage: rcu_skiplist <readers> <op> [op...]   (op>0 insert, op<0 remove)")
+    os.exit(2)
+  }
+  let numReaders = match strconv.atoi(os.args[1]) {
+    Ok(n)  => n,
+    Err(_) => { fmt.println("bad readers"); os.exit(2) },
+  }
+  var ops: []int = []int{}
+  var i = 2
+  while i < os.args.len() {
+    match strconv.atoi(os.args[i]) {
+      Ok(v)  => ops = ops.push(v),
+      Err(_) => { fmt.println("bad op:", os.args[i]); os.exit(2) },
+    }
+    i = i + 1
+  }
+
+  match run(numReaders, ops) {
+    Ok(r) => {
+      var parts: []string = []string{}
+      for k in r.keys { parts = parts.push(strconv.itoa(k)) }
+      fmt.println("set:", strings.join(parts, " "))
+      fmt.println("size:", r.keys.len())
+      fmt.println("matches-oracle:", if intSeqEq(r.keys, oracle(ops)) { "true" } else { "false" })
+      fmt.println("consistent-snapshots:", if r.torn == 0 { "true" } else { "false" })
+    },
+    Err(e) => {
+      fmt.println("error:", e)
+      os.exit(1)
+    },
+  }
+}
+
+// THE load-bearing RCU invariants (the whole reason this example exists). A
+// broken CAS-publish (a lost update) or an in-place mutation that violates the
+// copy discipline betrays itself in at least one clause:
+//   * intSeqEq(keys, oracle(ops)) — final membership after the concurrent batch
+//     equals the sequential oracle. Necessary AND sufficient for correctness: a
+//     dropped publish loses a key (short digest), a botched splice corrupts one
+//     (misaligned digest). A trivially-wrong `return Ok(emptySet)` fails it.
+//   * isStrictlyIncreasing(keys) — the ordered-set invariant (sorted ∧ no dup).
+//     Alone it is satisfied by the empty set, so it is paired with the oracle
+//     half above; together they pin the result to exactly the oracle's members.
+//   * allContained(set, keys) — the independent lock-free `contains` read path
+//     agrees with the `snapshotKeys` walk; a structure consistent to one reader
+//     but not the other would fail it.
+//   * torn == 0 — across every concurrent probe, no reader ever observed a torn
+//     (non-monotone) snapshot. An in-place write on a published node — the
+//     cardinal RCU violation — would let a reader catch a half-updated chain and
+//     drive this above zero.
+contract run {
+  ensures match result {
+    Ok(r)  => (intSeqEq(r.keys, oracle(ops))
+               && isStrictlyIncreasing(r.keys)
+               && allContained(r.set, r.keys)
+               && r.torn == 0),
+    Err(_) => false,
+  }
+}
+
+// The height assignment must stay within the tower bound, or `findPath`/insert
+// would index a level a node does not have. A bare structural guard on the one
+// piece of arithmetic that could silently corrupt every tower.
+contract heightForKey {
+  ensures result >= 1 && result <= maxLevel
+}
