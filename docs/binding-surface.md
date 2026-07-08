@@ -463,7 +463,8 @@ class http.Server {
   let handler: http.Handler
   // ... timeouts etc.
 
-  listenAndServe():       Result<unit, error>
+  serve(l: net.Listener):         Result<unit, error>   // drive on an existing listener
+  listenAndServe():               Result<unit, error>   // carry-forward (binds its own listener)
   shutdown(ctx: context.Context): Result<unit, error>
 }
 
@@ -489,11 +490,19 @@ handle field, yielding a `url.URL` handle so `r.url.path` routes; `url_router`
 proves it) fields via the field axis, the rest of its surface a carry-forward.
 `http.listenAndServe(addr,
 handler)` and `http.serve(listener, handler)` are bound (mechanical `Result<unit,
-error>` rows). `listenAndServe` blocks (so `healthcheck_server` builds but is
-`no-run`); `serve` over a `net.Listen` listener is stoppable by closing the
-listener — the `http_server` example uses it for a run-checkable in-process
-server driven by a raw `net` client (the runtime proof of the conformance
-machinery). **`http.Response` is a bound value-handle with a field axis** — the
+error>` rows). The free `http.listenAndServe` blocks; `http.serve` over a
+`net.Listen` listener is stoppable by closing the listener — the `http_server`
+example uses it for a run-checkable in-process server driven by a raw `net`
+client (the runtime proof of the conformance machinery). **`http.Server` is a
+bound constructable handle with init fields** — the first stdlib handle built
+with a brace-literal *field* (`http.Server{ handler: h, addr: a }`, lowering to
+`&http.Server{Handler: h, Addr: a}`), vs the fieldless `sync.Mutex{}`; its
+`serve(l: net.Listener)` and `shutdown(ctx)` methods (Go's `(*http.Server).Serve`
+/ `.Shutdown`, `ResultUnit`-wrapped) drive a **graceful** server: `healthcheck_server`
+now installs the Aril handler on an `http.Server`, `serve`s it, and — after an
+in-process client reads `ok` — `shutdown`s it cleanly, so it is **run_ok** (no
+longer `no-run`). `http.Server.listenAndServe()` (the self-listening form) stays a
+carry-forward. **`http.Response` is a bound value-handle with a field axis** — the
 first handle to expose *fields*, not just methods: `resp.statusCode` (int),
 `resp.status` (string), `resp.header` (http.Header), `resp.body` (io.ReadCloser,
 drained via `io.readAll`) lower to Go's exported `StatusCode`/`Status`/`Header`/

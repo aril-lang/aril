@@ -1,22 +1,67 @@
-// Showcase: the net/http binding and Go interface conformance.
-// HealthHandler explicitly implements Go's http.Handler — the conformance is
-// declared and checked by Aril (D14, see ../../docs/design-decisions.md),
-// with no hand-written glue.
+// Showcase: an Aril class IS a Go http.Handler, served through http.Server with
+// graceful shutdown.
+//
+// `HealthHandler implements http.Handler` is checked structurally by Aril (E0219,
+// no hand-written glue) and lowered so `serveHTTP` becomes Go's `ServeHTTP`. It is
+// installed on an `http.Server{ handler: ... }` — the first constructable stdlib
+// handle built with an init field — which `serve`s the handler until `shutdown`
+// drains it. The runtime proof: a raw `net` client GETs the server, reads the
+// handler's "ok", then shuts the server down cleanly (Go's http.Server.Shutdown),
+// all in-process on an OS-assigned loopback port so the scope joins deterministically.
 
+import fmt
+import net
 import http
-import log
+import strings
 
 class HealthHandler implements http.Handler {
   serveHTTP(w: http.ResponseWriter, r: http.Request) {
-    w.writeString("ok\n")
+    let _ = w.writeString("ok\n")
   }
 }
 
 func main() {
-  let handler = HealthHandler{}
-  log.println("listening on :8080")
-  match http.listenAndServe(":8080", handler) {
-    Ok(_)  => {},
-    Err(e) => log.fatal(e),
+  let ln = net.listen("tcp", "127.0.0.1:0") catch e {
+    fmt.println("listen failed")
+    return
   }
+  let addr = ln.addr().string()
+  let server = http.Server{ handler: HealthHandler{} }
+
+  let outcome = scope<unit, error> {
+    // Server: Go's HTTP runtime drives the Aril handler until Shutdown stops it.
+    spawn {
+      match server.serve(ln) {
+        Ok(_)  => {},
+        Err(_) => {},   // Serve returns ErrServerClosed on graceful shutdown
+      }
+    }
+    // Client: one HTTP/1.1 GET; read the "ok" body, then shut the server down.
+    spawn {
+      match net.dial("tcp", addr) {
+        Ok(c) => {
+          let req = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+          match c.write(strings.toBytes(req)) { Ok(_) => {}, Err(_) => {} }
+          // The whole small response arrives in one read on loopback.
+          let buf = makeSlice<byte>(1024)
+          match c.read(buf) {
+            Ok(n) => {
+              let raw = strings.fromBytes(buf[0:n])
+              if strings.contains(raw, "ok") {
+                fmt.println("healthcheck ok")
+              } else {
+                fmt.println("unexpected response")
+              }
+            },
+            Err(_) => { fmt.println("read failed") },
+          }
+          match c.close() { Ok(_) => {}, Err(_) => {} }
+        },
+        Err(_) => { fmt.println("dial failed") },
+      }
+      // Graceful shutdown: drain in-flight requests, then stop Serve so the scope joins.
+      match server.shutdown(scope.context) { Ok(_) => {}, Err(_) => {} }
+    }
+  }
+  match outcome { Ok(_) => {}, Err(_) => {} }
 }

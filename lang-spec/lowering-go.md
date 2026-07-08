@@ -310,10 +310,19 @@ form share one Go representation:
   value handle** (`sync.Mutex{}`, `sync.WaitGroup{}`) lowers to the bare
   Go value struct `pkg.Type{}` (no `&` — a local var is addressable, so
   a pointer-receiver method like `mu.lock()` → `mu.Lock()` auto-addresses).
-  Only the empty form lowers; the handle has no Aril-visible fields —
-  a field-bearing `sync.Mutex{x: 1}` is rejected in sema (E0218). Obtain-only
-  handles (regexp.Regexp, net.Conn) are not constructable — a brace literal on
-  them is likewise rejected in sema (E0218), pointing at the constructor.
+  A fieldless handle has no Aril-visible fields — `sync.Mutex{x: 1}` is
+  rejected in sema (E0218).
+- A **constructable handle with an init-field spec** (`http.Server`) accepts
+  its declared fields in the literal: `http.Server{ handler: h, addr: a }`
+  lowers to a Go composite over the handle's base type with each Aril field
+  mapped to its exported Go field in source order — `&http.Server{Handler: h,
+  Addr: a}`. The leading `&` is emitted for a **pointer** handle type
+  (`*http.Server`, so its pointer-receiver methods `serve`/`shutdown` reach it);
+  a value handle keeps the bare form. A field not in the spec is rejected in
+  sema (E0218). Field *values* are not deeply type-verified in v1 (Go checks the
+  composite literal at build).
+- Obtain-only handles (regexp.Regexp, net.Conn) are not constructable — a brace
+  literal on them is rejected in sema (E0218), pointing at the constructor.
 
 **Constructor type-argument stamping.** A constructor call
 (`Ok`/`Err`/`Some`/`None`) constrains only the type parameter its

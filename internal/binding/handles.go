@@ -89,6 +89,14 @@ var handleTypes = map[string]HandleType{
 	// from http.get/do; a Header from a Response/Request field).
 	"http.Response": {GoType: "*http.Response", GoPkg: "http"},
 	"http.Header":   {GoType: "http.Header", GoPkg: "http"},
+	// net/http server handle (CORPUS-POLISH epoch). http.Server is the first
+	// *constructable handle with init fields* — built `http.Server{ handler: h }`
+	// (vs the fieldless zero-construction of sync.Mutex{}), its settable fields
+	// listed in handleInitFields. GoType is the pointer `*http.Server` so Serve /
+	// Shutdown (pointer-receiver methods) reach it and the literal lowers to
+	// `&http.Server{…}`. It drives a self-terminating graceful server:
+	// `serve(ln)` then `shutdown(ctx)` (binding-surface §net/http).
+	"http.Server": {GoType: "*http.Server", GoPkg: "http", Constructable: true},
 	// net/url (HTTP-CLIENT epoch). url.URL is a pointer handle (*url.URL) with a
 	// field axis (scheme/host/path) + a string() method; obtained from url.parse
 	// or an http.Request's url field. GoPkg is the Aril import name `url` (→ net/url
@@ -195,6 +203,14 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"add":    {GoName: "Add", Params: []string{"string", "string"}, Return: "unit"},
 		"delete": {GoName: "Del", Params: []string{"string"}, Return: "unit"},
 	},
+	// net/http Server method set (binding-surface §net/http). Both wrap a bare-error
+	// Go return via ResultUnit (like net.Conn.close). serve(ln) is Go's
+	// (*http.Server).Serve — it blocks driving the handler until shutdown; shutdown(ctx)
+	// is (*http.Server).Shutdown — a graceful drain bounded by the context.
+	"http.Server": {
+		"serve":    {GoName: "Serve", Params: []string{"net.Listener"}, Return: "Result<unit, error>"},
+		"shutdown": {GoName: "Shutdown", Params: []string{"context.Context"}, Return: "Result<unit, error>"},
+	},
 	// net/url URL method set (binding-surface §net/url). string() reassembles the
 	// URL (Go's (*url.URL).String); the components are read as fields (handleFields).
 	"url.URL": {
@@ -236,6 +252,30 @@ var handleFields = map[string]map[string]HandleBinding{
 		"method": {GoName: "Method", Return: "string"},
 		"url":    {GoName: "URL", Return: "url.URL"},
 	},
+}
+
+// handleInitFields maps a *constructable* handle to the fields settable in its
+// brace literal (Aril field name → binding: GoName the exported Go struct field,
+// Return the documentary Aril type). This is the construction-time counterpart
+// of handleFields (which is read-access): `http.Server{ handler: h }` lowers to
+// `&http.Server{ Handler: h }`. A handle absent here is fieldless
+// zero-construction only (`sync.Mutex{}`); a field not listed for a handle that
+// is here is rejected (E0218). Field *values* are not deeply type-verified in
+// v1 (documentary Return, like handle-ctor Params) — Go checks the composite
+// literal at build.
+var handleInitFields = map[string]map[string]HandleBinding{
+	"http.Server": {
+		"handler": {GoName: "Handler", Return: "http.Handler"},
+		"addr":    {GoName: "Addr", Return: "string"},
+	},
+}
+
+// HandleInitFieldsOf returns the constructable-init-field set of the handle
+// spelled `handle`, or ok=false when it has no init fields (fieldless
+// zero-construction only).
+func HandleInitFieldsOf(handle string) (map[string]HandleBinding, bool) {
+	m, ok := handleInitFields[handle]
+	return m, ok
 }
 
 // HandleFieldOf returns the binding for field `arilName` on the handle type
