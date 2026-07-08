@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aril-lang/aril/internal/ast"
+	"github.com/aril-lang/aril/internal/sema"
 )
 
 // This file holds statement-level emission: block / function-body
@@ -239,13 +240,58 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 			return err
 		}
 		g.b.WriteString(" = ")
-		if err := g.emitExpr(v.Value); err != nil {
+		// Flow the assignment target's declared field type as the expected
+		// type so a constructor value Go can't infer — `n.prev = None` /
+		// `field = Ok(v)` — gets its type args stamped, mirroring the
+		// record-literal field path (§Constructor type-argument stamping).
+		// nil when the LValue is not a field of known type.
+		prevExpect := g.expectType
+		g.expectType = g.lvalueFieldType(v.LValue)
+		err := g.emitExpr(v.Value)
+		g.expectType = prevExpect
+		if err != nil {
 			return err
 		}
 		g.b.WriteByte('\n')
 		return nil
 	}
 	return fmt.Errorf("codegen: unhandled stmt %T", s)
+}
+
+// lvalueFieldType returns the declared Aril type of an assignment target that
+// is a record/class field, so the RHS can stamp constructor type args it can't
+// otherwise infer (`n.prev = None` → `OptionNone[*Node]()`). Two shapes:
+//   - a bare implicit-receiver field (`last = None`) — the resolved SymField
+//     symbol carries its *ast.FieldDecl (Decl), whose DeclType is the answer;
+//   - a qualified field (`n.prev = None`) — the receiver's sema Named names the
+//     owning type, and g.fieldTypes maps that type's field to its DeclType.
+//
+// Returns nil for any other LValue (index, non-field ident) — expectType then
+// stays unset, exactly as before this hook existed.
+func (g *gen) lvalueFieldType(lv ast.Expr) ast.TypeExpr {
+	if g.info == nil {
+		return nil
+	}
+	switch t := lv.(type) {
+	case *ast.Ident:
+		if sym := g.info.Symbol[t]; sym != nil && sym.Kind == sema.SymField {
+			// A class field's Decl is *ast.ClassField, a record field's is
+			// *ast.FieldDecl — both carry the declared type.
+			switch fd := sym.Decl.(type) {
+			case *ast.ClassField:
+				return fd.DeclType
+			case *ast.FieldDecl:
+				return fd.DeclType
+			}
+		}
+	case *ast.Field:
+		if named, ok := g.info.Type[t.Receiver].(*sema.Named); ok {
+			if fts, ok := g.fieldTypes[named.N]; ok {
+				return fts[t.Name]
+			}
+		}
+	}
+	return nil
 }
 
 // emitDestructureLet lowers `let (a, b) = e` (lowering-go.md

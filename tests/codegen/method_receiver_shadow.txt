@@ -72,7 +72,7 @@ func bagNew() *Bag {
 }
 func (_arilSelf *Bag) add(x int) {
 	_arilSelf.Count = _arilSelf.Count + 1
-	_arilSelf.Last = OptionSome(x)
+	_arilSelf.Last = OptionSome[int](x)
 }
 func (_arilSelf *Bag) take() Option[int] {
 	var result Option[int] = OptionNone[int]()
