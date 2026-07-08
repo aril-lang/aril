@@ -866,6 +866,14 @@ s[lo:hi]          → s[lo:hi]
 
 Slice index-write `s[i] = v` lowers to `s[i] = v` directly.
 
+**Receiver-type precondition.** These shortcuts apply only when the receiver
+sema-types to a slice (or, for `len`/`bytes`/`runes`, a string) — **not** to a
+user class/record value. A user type may declare its own `len()` / `push()` /
+… method; such a call dispatches to that method (`cache.len()`), never the
+builtin lowering (`len(cache)`, which would be a raw Go-backend leak — D10).
+Codegen gates the shortcut on the receiver's sema type; a user Named receiver
+falls through to ordinary method dispatch (`builtins.md` §Slice methods).
+
 ## Defer / panic / refEq
 
 ```
