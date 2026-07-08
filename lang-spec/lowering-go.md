@@ -468,15 +468,49 @@ ScopeIR { group_name: g, ctx_name: ctx, parent: P, body: B,
     _ = ctx                                     // ScopeRef reads ctx; the
                                                 //  blank assign covers a
                                                 //  scope that never does
-    <lowering of B>                             // ends with a trailing
-                                                //  arilrt.Result[T, E]
-                                                //  value or unit-Ok
-    if err := eg.Wait(); err != nil {
-        return arilrt.Result[T, E]{Tag: 1, E: err.(E)}
-    }
+    <lowering of B, with the join injected — see below>
     return <the trailing-expression Ok-wrap>
   }()
 ```
+
+**Join placement — before an in-scope fan-in close.** The join
+
+```
+  if err := eg.Wait(); err != nil {
+      return arilrt.Result[T, E]{Tag: 1, E: err.(E)}
+  }
+```
+
+is emitted **immediately before the first top-level fan-in `ch.close()`
+statement that follows the scope's spawns**; when the body has no such close it
+is emitted **after the whole body**, before the trailing Ok-wrap. This is what
+lets a scope *return* its spawns' collected results — the **in-scope fan-in
+drain** idiom, where the body itself closes and range-drains the channel:
+
+```
+scope<[]T, error> { …spawns send to ch…; ch.close(); for x in ch {…}; out }
+```
+
+The close must run only after every sibling spawn has finished sending, so the
+join precedes it; the drain then reads the buffered values on the success path,
+and is skipped on the error short-circuit. The **other** in-scope shape — direct
+concurrent receives (`let a = ch.recv()`) that interleave with the still-running
+sends over an unbuffered channel — carries no fan-in close, so its join stays at
+the body end and the receives remain concurrent with the sends (moving the join
+ahead of them would deadlock). The **external-drain** shape (`try scope { … }`
+then `ch.close()` + drain in the enclosing function) likewise has no in-body
+close and keeps the join at the body end. All three no-close cases lower
+identically to the pre-join-placement compiler.
+
+> **Constraint (in-scope fan-in).** The drained channel must be **buffered ≥ its
+> spawn count**. The join blocks for every spawn to return *before* the drain
+> begins, so an unbuffered fan-in channel would strand its producers (a send with
+> no concurrent receiver) and `eg.Wait()` would never return. Every corpus fan-in
+> sizes the buffer to the spawn count; an unbuffered concurrent drain is a
+> distinct (background-goroutine) lowering, not covered in v1.
+
+The join-placement query is the structural predicate `ast.ScopeJoinBeforeIndex`,
+which stops at a nested `ScopeExpr` (an inner scope joins its own spawns).
 
 **Group helper (no external dependency).** Generated modules carry no
 `errgroup` import — so the group is the `arilrt` `Group` helper

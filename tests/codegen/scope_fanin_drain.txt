@@ -1,0 +1,112 @@
+--- TITLE ---
+Scope in-scope fan-in drain — join relocated before the fan-in close (§ScopeIR)
+
+--- INPUT ---
+import fmt
+
+func collect(n: int): Result<[]int, error> {
+  return scope<[]int, error> {
+    let ch = makeChannel<int>(n)
+    for i in 0..n {
+      spawn { ch.send(i); return Ok(()) }
+    }
+    ch.close()
+    var out: []int = []int{}
+    for v in ch { out = out.push(v) }
+    out
+  }
+}
+
+func main() {
+  match collect(3) {
+    Ok(xs) => fmt.println("count:", xs.len()),
+    Err(e) => fmt.println("err:", e),
+  }
+}
+
+--- GO ---
+
+package main
+
+import (
+	"context"
+	"fmt"
+	"sync"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+
+type Group struct {
+	wg     sync.WaitGroup
+	once   sync.Once
+	err    error
+	cancel context.CancelFunc
+}
+
+func NewGroup(parent context.Context) (*Group, context.Context) {
+	ctx, cancel := context.WithCancel(parent)
+	return &Group{cancel: cancel}, ctx
+}
+
+func (g *Group) Go(f func() error) {
+	g.wg.Add(1)
+	go func() {
+		defer g.wg.Done()
+		if err := f(); err != nil {
+			g.once.Do(func() {
+				g.err = err
+				g.cancel()
+			})
+		}
+	}()
+}
+
+func (g *Group) Wait() error {
+	g.wg.Wait()
+	g.cancel()
+	return g.err
+}
+func collect(n int) Result[[]int, error] {
+	return func() Result[[]int, error] {
+		_arilEg0, _arilCtx0 := NewGroup(context.Background())
+		_ = _arilCtx0
+		var ch = make(chan int, n)
+		for i := 0; i < n; i++ {
+			_arilEg0.Go(func() error {
+				ch <- i
+				return nil
+			})
+		}
+		if _err := _arilEg0.Wait(); _err != nil {
+			return ResultErr[[]int, error](_err)
+		}
+		close(ch)
+		var out []int = []int{}
+		for v := range ch {
+			out = append(out, v)
+		}
+		return ResultOk[[]int, error](out)
+	}()
+}
+func main() {
+	__aril_match_1 := collect(3)
+	switch __aril_match_1.Tag {
+	case 0:
+		xs := __aril_match_1.V
+		fmt.Println("count:", len(xs))
+	case 1:
+		e := __aril_match_1.E
+		fmt.Println("err:", e)
+	}
+}

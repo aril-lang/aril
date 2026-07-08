@@ -79,27 +79,48 @@ func (g *gen) emitScopeExpr(s *ast.ScopeExpr) error {
 	g.writeIndent()
 	g.b.WriteString("_ = " + ctxv + "\n")
 
-	for _, st := range s.Body.Stmts {
+	// Place the join (Group.Wait) *before* an in-scope fan-in `ch.close()` so
+	// every sibling spawn has finished sending before the channel closes — else
+	// the close races a still-running send (send-after-close, E1203). A scope
+	// with no such close (concurrent-recv or external-drain) keeps the join at
+	// the body end, byte-identical to the pre-fix lowering (§ScopeIR).
+	joinBefore := ast.ScopeJoinBeforeIndex(s.Body)
+	emitJoin := func() error {
+		// Join: the first spawned error (if any) becomes Err.
+		g.writeIndent()
+		g.b.WriteString("if _err := ")
+		g.b.WriteString(gv)
+		g.b.WriteString(".Wait(); _err != nil {\n")
+		g.indent++
+		g.writeIndent()
+		g.b.WriteString("return " + g.rt("ResultErr") + "[")
+		if err := g.emitScopeTType(tArg); err != nil {
+			return err
+		}
+		g.b.WriteString(", error](_err)\n")
+		g.indent--
+		g.writeIndent()
+		g.b.WriteString("}\n")
+		return nil
+	}
+
+	for i, st := range s.Body.Stmts {
+		if i == joinBefore {
+			if err := emitJoin(); err != nil {
+				return err
+			}
+		}
 		if err := g.emitStmt(st); err != nil {
 			return err
 		}
 	}
-
-	// Join: the first spawned error (if any) becomes Err.
-	g.writeIndent()
-	g.b.WriteString("if _err := ")
-	g.b.WriteString(gv)
-	g.b.WriteString(".Wait(); _err != nil {\n")
-	g.indent++
-	g.writeIndent()
-	g.b.WriteString("return " + g.rt("ResultErr") + "[")
-	if err := g.emitScopeTType(tArg); err != nil {
-		return err
+	// No in-scope fan-in close (joinBefore < 0): join after the whole body,
+	// before the trailing-value wrap.
+	if joinBefore < 0 {
+		if err := emitJoin(); err != nil {
+			return err
+		}
 	}
-	g.b.WriteString(", error](_err)\n")
-	g.indent--
-	g.writeIndent()
-	g.b.WriteString("}\n")
 
 	// Success: wrap the trailing value (or unit) Ok.
 	g.writeIndent()

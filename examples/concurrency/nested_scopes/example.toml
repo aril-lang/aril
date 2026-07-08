@@ -4,6 +4,12 @@ category = "concurrency"
 showcase = true
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "compiling"
+status   = "running"
 expects  = "run-pass"
 entry    = "nested_scopes.aril"
+# The outer scope short-circuits on the `us/bad` failure, so main always
+# takes the Err arm ("failed: …"). The winning error's identity races
+# (us/bad vs a cancelled sibling), so assert the failure milestone and
+# forbid any "got <x>" success row rather than pin exact text (D34).
+expected_patterns  = "patterns.txt"
+forbidden_patterns = "forbidden.txt"
