@@ -6,7 +6,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 93 / 97 examples build end-to-end** (floor 93).
 - **diag_ok — 122 / 122 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 92 / 97 run-pass examples build and run as specified** (floor 92; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 93 / 97 run-pass examples build and run as specified** (floor 93; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
@@ -130,7 +130,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**5 of 97 run-pass examples fall short of run_ok.**
+**4 of 97 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
@@ -138,4 +138,3 @@ Run-pass examples that do not yet reach run_ok — they fail to build (an existi
 | `examples/concurrency/lockfree_stack` | build-fail | 1 |
 | `examples/concurrency/rcu_skiplist` | build-fail | 1 |
 | `examples/concurrency/rcu_tree` | build-fail | 1 |
-| `examples/core-language/lru_cache` | run-fail | 2 |
