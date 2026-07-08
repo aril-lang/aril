@@ -5,7 +5,7 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 92 / 93 examples build end-to-end** (floor 92).
-- **diag_ok — 98 / 121 negative cases produce their expected diagnostic** (floor 88).
+- **diag_ok — 121 / 121 negative cases produce their expected diagnostic** (floor 88).
 - **run_ok — 90 / 92 run-pass examples build and run as specified** (floor 90; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
@@ -117,33 +117,10 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.
 
-**23 of 121 cases fall short of the ideal.**
+**0 of 121 cases fall short of the ideal.**
 
 | Case | Ideal (`.expected`) | Actual |
 |---|---|---|
-| `examples/core-language/deep_destructure/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "cause" |
-| `examples/core-language/fizzbuzz/errors/missing-brace.patch` | error[E0112]: expected `{` | error[E0112]: expected Punct "{", got Newline "" |
-| `examples/core-language/fizzbuzz/errors/missing-in.patch` | error[E0112]: expected `in` | error[E0112]: expected Keyword "in", got IntLit "1" |
-| `examples/core-language/invert_binary_tree/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "right" |
-| `examples/core-language/merge_intervals/errors/organic-merge3-e0112.patch` | error[E0112]: expected a type | error[E0112]: expected type expression, got Newline "" |
-| `examples/core-language/p1242/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "v" |
-| `examples/core-language/p1335/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "e" |
-| `examples/core-language/p1349/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "e" |
-| `examples/core-language/p1404/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "e" |
-| `examples/core-language/p1605/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "e" |
-| `examples/core-language/p1683/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "e" |
-| `examples/core-language/p1786/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "b" |
-| `examples/core-language/p1820/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "b" |
-| `examples/core-language/set_algebra/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "b" |
-| `examples/core-language/two_sum/errors/missing-comma-args.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "i" |
-| `examples/core-language/two_sum/errors/missing-in-for.patch` | error[E0112]: expected `in` | error[E0112]: expected Keyword "in", got Ident "nums" |
-| `examples/modeling-errors/error_chain/errors/organic-dividend2-e0112.patch` | error[E0112]: expected an expression | error[E0112]: expected expression, got Punct "." |
-| `examples/modeling-errors/parse_int/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "v" |
-| `examples/modeling-errors/rpn_calculator/errors/organic-parseop2-e0112.patch` | error[E0112]: expected `(` | error[E0112]: expected Punct "(", got Punct "," |
-| `examples/modeling-errors/safe_divide/errors/bare-record-literal.patch` | error[E0112]: expected an expression | error[E0112]: expected expression, got Punct ":" |
-| `examples/modeling-errors/vending_machine/errors/organic-step2-e0112.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Punct ":" |
-| `examples/stdlib-binding/config_loader/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got Ident "cfg" |
-| `examples/stdlib-binding/wc/errors/missing-comma.patch` | error[E0112]: expected `)` | error[E0112]: expected Punct ")", got StringLit "\"\\n\"" |
 
 ## Run failures
 

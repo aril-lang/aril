@@ -25,8 +25,8 @@ func (p *parser) parseExternDecl() (ast.Decl, *Diag) {
 	}
 	t := p.peek()
 	return nil, p.diag("E0112",
-		fmt.Sprintf("expected `type`, `func`, or `impl` after `extern`, got %s %q",
-			t.Kind, t.Lexeme),
+		fmt.Sprintf("expected `type`, `func`, or `impl` after `extern`, got %s",
+			describeToken(t)),
 		t.Line, t.Col)
 }
 
@@ -239,8 +239,8 @@ func (p *parser) parseGoAttrOpt() (*ast.GoRef, *Diag) {
 	if !p.at(lexer.KindIdent, "go") {
 		t := p.peek()
 		return nil, p.diag("E0112",
-			fmt.Sprintf("expected `go(...)` foreign-binding attribute after `@`, got %s %q",
-				t.Kind, t.Lexeme),
+			fmt.Sprintf("expected `go(...)` foreign-binding attribute after `@`, got %s",
+				describeToken(t)),
 			t.Line, t.Col)
 	}
 	p.advance() // consume 'go'

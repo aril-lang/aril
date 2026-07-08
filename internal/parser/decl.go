@@ -65,7 +65,7 @@ func (p *parser) parseDecl() (ast.Decl, *Diag) {
 	}
 	t := p.peek()
 	return nil, p.diag("E0112",
-		fmt.Sprintf("expected top-level declaration, got %s %q", t.Kind, t.Lexeme),
+		fmt.Sprintf("expected top-level declaration, got %s", describeToken(t)),
 		t.Line, t.Col)
 }
 
@@ -589,7 +589,7 @@ func (p *parser) parseTypeParamList() ([]ast.TypeParam, *Diag) {
 		if !p.at(lexer.KindIdent) {
 			t := p.peek()
 			return nil, p.diag("E0112",
-				fmt.Sprintf("expected type-parameter name, got %s %q", t.Kind, t.Lexeme),
+				fmt.Sprintf("expected type-parameter name, got %s", describeToken(t)),
 				t.Line, t.Col)
 		}
 		tp := p.advance()
@@ -602,7 +602,7 @@ func (p *parser) parseTypeParamList() ([]ast.TypeParam, *Diag) {
 			if !p.at(lexer.KindIdent) {
 				t := p.peek()
 				return nil, p.diag("E0112",
-					fmt.Sprintf("expected a constraint name after `:`, got %s %q", t.Kind, t.Lexeme),
+					fmt.Sprintf("expected a constraint name after `:`, got %s", describeToken(t)),
 					t.Line, t.Col)
 			}
 			param.Bound = p.advance().Lexeme

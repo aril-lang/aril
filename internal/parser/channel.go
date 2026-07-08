@@ -101,8 +101,8 @@ func (p *parser) parseChannelClause() (ast.ChannelClause, *Diag) {
 	}
 	return ast.ChannelClause{}, p.diag("E0112",
 		fmt.Sprintf("expected a channel clause (closed-by/forbid send|recv after close/"+
-			"never more than … in flight/drains-before-scope-exit/drains-before-return), got %s %q",
-			start.Kind, start.Lexeme), start.Line, start.Col)
+			"never more than … in flight/drains-before-scope-exit/drains-before-return), got %s",
+			describeToken(start)), start.Line, start.Col)
 }
 
 // ---- RFC-0007 protocol clauses (inside a `contract` body) ----

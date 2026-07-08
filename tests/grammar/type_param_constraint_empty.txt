@@ -5,4 +5,4 @@ A `<T: >` constraint with no bound name is rejected (G3b; E0112 in parseTypePara
 func f<T: >(x: T): T { return x }
 
 --- ERRORS ---
-src.aril:1:11: error[E0112]: expected a constraint name after `:`, got Op ">"
+src.aril:1:11: error[E0112]: expected a constraint name after `:`, got `>`

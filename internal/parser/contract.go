@@ -85,7 +85,7 @@ func (p *parser) parseContractClause() (ast.ContractClause, *Diag) {
 	return ast.ContractClause{}, p.diag("E0112",
 		fmt.Sprintf("expected a contract clause (requires/ensures/invariant/loop/entry "+
 			"or an RFC-0007 protocol clause: channel/participant/forbid/eventually/every/"+
-			"delivered-to-all/fairness), got %s %q", t.Kind, t.Lexeme), t.Line, t.Col)
+			"delivered-to-all/fairness), got %s", describeToken(t)), t.Line, t.Col)
 }
 
 // parseEntrySection parses an `entry { (let <name> = <expr>)* }` section —
