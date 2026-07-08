@@ -208,6 +208,13 @@ shared with the original if capacity allowed; callers that need
 isolation should `copy()` first. This matches the corpus
 convention (`xs = xs.push(v)` everywhere).
 
+These slice shortcuts apply only when the receiver is a slice (or
+string, for `len`/`bytes`/`runes`) — **not** when it is a user
+class/record value. A user type may declare its own `len()` /
+`push()` / … method; such a call dispatches to that method
+(`cache.len()`), never the builtin lowering (`len(cache)`, which
+would be a raw Go-backend leak). See `lowering-go.md` §Slice methods.
+
 Slices also support:
 - index read `s[i]: T` (T-Index-Slice, `type-system.md`),
 - index write `s[i] = v` (slice index-write mutates the backing

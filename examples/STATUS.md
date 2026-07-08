@@ -4,14 +4,14 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 92 / 97 examples build end-to-end** (floor 92).
+- **build_ok — 93 / 97 examples build end-to-end** (floor 93).
 - **diag_ok — 122 / 122 negative cases produce their expected diagnostic** (floor 116).
 - **run_ok — 92 / 97 run-pass examples build and run as specified** (floor 92; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 92 |
-| emit / codegen fail | 1 |
+| ✅ build (full pipeline) | 93 |
+| emit / codegen fail | 0 |
 | sema fail | 3 |
 | parse fail | 1 |
 
@@ -51,6 +51,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/invert_binary_tree/invert_binary_tree.aril` | build | — |
 | `examples/core-language/leaderboard/leaderboard.aril` | build | — |
 | `examples/core-language/leetcode_3131/leetcode_3131.aril` | build | — |
+| `examples/core-language/lru_cache/lru_cache.aril` | build | — |
 | `examples/core-language/match_on_tuples/match_on_tuples.aril` | build | — |
 | `examples/core-language/merge_intervals/merge_intervals.aril` | build | — |
 | `examples/core-language/p1033/p1033.aril` | build | — |
@@ -111,7 +112,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/url_router/url_router.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
-| `examples/core-language/lru_cache/lru_cache.aril` | emit | go build failed |
 | `examples/concurrency/lockfree_ring/lockfree_ring.aril` | sema | error[E0117]: unknown import path "atomic" |
 | `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | sema | error[E0103]: Unknown name atomic |
 | `examples/concurrency/rcu_tree/rcu_tree.aril` | sema | error[E0103]: Unknown name atomic |
@@ -138,4 +138,4 @@ Run-pass examples that do not yet reach run_ok — they fail to build (an existi
 | `examples/concurrency/lockfree_stack` | build-fail | 1 |
 | `examples/concurrency/rcu_skiplist` | build-fail | 1 |
 | `examples/concurrency/rcu_tree` | build-fail | 1 |
-| `examples/core-language/lru_cache` | build-fail | 1 |
+| `examples/core-language/lru_cache` | run-fail | 2 |

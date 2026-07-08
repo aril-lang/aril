@@ -4,8 +4,8 @@
     "total": 97,
     "parse_fail": 1,
     "sema_fail": 3,
-    "emit_fail": 1,
-    "build_ok": 92,
+    "emit_fail": 0,
+    "build_ok": 93,
     "diag_ok": 122,
     "diag_total": 122,
     "run_ok": 92,
@@ -194,8 +194,8 @@
     },
     {
       "path": "examples/core-language/lru_cache/lru_cache.aril",
-      "stage": "emit",
-      "blocker": "go build failed"
+      "stage": "build",
+      "blocker": ""
     },
     {
       "path": "examples/core-language/match_on_tuples/match_on_tuples.aril",
@@ -522,8 +522,8 @@
     },
     {
       "path": "examples/core-language/lru_cache",
-      "status": "build-fail",
-      "code": 1
+      "status": "run-fail",
+      "code": 2
     }
   ]
 }

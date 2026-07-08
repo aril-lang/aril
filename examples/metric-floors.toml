@@ -20,9 +20,11 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 92   # current build_ok; strict ratchet (raised 91→92 in the
-                    # EXTERNAL-MODULES epoch — the greeter example depends on an
-                    # external pure-Aril library via [dependencies] (RFC-0008))
+build_ok_min = 93   # current build_ok; strict ratchet (raised 92→93 in the
+                    # GENERICS-HARDENING epoch — lru_cache, a generic class over a
+                    # Map + linked nodes, now builds: reserved method receiver,
+                    # None-on-assignment instantiation, the K: Comparable bound,
+                    # and user len() vs the slice builtin all fixed)
 diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # imprecise message is a penalty, not a red (raised 88→116 at
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
