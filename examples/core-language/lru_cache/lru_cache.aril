@@ -108,9 +108,15 @@ class LRU<K: Comparable, V> {
     match tail {
       None    => return,
       Some(t) => {
-        detach(t)
+        // Shrink the count *before* the list surgery, so `size <= capacity`
+        // holds at `detach`'s method exit too (detach is itself a checkpoint
+        // under --contracts=panic, and mid-eviction size is transiently
+        // capacity+1). Deleting from the index in the same step keeps
+        // `size == index.len()` satisfied throughout. `detach` only touches
+        // the prev/next links, so the order is behaviour-identical.
         index.delete(t.key)
         size = size - 1
+        detach(t)
       },
     }
   }
@@ -120,11 +126,20 @@ func main() {
   let cache = LRU<string, int>.new(2)
   cache.put("a", 1)
   cache.put("b", 2)
-  fmt.println("get a:", cache.get("a"))       // -> Some(1); a becomes MRU
-  cache.put("c", 3)                            // evicts b
-  fmt.println("get b:", cache.get("b"))       // -> None
-  fmt.println("get c:", cache.get("c"))       // -> Some(3)
-  fmt.println("len:",   cache.len())          // -> 2
+  match cache.get("a") {                        // a = 1; a becomes MRU
+    Some(v) => fmt.println("a =", v),
+    None    => fmt.println("a: miss"),
+  }
+  cache.put("c", 3)                             // evicts b (least recently used)
+  match cache.get("b") {                        // b was evicted
+    Some(v) => fmt.println("b =", v),
+    None    => fmt.println("b: miss"),
+  }
+  match cache.get("c") {
+    Some(v) => fmt.println("c =", v),
+    None    => fmt.println("c: miss"),
+  }
+  fmt.println("len:", cache.len())              // -> 2
 }
 
 // The canonical type-invariant case (RFC-0006): `size <= capacity` is

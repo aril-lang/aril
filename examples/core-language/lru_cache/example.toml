@@ -4,9 +4,10 @@ category = "core-language"
 showcase = false
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "lru_cache.aril"
+expected_output = "expected-output.txt"
 
 [[error]]
 patch   = "errors/unconstrained-map-key.patch"   # drop the `K: Comparable` bound → K keys the index Map unconstrained

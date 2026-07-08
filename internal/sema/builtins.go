@@ -57,9 +57,10 @@ func predeclaredSymbols() map[string]*Symbol {
 	return out
 }
 
-// goReservedIdent — codegen-internal `_aril_` prefix per E0107.
-// Lexer already rejects this; kept as defence-in-depth for
-// synthesised names that bypass the lexer.
+// goReservedIdent reports whether a name carries the codegen-reserved `_aril`
+// prefix. Defense-in-depth behind the lexer, which already rejects any
+// `_aril`-prefixed identifier at lex time (E0107); kept in lockstep with that
+// rule (five chars, no trailing underscore — covers `_arilSelf`/`_arilNew` too).
 func goReservedIdent(name string) bool {
-	return len(name) >= 6 && name[:6] == "_aril_"
+	return len(name) >= 5 && name[:5] == "_aril"
 }

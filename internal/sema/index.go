@@ -125,7 +125,7 @@ func (c *checker) indexFile(f *ast.File, file *Scope) {
 
 func (c *checker) checkReservedName(name string, span ast.Span) {
 	if goReservedIdent(name) {
-		c.report("E0107", "Reserved identifier prefix `_aril_` — used by codegen", span)
+		c.report("E0107", "Reserved identifier prefix `_aril` — used by codegen", span)
 	}
 }
 
