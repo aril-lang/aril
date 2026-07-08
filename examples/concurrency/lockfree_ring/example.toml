@@ -1,0 +1,25 @@
+description = "Bounded lock-free MPMC ring buffer (Vyukov) over atomic head/tail indices — scalar-atomics target-sketch"
+source   = "concurrency lockfree_ring"
+category = "concurrency"
+showcase = true
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.16"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "lockfree_ring.aril"
+
+# args: <producers> <consumers> <capacity> <perProducer>
+# Every case is oracle-deterministic: produced == consumed (+0 buffered),
+# and sum == triangular(total) = total*(total-1)/2, independent of interleaving.
+
+[[case]]
+args            = ["4", "4", "8", "25"]     # total 100, sum 4950
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["2", "3", "4", "10"]     # total 20, sum 190; tiny ring forces back-pressure
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["8", "2", "16", "50"]    # total 400, sum 79800; more producers than consumers
+expected_output = "case3.txt"

@@ -1,0 +1,4 @@
+set: 1 2 3 5 8 9
+size: 6
+matches-oracle: true
+consistent-snapshots: true

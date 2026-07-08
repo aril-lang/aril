@@ -1,0 +1,5 @@
+producers: 1
+consumers: 1
+pushed: 100
+popped: 100
+invariant: ok

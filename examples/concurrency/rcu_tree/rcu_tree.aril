@@ -1,0 +1,326 @@
+// RCU-synchronized ordered set over an immutable balanced binary search tree.
+//
+// The load-bearing idea: readers are *fully lock-free*. A reader `load()`s the
+// atomic root once and walks an immutable tree snapshot — no locks, no
+// synchronization, not even a memory barrier past the atomic load. A writer
+// never mutates a live node: it builds a fresh *path* of copied nodes down to
+// the point of change (persistent-tree style — every node off the path is
+// shared with the previous version), then `compareAndSwap`es the root to
+// publish the new version atomically (read-copy-update). Because Aril compiles
+// to Go, the garbage collector *is* the RCU grace period: a superseded path
+// stays alive exactly as long as some reader still holds it, and is reclaimed
+// once the last reader drops it. No hazard pointers, no epochs, no `unsafe`.
+//
+// This is a `target-sketch`: it is written against the forward-looking atomic
+// surface (`atomic.Pointer<T>` / `atomic.Bool`, docs/atomics-lock-free.md) and
+// the generic-class machinery, neither of which is implemented yet. It does
+// NOT build — `import atomic` is unbound — and that is the point: it is the
+// acceptance target (demand signal) for the generics + atomics epochs. It must
+// fail *gracefully* (a clean E-code on the unbound import), never panic.
+
+import fmt
+import os
+import strconv
+
+// An immutable BST node. Every field is `let`: once published, a node is never
+// mutated. A writer that needs a "different" tree builds new nodes; the RCU
+// invariant is that no reader ever observes a half-updated node.
+class Node {
+  let key:   int
+  let left:  Option<Node>
+  let right: Option<Node>
+}
+
+// ---- pure tree operations (no atomics — the immutable core) ----
+
+// Persistent insert: returns the root of a NEW tree that contains every key of
+// `root` plus `k`, copying only the nodes on the path from the root to the
+// insertion point and SHARING every off-path subtree with `root`. A duplicate
+// key returns a structurally-equal tree (the set is unchanged). `root` itself
+// is never mutated, so any reader still holding it keeps seeing the old set.
+func insertPersistent(root: Option<Node>, k: int): Node {
+  match root {
+    None => return Node{ key: k, left: None, right: None },
+    Some(n) => {
+      if k < n.key {
+        // copy this node, recurse left, SHARE the right subtree unchanged
+        return Node{ key: n.key, left: Some(insertPersistent(n.left, k)), right: n.right }
+      }
+      if k > n.key {
+        // copy this node, SHARE the left subtree unchanged, recurse right
+        return Node{ key: n.key, left: n.left, right: Some(insertPersistent(n.right, k)) }
+      }
+      return n                       // key already present — share the whole tree
+    },
+  }
+}
+
+func containsIn(root: Option<Node>, k: int): bool {
+  match root {
+    None => return false,
+    Some(n) => {
+      if k < n.key { return containsIn(n.left, k) }
+      if k > n.key { return containsIn(n.right, k) }
+      return true
+    },
+  }
+}
+
+// In-order traversal — the sorted key sequence of the snapshot.
+func inorder(root: Option<Node>): []int {
+  match root {
+    None => return []int{},
+    Some(n) => {
+      var out: []int = []int{}
+      for x in inorder(n.left)  { out = out.push(x) }
+      out = out.push(n.key)
+      for x in inorder(n.right) { out = out.push(x) }
+      return out
+    },
+  }
+}
+
+// A tree is a valid BST with unique keys iff its in-order sequence is strictly
+// increasing — the cheapest total structural check.
+func isBst(root: Option<Node>): bool {
+  return isSortedStrict(inorder(root))
+}
+
+// ---- the RCU cell ----
+
+// The generic atomic cell for the root pointer (docs/atomics-lock-free.md:
+// `atomic.Pointer<T>`). Aliased because the dotted-generic *brace literal*
+// `atomic.Pointer<Node>{}` is not yet parseable — a generics-epoch gap; the
+// alias's bare name `AtomicRoot{}` constructs the same cell and keeps the file
+// syntactically valid, so the sole remaining failure is the unbound `atomic`
+// surface (E0103 "Unknown name atomic") — the atomics-epoch demand signal.
+type AtomicRoot = atomic.Pointer<Node>
+
+class RcuTree {
+  // The single atomic root. Readers `load()` it; a writer `compareAndSwap`es
+  // it to publish. CAS compares by reference identity — RCU swaps the identity
+  // of the *published version*, not its contents.
+  let root: AtomicRoot
+
+  static new(): RcuTree {
+    return RcuTree{ root: AtomicRoot{} }             // starts empty (holds None)
+  }
+
+  // RCU publish: build the new path off the current root and CAS it in. If a
+  // concurrent writer won the race, `load()` the new root and rebuild — the
+  // classic lock-free retry loop. Add-only, so a published key stays present.
+  insert(k: int) {
+    while true {
+      let old = root.load()                          // : Option<Node>
+      let updated = insertPersistent(old, k)         // copy-path, share the rest
+      if root.compareAndSwap(old, Some(updated)) { return }
+    }
+  }
+
+  // Lock-free membership: a single atomic load, then a pure walk of the
+  // immutable snapshot. No lock is taken on the read path — ever.
+  contains(k: int): bool {
+    return containsIn(root.load(), k)
+  }
+
+  // Lock-free ordered read: snapshot the root and walk it in order. The
+  // returned slice is a consistent view of one published version — a
+  // concurrent writer publishing a newer version cannot tear it.
+  toSorted(): []int {
+    return inorder(root.load())
+  }
+
+  // Hand a reader the current immutable version so it can hold it across
+  // later writes (used to demonstrate persistence: the held snapshot is
+  // frozen even as the tree advances).
+  snapshot(): Option<Node> {
+    return root.load()
+  }
+}
+
+// Every published root is a valid BST with unique keys. A broken CAS-publish
+// (linking the copied path to the wrong subtree) or an in-place child mutation
+// (violating immutability) leaves some reachable node out of order — this
+// invariant catches it at every method exit. (RFC-0006 class invariant; inert
+// until `--contracts` enforcement.)
+contract RcuTree {
+  invariant isBst(root.load())
+}
+
+// ---- sequential oracle + slice helpers ----
+
+// Insert `k` into a sorted, de-duplicated list — the reference semantics the
+// tree must match, expressed without a tree.
+func sortedInsert(xs: []int, k: int): []int {
+  var out: []int = []int{}
+  var placed = false
+  for x in xs {
+    if x == k { placed = true }                      // already present — dedup
+    if x > k && placed == false {
+      out = out.push(k)
+      placed = true
+    }
+    out = out.push(x)
+  }
+  if placed == false { out = out.push(k) }
+  return out
+}
+
+// The sequential oracle: fold every key into a sorted unique list.
+func sortedUnique(xs: []int): []int {
+  var out: []int = []int{}
+  for x in xs { out = sortedInsert(out, x) }
+  return out
+}
+
+func isSortedStrict(xs: []int): bool {
+  var i = 1
+  while i < xs.len() {
+    if xs[i - 1] >= xs[i] { return false }
+    i = i + 1
+  }
+  return true
+}
+
+func seqEq(a: []int, b: []int): bool {
+  if a.len() != b.len() { return false }
+  var i = 0
+  while i < a.len() {
+    if a[i] != b[i] { return false }
+    i = i + 1
+  }
+  return true
+}
+
+func sumOf(xs: []int): int {
+  var s = 0
+  for x in xs { s = s + x }
+  return s
+}
+
+// Deterministic key stream (a POSIX-style LCG) so the inserted SET — and hence
+// the final sorted traversal — is fixed regardless of thread interleaving.
+func genKeys(seed: int, count: int): []int {
+  var out: []int = []int{}
+  var x = seed
+  var i = 0
+  while i < count {
+    x = (x * 1103515245 + 12345) % 2147483648
+    out = out.push(x % 1000)
+    i = i + 1
+  }
+  return out
+}
+
+func parseArg(idx: int, dflt: int): int {
+  if os.args.len() <= idx { return dflt }
+  match strconv.atoi(os.args[idx]) {
+    Ok(v)  => return v,
+    Err(_) => return dflt,
+  }
+}
+
+func main() {
+  let seed    = parseArg(1, 1)
+  let count   = parseArg(2, 16)
+  let readers = parseArg(3, 4)
+
+  let keys = genKeys(seed, count)
+  let tree = RcuTree.new()
+
+  // Phase 1 — build a base version sequentially, then freeze a reader's view
+  // of it. `oldRoot` is an immutable snapshot this reader "keeps"; the
+  // concurrent writes below must NOT change what it sees (persistence).
+  let half = count / 2
+  var i = 0
+  while i < half {
+    tree.insert(keys[i])
+    i = i + 1
+  }
+  let oldRoot = tree.snapshot()
+  let oldView = inorder(oldRoot)
+
+  // A shared flag every reader can flip lock-free if it ever materializes a
+  // torn (non-sorted) snapshot. Stays true iff RCU held.
+  let consistent = atomic.Bool{}
+  consistent.store(true)
+
+  // Phase 2 — concurrent writers (RCU inserts under CAS contention) alongside
+  // lock-free readers, all under one structured scope that joins on exit.
+  let mid = (half + count) / 2
+  match scope<unit, error> {
+    // writer A: keys[half, mid)
+    spawn {
+      var j = half
+      while j < mid {
+        tree.insert(keys[j])
+        j = j + 1
+      }
+      return Ok(())
+    }
+    // writer B: keys[mid, count)
+    spawn {
+      var j = mid
+      while j < count {
+        tree.insert(keys[j])
+        j = j + 1
+      }
+      return Ok(())
+    }
+    // lock-free readers: repeatedly snapshot-and-verify while writers churn
+    for _ in 0..readers {
+      spawn {
+        var it = 0
+        while it < 200 {
+          let snap = tree.toSorted()
+          if isSortedStrict(snap) {
+            // consistent snapshot — expected
+          } else {
+            consistent.store(false)             // a torn read: RCU was violated
+          }
+          it = it + 1
+        }
+        return Ok(())
+      }
+    }
+  } {
+    Ok(_)  => {},
+    Err(e) => { fmt.println("scope error:", e); os.exit(1) },
+  }
+
+  // Verify against the sequential oracle and the persistence guarantee.
+  let got       = tree.toSorted()
+  let oracle    = sortedUnique(keys)
+  let oldViewAfter = inorder(oldRoot)
+
+  fmt.println("distinct keys:", got.len())
+  fmt.println("checksum:", sumOf(got))
+  fmt.println("final set matches oracle:", seqEq(got, oracle))
+  fmt.println("old snapshot preserved:", seqEq(oldView, oldViewAfter))
+  fmt.println("readers observed consistent snapshots:", consistent.load())
+}
+
+// The heart of the correctness argument. `insertPersistent` must produce the
+// tree whose in-order sequence is EXACTLY the old sequence with `k` inserted in
+// sorted position and de-duplicated — necessary *and* sufficient. This one
+// predicate fires on every way the copy-path can go wrong: dropping `k`
+// (missing element), linking the copied node to the wrong branch (misordered
+// in-order → not equal), corrupting a shared subtree (elements lost/duplicated),
+// or double-inserting a duplicate (extra element). A one-sided `isSortedStrict`
+// would be satisfied by `return oldTree` (drops k) — pairing "sorted" with
+// "derived from the input via sortedInsert" is what closes that hole
+// (sorted ∧ permutation-of-input — docs/atomics-lock-free.md §Contract discipline).
+contract insertPersistent {
+  ensures seqEq(inorder(Some(result)), sortedInsert(inorder(root), k))
+}
+
+// The lock-free read depends on the snapshot being a well-formed BST: the
+// left/right descent only finds a present key if every node is in order. This
+// precondition states that reliance — it fires the instant a reader is handed a
+// torn or out-of-order snapshot (an in-place child mutation, a bad publish),
+// which is exactly when `containsIn`'s binary descent would silently miss a
+// present key. (Pairs with `RcuTree.invariant isBst(root.load())`, which
+// guarantees the published root always satisfies it.)
+contract containsIn {
+  requires isBst(root)
+}

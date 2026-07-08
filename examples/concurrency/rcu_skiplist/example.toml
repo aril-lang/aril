@@ -1,0 +1,31 @@
+description = "RCU-synchronized ordered set over an immutable skip-list: fully lock-free readers walk a frozen snapshot, a single writer path-copies the predecessor prefix and CAS-publishes the root (aspirational target-sketch against the atomics surface)"
+source   = "concurrency rcu_skiplist"
+category = "concurrency"
+showcase = true
+forces   = []
+since    = "0.16"
+status   = "target-sketch"
+expects  = "run-pass"
+entry    = "rcu_skiplist.aril"
+
+# args = [readers, op...]; op > 0 inserts, op < 0 removes |op|. A single writer
+# applies the op sequence in order, so the final membership is a pure function of
+# the ops regardless of how the lock-free readers interleave — the printed output
+# (sorted membership + the two invariant booleans) is deterministic, never a raw
+# interleaving. Each case varies the key-set size and the reader count, and mixes
+# inserts with present/absent removes and duplicate inserts.
+[[case]]
+args            = ["2", "5", "3", "8", "1", "9", "2"]
+expected_output = "case1.txt"
+
+[[case]]
+args            = ["3", "5", "3", "8", "1", "9", "2", "-3", "-8", "7"]
+expected_output = "case2.txt"
+
+[[case]]
+args            = ["4", "10", "20", "30", "40", "-20", "25", "15", "-40"]
+expected_output = "case3.txt"
+
+[[case]]
+args            = ["1", "5", "5", "-7", "3", "-3"]
+expected_output = "case4.txt"

@@ -1,0 +1,225 @@
+// TARGET-SKETCH: lock-free Treiber stack.
+//
+// This example does NOT build yet — it is the acceptance target for the
+// generics and `sync/atomic`-binding epochs. It is written against the atomic
+// surface the atomics design settles on: `atomic.Pointer<T>` (whose `load`
+// yields `Option<T>`, None == the nil pointer) and the scalar `atomic.Int64`,
+// with the method set `load` / `store` / `compareAndSwap` / `swap` / `add`.
+//
+// The Treiber stack is the canonical lock-free container: a singly-linked list
+// whose top is an atomic reference. Both mutators are a CAS retry loop — read
+// the current head, build/relink a node, publish it with `compareAndSwap`, and
+// retry on a lost race. No locks, no hazard pointers: Aril compiles to Go, so
+// the GC is the reclamation grace period — a node a reader still holds stays
+// reachable, and a superseded node is collected once the last reader drops it.
+//
+// The harness runs a HARD concurrent stress test under one `scope`: N producer
+// goroutines each push a disjoint range of ints, M consumer goroutines pop
+// concurrently and record what they take, and an oracle checks the load-bearing
+// invariant — the multiset of popped values equals the multiset pushed (no lost
+// or duplicated node under contention). Producer/consumer counts and the
+// per-producer element count come from the CLI.
+
+import fmt
+import os
+import sort
+import strconv
+import atomic
+
+// Immutable list node. `next` is never mutated after construction — a CAS
+// publishes a *new* node whose `next` snapshots the head it raced against, so
+// concurrent readers walking an older head see a consistent, frozen chain.
+class Node<T> {
+  let value: T
+  let next:  Option<Node<T>>
+}
+
+class TreiberStack<T> {
+  // The single point of contention. Starts empty (holds None).
+  let head: atomic.Pointer<Node<T>>
+
+  static new(): TreiberStack<T> {
+    return TreiberStack<T>{ head: atomic.Pointer<Node<T>>{} }
+  }
+
+  // Push: build a node pointing at the observed head, CAS it in, retry on race.
+  push(v: T) {
+    while true {
+      let old  = head.load()                       // : Option<Node<T>>
+      let node = Node<T>{ value: v, next: old }
+      if head.compareAndSwap(old, Some(node)) {
+        return
+      }
+    }
+  }
+
+  // Pop: read the head; if empty, report None; else CAS the head forward to
+  // `next` and hand back the detached value. Retry when a concurrent mutator
+  // moved the head between the load and the CAS.
+  pop(): Option<T> {
+    while true {
+      let old = head.load()
+      match old {
+        None    => return None,
+        Some(n) => {
+          if head.compareAndSwap(old, n.next) {
+            return Some(n.value)
+          }
+        },
+      }
+    }
+  }
+}
+
+// ----- oracle helpers -----
+
+// The exact multiset the producers push: the contiguous range 1..=total.
+// Distinct values make the permutation check below decisive — a lost node
+// drops one, a duplicated node repeats one, either way the sorted digest moves.
+func rangeInts(hi: int): []int {
+  var out: []int = []int{}
+  var i = 1
+  while i <= hi {
+    out = out.push(i)
+    i = i + 1
+  }
+  return out
+}
+
+func sortedInts(xs: []int): []int {
+  return sort.sorted(xs, (a, b) => a < b)
+}
+
+// Elementwise equality of two int sequences (slices are reference types, so
+// `==` is unavailable — the multiset comparison walks them).
+func intSeqEq(a: []int, b: []int): bool {
+  if a.len() != b.len() {
+    return false
+  }
+  var i = 0
+  while i < a.len() {
+    if a[i] != b[i] {
+      return false
+    }
+    i = i + 1
+  }
+  return true
+}
+
+// Drive the stack under contention and return every popped value (in the
+// nondeterministic order they were taken — the contract sorts before checking).
+//
+// Termination is coordinated by two atomic counters, not a sentinel: each
+// producer bumps `producersDone` on exit, each successful pop bumps `popped`.
+// A consumer that finds the stack momentarily empty stops only once *all*
+// producers have finished AND every pushed element has been popped — at which
+// point the stack is drained for good; otherwise it retries (an honest
+// lock-free spin). `resultCh` has one slot per consumer, so the final sends
+// never block.
+func stressTest(numProducers: int, numConsumers: int, perProducer: int): Result<[]int, error> {
+  let stack         = TreiberStack<int>.new()
+  let popped        = atomic.Int64{}
+  let producersDone = atomic.Int64{}
+  let total         = int64(numProducers * perProducer)
+  let resultCh      = makeChannel<[]int>(numConsumers)
+
+  try scope<unit, error> {
+    // Producers: producer p pushes the disjoint block (p*perProducer, ..].
+    var p = 0
+    while p < numProducers {
+      let base = p * perProducer
+      spawn {
+        var i = 1
+        while i <= perProducer {
+          stack.push(base + i)
+          i = i + 1
+        }
+        producersDone.add(1)
+        return Ok(())
+      }
+      p = p + 1
+    }
+
+    // Consumers: pop into a private slice until the drain is provably complete.
+    var c = 0
+    while c < numConsumers {
+      spawn {
+        var mine: []int = []int{}
+        while true {
+          match stack.pop() {
+            Some(v) => {
+              mine = mine.push(v)
+              popped.add(1)
+            },
+            None => {
+              if producersDone.load() == int64(numProducers) && popped.load() == total {
+                resultCh.send(mine)
+                return Ok(())
+              }
+            },
+          }
+        }
+      }
+      c = c + 1
+    }
+  }
+  resultCh.close()
+
+  // Aggregate every consumer's take into one unsorted multiset.
+  var collected: []int = []int{}
+  for chunk in resultCh {
+    for v in chunk {
+      collected = collected.push(v)
+    }
+  }
+  return Ok(collected)
+}
+
+func main() {
+  if os.args.len() != 4 {
+    fmt.println("usage: lockfree_stack <producers> <consumers> <per-producer>")
+    os.exit(2)
+  }
+  let numProducers = match strconv.atoi(os.args[1]) {
+    Ok(n)  => n,
+    Err(_) => { fmt.println("bad producers"); os.exit(2) },
+  }
+  let numConsumers = match strconv.atoi(os.args[2]) {
+    Ok(n)  => n,
+    Err(_) => { fmt.println("bad consumers"); os.exit(2) },
+  }
+  let perProducer = match strconv.atoi(os.args[3]) {
+    Ok(n)  => n,
+    Err(_) => { fmt.println("bad per-producer"); os.exit(2) },
+  }
+
+  match stressTest(numProducers, numConsumers, perProducer) {
+    Ok(collected) => {
+      let total = numProducers * perProducer
+      let ok    = intSeqEq(sortedInts(collected), rangeInts(total))
+      fmt.println("producers:", numProducers)
+      fmt.println("consumers:", numConsumers)
+      fmt.println("pushed:", total)
+      fmt.println("popped:", collected.len())
+      fmt.println("invariant:", if ok { "ok" } else { "VIOLATED" })
+    },
+    Err(e) => fmt.println("stress error:", e),
+  }
+}
+
+// THE load-bearing invariant (the whole reason this example exists): after a
+// concurrent drain, the multiset of popped values equals the multiset pushed —
+// the contiguous range 1..=(numProducers*perProducer). A racy or broken CAS
+// betrays itself here: a lost node drops a value (short digest), a duplicated
+// node (an ABA-style double-take) repeats one (long/misaligned digest); either
+// fails the sorted-permutation match. This is the real Treiber correctness
+// property, not a sanity bound — a trivially-wrong `pop` that returned the same
+// node twice, or dropped one under contention, would violate it. (LIFO holds
+// per producer as well, but interleaved consumers make global order
+// nondeterministic, so the multiset property is the checkable one.)
+contract stressTest {
+  ensures match result {
+    Ok(collected) => intSeqEq(sortedInts(collected), rangeInts(numProducers * perProducer)),
+    Err(_)        => false,
+  }
+}

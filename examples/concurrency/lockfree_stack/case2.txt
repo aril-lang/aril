@@ -1,0 +1,5 @@
+producers: 8
+consumers: 2
+pushed: 4000
+popped: 4000
+invariant: ok

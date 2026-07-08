@@ -1,0 +1,5 @@
+distinct keys: 226
+checksum: 109507
+final set matches oracle: true
+old snapshot preserved: true
+readers observed consistent snapshots: true

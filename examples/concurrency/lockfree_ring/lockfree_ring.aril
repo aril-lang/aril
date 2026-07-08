@@ -1,0 +1,246 @@
+// TARGET-SKETCH (aspirational): a bounded lock-free MPMC ring buffer over a
+// fixed slice with atomic head/tail indices. This is the acceptance target for
+// the future atomics-binding epoch — it does NOT build yet, because `atomic`
+// (Go's sync/atomic) is unbound. That is intentional: the file is the demand
+// signal for binding the scalar atomics `atomic.Int64` needs (a table edit, no
+// generics — this container deliberately uses a monomorphic `int` element type
+// so it isolates the scalar-atomics demand from the generics demand).
+//
+// Algorithm: Dmitry Vyukov's bounded MPMC queue — the one lock-free container
+// reachable with ONLY scalar atomics (no atomic.Pointer). Each cell carries an
+// `atomic.Int64 seq` (a per-slot sequence number) alongside its value; the two
+// shared cursors `enqueuePos` / `dequeuePos` are `atomic.Int64`. A producer
+// claims a slot by CAS'ing `enqueuePos`, then publishes by bumping the cell's
+// seq (release); a consumer claims by CAS'ing `dequeuePos` and reads after the
+// matching seq load (acquire). The seq handshake is what makes it correct:
+//   * a producer touches a cell only when `seq == pos`  → the slot is free,
+//     so it never OVERWRITES an unconsumed value;
+//   * a consumer touches a cell only when `seq == pos + 1` → the value is
+//     published, so it never READS an unwritten slot;
+//   * `seq < pos` (producer) / `seq < pos + 1` (consumer) means FULL / EMPTY.
+// Per-producer FIFO follows: one producer's successive offers take strictly
+// increasing `enqueuePos` values, and each value is read in that index order.
+//
+// Capacity is a power of two so the wrap index is `pos & (cap-1)`. Aril has no
+// bitwise `&`, and for the monotonically-increasing non-negative cursors here
+// `pos & (cap-1)` is exactly `pos % cap`, which is how it is spelled below.
+
+import atomic          // → sync/atomic  (UNBOUND today — the intentional miss)
+import fmt
+import os
+import strconv
+
+// One ring slot: a value plus its sequence stamp. `data` is a plain field —
+// the atomic load/store of `seq` provides the release/acquire fence that orders
+// the write against the paired read, so `data` needs no atomic of its own.
+class Cell {
+  var seq:  atomic.Int64
+  var data: int
+}
+
+class RingBuffer {
+  let capacity: int64                 // power of two; number of cells
+  let cells:    []Cell
+
+  var enqueuePos: atomic.Int64        // next slot a producer will claim
+  var dequeuePos: atomic.Int64        // next slot a consumer will claim
+
+  // Build an empty ring of `capacity` cells, stamping cell i with seq = i
+  // (the state in which a producer at pos i may fill it).
+  static new(capacity: int): RingBuffer {
+    var cells: []Cell = []Cell{}
+    var i = 0
+    while i < capacity {
+      let c = Cell{ seq: atomic.Int64{}, data: 0 }
+      c.seq.store(int64(i))
+      cells = cells.push(c)
+      i = i + 1
+    }
+    return RingBuffer{
+      capacity:   int64(capacity),
+      cells:      cells,
+      enqueuePos: atomic.Int64{},
+      dequeuePos: atomic.Int64{},
+    }
+  }
+
+  // Try to enqueue `v`. Returns false (without blocking) when the ring is full.
+  offer(v: int): bool {
+    while true {
+      let pos  = enqueuePos.load()
+      let cell = cells[int(pos % capacity)]
+      let seq  = cell.seq.load()
+      let diff = seq - pos
+      if diff == 0 {
+        // Slot is free and ours iff we win the cursor CAS.
+        if enqueuePos.compareAndSwap(pos, pos + 1) {
+          cell.data = v
+          cell.seq.store(pos + 1)          // publish (release): now consumable
+          return true
+        }
+        // lost the race → reload and retry
+      } else if diff < 0 {
+        return false                        // seq lagged pos → full
+      }
+      // diff > 0 → another producer already advanced; reload and retry
+    }
+  }
+
+  // Try to dequeue. Returns None (without blocking) when the ring is empty.
+  poll(): Option<int> {
+    while true {
+      let pos  = dequeuePos.load()
+      let cell = cells[int(pos % capacity)]
+      let seq  = cell.seq.load()
+      let diff = seq - (pos + 1)
+      if diff == 0 {
+        if dequeuePos.compareAndSwap(pos, pos + 1) {
+          let v = cell.data                 // acquire happened via seq.load
+          cell.seq.store(pos + capacity)    // free the slot for its next lap
+          return Some(v)
+        }
+      } else if diff < 0 {
+        return None                         // seq not yet published → empty
+      }
+    }
+  }
+
+  // Items currently buffered (claimed by a producer, not yet by a consumer).
+  // Used by the oracle to state the conservation law.
+  inFlight(): int {
+    return int(enqueuePos.load() - dequeuePos.load())
+  }
+}
+
+// Sum of 0 + 1 + … + (n-1). The producers below offer exactly the disjoint
+// ranges whose union is [0, total), so this is the oracle's expected digest.
+func triangular(n: int): int {
+  return n * (n - 1) / 2
+}
+
+type Summary = {
+  produced: int
+  consumed: int
+  buffered: int
+  sum:      int
+}
+
+// The hard concurrent stress test: `producers` goroutines each offer a disjoint
+// contiguous range of integers (producer p offers [p*perProducer, (p+1)*perProducer));
+// `consumers` goroutines poll until every item has been drained. All run under one
+// structured-concurrency `scope`, which joins them (Go's WaitGroup, uncolored).
+// Shared state is three scalar atomics — the ring cursors plus a consumed-count
+// and a sum accumulator — with no lock anywhere.
+func stress(producers: int, consumers: int, capacity: int, perProducer: int):
+    Result<Summary, error> {
+  let total    = producers * perProducer
+  let ring     = RingBuffer.new(capacity)
+  let consumed = atomic.Int64{}
+  let sumAcc   = atomic.Int64{}
+
+  try scope<unit, error> {
+    var p = 0
+    while p < producers {
+      let base = p * perProducer
+      spawn {
+        var k = 0
+        while k < perProducer {
+          // Back-pressure: retry until the ring has room. offer never blocks;
+          // spinning here is what bounds the structure to `capacity` in flight.
+          while !ring.offer(base + k) {}
+          k = k + 1
+        }
+        return Ok(())
+      }
+      p = p + 1
+    }
+
+    var c = 0
+    while c < consumers {
+      spawn {
+        while true {
+          if consumed.load() >= int64(total) {
+            return Ok(())                    // everything drained → done
+          }
+          match ring.poll() {
+            Some(v) => {
+              sumAcc.add(int64(v))
+              consumed.add(1)
+            },
+            None => {},                       // transiently empty → retry
+          }
+        }
+        return Ok(())
+      }
+      c = c + 1
+    }
+  }
+
+  return Ok(Summary{
+    produced: total,
+    consumed: int(consumed.load()),
+    buffered: ring.inFlight(),
+    sum:      int(sumAcc.load()),
+  })
+}
+
+func run(): Result<unit, error> {
+  if os.args.len() != 5 {
+    return Err(error("usage: lockfree_ring <producers> <consumers> <capacity> <perProducer>"))
+  }
+  let producers   = try strconv.atoi(os.args[1])
+  let consumers   = try strconv.atoi(os.args[2])
+  let capacity    = try strconv.atoi(os.args[3])
+  let perProducer = try strconv.atoi(os.args[4])
+
+  let s = try stress(producers, consumers, capacity, perProducer)
+  fmt.println("produced:", s.produced)
+  fmt.println("consumed:", s.consumed)
+  fmt.println("buffered:", s.buffered)
+  fmt.println("sum:", s.sum)
+  fmt.println("ok:", (s.produced == s.consumed + s.buffered
+                      && s.consumed == producers * perProducer
+                      && s.sum == triangular(producers * perProducer)))
+  return Ok(())
+}
+
+func main() {
+  match run() {
+    Ok(_)  => {},
+    Err(e) => {
+      fmt.println("error:", e)
+      os.exit(1)
+    },
+  }
+}
+
+// Load-bearing invariant (RFC-0007-style capacity property): the ring never
+// holds more than `capacity` items in flight, and the consume cursor never
+// overtakes the produce cursor. A dropped full-check in `offer` (producing when
+// the slot is still unconsumed) drives `enqueuePos` past `dequeuePos + capacity`
+// and trips the second clause; a double-advancing `poll` trips the first. Reads
+// are a racy snapshot under contention — fine here: the property is what a
+// correct impl must maintain, checked at each method boundary.
+contract RingBuffer {
+  invariant dequeuePos.load() <= enqueuePos.load()
+  invariant enqueuePos.load() - dequeuePos.load() <= capacity
+}
+
+// The oracle: a conservation law + a value digest that together pin down "no
+// lost, no duplicated, no corrupted item" under contention.
+//   * produced == consumed + buffered   — nothing vanishes or is invented
+//     (a lost CAS'd item makes consumed drop below produced; a double-poll of
+//     one slot makes consumed exceed it);
+//   * consumed == producers * perProducer — every offered item was drained;
+//   * sum == triangular(total)           — the multiset of drained values is
+//     exactly [0, total): a corrupted / overwritten slot changes the sum.
+// A trivially-wrong ring (skipped full/empty check, broken index CAS) fails at
+// least one clause; a `return Ok(emptySummary)` fails all three.
+contract stress {
+  ensures match result {
+    Ok(s) => (s.produced == s.consumed + s.buffered
+              && s.consumed == producers * perProducer
+              && s.sum == triangular(producers * perProducer)),
+    Err(_) => false,
+  }
+}

@@ -1,0 +1,5 @@
+produced: 400
+consumed: 400
+buffered: 0
+sum: 79800
+ok: true
