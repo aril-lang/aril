@@ -349,6 +349,12 @@ type) and by an **assignment target** whose LValue is a field
 (`n.next = None`, `slot = None` — the qualified and implicit-receiver
 field forms), so the same constructor value assigned into a generic
 `Option`/`Result` field is stamped from that field's declared type.
+Both field paths stamp the field's *declared* type verbatim, carrying
+the owning type's parameter letters; a field of a **concretely
+instantiated** generic value written from a context where those letters
+are not in scope (`func f(b: Box<int>) { b.slot = None }` → `OptionNone[T]()`)
+is a v1 limitation — the receiver's concrete type arguments are not yet
+substituted into the declared field type before stamping.
 
 **Tag/field invariants.** Codegen and the runtime helpers
 guarantee:
