@@ -32,6 +32,6 @@ diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # negative fixtures that don't immediately hit their ideal)
 run_ok_min   = 93   # current run_ok; strict ratchet (raised 92→93 in the
                     # GENERICS-HARDENING epoch — lru_cache flips target-sketch→
-                    # run-pass: the generic class builds and runs, its size==index.len()
+                    # run-pass: the generic class builds and runs, its size<=capacity
                     # invariant holds under --contracts=panic after reordering evictTail
-                    # so detach's method-exit checkpoint sees a consistent count)
+                    # so detach's method-exit checkpoint sees size already decremented)

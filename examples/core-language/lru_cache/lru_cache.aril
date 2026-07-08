@@ -108,11 +108,12 @@ class LRU<K: Comparable, V> {
     match tail {
       None    => return,
       Some(t) => {
-        // Drop from the index and shrink the count *before* the list
-        // surgery, so the `size == index.len()` invariant holds at
-        // `detach`'s method exit too (detach is itself a checkpoint under
-        // --contracts=panic). `detach` only touches the prev/next links, so
-        // the order is behaviour-identical.
+        // Shrink the count *before* the list surgery, so `size <= capacity`
+        // holds at `detach`'s method exit too (detach is itself a checkpoint
+        // under --contracts=panic, and mid-eviction size is transiently
+        // capacity+1). Deleting from the index in the same step keeps
+        // `size == index.len()` satisfied throughout. `detach` only touches
+        // the prev/next links, so the order is behaviour-identical.
         index.delete(t.key)
         size = size - 1
         detach(t)
