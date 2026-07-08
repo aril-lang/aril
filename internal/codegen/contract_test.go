@@ -125,11 +125,11 @@ contract Counter {
 `
 	got := emitContract(t, src, "panic")
 	for _, want := range []string{
-		"func (t *Counter) bump()", // the mutating method
-		"defer func()",             // method-exit defer
-		"if r := recover()",        // recover-rethrow guard
-		"if !_arilInContract {",    // re-entrancy guard
-		"t.N >= 0",                 // bare field via implicit receiver
+		"func (_arilSelf *Counter) bump()", // the mutating method
+		"defer func()",                     // method-exit defer
+		"if r := recover()",                // recover-rethrow guard
+		"if !_arilInContract {",            // re-entrancy guard
+		"_arilSelf.N >= 0",                 // bare field via implicit receiver
 		"invariant violated (Counter)",
 	} {
 		if !strings.Contains(got, want) {
@@ -141,7 +141,7 @@ contract Counter {
 	// the `Counter{…}` literal, which uses no defer — covered separately by
 	// TestEmitConstructionInvariant).
 	staticIdx := strings.Index(got, "func counterNew()")
-	bumpIdx := strings.Index(got, "func (t *Counter) bump()")
+	bumpIdx := strings.Index(got, "func (_arilSelf *Counter) bump()")
 	if staticIdx < 0 || bumpIdx < 0 {
 		t.Fatalf("expected both the static factory and bump in the emit:\n%s", got)
 	}

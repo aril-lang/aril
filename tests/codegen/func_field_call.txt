@@ -23,8 +23,8 @@ type Box struct {
 	Cb func(int) int `json:"cb"`
 }
 
-func (t *Box) run(x int) int {
-	return t.Cb(x)
+func (_arilSelf *Box) run(x int) int {
+	return _arilSelf.Cb(x)
 }
 func main() {
 	var b = &Box{Cb: func(x int) int {

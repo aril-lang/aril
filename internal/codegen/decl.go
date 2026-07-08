@@ -302,7 +302,7 @@ func (g *gen) emitMethod(cd *ast.ClassDecl, m *ast.Method) error {
 	g.line(m.Span.StartLine)
 	g.b.WriteString("func ")
 	if !m.IsStatic {
-		g.b.WriteString("(t *")
+		g.b.WriteString("(" + methodRecvName + " *")
 		g.b.WriteString(goIdent(cd.Name))
 		g.emitTypeParamBrackets(cd.TypeParams, false) // receiver: type params without constraints
 		g.b.WriteString(") ")

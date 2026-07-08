@@ -1,0 +1,111 @@
+--- TITLE ---
+Method-receiver name collision: a method that binds a user variable `t` (a `match` arm `Some(t)`) must not shadow the implicit receiver. The receiver is emitted under the reserved name `_arilSelf`, so the implicit-receiver refs (`clear()`, `count`) dispatch on the receiver while the bound `t` stays the matched value (lowering-go.md §Implicit receiver).
+
+--- INPUT ---
+import fmt
+
+class Bag {
+  var count: int
+  var last:  Option<int>
+
+  static new(): Bag { return Bag{ count: 0, last: None } }
+
+  add(x: int) {
+    count = count + 1
+    last = Some(x)
+  }
+
+  // Binds `t` in the match arm — this used to shadow the `t` receiver,
+  // mis-lowering `clear()`/`count` onto the bound int value.
+  take(): Option<int> {
+    var result: Option<int> = None
+    match last {
+      Some(t) => {
+        result = Some(t)
+        clear()
+      },
+      None => {},
+    }
+    return result
+  }
+
+  clear() {
+    count = 0
+  }
+}
+
+func main() {
+  let b = Bag.new()
+  b.add(7)
+  match b.take() {
+    Some(v) => fmt.println("took:", v),
+    None    => fmt.println("empty"),
+  }
+  fmt.println("count:", b.count)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type Bag struct {
+	Count int         `json:"count"`
+	Last  Option[int] `json:"last"`
+}
+
+func bagNew() *Bag {
+	return &Bag{Count: 0, Last: OptionNone[int]()}
+}
+func (_arilSelf *Bag) add(x int) {
+	_arilSelf.Count = _arilSelf.Count + 1
+	_arilSelf.Last = OptionSome(x)
+}
+func (_arilSelf *Bag) take() Option[int] {
+	var result Option[int] = OptionNone[int]()
+	__aril_match_1 := _arilSelf.Last
+	switch __aril_match_1.Tag {
+	case 1:
+		t := __aril_match_1.V
+		result = OptionSome(t)
+		_arilSelf.clear()
+	case 0:
+	}
+	return result
+}
+func (_arilSelf *Bag) clear() {
+	_arilSelf.Count = 0
+}
+func main() {
+	var b = bagNew()
+	b.add(7)
+	__aril_match_2 := b.take()
+	switch __aril_match_2.Tag {
+	case 1:
+		v := __aril_match_2.V
+		fmt.Println("took:", v)
+	case 0:
+		fmt.Println("empty")
+	}
+	fmt.Println("count:", b.Count)
+}
+
+--- STDOUT ---
+took: 7
+count: 0
+
+--- EXIT ---
+0

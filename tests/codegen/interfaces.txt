@@ -34,8 +34,8 @@ type Square struct {
 	Side int `json:"side"`
 }
 
-func (t *Square) area() int {
-	return t.Side * t.Side
+func (_arilSelf *Square) area() int {
+	return _arilSelf.Side * _arilSelf.Side
 }
 func describe(s Shape) int {
 	return s.area()

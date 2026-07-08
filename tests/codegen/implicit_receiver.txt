@@ -30,12 +30,12 @@ type Point struct {
 	Y int `json:"y"`
 }
 
-func (t *Point) sum() int {
-	return t.X + t.Y
+func (_arilSelf *Point) sum() int {
+	return _arilSelf.X + _arilSelf.Y
 }
-func (t *Point) shifted(d int) int {
+func (_arilSelf *Point) shifted(d int) int {
 	var x = 100
-	return x + t.Y
+	return x + _arilSelf.Y
 }
 func main() {
 	var p = &Point{X: 3, Y: 4}

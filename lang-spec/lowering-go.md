@@ -786,10 +786,14 @@ collected `return` types (`type-system.md` §T-Closure-Block).
 ## Implicit receiver / Field
 
 `Field { receiver: This{type: C}, name: n }` lowers to the Go
-expression `t.N` — `t` is the receiver name chosen for the
-generated Go method (codegen uses `t` consistently for clarity;
-not exposed in Aril), and the field is exported per §"Record /
-struct field lowering".
+expression `_arilSelf.N` — `_arilSelf` is the receiver name chosen
+for the generated Go method. It carries the `_aril`-reserved prefix
+(rejected in user source by E0107) so it can never collide with a
+user binding of the same spelling: a method that binds `t` — e.g. a
+`match` arm `Some(t)` — used to shadow an earlier hard-coded `t`
+receiver and mis-dispatch the implicit-receiver refs onto the bound
+value. The name is not exposed in Aril; the field is exported per
+§"Record / struct field lowering".
 
 Generic class methods carry their type parameters as Go-side
 type params; the receiver is a pointer for any class with

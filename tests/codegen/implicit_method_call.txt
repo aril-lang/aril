@@ -1,5 +1,5 @@
 --- TITLE ---
-Static-method-call return typing + bare instance-method call via the implicit receiver: `Counter.new()` types its result so the value-`if` over `c.n`/`c.bump()` resolves, and the bare sibling call `step()` inside `bump()` lowers to `t.step()` (name-resolution §Implicit receiver).
+Static-method-call return typing + bare instance-method call via the implicit receiver: `Counter.new()` types its result so the value-`if` over `c.n`/`c.bump()` resolves, and the bare sibling call `step()` inside `bump()` lowers to `_arilSelf.step()` (name-resolution §Implicit receiver).
 
 --- INPUT ---
 import fmt
@@ -29,10 +29,10 @@ type Counter struct {
 func counterNew() *Counter {
 	return &Counter{N: 0}
 }
-func (t *Counter) bump() int {
-	return t.step() + t.N
+func (_arilSelf *Counter) bump() int {
+	return _arilSelf.step() + _arilSelf.N
 }
-func (t *Counter) step() int {
+func (_arilSelf *Counter) step() int {
 	return 1
 }
 func main() {

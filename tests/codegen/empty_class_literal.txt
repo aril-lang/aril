@@ -33,7 +33,7 @@ type Strategy interface {
 type AlwaysZero struct {
 }
 
-func (t *AlwaysZero) decide() int {
+func (_arilSelf *AlwaysZero) decide() int {
 	return 0
 }
 func run(s Strategy) int {

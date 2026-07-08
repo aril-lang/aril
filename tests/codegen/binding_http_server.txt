@@ -45,7 +45,7 @@ func ResultOf[T any](v T, err error) Result[T, error] {
 type H struct {
 }
 
-func (t *H) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (_arilSelf *H) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var _ = ResultOf(w.Write([]byte("ok")))
 }
 func run(ln net.Listener, ctx context.Context) {

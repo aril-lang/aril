@@ -57,8 +57,8 @@ type MyErr struct {
 	Msg string `json:"msg"`
 }
 
-func (t *MyErr) Error() string {
-	return t.Msg
+func (_arilSelf *MyErr) Error() string {
+	return _arilSelf.Msg
 }
 func render(e error) string {
 	return e.Error()
