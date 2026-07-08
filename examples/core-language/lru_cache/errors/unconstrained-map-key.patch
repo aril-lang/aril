@@ -1,0 +1,11 @@
+--- lru_cache.aril
++++ lru_cache.aril
+@@ -15,7 +15,7 @@
+   var next:  Option<LRUNode<K, V>>
+ }
+ 
+-class LRU<K: Comparable, V> {
++class LRU<K, V> {
+   let capacity: int
+ 
+   var size:  int

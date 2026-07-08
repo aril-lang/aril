@@ -140,6 +140,74 @@ func (c *checker) checkTypeParamBound(tp ast.TypeParam, span ast.Span) {
 	c.report("E0119", "unknown type-parameter constraint `"+tp.Bound+"` — the built-in constraints are `Ordered` and `Comparable`", span)
 }
 
+// checkComparableKeyBounds reports E0127 when one of a declaration's own type
+// parameters is used as a Map or Set key without a `Comparable`/`Ordered`
+// bound. Go's map/set key type must satisfy `comparable`; an unconstrained
+// (`any`) parameter in key position otherwise leaks a raw go/types "K does not
+// satisfy comparable" at `go build` (a D10 violation). Aril requires the bound
+// to be declared explicitly — D29: constraints mirror Go's and are stated,
+// never inferred — and points the user at `K: Comparable`.
+//
+// Sound-over-complete (D38): only key positions reachable from the
+// declaration's *field* types are scanned — the common case (`var index:
+// Map<K, V>`). A Map/Set constructed on a bare parameter only inside a method
+// body is out of v1 scope (it still fires the field-level check once the same
+// parameter keys a field, as every real container does).
+func (c *checker) checkComparableKeyBounds(params []ast.TypeParam, fields []ast.TypeExpr) {
+	if len(params) == 0 {
+		return
+	}
+	bound := make(map[string]string, len(params))
+	for _, tp := range params {
+		bound[tp.Name] = tp.Bound
+	}
+	reported := map[string]bool{}
+	var scan func(te ast.TypeExpr)
+	scan = func(te ast.TypeExpr) {
+		switch t := te.(type) {
+		case *ast.NamedType:
+			if len(t.QName) == 1 && (t.QName[0] == "Map" || t.QName[0] == "Set") && len(t.Args) >= 1 {
+				c.reportUnconstrainedKey(t.Args[0], bound, reported)
+			}
+			for _, a := range t.Args {
+				scan(a)
+			}
+		case *ast.SliceType:
+			scan(t.Elem)
+		case *ast.TupleType:
+			for _, comp := range t.Components {
+				scan(comp)
+			}
+		case *ast.FuncType:
+			for _, p := range t.Params {
+				scan(p)
+			}
+			scan(t.ReturnType)
+		}
+	}
+	for _, ft := range fields {
+		scan(ft)
+	}
+}
+
+// reportUnconstrainedKey fires E0127 for a Map/Set key that is a bare,
+// unconstrained type parameter of the enclosing declaration. Each parameter is
+// reported once (reported set). A non-parameter key (a concrete type, a nested
+// generic) is Go's own business and is left alone.
+func (c *checker) reportUnconstrainedKey(key ast.TypeExpr, bound map[string]string, reported map[string]bool) {
+	nt, ok := key.(*ast.NamedType)
+	if !ok || len(nt.QName) != 1 || len(nt.Args) != 0 {
+		return
+	}
+	name := nt.QName[0]
+	b, isParam := bound[name]
+	if !isParam || b == "Comparable" || b == "Ordered" || reported[name] {
+		return
+	}
+	reported[name] = true
+	c.report("E0127", "type parameter `"+name+"` is used as a Map/Set key, so it must be comparable — add the bound `"+name+": Comparable`", nt.Span)
+}
+
 // checkReservedTypeName rejects a user type declaration that reuses a
 // built-in type name — a primitive (`int`, `string`, …), `error`,
 // `Any`/`Dynamic`/`unit`/`Never`, or a built-in generic (`Result`,

@@ -110,16 +110,23 @@ func (c *checker) resolveTypeDecl(t *ast.TypeDecl, parent *Scope) {
 	switch b := t.Body.(type) {
 	case *ast.AliasBody:
 		c.resolveTypeExpr(b.Aliased, scope)
+		c.checkComparableKeyBounds(t.TypeParams, []ast.TypeExpr{b.Aliased})
 	case *ast.SumTypeBody:
+		var fts []ast.TypeExpr
 		for _, v := range b.Variants {
 			for _, f := range v.Fields {
 				c.resolveTypeExpr(f.DeclType, scope)
+				fts = append(fts, f.DeclType)
 			}
 		}
+		c.checkComparableKeyBounds(t.TypeParams, fts)
 	case *ast.RecordTypeBody:
+		fts := make([]ast.TypeExpr, 0, len(b.Fields))
 		for _, f := range b.Fields {
 			c.resolveTypeExpr(f.DeclType, scope)
+			fts = append(fts, f.DeclType)
 		}
+		c.checkComparableKeyBounds(t.TypeParams, fts)
 		// Bind a `contract <Record> { invariant … }`'s predicate fields in a
 		// synthetic field scope (RFC-0006 type invariants on records).
 		c.resolveRecordInvariants(t, b, scope)
@@ -142,9 +149,12 @@ func (c *checker) resolveClassDecl(cd *ast.ClassDecl, parent *Scope) {
 	// Resolve every field / method annotation against classScope
 	// before building member symbols, so the signatures are fully
 	// typed (Barrier B) regardless of declaration order.
+	fieldTypes := make([]ast.TypeExpr, 0, len(cd.Fields))
 	for _, f := range cd.Fields {
 		c.resolveTypeExpr(f.DeclType, classScope)
+		fieldTypes = append(fieldTypes, f.DeclType)
 	}
+	c.checkComparableKeyBounds(cd.TypeParams, fieldTypes)
 	for _, m := range cd.Methods {
 		for _, p := range m.Params {
 			c.resolveTypeExpr(p.DeclType, classScope)
