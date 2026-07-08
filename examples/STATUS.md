@@ -5,7 +5,7 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 - **build_ok — 92 / 93 examples build end-to-end** (floor 92).
-- **diag_ok — 121 / 121 negative cases produce their expected diagnostic** (floor 88).
+- **diag_ok — 121 / 121 negative cases produce their expected diagnostic** (floor 116).
 - **run_ok — 91 / 93 run-pass examples build and run as specified** (floor 91; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |

@@ -23,10 +23,11 @@
 build_ok_min = 92   # current build_ok; strict ratchet (raised 91→92 in the
                     # EXTERNAL-MODULES epoch — the greeter example depends on an
                     # external pure-Aril library via [dependencies] (RFC-0008))
-diag_ok_min  = 88   # headroom below current diag_ok (98) so an
-                    # individual imprecise message is a penalty, not a red
-                    # (raised 82→88 at the BINDING-HARDENING close as E0217/E0218
-                    # coverage grew diag_ok 94→97)
+diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
+                    # imprecise message is a penalty, not a red (raised 88→116 at
+                    # the CORPUS-POLISH close — the E0112 humanizer closed the whole
+                    # token-spelling backlog, diag_ok 98→121; ~5 slack for future
+                    # negative fixtures that don't immediately hit their ideal)
 run_ok_min   = 91   # current run_ok; strict ratchet (raised 90→91 in the
                     # CORPUS-POLISH epoch — healthcheck_server flips no-run→run_ok:
                     # the http.Server{} handle + shutdown drives a self-terminating
