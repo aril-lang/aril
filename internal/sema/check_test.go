@@ -80,11 +80,11 @@ func main() {}
 `); hasCode(codes, "E0127") {
 		t.Errorf("a concrete Map key must not fire E0127, got %v", codes)
 	}
-	// The param in the *value* position is unconstrained-fine.
-	if codes := runCheck(t, `class Cache<K: Comparable, V> { var index: Map<K, V> }
+	// A param only in the *value* position (concrete key) needs no bound.
+	if codes := runCheck(t, `class Cache<V> { var index: Map<string, V> }
 func main() {}
 `); hasCode(codes, "E0127") {
-		t.Errorf("the value type param needs no bound, got %v", codes)
+		t.Errorf("a value-only type param needs no key bound, got %v", codes)
 	}
 }
 
