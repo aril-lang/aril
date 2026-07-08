@@ -55,7 +55,7 @@ severity column.
 | E0104 | E | Ambiguous variant name | `name-resolution.md` §Variant constructors | Use the qualified form `Type.Variant`. |
 | E0105 | E | Duplicate field name | `type-system.md` §WF-Body-Record | Rename one of the colliding fields. |
 | E0106 | E | Duplicate variant name | `type-system.md` §WF-Body-Sum | Rename one of the colliding variants. |
-| E0107 | E | Reserved identifier prefix | `grammar.ebnf` Ident (`_aril_` prefix rejected) / `lowering-go.md` §Identifier encoding | Rename the identifier — `_aril_…` is reserved for codegen. |
+| E0107 | E | Reserved identifier prefix | `grammar.ebnf` Ident (`_aril` prefix rejected) / `lowering-go.md` §Identifier encoding | Rename the identifier — `_aril…` is reserved for codegen. |
 | E0108 | E | Type used as value | `name-resolution.md` §Generic type-argument resolution | Use the type in a type position, or call `.new(...)` on a class, or use a brace literal. |
 | E0109 | E | Malformed numeric literal | `grammar.ebnf` IntLit / FloatLit | A digit is missing or invalid for the radix (e.g. `0o9`, `0x`, bare `1e`). |
 | E0110 | E | Malformed escape sequence | `grammar.ebnf` EscapeChar | Use one of the v1 escapes: `\n \t \r \\ \" \' \0 \xNN \uNNNN`. |

@@ -71,13 +71,14 @@ SnakeCase                    SnakeCase
 ```
 
 **Reserved user-source prefix.** To guarantee no collision
-between user-source identifiers and codegen's `_aril_NN` fresh
-names, the lexer rejects any user-source identifier whose
-**first six characters** are `_aril_` (case-sensitive). Emits
-**E0107 Reserved identifier prefix** — a hard error at lex time.
-This is a paired edit with `grammar.ebnf` (lexical
-`Ident` production); a user-source identifier starting with
-`_aril_` is grammar-illegal.
+between user-source identifiers and codegen's synthesised names —
+both the `_aril_NN` fresh desugar locals *and* the camelCase
+semantic temps (`_arilNew`, `_arilRet`, `_arilSelf`, …) — the
+lexer rejects any user-source identifier whose **first five
+characters** are `_aril` (case-sensitive). Emits **E0107 Reserved
+identifier prefix** — a hard error at lex time. This is a paired
+edit with `grammar.ebnf` (lexical `Ident` production); a
+user-source identifier starting with `_aril` is grammar-illegal.
 
 The Go reserved-word list as of Go 1.22 is hard-coded into the
 codegen pass: `break case chan const continue default defer

@@ -253,7 +253,12 @@ func (l *lexer) next() *Diag {
 			l.advance(sz)
 		}
 		lex := l.src[startOffset:l.offset]
-		if strings.HasPrefix(lex, "_aril_") {
+		// The `_aril` prefix (case-sensitive, no trailing underscore
+		// required) is reserved for every codegen-synthesised name — the
+		// `_aril_NN` desugar locals *and* the camelCase semantic temps
+		// (_arilNew, _arilRet, _arilSelf, …). Reserving the shorter prefix
+		// keeps a user binding from shadowing any of them (E0107).
+		if strings.HasPrefix(lex, "_aril") {
 			return l.diag("E0107", "Reserved identifier prefix", startLine, startCol)
 		}
 		if keywordSet[lex] {

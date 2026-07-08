@@ -51,11 +51,12 @@ Ident       = Letter (Letter | Digit)* ;
 // class (as Go does) is park material; the lexer never produces an
 // Ident token from a non-ASCII first character.
 //
-// RESERVED PREFIX: an Ident whose first six characters are exactly
-// `_aril_` (case-sensitive) is reserved for codegen-synthesised
+// RESERVED PREFIX: an Ident whose first five characters are exactly
+// `_aril` (case-sensitive) is reserved for codegen-synthesised
 // names and is REJECTED by the lexer with E0107 Reserved
-// identifier prefix. This guarantees no collision with the
-// `_aril_NN` fresh names introduced during desugaring; see
+// identifier prefix. This guarantees no collision with any
+// synthesised name — the `_aril_NN` fresh desugar locals and the
+// camelCase semantic temps (`_arilNew`, `_arilSelf`, …); see
 // `lowering-go.md` §Identifier encoding.
 
 // Keyword is not a separate alternative in Token below — the lexer

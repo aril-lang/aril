@@ -1,8 +1,8 @@
 --- TITLE ---
-E0107: _aril_ prefix on user identifier is rejected at lex time
+E0107: the `_aril` prefix on a user identifier is rejected at lex time — covers the camelCase codegen family (`_arilSelf`, `_arilNew`, …), not only `_aril_NN`
 
 --- INPUT ---
-let _aril_99 = 7
+let _arilSelf = 7
 
 --- ERRORS ---
 src.aril:1:5: error[E0107]: Reserved identifier prefix
