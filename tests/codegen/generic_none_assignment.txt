@@ -1,0 +1,88 @@
+--- TITLE ---
+Assignment-target type stamping: a bare `None` / `Some(x)` assigned to an `Option`-typed field in a generic method gets its type args from the field's declared type — `slot = None` → `slot = OptionNone[T]()`, `slot = Some(x)` → `OptionSome(x)`. Covers both a qualified field (`c.slot`) and an implicit-receiver field (`slot`). Before the fix a bare `None` on an assignment target lowered uninstantiated (`arilrt.OptionNone`), which Go rejects (lowering-go.md §Constructor type-argument stamping).
+
+--- INPUT ---
+import fmt
+
+class Cell<T> {
+  var slot: Option<T>
+
+  static empty(): Cell<T> { return Cell<T>{ slot: None } }
+
+  set(x: T) { slot = Some(x) }
+  clear()   { slot = None }
+}
+
+func main() {
+  let c = Cell<int>.empty()
+  c.set(42)
+  match c.slot {
+    Some(v) => fmt.println("set:", v),
+    None    => fmt.println("empty"),
+  }
+  c.clear()
+  match c.slot {
+    Some(v) => fmt.println("still:", v),
+    None    => fmt.println("cleared"),
+  }
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type Cell[T any] struct {
+	Slot Option[T] `json:"slot"`
+}
+
+func cellEmpty[T any]() *Cell[T] {
+	return &Cell[T]{Slot: OptionNone[T]()}
+}
+func (_arilSelf *Cell[T]) set(x T) {
+	_arilSelf.Slot = OptionSome[T](x)
+}
+func (_arilSelf *Cell[T]) clear() {
+	_arilSelf.Slot = OptionNone[T]()
+}
+func main() {
+	var c = cellEmpty[int]()
+	c.set(42)
+	__aril_match_1 := c.Slot
+	switch __aril_match_1.Tag {
+	case 1:
+		v := __aril_match_1.V
+		fmt.Println("set:", v)
+	case 0:
+		fmt.Println("empty")
+	}
+	c.clear()
+	__aril_match_2 := c.Slot
+	switch __aril_match_2.Tag {
+	case 1:
+		v := __aril_match_2.V
+		fmt.Println("still:", v)
+	case 0:
+		fmt.Println("cleared")
+	}
+}
+
+--- STDOUT ---
+set: 42
+cleared
+
+--- EXIT ---
+0
