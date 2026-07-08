@@ -28,7 +28,8 @@ diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 91   # current run_ok; strict ratchet (raised 90→91 in the
-                    # CORPUS-POLISH epoch — healthcheck_server flips no-run→run_ok:
-                    # the http.Server{} handle + shutdown drives a self-terminating
-                    # graceful server, the last no-run showcase removed)
+run_ok_min   = 92   # current run_ok; strict ratchet (raised 91→92 in the
+                    # CONCURRENCY-CORRECTNESS epoch — nested_scopes flips run-fail→
+                    # run_ok: the structured-scope join is relocated before the
+                    # in-scope fan-in close, so the drain no longer races the spawns
+                    # (send-after-close E1203 was a true-positive codegen bug))

@@ -8,7 +8,7 @@
     "build_ok": 92,
     "diag_ok": 121,
     "diag_total": 121,
-    "run_ok": 91,
+    "run_ok": 92,
     "run_total": 93
   },
   "files": [
@@ -480,11 +480,6 @@
   ],
   "diag_misses": [],
   "run_fails": [
-    {
-      "path": "examples/concurrency/nested_scopes",
-      "status": "run-fail",
-      "code": 2
-    },
     {
       "path": "examples/core-language/lru_cache",
       "status": "build-fail",
