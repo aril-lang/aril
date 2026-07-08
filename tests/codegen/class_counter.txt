@@ -40,11 +40,11 @@ type Counter struct {
 func counterMake(start int) *Counter {
 	return &Counter{start}
 }
-func (t *Counter) bump() {
-	t.N = t.N + 1
+func (_arilSelf *Counter) bump() {
+	_arilSelf.N = _arilSelf.N + 1
 }
-func (t *Counter) get() int {
-	return t.N
+func (_arilSelf *Counter) get() int {
+	return _arilSelf.N
 }
 func main() {
 	var c = counterMake(10)

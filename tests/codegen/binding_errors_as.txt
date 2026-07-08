@@ -49,8 +49,8 @@ type NotFound struct {
 	Key string `json:"key"`
 }
 
-func (t *NotFound) Error() string {
-	return "not found: " + t.Key
+func (_arilSelf *NotFound) Error() string {
+	return "not found: " + _arilSelf.Key
 }
 func classify(e error) {
 	__aril_match_1 := ErrorsAs[*NotFound](e)

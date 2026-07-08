@@ -24,8 +24,8 @@ type Box[T any] struct {
 	V T `json:"v"`
 }
 
-func (t *Box[T]) get() T {
-	return t.V
+func (_arilSelf *Box[T]) get() T {
+	return _arilSelf.V
 }
 func main() {
 	fmt.Println("declared")

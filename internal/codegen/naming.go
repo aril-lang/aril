@@ -13,6 +13,16 @@ import (
 // the //line directive emitter. Split out of the codegen.go
 // god-file; behaviour-preserving.
 
+// methodRecvName is the Go variable emitted for a class method's implicit
+// receiver (`func (_arilSelf *T) …`) and every implicit-receiver reference in
+// the body (a bare field name / `this`). It carries the `_aril`-reserved
+// prefix (E0107 rejects it in user source) so it can never collide with a
+// user binding — e.g. a `match` arm binding `Some(t)` used to shadow the old
+// hard-coded `t` receiver and mis-dispatch onto the bound value
+// (lowering-go.md §Implicit receiver). The construction-time checker uses its
+// own `_arilNew` temp (contract.go); both are the same reserved family.
+const methodRecvName = "_arilSelf"
+
 // payloadFieldName builds the Go struct field name for a payload
 // field of a variant, per the lowering-go.md tagged-struct shape:
 // `<VariantName><FieldName>` (both capitalised). E.g. variant

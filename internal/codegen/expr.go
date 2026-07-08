@@ -443,9 +443,10 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// returning Result[T, error] (lowering-go.md §ScopeIR).
 		return g.emitScopeExpr(v)
 	case *ast.ThisExpr:
-		// lowering-go.md §Implicit receiver — the receiver is
-		// named `t` consistently in generated method bodies.
-		g.b.WriteString("t")
+		// lowering-go.md §Implicit receiver — the receiver carries a
+		// reserved name (methodRecvName) so it can't collide with a user
+		// binding of the same spelling.
+		g.b.WriteString(methodRecvName)
 		return nil
 	case *ast.Ident:
 		// Inside an emitted contract predicate (RFC-0006): `result` is the
@@ -507,13 +508,13 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// A bare ident that sema resolved to a class/record field (not a
 		// shadowing local/param) is an implicit-receiver reference
 		// (name-resolution §Implicit receiver) — emit `<recv>.<field>`,
-		// since the Go field lives on the method receiver `t` (or, inside a
-		// type-invariant construction check, the construction temp).
+		// since the Go field lives on the method receiver (methodRecvName)
+		// or, inside a type-invariant construction check, the construction temp.
 		if g.info != nil {
 			if sym := g.info.Symbol[v]; sym != nil && sym.Kind == sema.SymField {
 				recv := g.contractReceiver
 				if recv == "" {
-					recv = "t"
+					recv = methodRecvName
 				}
 				g.b.WriteString(recv)
 				g.b.WriteByte('.')

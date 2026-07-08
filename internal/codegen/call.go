@@ -560,12 +560,12 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// Bare instance-method call via the implicit receiver (`find(a)`
-	// inside a sibling method → `t.find(a)`; name-resolution §Implicit
+	// inside a sibling method → `_arilSelf.find(a)`; name-resolution §Implicit
 	// receiver). Sema resolves the bare name to the method symbol off
 	// the member scope (so the call is typed); codegen prefixes the
-	// receiver `t`, mirroring the bare-field case in emitExpr.
+	// reserved receiver name, mirroring the bare-field case in emitExpr.
 	if id, ok := c.Callee.(*ast.Ident); ok && g.isImplicitInstanceMethod(id) {
-		g.b.WriteString("t.")
+		g.b.WriteString(methodRecvName + ".")
 		g.b.WriteString(goIdent(id.Name))
 		if err := g.emitTypeArgs(c.TypeArgs); err != nil {
 			return err

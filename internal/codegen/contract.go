@@ -181,7 +181,7 @@ func (g *gen) emitContractCheck(pred ast.Expr, kind, fnName string) error {
 // method-exit check, emitted as a `defer` at the top of every non-static
 // method body so it runs on each return path (the mutation boundary), via the
 // shared emitDeferredCheckBlock wrapper. The invariant's field names lower to
-// `t.<field>` (implicit receiver), so the check reads the post-mutation state.
+// `<recv>.<field>` (implicit receiver), so the check reads the post-mutation state.
 // Under off (the default) nothing is emitted — byte-identical lowering. A
 // static method (no receiver) is skipped here; construction-time checking is a
 // later slice.

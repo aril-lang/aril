@@ -71,13 +71,14 @@ SnakeCase                    SnakeCase
 ```
 
 **Reserved user-source prefix.** To guarantee no collision
-between user-source identifiers and codegen's `_aril_NN` fresh
-names, the lexer rejects any user-source identifier whose
-**first six characters** are `_aril_` (case-sensitive). Emits
-**E0107 Reserved identifier prefix** — a hard error at lex time.
-This is a paired edit with `grammar.ebnf` (lexical
-`Ident` production); a user-source identifier starting with
-`_aril_` is grammar-illegal.
+between user-source identifiers and codegen's synthesised names —
+both the `_aril_NN` fresh desugar locals *and* the camelCase
+semantic temps (`_arilNew`, `_arilRet`, `_arilSelf`, …) — the
+lexer rejects any user-source identifier whose **first five
+characters** are `_aril` (case-sensitive). Emits **E0107 Reserved
+identifier prefix** — a hard error at lex time. This is a paired
+edit with `grammar.ebnf` (lexical `Ident` production); a
+user-source identifier starting with `_aril` is grammar-illegal.
 
 The Go reserved-word list as of Go 1.22 is hard-coded into the
 codegen pass: `break case chan const continue default defer
@@ -786,10 +787,14 @@ collected `return` types (`type-system.md` §T-Closure-Block).
 ## Implicit receiver / Field
 
 `Field { receiver: This{type: C}, name: n }` lowers to the Go
-expression `t.N` — `t` is the receiver name chosen for the
-generated Go method (codegen uses `t` consistently for clarity;
-not exposed in Aril), and the field is exported per §"Record /
-struct field lowering".
+expression `_arilSelf.N` — `_arilSelf` is the receiver name chosen
+for the generated Go method. It carries the `_aril`-reserved prefix
+(rejected in user source by E0107) so it can never collide with a
+user binding of the same spelling: a method that binds `t` — e.g. a
+`match` arm `Some(t)` — used to shadow an earlier hard-coded `t`
+receiver and mis-dispatch the implicit-receiver refs onto the bound
+value. The name is not exposed in Aril; the field is exported per
+§"Record / struct field lowering".
 
 Generic class methods carry their type parameters as Go-side
 type params; the receiver is a pointer for any class with
