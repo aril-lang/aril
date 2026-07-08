@@ -45,14 +45,42 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 		// (lowering-go §Brace literals).
 		spelled := strings.Join(b.TypeName.QName, ".")
 		if ht, ok := binding.HandleTypeOf(spelled); ok && ht.Constructable {
-			if len(b.Entries) != 0 {
+			initFields, hasInit := binding.HandleInitFieldsOf(spelled)
+			if len(b.Entries) != 0 && !hasInit {
 				return fmt.Errorf("codegen: %s takes no fields — construct it as %s{}", spelled, spelled)
 			}
 			if ht.GoPkg != "" {
 				g.usedGoPkgs[ht.GoPkg] = true
 			}
-			g.b.WriteString(ht.GoType)
-			g.b.WriteString("{}")
+			// A pointer handle (`*http.Server`) lowers to `&http.Server{…}`; a value
+			// handle (`sync.Mutex`) to `sync.Mutex{…}`. Init fields (sema-validated)
+			// map Aril name → exported Go field, in source order.
+			goType := ht.GoType
+			if strings.HasPrefix(goType, "*") {
+				g.b.WriteByte('&')
+				goType = goType[1:]
+			}
+			g.b.WriteString(goType)
+			g.b.WriteByte('{')
+			for i, e := range b.Entries {
+				re, ok := e.(*ast.RecordEntry)
+				if !ok {
+					return fmt.Errorf("codegen: %s is constructed with named fields", spelled)
+				}
+				fb, ok := initFields[re.Name]
+				if !ok {
+					return fmt.Errorf("codegen: %s has no constructable field %s", spelled, re.Name)
+				}
+				if i > 0 {
+					g.b.WriteString(", ")
+				}
+				g.b.WriteString(fb.GoName)
+				g.b.WriteString(": ")
+				if err := g.emitExpr(re.Value); err != nil {
+					return err
+				}
+			}
+			g.b.WriteByte('}')
 			return nil
 		}
 		return fmt.Errorf("codegen: qualified record type name not supported")

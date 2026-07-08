@@ -1,12 +1,13 @@
-description = "net/http server; a Aril type as http.Handler"
+description = "net/http server; an Aril type as http.Handler, with graceful shutdown"
 source   = "services healthcheck_server"
 category = "stdlib-binding"
 showcase = true
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.1"
-status   = "compiling"
-expects  = "no-run"
+status   = "running"
+expects  = "run-pass"
 entry    = "healthcheck_server.aril"
+expected_output = "expected-output.txt"
 
 # E0219 — an Aril class declaring `implements http.Handler` must structurally
 # provide `serveHTTP`; renaming it (so the method set no longer matches) is a

@@ -301,10 +301,27 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 			return &Unknown{}
 		}
 		if len(b.Entries) != 0 {
-			c.report("E0218", "Stdlib handle `"+named.N+"` takes no fields — construct it as `"+named.N+"{}`", b.Span)
-			return &Unknown{}
+			// A constructable handle with an init-field spec (http.Server) accepts
+			// its declared fields by name; a fieldless one (sync.Mutex) accepts
+			// none. An unknown/misshapen field is E0218 in .aril coordinates.
+			initFields, hasInit := binding.HandleInitFieldsOf(named.N)
+			if !hasInit {
+				c.report("E0218", "Stdlib handle `"+named.N+"` takes no fields — construct it as `"+named.N+"{}`", b.Span)
+				return &Unknown{}
+			}
+			for _, e := range b.Entries {
+				re, ok := e.(*ast.RecordEntry)
+				if !ok {
+					c.report("E0218", "Stdlib handle `"+named.N+"` is constructed with named fields", b.Span)
+					continue
+				}
+				c.inferExpr(re.Value) // walk the value so its own errors surface
+				if _, known := initFields[re.Name]; !known {
+					c.report("E0218", "Stdlib handle `"+named.N+"` has no constructable field `"+re.Name+"`", re.Span)
+				}
+			}
 		}
-		return rt // `sync.Mutex{}` zero-construction; its method set resolves off rt.
+		return rt // constructable handle; its method set resolves off rt.
 	}
 	for _, e := range b.Entries {
 		switch en := e.(type) {

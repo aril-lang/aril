@@ -365,3 +365,47 @@ func TestNetDialListenRegistry(t *testing.T) {
 		t.Error("net.dial should be a registry ResultWrap row, not a handle ctor")
 	}
 }
+
+// TestHTTPServerHandle: http.Server is the first constructable handle with init
+// fields (binding-surface §net/http). It is a pointer handle (*http.Server) so
+// the literal lowers to `&http.Server{…}`; `handler`/`addr` are settable at
+// construction; serve/shutdown wrap a bare-error Go return via ResultUnit.
+func TestHTTPServerHandle(t *testing.T) {
+	ht, ok := HandleTypeOf("http.Server")
+	if !ok {
+		t.Fatal("http.Server should be a handle type")
+	}
+	if ht.GoType != "*http.Server" || ht.GoPkg != "http" {
+		t.Errorf("http.Server lowering = %+v; want *http.Server / http", ht)
+	}
+	if !ht.Constructable || !IsConstructableHandle("http.Server") {
+		t.Error("http.Server should be Constructable")
+	}
+	// Init fields: handler → Handler, addr → Addr; an unknown field is absent.
+	init, ok := HandleInitFieldsOf("http.Server")
+	if !ok {
+		t.Fatal("http.Server should have init fields")
+	}
+	if h := init["handler"]; h.GoName != "Handler" {
+		t.Errorf("http.Server init handler = %+v; want Handler", h)
+	}
+	if a := init["addr"]; a.GoName != "Addr" {
+		t.Errorf("http.Server init addr = %+v; want Addr", a)
+	}
+	if _, bad := init["bogus"]; bad {
+		t.Error("http.Server should have no `bogus` init field")
+	}
+	// A fieldless constructable handle has no init-field spec.
+	if _, ok := HandleInitFieldsOf("sync.Mutex"); ok {
+		t.Error("sync.Mutex is fieldless zero-construction, should have no init fields")
+	}
+	// Methods.
+	serve, _ := HandleMethodOf("http.Server", "serve")
+	if serve.GoName != "Serve" || serve.Return != "Result<unit, error>" {
+		t.Errorf("http.Server.serve = %+v; want Serve → Result<unit, error>", serve)
+	}
+	shut, _ := HandleMethodOf("http.Server", "shutdown")
+	if shut.GoName != "Shutdown" || shut.Return != "Result<unit, error>" {
+		t.Errorf("http.Server.shutdown = %+v; want Shutdown → Result<unit, error>", shut)
+	}
+}

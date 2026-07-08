@@ -1,10 +1,11 @@
 --- healthcheck_server.aril
 +++ healthcheck_server.aril
-@@ -7,7 +7,7 @@
+@@ -15,7 +15,7 @@
+ import strings
  
  class HealthHandler implements http.Handler {
 -  serveHTTP(w: http.ResponseWriter, r: http.Request) {
 +  serve(w: http.ResponseWriter, r: http.Request) {
-     w.writeString("ok\n")
+     let _ = w.writeString("ok\n")
    }
  }

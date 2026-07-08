@@ -27,6 +27,7 @@ diag_ok_min  = 88   # headroom below current diag_ok (98) so an
                     # individual imprecise message is a penalty, not a red
                     # (raised 82→88 at the BINDING-HARDENING close as E0217/E0218
                     # coverage grew diag_ok 94→97)
-run_ok_min   = 90   # current run_ok; strict ratchet (raised 89→90 in the
-                    # EXTERNAL-MODULES epoch — the greeter example runs, printing
-                    # output from its external-library dependency (RFC-0008))
+run_ok_min   = 91   # current run_ok; strict ratchet (raised 90→91 in the
+                    # CORPUS-POLISH epoch — healthcheck_server flips no-run→run_ok:
+                    # the http.Server{} handle + shutdown drives a self-terminating
+                    # graceful server, the last no-run showcase removed)

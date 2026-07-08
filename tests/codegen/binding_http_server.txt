@@ -1,0 +1,55 @@
+--- TITLE ---
+Constructable handle with init fields: http.Server{ handler: H{}, addr: "…" } lowers to a Go pointer composite `&http.Server{Handler: &H{}, Addr: "…"}` (the first handle brace-literal with fields, vs the fieldless sync.Mutex{}); serve(ln) / shutdown(ctx) lower to (*http.Server).Serve / .Shutdown wrapped in arilrt.ResultUnit.
+
+--- INPUT ---
+import net
+import http
+import context
+
+class H implements http.Handler {
+  serveHTTP(w: http.ResponseWriter, r: http.Request) {
+    let _ = w.writeString("ok")
+  }
+}
+
+func run(ln: net.Listener, ctx: context.Context) {
+  let server = http.Server{ handler: H{}, addr: "127.0.0.1:0" }
+  let _ = server.serve(ln)
+  let _ = server.shutdown(ctx)
+}
+
+--- GO ---
+package main
+
+import "net/http"
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+
+type H struct {
+}
+
+func (t *H) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var _ = ResultOf(w.Write([]byte("ok")))
+}
+func run(ln net.Listener, ctx context.Context) {
+	var server = &http.Server{Handler: &H{}, Addr: "127.0.0.1:0"}
+	var _ = ResultUnit(server.Serve(ln))
+	var _ = ResultUnit(server.Shutdown(ctx))
+}
