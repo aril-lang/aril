@@ -118,6 +118,19 @@ express (reverse order, projection keys, struct fields). The
 constraint is enforced at instantiation by the Go backend; a richer
 Aril-level instantiation diagnostic is future work.
 
+**Map/Set key parameters must be declared comparable.** A `Map<K, V>`
+lowers to a Go `map[K]V` and a `Set<K>` to a `map[K]struct{}`, whose
+key type must satisfy Go `comparable`. When a declaration uses one of
+its *own* type parameters as a `Map`/`Set` **key** without a
+`Comparable`/`Ordered` bound (`class Cache<K, V> { var index: Map<K,
+V> }`), that would leak Go's raw "K does not satisfy comparable" at the
+backend — so it is caught in Aril coordinates as **E0127 Map/Set key
+type parameter is not comparable**, pointing the user at `K:
+Comparable`. Consistent with the explicit-constraint rule above: the
+bound is *declared*, never inferred from the key usage. Scanned over
+the declaration's field types (the container-field case); a bare
+parameter keyed only in a method-body construction is out of v1 scope.
+
 ## Type judgements — expressions
 
 ### Literals

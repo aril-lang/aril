@@ -15,7 +15,7 @@ class LRUNode<K, V> {
   var next:  Option<LRUNode<K, V>>
 }
 
-class LRU<K, V> {
+class LRU<K: Comparable, V> {
   let capacity: int
 
   var size:  int

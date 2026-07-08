@@ -7,3 +7,10 @@ since    = "0.1"
 status   = "target-sketch"
 expects  = "run-pass"
 entry    = "lru_cache.aril"
+
+[[error]]
+patch   = "errors/unconstrained-map-key.patch"   # drop the `K: Comparable` bound → K keys the index Map unconstrained
+expect  = ["E0127"]
+stage   = "sema"
+matches = "errors/unconstrained-map-key.expected"
+origin  = "synthetic"

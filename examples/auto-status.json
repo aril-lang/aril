@@ -6,8 +6,8 @@
     "sema_fail": 3,
     "emit_fail": 1,
     "build_ok": 92,
-    "diag_ok": 121,
-    "diag_total": 121,
+    "diag_ok": 122,
+    "diag_total": 122,
     "run_ok": 92,
     "run_total": 97
   },

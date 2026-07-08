@@ -46,6 +46,48 @@ func main() {}
 	}
 }
 
+// TestComparableKeyBound: a type parameter used as a Map/Set key must carry a
+// Comparable/Ordered bound (E0127), the D10-clean stand-in for Go's raw "K does
+// not satisfy comparable"; the bound (or a concrete/comparable key) silences it.
+func TestComparableKeyBound(t *testing.T) {
+	// Unconstrained K keys a Map field → E0127.
+	if codes := runCheck(t, `class Cache<K, V> { var index: Map<K, V> }
+func main() {}
+`); !hasCode(codes, "E0127") {
+		t.Errorf("want E0127 for an unconstrained Map-key type param, got %v", codes)
+	}
+	// A Set element position is a key too.
+	if codes := runCheck(t, `class Seen<T> { var seen: Set<T> }
+func main() {}
+`); !hasCode(codes, "E0127") {
+		t.Errorf("want E0127 for an unconstrained Set-element type param, got %v", codes)
+	}
+	// The Comparable bound silences it.
+	if codes := runCheck(t, `class Cache<K: Comparable, V> { var index: Map<K, V> }
+func main() {}
+`); hasCode(codes, "E0127") {
+		t.Errorf("K: Comparable satisfies the key constraint, got %v", codes)
+	}
+	// Ordered also satisfies comparable.
+	if codes := runCheck(t, `class Cache<K: Ordered, V> { var index: Map<K, V> }
+func main() {}
+`); hasCode(codes, "E0127") {
+		t.Errorf("K: Ordered satisfies the key constraint, got %v", codes)
+	}
+	// A concrete (non-parameter) key is Go's business, never E0127.
+	if codes := runCheck(t, `class Cache<V> { var index: Map<string, V> }
+func main() {}
+`); hasCode(codes, "E0127") {
+		t.Errorf("a concrete Map key must not fire E0127, got %v", codes)
+	}
+	// The param in the *value* position is unconstrained-fine.
+	if codes := runCheck(t, `class Cache<K: Comparable, V> { var index: Map<K, V> }
+func main() {}
+`); hasCode(codes, "E0127") {
+		t.Errorf("the value type param needs no bound, got %v", codes)
+	}
+}
+
 func TestKnownNamesPass(t *testing.T) {
 	src := `import fmt
 class Counter { var n: int }
