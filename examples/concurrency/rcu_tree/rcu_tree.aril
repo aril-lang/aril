@@ -309,7 +309,7 @@ func main() {
 // or double-inserting a duplicate (extra element). A one-sided `isSortedStrict`
 // would be satisfied by `return oldTree` (drops k) — pairing "sorted" with
 // "derived from the input via sortedInsert" is what closes that hole
-// (AI/authoring.md: sorted ∧ permutation-of-input).
+// (sorted ∧ permutation-of-input — docs/atomics-lock-free.md §Contract discipline).
 contract insertPersistent {
   ensures seqEq(inorder(Some(result)), sortedInsert(inorder(root), k))
 }
