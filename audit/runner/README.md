@@ -30,9 +30,13 @@ audit-runner grade <task-dir> <submission.aril>
   the compiler regressed) — a **tooling failure**, exit 1, never silent. It
   prints one JSONL record per task to stdout (proving the serialize path) and a
   final `#`-prefixed summary line; the exit code is the gate.
-- **`grade <task-dir> <submission.aril>`** — emit exactly one JSONL record for
-  one submission. This is the primitive the pilot (`harness.md §9` item 4) calls
-  per probe output: the probe writes a submission, `grade` scores it.
+- **`grade <task-dir> <submission.aril> [--model M] [--rung R] [--arm A] [--trial N]`**
+  — emit exactly one JSONL record for one submission. This is the primitive the
+  pilot (`harness.md §9` item 4) calls per probe output: the probe writes a
+  submission, `grade` scores it. The oracle owns only `compile_ok`/`run_ok`; the
+  pilot injects the cell coordinates (`model`/`rung`/`arm`/`trial`) via the
+  flags, so a `grade` record is a complete §1 cell. With no flags, `model`
+  defaults to the placeholder `probe` and `rung`/`arm` to empty (JSON null).
 
 The tool `chdir`s to the git root, builds the `aril` compiler once, and grades
 each submission with `--contracts=panic` (a stated contract becomes part of the
@@ -43,10 +47,11 @@ run-oracle.
 
 - **No subagents.** This PR is the deterministic oracle only; driving probe
   subagents is the pilot's job (harness §3/§9).
-- **No error classification.** `error_class` / `idiom_divergence` are the blind
-  classifier's output (harness §6), filled by a later pass — not guessed here.
-  (`validate` stamps `idiom_divergence = "intended"` only for the reference,
-  where it is ground truth, not a judgment.)
+- **No error classification.** `error_class` (left empty) and `idiom_divergence`
+  (defaulted to the `n/a` sentinel) are the blind classifier's output
+  (harness §6), filled by a later pass — not guessed here. (`validate` stamps
+  `idiom_divergence = "intended"` only for the reference, where it is ground
+  truth, not a judgment.)
 
 ## Follow-up
 

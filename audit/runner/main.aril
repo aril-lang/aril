@@ -3,6 +3,7 @@ import os
 import strings
 import json
 import sort
+import strconv
 
 // audit-runner — the deterministic oracle + record-writer for the readiness
 // audit (docs/audit/harness.md §4). Given a task and a submission .aril file it
@@ -143,17 +144,23 @@ func parseTaskMeta(dir: string, text: string): TaskMeta {
     if strings.hasPrefix(line, "[") {
       break
     }
-    if strings.hasPrefix(line, "id") {
+    // Match the key EXACTLY (the text before `=`, trimmed) rather than by
+    // prefix — so a future `expected_exit`/`args_foo` key can't be mistaken for
+    // `expected`/`args`.
+    let eq = strings.index(line, "=")
+    if eq < 0 { continue }
+    let key = strings.trimSpace(line[:eq])
+    if key == "id" {
       m.id = tomlScalar(line)
-    } else if strings.hasPrefix(line, "stratum") {
+    } else if key == "stratum" {
       m.stratum = tomlScalar(line)
-    } else if strings.hasPrefix(line, "oracle") {
+    } else if key == "oracle" {
       m.oracle = tomlScalar(line)
-    } else if strings.hasPrefix(line, "reference") {
+    } else if key == "reference" {
       m.reference = tomlScalar(line)
-    } else if strings.hasPrefix(line, "expected") {
+    } else if key == "expected" {
       m.expected = tomlScalar(line)
-    } else if strings.hasPrefix(line, "args") {
+    } else if key == "args" {
       m.args = tomlCodes(line)
     }
   }
@@ -186,15 +193,27 @@ func discoverTasks(): []string {
 
 // gradeSubmission is the oracle: compile the submission, run it in the task dir,
 // and compare stdout to the expected sidecar (harness §4). compile_ok/run_ok are
-// the only judgments; error_class / idiom_divergence are left empty for the
-// blind classifier (§6). Built with --contracts=panic so a stated contract is
+// the only judgments; error_class is left empty and idiom_divergence defaults to
+// the "n/a" sentinel — both are the blind classifier's output (§6), not the
+// deterministic oracle's. Built with --contracts=panic so a stated contract is
 // part of the behavioural check (inert when the submission has none), matching
 // the corpus run-oracle.
+//
+// run_ok is a plain bool: it is false and NOT meaningful whenever compile_ok is
+// false (a never-compiled submission never ran). Aggregators must read run_ok
+// gated on compile_ok (harness §1).
 func gradeSubmission(aril: string, tmp: string, m: TaskMeta, submission: string, model: string, rung: string, arm: string, trial: int): Record {
+  // An unsupported oracle mode is a misconfigured task, not a probe failure —
+  // fail loud rather than silently exact-grading (e.g. a concurrent task whose
+  // stdout is only an ordered subsequence). Only stdout-exact is implemented.
+  if m.oracle != "stdout-exact" {
+    fmt.println(fmt.sprintf("audit-runner: task %s: unsupported oracle '%s' (only stdout-exact implemented)", m.id, m.oracle))
+    os.exit(1)
+  }
   var rec = Record{
     task_id: m.id, stratum: m.stratum, model: model, rung: rung, arm: arm,
     trial: trial, language: "aril", compile_ok: false, run_ok: false,
-    iterations: 1, error_class: "", idiom_divergence: "",
+    iterations: 1, error_class: "", idiom_divergence: "n/a",
     submission: submission, transcript: "",
   }
   let outBin = pathJoin(tmp, m.id)
@@ -287,14 +306,39 @@ func main() {
   let aril = buildAril(tmp)
 
   if args.len() >= 2 && args[1] == "grade" {
-    if args.len() != 4 {
-      fmt.println("usage: audit-runner grade <task-dir> <submission.aril>")
+    if args.len() < 4 {
+      fmt.println("usage: audit-runner grade <task-dir> <submission.aril> [--model M] [--rung R] [--arm A] [--trial N]")
       cleanup(tmp)
       os.exit(2)
     }
     let dir = args[2]
+    // The oracle owns only compile_ok/run_ok; the pilot injects the cell
+    // coordinates (model/rung/arm/trial) via these flags so a `grade` record is
+    // a complete harness §1 cell, not a placeholder (default model "probe" when
+    // omitted). --model/--rung/--arm/--trial; unknown flags are ignored.
+    var model = "probe"
+    var rung = ""
+    var arm = ""
+    var trial = 0
+    var i = 4
+    while i + 1 < args.len() {
+      let f = args[i]
+      if f == "--model" {
+        model = args[i + 1]
+      } else if f == "--rung" {
+        rung = args[i + 1]
+      } else if f == "--arm" {
+        arm = args[i + 1]
+      } else if f == "--trial" {
+        match strconv.atoi(args[i + 1]) {
+          Ok(n)  => trial = n,
+          Err(_) => trial = 0,
+        }
+      }
+      i = i + 2
+    }
     let m = parseTaskMeta(dir, readFileOrEmpty(pathJoin(dir, "task.toml")))
-    let rec = gradeSubmission(aril, tmp, m, args[3], "probe", "", "", 0)
+    let rec = gradeSubmission(aril, tmp, m, args[3], model, rung, arm, trial)
     fmt.println(recordJson(rec))
     cleanup(tmp)
     os.exit(0)

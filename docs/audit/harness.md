@@ -41,7 +41,7 @@ One JSON object per run (the pilot writes JSONL; one line per record):
 | `trial` | int | 0-based repeat index within the cell |
 | `language` | enum | `aril` \| `go` \| `ts` \| `rust` (reference control, §5) |
 | `compile_ok` | bool | deterministic oracle (§4) |
-| `run_ok` | bool\|null | deterministic oracle; null if it never compiled |
+| `run_ok` | bool | deterministic oracle; **read gated on `compile_ok`** — `false` and not meaningful when `compile_ok` is `false` (a never-compiled submission never ran) |
 | `iterations` | int | attempts to green in the iterative arm (1 in one-shot) |
 | `error_class` | enum\|null | blind classifier (§6); null on first-try success |
 | `idiom_divergence` | enum | `intended` \| `awkward` \| `n/a`; blind classifier |
