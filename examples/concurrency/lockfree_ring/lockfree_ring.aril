@@ -1,10 +1,8 @@
-// TARGET-SKETCH (aspirational): a bounded lock-free MPMC ring buffer over a
-// fixed slice with atomic head/tail indices. This is the acceptance target for
-// the future atomics-binding epoch — it does NOT build yet, because `atomic`
-// (Go's sync/atomic) is unbound. That is intentional: the file is the demand
-// signal for binding the scalar atomics `atomic.Int64` needs (a table edit, no
-// generics — this container deliberately uses a monomorphic `int` element type
-// so it isolates the scalar-atomics demand from the generics demand).
+// A bounded lock-free MPMC ring buffer over a fixed slice with atomic head/tail
+// indices (ATOMICS-BINDING — builds and runs over the bound scalar
+// `atomic.Int64`). This container deliberately uses a monomorphic `int` element
+// type, so it needs only the scalar atomics (no atomic.Pointer) — isolating the
+// scalar-atomics surface from the generic one.
 //
 // Algorithm: Dmitry Vyukov's bounded MPMC queue — the one lock-free container
 // reachable with ONLY scalar atomics (no atomic.Pointer). Each cell carries an
