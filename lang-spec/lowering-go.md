@@ -261,6 +261,30 @@ Method bodies for these types live in the `arilrt` package
 `m.set(k, v)` in Aril IR lowers to `m.Set(k, v)` in Go (note
 the capital — runtime methods are exported).
 
+**atomic.Pointer<T> — the generic atomic reference cell.** A first-class
+generic builtin (modelled like `Map`/`Set`, not a value-handle row), it lowers
+to a pointer to an `arilrt.AtomicPointer[P]` wrapper (`atomics.go`) over Go's
+`atomic.Pointer[P]`:
+
+```go
+type AtomicPointer[T any] struct { p atomic.Pointer[T] }
+func (a *AtomicPointer[T]) Load() Option[*T]                       // nil → None
+func (a *AtomicPointer[T]) Store(v *T)
+func (a *AtomicPointer[T]) Swap(v Option[*T]) Option[*T]
+func (a *AtomicPointer[T]) CompareAndSwap(old, new Option[*T]) bool
+```
+
+The type parameter `P` is the **pointee**: an Aril class `T` is already a Go
+`*T`, and Go's `atomic.Pointer[P]` stores a `*P`, so `atomic.Pointer<Node>`
+lowers to `*arilrt.AtomicPointer[Node]` (the class-reference star is suppressed
+inside the brackets). Construction `atomic.Pointer<T>{}` → `&arilrt.AtomicPointer[P]{}`
+(a fresh heap cell, shared by reference like a class, so the wrapped atomic is
+never copied — Go's `noCopy`). The four methods export like container methods
+(`head.compareAndSwap(...)` → `head.CompareAndSwap(...)`); `load`/`swap` lift Go's
+raw `*P`/nil into `Option<T>` (`None` = the nil pointer), CAS compares by Go
+pointer identity. The GC is the RCU reclamation grace period, so a superseded
+version stays reachable exactly as long as a reader holds it (no `unsafe`).
+
 **Option ⇄ JSON.** When a program uses both `Option` and an
 `encoding/json` binding, the generated `Option[T]` carries
 `MarshalJSON`/`UnmarshalJSON`: `None` ⇄ JSON `null`, `Some(v)` ⇄ the

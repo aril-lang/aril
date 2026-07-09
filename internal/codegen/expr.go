@@ -44,6 +44,18 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 		// A qualified name here is a constructable stdlib handle, empty-only
 		// (lowering-go §Brace literals).
 		spelled := strings.Join(b.TypeName.QName, ".")
+		// atomic.Pointer<T>{} — the generic atomic cell (ATOMICS-BINDING). A fresh
+		// heap cell `&arilrt.AtomicPointer[P]{}` (a pointer, like a class, so it is
+		// shared by reference and never copied). sema rejects a non-empty literal
+		// (E0218), so any entry is ignored here.
+		if spelled == "atomic.Pointer" && len(b.TypeName.Args) == 1 {
+			g.b.WriteString("&" + g.rt("AtomicPointer") + "[")
+			if err := g.emitPointeeType(b.TypeName.Args[0]); err != nil {
+				return err
+			}
+			g.b.WriteString("]{}")
+			return nil
+		}
 		if ht, ok := binding.HandleTypeOf(spelled); ok && ht.Constructable {
 			initFields, hasInit := binding.HandleInitFieldsOf(spelled)
 			if len(b.Entries) != 0 && !hasInit {
@@ -912,7 +924,9 @@ func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
 		return false
 	}
 	switch g.info.Type[receiver].(type) {
-	case *sema.Map, *sema.Set, *sema.Stack:
+	case *sema.Map, *sema.Set, *sema.Stack, *sema.AtomicPtr:
+		// AtomicPtr methods (load/store/swap/compareAndSwap) cross the arilrt
+		// boundary to the exported wrapper methods, like the container methods.
 		return true
 	}
 	return false

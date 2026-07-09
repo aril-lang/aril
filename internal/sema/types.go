@@ -110,6 +110,17 @@ type Option struct{ T Type }
 func (*Option) typeMarker()      {}
 func (o *Option) String() string { return "Option<" + o.T.String() + ">" }
 
+// AtomicPtr — `atomic.Pointer<T>`, the generic atomic reference cell
+// (ATOMICS-BINDING; docs/atomics-lock-free.md §Atomic references). T is a
+// class reference and "nil" is `None`, so load()/swap() yield Option<T>.
+// Modelled like Map/Set — a first-class generic builtin, not a value handle
+// (the handle path carries no type args) — and lowers to an arilrt wrapper
+// over Go's atomic.Pointer[T].
+type AtomicPtr struct{ Elem Type }
+
+func (*AtomicPtr) typeMarker()      {}
+func (a *AtomicPtr) String() string { return "atomic.Pointer<" + a.Elem.String() + ">" }
+
 // Channel — `Channel<T>` (bidirectional). SendChan / RecvChan are
 // the one-way widenings (builtins.md §Channel); Channel<T> widens
 // implicitly into either at argument sites (T-Chan-Widen, enforced
@@ -258,6 +269,9 @@ func equal(a, b Type) bool {
 	case *Stack:
 		y, ok := b.(*Stack)
 		return ok && equal(x.Elem, y.Elem)
+	case *AtomicPtr:
+		y, ok := b.(*AtomicPtr)
+		return ok && equal(x.Elem, y.Elem)
 	case *Channel:
 		y, ok := b.(*Channel)
 		return ok && equal(x.Elem, y.Elem)
@@ -332,9 +346,10 @@ func comparable(t Type) bool {
 			}
 		}
 		return true
-	case *Slice, *Map, *Set, *Stack, *Channel, *SendChan, *RecvChan, *Func, *Never, *Result, *Option:
+	case *Slice, *Map, *Set, *Stack, *Channel, *SendChan, *RecvChan, *Func, *Never, *Result, *Option, *AtomicPtr:
 		// Result / Option are matched, not compared with `==` in v1
-		// (their payloads may themselves be non-comparable).
+		// (their payloads may themselves be non-comparable). An atomic
+		// cell is mutated via its methods, never compared.
 		return false
 	default:
 		return false
