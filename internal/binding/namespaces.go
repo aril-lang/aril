@@ -19,6 +19,10 @@ var stdlibNamespaces = []string{
 	"errors", "fmt", "os", "strings", "strconv", "bufio", "context",
 	"time", "sync", "io", "log", "net", "encoding", "math",
 	"unicode", "sort", "json", "slices", "regexp", "http", "url",
+	// atomic → Go's sync/atomic (goImportPath); the Go package selector is still
+	// `atomic`, so call sites are unaffected. Handle-only namespace (no bound
+	// package functions — its whole surface is the atomic.Int64/Uint64/Bool cells).
+	"atomic",
 }
 
 // runtimeNamespaces are arilrt-backed builtin modules — importable, but not

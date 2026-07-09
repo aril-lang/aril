@@ -4,15 +4,15 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 93 / 97 examples build end-to-end** (floor 93).
+- **build_ok — 94 / 97 examples build end-to-end** (floor 94).
 - **diag_ok — 122 / 122 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 93 / 97 run-pass examples build and run as specified** (floor 93; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 94 / 97 run-pass examples build and run as specified** (floor 94; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 93 |
-| emit / codegen fail | 0 |
-| sema fail | 3 |
+| ✅ build (full pipeline) | 94 |
+| emit / codegen fail | 2 |
+| sema fail | 0 |
 | parse fail | 1 |
 
 ## Per-example
@@ -21,6 +21,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 |---|---|---|
 | `examples/concurrency/concurrency/concurrency.aril` | build | — |
 | `examples/concurrency/graceful_server/graceful_server.aril` | build | — |
+| `examples/concurrency/lockfree_ring/lockfree_ring.aril` | build | — |
 | `examples/concurrency/mutex_counter/mutex_counter.aril` | build | — |
 | `examples/concurrency/nested_scopes/nested_scopes.aril` | build | — |
 | `examples/concurrency/parallel_fetcher/parallel_fetcher.aril` | build | — |
@@ -112,9 +113,8 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/url_router/url_router.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
-| `examples/concurrency/lockfree_ring/lockfree_ring.aril` | sema | error[E0117]: unknown import path "atomic" |
-| `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | sema | error[E0103]: Unknown name atomic |
-| `examples/concurrency/rcu_tree/rcu_tree.aril` | sema | error[E0103]: Unknown name atomic |
+| `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | emit | go build failed |
+| `examples/concurrency/rcu_tree/rcu_tree.aril` | emit | unknown failure |
 | `examples/concurrency/lockfree_stack/lockfree_stack.aril` | parse | error[E0112]: generic brace literal requires a bare type name |
 
 ## Diagnostic-quality gaps
@@ -130,11 +130,10 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**4 of 97 run-pass examples fall short of run_ok.**
+**3 of 97 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
-| `examples/concurrency/lockfree_ring` | build-fail | 1 |
 | `examples/concurrency/lockfree_stack` | build-fail | 1 |
 | `examples/concurrency/rcu_skiplist` | build-fail | 1 |
 | `examples/concurrency/rcu_tree` | build-fail | 1 |

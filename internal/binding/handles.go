@@ -70,6 +70,19 @@ var handleTypes = map[string]HandleType{
 	// sync primitives — Constructable value structs (binding-surface §sync).
 	"sync.Mutex":     {GoType: "sync.Mutex", GoPkg: "sync", Constructable: true},
 	"sync.WaitGroup": {GoType: "sync.WaitGroup", GoPkg: "sync", Constructable: true},
+	// sync/atomic scalar cells (ATOMICS-BINDING epoch) — Constructable value
+	// structs whose zero value is ready to use, exactly like sync.Mutex. Their
+	// methods are pointer-receiver (Load/Store/…), reached because a handle lives
+	// in an addressable location (a class field or local); Go auto-takes the
+	// address. GoPkg is the Aril import name `atomic` (→ sync/atomic via
+	// goImportPath; the Go selector `atomic.` in GoType is already correct — like
+	// http→net/http). These must never be *copied* (Go's noCopy), which holds:
+	// a `class` instance lowers to a Go pointer (§Implicit receiver), so a handle
+	// field is shared by reference, and a handle local is captured by reference
+	// across spawned goroutines. binding-surface §sync/atomic.
+	"atomic.Int64":  {GoType: "atomic.Int64", GoPkg: "atomic", Constructable: true},
+	"atomic.Uint64": {GoType: "atomic.Uint64", GoPkg: "atomic", Constructable: true},
+	"atomic.Bool":   {GoType: "atomic.Bool", GoPkg: "atomic", Constructable: true},
 	// context.Context — a Go interface (bare spelling, like net.Conn), obtain-only.
 	"context.Context": {GoType: "context.Context", GoPkg: "context"},
 	// net/http server-path handles (HTTP-SERVER epoch). ResponseWriter is a Go
@@ -176,6 +189,31 @@ var handleMethods = map[string]map[string]HandleBinding{
 		"add":  {GoName: "Add", Params: []string{"int"}, Return: "unit"},
 		"done": {GoName: "Done", Params: nil, Return: "unit"},
 		"wait": {GoName: "Wait", Params: nil, Return: "unit"},
+	},
+	// sync/atomic method sets (ATOMICS-BINDING epoch, binding-surface §sync/atomic).
+	// load/store/swap/compareAndSwap are common to all three; add is integer-only
+	// (atomic.Bool has no Add). compareAndSwap returns Go's `swapped bool`; swap and
+	// add return the exchanged/new value. Go signatures: Load()→T, Store(T),
+	// Swap(new T)→old T, CompareAndSwap(old,new T)→bool, Add(delta T)→new T.
+	"atomic.Int64": {
+		"load":           {GoName: "Load", Params: nil, Return: "int64"},
+		"store":          {GoName: "Store", Params: []string{"int64"}, Return: "unit"},
+		"swap":           {GoName: "Swap", Params: []string{"int64"}, Return: "int64"},
+		"compareAndSwap": {GoName: "CompareAndSwap", Params: []string{"int64", "int64"}, Return: "bool"},
+		"add":            {GoName: "Add", Params: []string{"int64"}, Return: "int64"},
+	},
+	"atomic.Uint64": {
+		"load":           {GoName: "Load", Params: nil, Return: "uint64"},
+		"store":          {GoName: "Store", Params: []string{"uint64"}, Return: "unit"},
+		"swap":           {GoName: "Swap", Params: []string{"uint64"}, Return: "uint64"},
+		"compareAndSwap": {GoName: "CompareAndSwap", Params: []string{"uint64", "uint64"}, Return: "bool"},
+		"add":            {GoName: "Add", Params: []string{"uint64"}, Return: "uint64"},
+	},
+	"atomic.Bool": {
+		"load":           {GoName: "Load", Params: nil, Return: "bool"},
+		"store":          {GoName: "Store", Params: []string{"bool"}, Return: "unit"},
+		"swap":           {GoName: "Swap", Params: []string{"bool"}, Return: "bool"},
+		"compareAndSwap": {GoName: "CompareAndSwap", Params: []string{"bool", "bool"}, Return: "bool"},
 	},
 	"context.Context": {
 		// done() → Go's <-chan struct{}; err/deadline/value deferred (binding-surface §context).

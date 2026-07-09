@@ -325,6 +325,62 @@ func TestSyncHandles(t *testing.T) {
 	}
 }
 
+// TestAtomicHandles locks the sync/atomic scalar cells (ATOMICS-BINDING):
+// atomic.Int64/Uint64/Bool are Constructable value handles (like sync.Mutex —
+// built `atomic.T{}`, ready to use at zero) whose methods rename to the Go set.
+// They map to the Aril import name `atomic` (→ sync/atomic via goImportPath), so
+// GoPkg is "atomic", not the import path. load/store/swap/compareAndSwap are
+// common; add is integer-only (Bool has none).
+func TestAtomicHandles(t *testing.T) {
+	for _, spelled := range []string{"atomic.Int64", "atomic.Uint64", "atomic.Bool"} {
+		ht, ok := HandleTypeOf(spelled)
+		if !ok {
+			t.Fatalf("%s should be a handle type", spelled)
+		}
+		if ht.GoType != spelled || ht.GoPkg != "atomic" {
+			t.Errorf("%s lowering = %+v; want value GoType %s / atomic", spelled, ht, spelled)
+		}
+		if !ht.Constructable || !IsConstructableHandle(spelled) {
+			t.Errorf("%s should be Constructable (built with %s{})", spelled, spelled)
+		}
+		// The shared method set, present on all three.
+		for _, m := range []string{"load", "store", "swap", "compareAndSwap"} {
+			if _, ok := HandleMethodOf(spelled, m); !ok {
+				t.Errorf("%s should bind method %s", spelled, m)
+			}
+		}
+	}
+	// Int64: load→int64, store(int64)→unit, compareAndSwap(int64,int64)→bool, add(int64)→int64.
+	load, _ := HandleMethodOf("atomic.Int64", "load")
+	if load.GoName != "Load" || load.Return != "int64" || len(load.Params) != 0 {
+		t.Errorf("atomic.Int64.load = %+v; want Load() → int64", load)
+	}
+	store, _ := HandleMethodOf("atomic.Int64", "store")
+	if store.GoName != "Store" || store.Return != "unit" || len(store.Params) != 1 || store.Params[0] != "int64" {
+		t.Errorf("atomic.Int64.store = %+v; want Store(int64) → unit", store)
+	}
+	cas, _ := HandleMethodOf("atomic.Int64", "compareAndSwap")
+	if cas.GoName != "CompareAndSwap" || cas.Return != "bool" || len(cas.Params) != 2 {
+		t.Errorf("atomic.Int64.compareAndSwap = %+v; want CompareAndSwap(int64,int64) → bool", cas)
+	}
+	add, _ := HandleMethodOf("atomic.Int64", "add")
+	if add.GoName != "Add" || add.Return != "int64" {
+		t.Errorf("atomic.Int64.add = %+v; want Add(int64) → int64", add)
+	}
+	// Bool carries no add (integer-only operation).
+	if _, ok := HandleMethodOf("atomic.Bool", "add"); ok {
+		t.Error("atomic.Bool should not bind add (integer-only)")
+	}
+	boolLoad, _ := HandleMethodOf("atomic.Bool", "load")
+	if boolLoad.Return != "bool" {
+		t.Errorf("atomic.Bool.load = %+v; want → bool", boolLoad)
+	}
+	// atomic is an importable builtin module (stdlib category, not runtime).
+	if !IsBuiltinModule("atomic") || !IsStdlibNamespace("atomic") {
+		t.Error("atomic should be an importable stdlib builtin module")
+	}
+}
+
 // TestContextHandle locks context.Context: an obtain-only interface handle
 // (not Constructable) whose done() renames to Done() returning a receive
 // channel of unit (Go's <-chan struct{}).
