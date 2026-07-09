@@ -1,0 +1,3 @@
+ok 5
+err division by zero
+ok 3

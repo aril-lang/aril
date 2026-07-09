@@ -17,7 +17,7 @@ audit/tasks/<stratum>/<id>/
   task.toml            # metadata: id, stratum, spec anchors, oracle mode, controls
   prompt.md            # the task statement handed to the probe (language-neutral)
   reference.aril       # a known-good Aril solution — NEVER shown to the probe
-  expected.out         # the oracle target (stdout), captured from reference.aril
+  expected.txt         # the oracle target (stdout), captured from reference.aril
   controls/            # reference-language statements (methodology §5 control)
     <id>.go
     <id>.rs
@@ -43,13 +43,13 @@ audit/tasks/<stratum>/<id>/
   reaches for is the measurement.
 - **`reference.aril` is never part of a probe's context.** The harness builds a
   probe prompt from the rung documents + `prompt.md` only (`harness.md §3`). The
-  reference solution exists to (a) *generate* `expected.out`, (b) let the
+  reference solution exists to (a) *generate* `expected.txt`, (b) let the
   oracle-glue PR validate itself on a known-good submission before any subagent
   runs, and (c) document the *intended idiom* for the `idiom_divergence` grade.
   A probe that could read `reference.aril` would be measuring copying, not
   intuition.
-- **`expected.out`** is the exact stdout of `reference.aril`. Because these
-  tasks print language-independent output, the *same* `expected.out` is the
+- **`expected.txt`** is the exact stdout of `reference.aril`. Because these
+  tasks print language-independent output, the *same* `expected.txt` is the
   oracle target for the Aril submission and for all control languages.
 
 ## `task.toml`
@@ -58,12 +58,12 @@ audit/tasks/<stratum>/<id>/
 id       = "fizzbuzz"
 stratum  = "prior-aligned"
 anchors  = ["T-For", "T-Arith", "T-Cmp"]   # lang-spec artifact IDs exercised
-oracle   = "stdout-exact"                    # compare stdout byte-exact to expected.out
+oracle   = "stdout-exact"                    # compare stdout byte-exact to expected.txt
 args     = []                                # CLI args to the built program
 
 prompt    = "prompt.md"
 reference = "reference.aril"
-expected  = "expected.out"
+expected  = "expected.txt"
 
 [controls]                                   # methodology §5 reference control
 go   = "controls/fizzbuzz.go"
@@ -74,8 +74,8 @@ ts   = "controls/fizzbuzz.ts"
 ## Validation status of the seed
 
 Every seed task's `reference.aril` is compiled + run (`aril run`) and its
-`expected.out` captured from that run. The Go and Rust controls are compiled +
-run and confirmed byte-identical to `expected.out`. The **TS control is a
+`expected.txt` captured from that run. The Go and Rust controls are compiled +
+run and confirmed byte-identical to `expected.txt`. The **TS control is a
 statement only** — no Node/`tsc` toolchain is present in the current
 environment, so it is written to the same contract but not machine-validated
 here; the oracle-glue PR wires TS validation where a toolchain exists.

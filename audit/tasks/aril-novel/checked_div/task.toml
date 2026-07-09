@@ -1,12 +1,12 @@
 id       = "checked_div"
 stratum  = "aril-novel"
-anchors  = ["T-Catch", "T-Match", "T-Func-Decl", "T-For"]
+anchors  = ["T-Variant-Payload", "T-Match", "T-Func-Decl", "T-For"]
 oracle   = "stdout-exact"
 args     = []
 
 prompt    = "prompt.md"
 reference = "reference.aril"
-expected  = "expected.out"
+expected  = "expected.txt"
 
 [controls]
 go   = "controls/checked_div.go"

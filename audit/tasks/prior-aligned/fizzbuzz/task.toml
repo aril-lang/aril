@@ -6,7 +6,7 @@ args     = []
 
 prompt    = "prompt.md"
 reference = "reference.aril"
-expected  = "expected.out"
+expected  = "expected.txt"
 
 [controls]
 go   = "controls/fizzbuzz.go"
