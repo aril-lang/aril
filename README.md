@@ -65,6 +65,7 @@ Source files use the `.aril` extension.
 
 | To understand... | Read |
 |---|---|
+| **Aril in one page** — the fastest start if you know TS / Go / Rust | [`docs/cheatsheet.md`](docs/cheatsheet.md) |
 | The architectural commitments and why Aril is the way it is | [`docs/design-decisions.md`](docs/design-decisions.md) |
 | How the compiler is built — pipeline, bindings, concurrency, testing | [`docs/architecture.md`](docs/architecture.md) |
 | The language surface (working draft) | [`docs/language-spec.md`](docs/language-spec.md) |
