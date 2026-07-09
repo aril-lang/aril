@@ -1,4 +1,4 @@
-description = "RCU-synchronized ordered set over an immutable persistent BST: lock-free readers, copy-path CAS-publish writers (aspirational target-sketch against the atomics surface)"
+description = "RCU-synchronized ordered set over an immutable persistent BST: lock-free readers, copy-path CAS-publish writers over a generic atomic.Pointer<T> cell"
 source   = "concurrency rcu_tree"
 category = "concurrency"
 showcase = true
