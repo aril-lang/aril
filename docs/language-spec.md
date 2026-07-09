@@ -528,9 +528,15 @@ block-scoped (matches Go).
 
 ## Records
 
-Records (`type X = {...}`) are **structural** value types (D14 — see
-`design-decisions.md`): two records with the same fields are
-interchangeable. They are copied on assignment, like Go structs.
+Records (`type X = {...}`) are value types, copied on assignment like Go
+structs, and compared **field-wise** by `==`.
+
+> **v1 status vs. D14.** D14 (see `design-decisions.md`) targets *structural*
+> record typing — two records with the same fields interchangeable. The current
+> compiler does **not** yet realize that: records are **nominal named types**, so
+> a value of one record type is rejected where a same-shape *different* record
+> type is expected (E0201). Realizing D14's structural target (or amending D14 to
+> nominal-for-v1) is an open item.
 
 **Construction.** Named fields, all required unless the field type is
 `Option<T>`:
@@ -540,8 +546,9 @@ let u = User{ id: "x", name: "y" }
 ```
 
 No positional form (rejected: short records' "obvious" order is exactly
-the case people get wrong). Anonymous record literals — `{ x: 1, y: 2 }`
-— are accepted only when the target type is inferable from context.
+the case people get wrong). Construction is **named-form only** in v1
+(`User{ … }`); a bare anonymous literal `{ x: 1, y: 2 }` is not accepted, even
+where the target type is known (E0112).
 
 **Generic records** are declared the same way as generic classes:
 

@@ -34,7 +34,7 @@ const K = 100       // just an alias for `let` — not a separate category
 | `string` | `string` (UTF-8; iterate for `rune`s, index for bytes) |
 | `boolean` | `bool` |
 | `void` | `unit` (its sole value is `()`) |
-| a record / object type | `type User = { id: string, name: int }` — **structural** (D14) |
+| a record / object type | `type User = { id: string, name: int }` — a named value type; construct by name (`User{…}`) |
 | a tuple | `type Coord = (int, int)` |
 | a union / enum | a **sum type** (§4) |
 | `T[]` | `[]T` |
@@ -53,8 +53,8 @@ let inc = (n) => n + 1                            // closure (arrow); or func(n:
 
 ⚠ `fn`, `function`, `async`, `await`, `yield` are **not keywords** — top-level
 functions use `func`; **there is no `async`/`await`** (concurrency is uncolored,
-§9). String interpolation is `"${expr}"` (one hole → `fmt.Sprintf %v`; no nested
-string literal inside a hole).
+§9). String interpolation is `"…${expr}…"` (each hole → one `fmt.Sprintf %v`; no
+nested string literal inside a hole).
 
 ## 4. Modeling data — sum types + `match`
 
@@ -121,8 +121,9 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
   *does* mutate — the asymmetry is deliberate.)
 - `m[k]` on a `Map` returns the **zero value** on a miss (Go semantics); the
   safe form is `m.get(k): Option<V>`.
-- `==` works on tuples/records (structural) but ⚠ **not on class instances**
-  (E0401 — use `refEq(a, b)`), the "structural records, nominal classes" split.
+- `==` compares tuples/records **field-wise**, but ⚠ **not class instances**
+  (E0401 — use `refEq(a, b)`). ⚠ Records are **nominal named types** in v1: two
+  same-shape records (`A`, `B`) are *not* interchangeable (E0201), unlike TS.
 - `string → int` is **not** a cast (`int(s)` is E0205) — use `strconv.atoi`
   (`Result`) / `strconv.itoa`.
 
@@ -178,6 +179,7 @@ Aril binds (does not port) the Go stdlib. If what you need isn't in
 `extern` declaration:
 
 ```aril
+extern type Cmd @go("os/exec")
 extern func command(name: string, args: []string): Cmd @go("os/exec.Command")
 ```
 
@@ -194,7 +196,8 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `throw` / exceptions | none — `Result<T, E>` |
 | `arr.push(x)` mutates | slice `push` **returns a new slice**; `xs = xs.push(x)` |
 | `map[k]` → undefined on miss | zero value; use `m.get(k): Option<V>` |
-| `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples are structural |
+| `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples compare field-wise |
+| same-shape records interchangeable | nominal named types — `A` ≠ `B` (E0201) |
 | `Number(s)` / `int(s)` | `strconv.atoi(s): Result<int,error>` (E0205 on a cast) |
 | `enum` / `struct` keyword | `type X = | A | B(…)` / `type X = { … }` / `class` |
 | `async` / `await` / `go f()` | uncolored: `scope { spawn { … } }` |
