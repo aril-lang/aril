@@ -1,0 +1,14 @@
+id       = "fizzbuzz"
+stratum  = "prior-aligned"
+anchors  = ["T-For", "T-Arith", "T-Cmp", "T-If-Stmt"]
+oracle   = "stdout-exact"
+args     = []
+
+prompt    = "prompt.md"
+reference = "reference.aril"
+expected  = "expected.txt"
+
+[controls]
+go   = "controls/fizzbuzz.go"
+rust = "controls/fizzbuzz.rs"
+ts   = "controls/fizzbuzz.ts"
