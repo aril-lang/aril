@@ -75,11 +75,17 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 	// re-introducing the sema↔codegen split (D37). Other qualified
 	// names are not modelled by sema yet.
 	if len(v.QName) > 1 {
+		spelled := strings.Join(v.QName, ".")
+		// atomic.Pointer<T> — a first-class generic builtin (not a handle),
+		// so it carries a type argument (ATOMICS-BINDING; docs/atomics-lock-free.md).
+		if spelled == "atomic.Pointer" && len(v.Args) == 1 {
+			return &AtomicPtr{Elem: c.typeFromExprSeen(v.Args[0], seen)}
+		}
 		// A bound value-handle (regexp.Regexp, net.Conn, http.ResponseWriter) or
 		// a bound Go interface (http.Handler) resolves to its Named boundary
 		// type, so an annotated parameter / field / return / `implements` entry
 		// types identically to the binding table's spelling.
-		if spelled := strings.Join(v.QName, "."); binding.IsHandleType(spelled) || binding.IsBoundInterface(spelled) {
+		if binding.IsHandleType(spelled) || binding.IsBoundInterface(spelled) {
 			return &Named{N: spelled}
 		}
 		return &Unknown{}

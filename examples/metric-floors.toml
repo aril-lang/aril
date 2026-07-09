@@ -20,16 +20,17 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 94   # current build_ok; strict ratchet (raised 93→94 in the
-                    # ATOMICS-BINDING epoch — lockfree_ring, a Vyukov MPMC ring over
-                    # scalar atomic.Int64 cursors, now builds: sync/atomic bound as
-                    # constructable value-handles atomic.Int64/Uint64/Bool)
+build_ok_min = 95   # current build_ok; strict ratchet (raised 93→95 across the
+                    # ATOMICS-BINDING epoch — lockfree_ring over scalar atomic.Int64
+                    # cursors, then lockfree_stack, a generic Treiber stack over the
+                    # first-class generic atomic.Pointer<T> cell, now build)
 diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # imprecise message is a penalty, not a red (raised 88→116 at
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 94   # current run_ok; strict ratchet (raised 93→94 in the
-                    # ATOMICS-BINDING epoch — lockfree_ring flips target-sketch→
-                    # run-pass: builds+runs, the capacity/conservation invariants hold
-                    # under --contracts=panic and the MPMC stress is -race-clean)
+run_ok_min   = 95   # current run_ok; strict ratchet (raised 93→95 across the
+                    # ATOMICS-BINDING epoch — lockfree_ring, then lockfree_stack flip
+                    # target-sketch→run-pass: the Treiber stack builds+runs, its
+                    # multiset-conservation invariant holds under --contracts=panic and
+                    # the CAS-retry stress is -race-clean over the atomic.Pointer cell)

@@ -285,6 +285,15 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 		return c.inferContainerBraceLit(b, name)
 	}
 	rt := c.typeFromExpr(b.TypeName)
+	// atomic.Pointer<T>{} — the generic atomic cell (ATOMICS-BINDING),
+	// zero-constructed empty (holds None); its element type comes from the
+	// type-args like a container. Any entry is a misuse (E0218, .aril coords — D10).
+	if ap, ok := rt.(*AtomicPtr); ok {
+		if len(b.Entries) != 0 {
+			c.report("E0218", "`atomic.Pointer<T>` is constructed empty as `atomic.Pointer<T>{}` — it starts holding None", b.Span)
+		}
+		return ap
+	}
 	// An opaque handle has no visible layout — it cannot be built
 	// from a literal (ffi.md §ExternType).
 	if isOpaqueHandle(rt) {

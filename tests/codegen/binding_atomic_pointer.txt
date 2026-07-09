@@ -1,0 +1,68 @@
+--- TITLE ---
+Generic atomic.Pointer<T> (ATOMICS-BINDING): the first-class generic atomic reference cell lowers to `*arilrt.AtomicPointer[P]` (P = the class pointee, no reference star); construction to `&arilrt.AtomicPointer[P]{}`; load/store/swap/compareAndSwap to the exported wrapper methods (load→Option<T>, None = nil). GO-only; the corpus lockfree_stack execs the same surface under a Treiber CAS-retry stress.
+
+--- INPUT ---
+class Node { let value: int }
+
+class Cell {
+  let slot: atomic.Pointer<Node>
+
+  static new(): Cell {
+    return Cell{ slot: atomic.Pointer<Node>{} }
+  }
+
+  publish(n: Node) {
+    slot.store(n)
+  }
+
+  swapIn(old: Option<Node>, n: Node): bool {
+    return slot.compareAndSwap(old, Some(n))
+  }
+
+  take(next: Option<Node>): Option<Node> {
+    return slot.swap(next)
+  }
+
+  peek(): Option<Node> {
+    return slot.load()
+  }
+}
+
+--- GO ---
+
+package main
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type Node struct {
+	Value int `json:"value"`
+}
+type Cell struct {
+	Slot *AtomicPointer[Node] `json:"slot"`
+}
+
+func cellNew() *Cell {
+	return &Cell{Slot: &AtomicPointer[Node]{}}
+}
+func (_arilSelf *Cell) publish(n *Node) {
+	_arilSelf.Slot.Store(n)
+}
+func (_arilSelf *Cell) swapIn(old Option[*Node], n *Node) bool {
+	return _arilSelf.Slot.CompareAndSwap(old, OptionSome(n))
+}
+func (_arilSelf *Cell) take(next Option[*Node]) Option[*Node] {
+	return _arilSelf.Slot.Swap(next)
+}
+func (_arilSelf *Cell) peek() Option[*Node] {
+	return _arilSelf.Slot.Load()
+}

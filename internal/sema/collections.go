@@ -325,6 +325,21 @@ func containerMethodType(recv Type, name string) *Func {
 		case "peek":
 			return &Func{Return: &Option{T: r.Elem}}
 		}
+	case *AtomicPtr:
+		// atomic.Pointer<T> method set (docs/atomics-lock-free.md §Atomic
+		// references). T is a class reference, so "nil" is None: load/swap
+		// traffic in Option<T>; store takes a bare T (never None — a cell is
+		// emptied via swap(None)); CAS compares by reference identity.
+		switch name {
+		case "load":
+			return &Func{Return: &Option{T: r.Elem}}
+		case "store":
+			return &Func{Params: []Type{r.Elem}, Return: &Unit{}}
+		case "swap":
+			return &Func{Params: []Type{&Option{T: r.Elem}}, Return: &Option{T: r.Elem}}
+		case "compareAndSwap":
+			return &Func{Params: []Type{&Option{T: r.Elem}, &Option{T: r.Elem}}, Return: &Builtin{N: "bool"}}
+		}
 	case *Slice:
 		switch name {
 		case "len":
@@ -396,7 +411,7 @@ func containerMethodType(recv Type, name string) *Func {
 // not fully known here (sound over complete, D38).
 func builtinMemberMiss(recv Type, name string) bool {
 	switch r := recv.(type) {
-	case *Map, *Set, *Stack, *Slice, *Option, *Channel, *SendChan, *RecvChan:
+	case *Map, *Set, *Stack, *Slice, *Option, *Channel, *SendChan, *RecvChan, *AtomicPtr:
 		return true
 	case *Result:
 		return name != "mapErr"

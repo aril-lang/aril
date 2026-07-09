@@ -581,9 +581,35 @@ handle lives in an addressable location (a `class` field or a local); a `class`
 instance lowers to a Go pointer, so a handle field is shared by reference and a
 handle local is captured by reference across `spawn`ed goroutines — the atomic is
 never copied (Go's `noCopy`). Scalar atomics alone suffice for a lock-free ring
-buffer over atomic head/tail indices. The generic reference cell
-`atomic.Pointer<T>` (whose `load` yields `Option<T>`, `None` = the nil pointer)
-is the atomics epoch's follow-on and remains on the target surface here.
+buffer over atomic head/tail indices.
+
+### atomic.Pointer<T> — the generic atomic reference cell
+
+Aril has no raw pointers: a `class` instance is a reference and "nil" is
+`Option`, so the atomic cell is typed over a class `T` and its load yields
+`Option<T>` (`None` = the nil pointer).
+
+```aril
+class Node<T> { let value: T; let next: Option<Node<T>> }
+
+let head = atomic.Pointer<Node<int>>{}          // starts empty (holds None)
+let top  = head.load()                           // : Option<Node<int>>  (lock-free)
+let won  = head.compareAndSwap(top, Some(node))  // : bool  (by reference identity)
+let prev = head.swap(Some(node))                 // : Option<Node<int>>
+head.store(node)                                 // : unit  (v: Node<int>)
+```
+
+Method set: `load(): Option<T>`, `store(v: T): unit`, `swap(v: Option<T>):
+Option<T>`, `compareAndSwap(old: Option<T>, new: Option<T>): bool`. CAS compares
+by **reference identity** (Go pointer equality), not structurally — RCU swaps the
+identity of the published version. Unlike the scalar cells (a handle-table row),
+`atomic.Pointer<T>` is a **first-class generic builtin type** modelled like
+`Map`/`Set` (a `sema` type + inference), lowering to an `arilrt.AtomicPointer[P]`
+wrapper over Go's `atomic.Pointer[P]` (P = the class pointee): `load`/`swap` lift
+Go's raw `*P`/nil into `Option<T>`, `store` takes the bare reference. The cell is
+a Go pointer, so it is shared by reference and never copied. Honest RCU: the GC is
+the reclamation grace period — a superseded version stays reachable as long as a
+reader holds it — so no hazard pointers / epochs / `unsafe`.
 
 ## os/signal
 

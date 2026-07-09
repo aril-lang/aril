@@ -515,6 +515,21 @@ func (g *gen) emitFuncDecl(fn *ast.FuncDecl) error {
 // emitTypeExpr lowers a TypeExpr to its Go form. PR-F1 handles
 // PrimitiveType and NamedType; SliceType / TupleType / FuncType /
 // InlineInterface land with later PRs.
+// emitPointeeType emits the Go *pointee* type of an atomic.Pointer<T> element:
+// a class T lowers to `*T` everywhere else (a reference), but the arilrt cell's
+// type parameter is the bare struct (Go's atomic.Pointer[P] already stores a
+// *P), so the reference star is suppressed here. A non-class element (unusual —
+// the cell is meant for class references) falls back to the normal lowering.
+func (g *gen) emitPointeeType(t ast.TypeExpr) error {
+	if nt, ok := t.(*ast.NamedType); ok && len(nt.QName) == 1 {
+		if _, isClass := g.class[nt.QName[0]]; isClass {
+			g.b.WriteString(goIdent(nt.QName[0]))
+			return g.emitTypeArgs(nt.Args)
+		}
+	}
+	return g.emitTypeExpr(t)
+}
+
 func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 	switch v := t.(type) {
 	case *ast.PrimitiveType:
@@ -587,6 +602,20 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 				g.b.WriteString(prefix)
 				return g.emitTypeExpr(v.Args[0])
 			}
+		}
+		// atomic.Pointer<T> → the arilrt reference cell `*arilrt.AtomicPointer[P]`
+		// (ATOMICS-BINDING; docs/atomics-lock-free.md). Go's atomic.Pointer[P]
+		// stores a *P, and an Aril class T is already a Go *T, so the wrapper's
+		// type parameter P is the *pointee* (the class struct, no reference star).
+		// The cell itself is a pointer so the field/local is shared by reference
+		// (like a class) — no atomic.Pointer copy (Go's noCopy).
+		if len(v.QName) == 2 && v.QName[0] == "atomic" && v.QName[1] == "Pointer" && len(v.Args) == 1 {
+			g.b.WriteString("*" + g.rt("AtomicPointer") + "[")
+			if err := g.emitPointeeType(v.Args[0]); err != nil {
+				return err
+			}
+			g.b.WriteByte(']')
+			return nil
 		}
 		// An opaque foreign handle (ffi.md §ExternType) lowers to the
 		// Go pointer type `*pkg.Sym` — the `*regexp.Regexp` / `*exec.Cmd`
