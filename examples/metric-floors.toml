@@ -20,18 +20,16 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 93   # current build_ok; strict ratchet (raised 92→93 in the
-                    # GENERICS-HARDENING epoch — lru_cache, a generic class over a
-                    # Map + linked nodes, now builds: reserved method receiver,
-                    # None-on-assignment instantiation, the K: Comparable bound,
-                    # and user len() vs the slice builtin all fixed)
+build_ok_min = 94   # current build_ok; strict ratchet (raised 93→94 in the
+                    # ATOMICS-BINDING epoch — lockfree_ring, a Vyukov MPMC ring over
+                    # scalar atomic.Int64 cursors, now builds: sync/atomic bound as
+                    # constructable value-handles atomic.Int64/Uint64/Bool)
 diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # imprecise message is a penalty, not a red (raised 88→116 at
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 93   # current run_ok; strict ratchet (raised 92→93 in the
-                    # GENERICS-HARDENING epoch — lru_cache flips target-sketch→
-                    # run-pass: the generic class builds and runs, its size<=capacity
-                    # invariant holds under --contracts=panic after reordering evictTail
-                    # so detach's method-exit checkpoint sees size already decremented)
+run_ok_min   = 94   # current run_ok; strict ratchet (raised 93→94 in the
+                    # ATOMICS-BINDING epoch — lockfree_ring flips target-sketch→
+                    # run-pass: builds+runs, the capacity/conservation invariants hold
+                    # under --contracts=panic and the MPMC stress is -race-clean)

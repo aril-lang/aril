@@ -32,6 +32,11 @@
       "code": 0
     },
     {
+      "key": "0cca159e83250a5ae6bc19f17d1471924af3f2dd3e538115840d8c3f592800ef",
+      "status": "build-fail",
+      "code": 1
+    },
+    {
       "key": "11043f221bf1980208ab63bb923c40bb51a621cb46c387966a291ef68cc22584",
       "status": "ok",
       "code": 0
@@ -53,6 +58,11 @@
     },
     {
       "key": "20aa67c901a24240c93afbf9da4c65821a00430ed82a42323d1bcc43d1b1492c",
+      "status": "ok",
+      "code": 0
+    },
+    {
+      "key": "285825b38d9c42ae66067b56cecfbe8f021fd948e6d5584174e5ac8410e31324",
       "status": "ok",
       "code": 0
     },

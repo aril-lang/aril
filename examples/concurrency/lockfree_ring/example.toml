@@ -4,7 +4,7 @@ category = "concurrency"
 showcase = true
 forces   = []   # TODO backfill against lang-spec artefact IDs
 since    = "0.16"
-status   = "target-sketch"
+status   = "running"
 expects  = "run-pass"
 entry    = "lockfree_ring.aril"
 

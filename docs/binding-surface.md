@@ -548,6 +548,43 @@ construction path). `sync.RWMutex` and `sync.Once` (its `do` takes a `func()`
 argument, which the handle-method param surface does not type yet) remain on the
 target surface.
 
+## sync/atomic
+
+The Aril import name is `atomic` (→ Go `sync/atomic`; the Go package selector
+stays `atomic`, so call sites are unaffected — like `http`→`net/http`).
+
+```aril
+import atomic
+
+class atomic.Int64 {          // and atomic.Uint64 (identical, over uint64)
+  load(): int64
+  store(v: int64)
+  swap(new: int64): int64
+  compareAndSwap(old: int64, new: int64): bool
+  add(delta: int64): int64
+}
+
+class atomic.Bool {
+  load(): bool
+  store(v: bool)
+  swap(new: bool): bool
+  compareAndSwap(old: bool, new: bool): bool
+}
+```
+
+**Bound today:** `atomic.Int64`, `atomic.Uint64`, `atomic.Bool` — constructable
+value handles built in place with `atomic.T{}` (zero-valued, ready to use, the
+`pkg.Type{}` path shared with `sync.Mutex{}`). The method set is the Go set
+renamed (`Load`/`Store`/`Swap`/`CompareAndSwap`/`Add`); `add` is integer-only
+(`atomic.Bool` has none). They are pointer-receiver methods reached because a
+handle lives in an addressable location (a `class` field or a local); a `class`
+instance lowers to a Go pointer, so a handle field is shared by reference and a
+handle local is captured by reference across `spawn`ed goroutines — the atomic is
+never copied (Go's `noCopy`). Scalar atomics alone suffice for a lock-free ring
+buffer over atomic head/tail indices. The generic reference cell
+`atomic.Pointer<T>` (whose `load` yields `Option<T>`, `None` = the nil pointer)
+is the atomics epoch's follow-on and remains on the target surface here.
+
 ## os/signal
 
 ```aril

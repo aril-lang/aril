@@ -1,0 +1,38 @@
+--- TITLE ---
+Scalar sync/atomic cells (ATOMICS-BINDING): atomic.Int64/Uint64/Bool are Constructable value handles — `atomic.T{}` lowers to Go `atomic.T{}`, methods rename to the Go set (Load/Store/Swap/CompareAndSwap/Add), and `import atomic` emits `import "sync/atomic"` (the Go selector stays `atomic`). GO-only; the corpus lockfree_ring execs the same surface under MPMC scope fan-out.
+
+--- INPUT ---
+import atomic
+
+func scalars() {
+  var n = atomic.Int64{}
+  n.store(1)
+  let cur = n.load()
+  let prev = n.swap(cur + 1)
+  let won = n.compareAndSwap(prev, 0)
+  let next = n.add(5)
+
+  var flag = atomic.Bool{}
+  flag.store(true)
+  let seen = flag.load()
+  let flipped = flag.compareAndSwap(seen, false)
+}
+
+--- GO ---
+
+package main
+
+import "sync/atomic"
+
+func scalars() {
+	var n = atomic.Int64{}
+	n.Store(1)
+	var cur = n.Load()
+	var prev = n.Swap(cur + 1)
+	var won = n.CompareAndSwap(prev, 0)
+	var next = n.Add(5)
+	var flag = atomic.Bool{}
+	flag.Store(true)
+	var seen = flag.Load()
+	var flipped = flag.CompareAndSwap(seen, false)
+}

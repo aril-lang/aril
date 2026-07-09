@@ -88,6 +88,8 @@ func goImportPath(arilName string) string {
 		return "net/http" // Go selector is still `http`, so call sites are unaffected
 	case "url":
 		return "net/url" // Go selector is still `url`, so call sites are unaffected
+	case "atomic":
+		return "sync/atomic" // Go selector is still `atomic`, so call sites are unaffected
 	}
 	return arilName
 }
