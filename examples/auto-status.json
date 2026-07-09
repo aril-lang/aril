@@ -2,9 +2,9 @@
   "schema_version": 3,
   "totals": {
     "total": 97,
-    "parse_fail": 1,
+    "parse_fail": 0,
     "sema_fail": 0,
-    "emit_fail": 2,
+    "emit_fail": 3,
     "build_ok": 94,
     "diag_ok": 122,
     "diag_total": 122,
@@ -29,8 +29,8 @@
     },
     {
       "path": "examples/concurrency/lockfree_stack/lockfree_stack.aril",
-      "stage": "parse",
-      "blocker": "error[E0112]: generic brace literal requires a bare type name"
+      "stage": "emit",
+      "blocker": "unknown failure"
     },
     {
       "path": "examples/concurrency/mutex_counter/mutex_counter.aril",

@@ -253,14 +253,17 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 				// form; the type-args ride on the NamedType
 				// (grammar.ebnf §BraceLit). Suppressed in control-flow
 				// headers (noBrace).
-				id, ok := e.(*ast.Ident)
+				// The QName may be multi-segment for a qualified `pkg.Type`
+				// head (`atomic.Pointer<Node>{}`) — the same qualifiedNameChain
+				// flatten the non-generic `sync.Mutex{}` path uses.
+				qname, span, ok := qualifiedNameChain(e)
 				if !ok {
 					t := p.peek()
-					return nil, p.diag("E0112", "generic brace literal requires a bare type name", t.Line, t.Col)
+					return nil, p.diag("E0112", "generic brace literal requires a type name", t.Line, t.Col)
 				}
 				lit, err := p.parseBraceLitBody(&ast.NamedType{
-					Span:  id.Span,
-					QName: []string{id.Name},
+					Span:  span,
+					QName: qname,
 					Args:  typeArgs,
 				})
 				if err != nil {
