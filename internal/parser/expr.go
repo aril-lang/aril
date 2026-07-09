@@ -254,8 +254,8 @@ func (p *parser) parsePostfix() (ast.Expr, *Diag) {
 				// (grammar.ebnf §BraceLit). Suppressed in control-flow
 				// headers (noBrace).
 				// The QName may be multi-segment for a qualified `pkg.Type`
-				// head (`atomic.Pointer<Node>{}`) — the same qualifiedNameChain
-				// flatten the non-generic `sync.Mutex{}` path uses.
+				// head (`atomic.Pointer<Node>{}`) — via the same
+				// qualifiedNameChain the non-generic `sync.Mutex{}` path uses.
 				qname, span, ok := qualifiedNameChain(e)
 				if !ok {
 					t := p.peek()
