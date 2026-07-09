@@ -11,13 +11,13 @@
 // stays alive exactly as long as some reader still holds it, and is reclaimed
 // once the last reader drops it. No hazard pointers, no epochs, no `unsafe`.
 //
-// This is a `target-sketch`: it is written against the forward-looking atomic
-// surface (`atomic.Pointer<T>` / `atomic.Bool`, docs/atomics-lock-free.md) and
-// the generic-class machinery, neither of which is implemented yet. It does
-// NOT build — `import atomic` is unbound — and that is the point: it is the
-// acceptance target (demand signal) for the generics + atomics epochs. It must
-// fail *gracefully* (a clean E-code on the unbound import), never panic.
+// Written against the atomic surface (`atomic.Pointer<T>` / `atomic.Bool`,
+// docs/atomics-lock-free.md) and the generic-class machinery — both now
+// implemented (ATOMICS-BINDING), so this builds and runs: readers are lock-free
+// over an immutable tree snapshot, the writer copy-path-and-CAS-publishes, and
+// the oracle checks a consistent snapshot plus persistence of a held version.
 
+import atomic
 import fmt
 import os
 import strconv
@@ -88,22 +88,15 @@ func isBst(root: Option<Node>): bool {
 
 // ---- the RCU cell ----
 
-// The generic atomic cell for the root pointer (docs/atomics-lock-free.md:
-// `atomic.Pointer<T>`). Aliased because the dotted-generic *brace literal*
-// `atomic.Pointer<Node>{}` is not yet parseable — a generics-epoch gap; the
-// alias's bare name `AtomicRoot{}` constructs the same cell and keeps the file
-// syntactically valid, so the sole remaining failure is the unbound `atomic`
-// surface (E0103 "Unknown name atomic") — the atomics-epoch demand signal.
-type AtomicRoot = atomic.Pointer<Node>
-
 class RcuTree {
-  // The single atomic root. Readers `load()` it; a writer `compareAndSwap`es
-  // it to publish. CAS compares by reference identity — RCU swaps the identity
-  // of the *published version*, not its contents.
-  let root: AtomicRoot
+  // The single atomic root (docs/atomics-lock-free.md: `atomic.Pointer<T>`).
+  // Readers `load()` it; a writer `compareAndSwap`es it to publish. CAS compares
+  // by reference identity — RCU swaps the identity of the *published version*,
+  // not its contents.
+  let root: atomic.Pointer<Node>
 
   static new(): RcuTree {
-    return RcuTree{ root: AtomicRoot{} }             // starts empty (holds None)
+    return RcuTree{ root: atomic.Pointer<Node>{} }   // starts empty (holds None)
   }
 
   // RCU publish: build the new path off the current root and CAS it in. If a

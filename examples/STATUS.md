@@ -4,14 +4,14 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 95 / 97 examples build end-to-end** (floor 95).
+- **build_ok — 97 / 97 examples build end-to-end** (floor 97).
 - **diag_ok — 122 / 122 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 95 / 97 run-pass examples build and run as specified** (floor 95; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 97 / 97 run-pass examples build and run as specified** (floor 97; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 95 |
-| emit / codegen fail | 2 |
+| ✅ build (full pipeline) | 97 |
+| emit / codegen fail | 0 |
 | sema fail | 0 |
 | parse fail | 0 |
 
@@ -30,6 +30,8 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/concurrency/pipeline/pipeline.aril` | build | — |
 | `examples/concurrency/pubsub/pubsub.aril` | build | — |
 | `examples/concurrency/rate_limited/rate_limited.aril` | build | — |
+| `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | build | — |
+| `examples/concurrency/rcu_tree/rcu_tree.aril` | build | — |
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
 | `examples/concurrency/worker_pool/worker_pool.aril` | build | — |
 | `examples/core-language/balanced_brackets/balanced_brackets.aril` | build | — |
@@ -114,8 +116,6 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/url_router/url_router.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
-| `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | emit | go build failed |
-| `examples/concurrency/rcu_tree/rcu_tree.aril` | emit | unknown failure |
 
 ## Diagnostic-quality gaps
 
@@ -130,9 +130,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**2 of 97 run-pass examples fall short of run_ok.**
+**0 of 97 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
-| `examples/concurrency/rcu_skiplist` | build-fail | 1 |
-| `examples/concurrency/rcu_tree` | build-fail | 1 |

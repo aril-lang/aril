@@ -1,0 +1,51 @@
+--- TITLE ---
+Value-position match arm block that diverges (every path returns): the `match` is the function tail (value-returning), and an arm block ending in `return` needs no trailing expression — emitBlockTail admits a diverging block (ast.BlockDiverges, the diverge.go contract) rather than requiring a value. Regression for the rcu_tree insertPersistent shape (a value-returning function whose match arm branches all return).
+
+--- INPUT ---
+func classify(o: Option<int>): int {
+  match o {
+    None => return 0,
+    Some(n) => {
+      if n > 0 {
+        return n
+      }
+      if n < 0 {
+        return 0 - n
+      }
+      return 1
+    },
+  }
+}
+
+--- GO ---
+
+package main
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+func classify(o Option[int]) int {
+	__aril_match_1 := o
+	switch __aril_match_1.Tag {
+	case 0:
+		return 0
+	case 1:
+		n := __aril_match_1.V
+		if n > 0 {
+			return n
+		}
+		if n < 0 {
+			return 0 - n
+		}
+		return 1
+	}
+	panic("unreachable: non-exhaustive match")
+}
