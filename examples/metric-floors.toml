@@ -20,17 +20,18 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 95   # current build_ok; strict ratchet (raised 93→95 across the
-                    # ATOMICS-BINDING epoch — lockfree_ring over scalar atomic.Int64
-                    # cursors, then lockfree_stack, a generic Treiber stack over the
-                    # first-class generic atomic.Pointer<T> cell, now build)
+build_ok_min = 97   # current build_ok; strict ratchet (raised 93→97 across the
+                    # ATOMICS-BINDING epoch — all four lock-free examples now build:
+                    # lockfree_ring (scalar atomic.Int64), lockfree_stack (generic
+                    # Treiber over atomic.Pointer<T>), rcu_skiplist + rcu_tree (RCU
+                    # over atomic.Pointer<T>); the corpus is fully green, 97/97)
 diag_ok_min  = 116  # headroom below current diag_ok (121/121) so an individual
                     # imprecise message is a penalty, not a red (raised 88→116 at
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 95   # current run_ok; strict ratchet (raised 93→95 across the
-                    # ATOMICS-BINDING epoch — lockfree_ring, then lockfree_stack flip
-                    # target-sketch→run-pass: the Treiber stack builds+runs, its
-                    # multiset-conservation invariant holds under --contracts=panic and
-                    # the CAS-retry stress is -race-clean over the atomic.Pointer cell)
+run_ok_min   = 97   # current run_ok; strict ratchet (raised 93→97 across the
+                    # ATOMICS-BINDING epoch — all four lock-free examples flip
+                    # target-sketch→run-pass: ring/stack/skiplist/tree build+run,
+                    # their conservation/consistency invariants hold under
+                    # --contracts=panic, and every one is -race-clean; corpus 97/97)

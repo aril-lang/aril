@@ -64,6 +64,15 @@ func (g *gen) emitBlockTail(b *ast.Block) error {
 		}
 	}
 	if b.Trailing == nil {
+		// A *diverging* value-position block (every path exits via return / panic /
+		// os.exit — e.g. a match arm `Some(n) => { if … return …; return n }` in a
+		// value-returning function) yields no fall-through value: its statements,
+		// already emitted above, carry the exit, so no `return <trailing>` is
+		// needed. This is the diverge.go codegen contract (D40 catch / block-body
+		// closure). A non-diverging trailing-less block is a real error.
+		if ast.BlockDiverges(b) {
+			return nil
+		}
 		return fmt.Errorf("codegen: value-returning block needs a trailing expression")
 	}
 	g.expectType = expect

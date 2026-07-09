@@ -21,15 +21,13 @@
 // deterministically (a random source is unavailable and would break the oracle);
 // membership is height-independent, so this loses no correctness.
 //
-// This is a `target-sketch`: it is written against the forward-looking atomic
-// surface (`atomic.Pointer<T>` / `atomic.Int64`, docs/atomics-lock-free.md) and
-// the generic-class machinery, neither implemented yet. It does NOT build —
-// `atomic` is unbound (and the dotted-generic brace literal `atomic.Pointer<T>{}`
-// has an open parser gap, dodged by the `AtomicRoot` alias below) — and that is
-// the point: it is the acceptance target (demand signal) for the generics +
-// atomics epochs. It must fail *gracefully* (a clean E-code on the unbound
-// name), never panic.
+// Written against the atomic surface (`atomic.Pointer<T>` / `atomic.Int64`,
+// docs/atomics-lock-free.md) and the generic-class machinery — both now
+// implemented (ATOMICS-BINDING), so this builds and runs: readers are lock-free,
+// the writer path-copies and CAS-publishes, and the oracle checks a consistent
+// snapshot against a sequential set.
 
+import atomic
 import fmt
 import os
 import sort
@@ -56,14 +54,6 @@ class Node {
   let key:  int
   let next: []Option<Node>
 }
-
-// The generic atomic cell for the root pointer (docs/atomics-lock-free.md:
-// `atomic.Pointer<T>`). Aliased because the dotted-generic *brace literal*
-// `atomic.Pointer<Node>{}` is not yet parseable — a generics-epoch gap; the
-// alias's bare name `AtomicRoot{}` constructs the same cell and keeps the file
-// syntactically valid, so the sole remaining failure is the unbound `atomic`
-// surface (E0103 "Unknown name atomic") — the atomics-epoch demand signal.
-type AtomicRoot = atomic.Pointer<Node>
 
 // ---- pure skip-list operations (no atomics — the immutable core) ----
 
@@ -276,12 +266,12 @@ class SkipSet {
   // The single point of contention. Readers `load()` it; the writer
   // `compareAndSwap`es it to publish. CAS compares by reference identity — RCU
   // swaps the identity of the *published version*, not its contents.
-  let root: AtomicRoot
+  let root: atomic.Pointer<Node>
 
   static new(): SkipSet {
     // Construct with an empty cell, then publish the initial sentinel through
     // the field — the value-handle is never copied after first use.
-    let set  = SkipSet{ root: AtomicRoot{} }
+    let set  = SkipSet{ root: atomic.Pointer<Node>{} }
     let head = Node{ key: 0, next: makeSlice<Option<Node>>(maxLevel) }
     set.root.store(head)
     return set
