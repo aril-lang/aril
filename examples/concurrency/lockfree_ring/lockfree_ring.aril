@@ -23,7 +23,7 @@
 // bitwise `&`, and for the monotonically-increasing non-negative cursors here
 // `pos & (cap-1)` is exactly `pos % cap`, which is how it is spelled below.
 
-import atomic          // → sync/atomic  (UNBOUND today — the intentional miss)
+import atomic          // → sync/atomic
 import fmt
 import os
 import strconv

@@ -468,9 +468,10 @@ substitution — not `catch`'s. To discriminate among several error kinds, model
 the error as a sum type and `match err` inside the handler (each arm still
 diverging).
 
-For inspection rather than propagation, use `match`. Mapping Go's
-`errors.Is`/`errors.As`/`%w` wrapping onto Aril error values is a later
-design item.
+For inspection rather than propagation, use `match`. Go's error-chain
+utilities are bound: `errors.is` classifies against a sentinel, `errors.as<T>`
+extracts a concrete error type (→ `Option<T>`), and `fmt.errorf` wraps with
+`%w` — see [`stdlib-bindings-status.md`](stdlib-bindings-status.md).
 
 **Diverging built-ins.** Two built-ins never return — they unify with
 any expected type at the call site, so they can occupy a `match` arm
@@ -893,6 +894,59 @@ The explicit-parent form is how cancellation propagates across scope
 boundaries without breaking the lexical-binding rule above: callees that
 open inner scopes take `ctx: context.Context` as a parameter and pass
 it as `scope<T, E>(ctx) { ... }`.
+
+## Contracts
+
+Contracts are executable specifications written *alongside* code, in a separate
+block that does not touch the subject's body. They are **separable and
+additive**: a program's meaning is unchanged with contracts elided, and the
+enforcement level is a build flag — `--contracts=off` drops them entirely,
+`--contracts=panic` checks them at runtime and aborts (in `.aril` coordinates)
+on a violation. Full formal treatment: `docs/rfcs/0006-contracts.md` (value) and
+`docs/rfcs/0007-channel-contracts.md` (channel).
+
+**Value contracts** attach to a like-named function or class:
+
+```aril
+contract parsePort {
+  requires raw.len() > 0             // precondition
+  ensures  result >= 1 && result <= 65535   // postcondition; `result` = the return value
+}
+
+class LRU<K: Comparable, V> { ... }
+contract LRU {
+  invariant size >= 0
+  invariant size <= capacity
+  invariant size == index.len()      // checked at construction + every method exit
+}
+```
+
+- `requires` — a precondition, checked on entry.
+- `ensures` — a postcondition, checked on exit; the return value is named
+  `result`. To compare against pre-call state, snapshot it in an `entry { let
+  ... }` prelude. An `ensures` predicate may itself be a `match result { ... }`.
+- `invariant` — a class/type invariant, established at construction and
+  re-checked at every method exit (so external field writes cannot break it;
+  see D28). A loop invariant is written `loop <label> { invariant ... }`.
+
+Predicates are ordinary boolean Aril expressions. Reusable predicate
+vocabulary — `seqEq`, `reversed`, `isSorted`, `allDistinct`, … — is imported
+from the bundled `std/pred` module; domain predicates are just functions you
+write. A good contract *fires on a broken implementation* (it pins the property,
+not a tautology like `x == x`).
+
+**Channel trace contracts** attach to a channel by name and constrain its
+event trace:
+
+```aril
+channel resultCh { forbid send after close }
+```
+
+`forbid send after close` is the enforced subset today (a violation is the
+controlled diagnostic **E1203**, not a raw `panic: send on closed channel`).
+Broader trace and liveness clauses (ordering, in-flight bounds, drain-before-exit,
+delivery, fairness) are accepted and well-formedness-checked; their runtime
+monitor is a documented follow-up.
 
 ## Examples
 

@@ -175,8 +175,9 @@ box". The compiler should never silently promote one to the other.
 | `=`  | initialiser in a `let` / `var` declaration; assignment to a `var` binding or `var` field; right-hand side of a record / map literal field (`k: v` form). Not a comparison operator |
 | `let` / `var` | binding declaration (keywords above; not operators) |
 
-There is no compound assignment in v1 (`+=`, `-=`, ... are not
-recognised). Write `x = x + 1` explicitly.
+Compound assignment `+=` `-=` `*=` `/=` `%=` is accepted as sugar: the
+parser desugars `lhs op= rhs` to `lhs = lhs op rhs` (grammar `AssignOp`,
+`type-system.md` §Assignment). `x = x + 1` and `x += 1` are equivalent.
 
 ### Receive operator
 

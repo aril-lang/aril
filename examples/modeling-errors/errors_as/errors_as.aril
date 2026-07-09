@@ -1,7 +1,7 @@
-// DEMAND SKETCH (build-fails until `errors.as<T>` binds) — recover a concrete
-// error type from a wrapped chain (the typed-unwrap counterpart to the bound
-// `errors.is`). Forces `errors.as<T>(err): Option<T>` (binding-surface.md
-// §errors) — its pointer-out protocol is a distinct shape from a comma-ok lift.
+// Recover a concrete error type from a wrapped chain (the typed-unwrap
+// counterpart to `errors.is`), via `errors.as<T>(err): Option<T>`
+// (binding-surface.md §errors) — its pointer-out protocol is a distinct shape
+// from a comma-ok lift.
 import fmt
 import errors
 

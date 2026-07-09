@@ -86,6 +86,8 @@ RFC-0000 §"Referencing decisions and stable labels").
 | D18 | Aril has a runtime, and it is part of the language contract |
 | D19 | Third-party Go dependencies are reserved for UX-only surfaces |
 | D20 | Module import graph is acyclic |
+| D26 | The runtime is the `arilrt` package; emission is dual-mode |
+| D27 | Built-in type names are reserved |
 
 ### D1 — Go is an intermediate representation, not a target
 
