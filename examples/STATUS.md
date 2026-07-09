@@ -11,9 +11,9 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | Stage reached | Count |
 |---|---|
 | ✅ build (full pipeline) | 94 |
-| emit / codegen fail | 2 |
+| emit / codegen fail | 3 |
 | sema fail | 0 |
-| parse fail | 1 |
+| parse fail | 0 |
 
 ## Per-example
 
@@ -113,9 +113,9 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/stdlib-binding/todo_api/todo_api.aril` | build | — |
 | `examples/stdlib-binding/url_router/url_router.aril` | build | — |
 | `examples/stdlib-binding/wc/wc.aril` | build | — |
+| `examples/concurrency/lockfree_stack/lockfree_stack.aril` | emit | unknown failure |
 | `examples/concurrency/rcu_skiplist/rcu_skiplist.aril` | emit | go build failed |
 | `examples/concurrency/rcu_tree/rcu_tree.aril` | emit | unknown failure |
-| `examples/concurrency/lockfree_stack/lockfree_stack.aril` | parse | error[E0112]: generic brace literal requires a bare type name |
 
 ## Diagnostic-quality gaps
 
