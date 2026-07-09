@@ -1,0 +1,312 @@
+import fmt
+import os
+import strings
+import json
+import sort
+
+// audit-runner — the deterministic oracle + record-writer for the readiness
+// audit (docs/audit/harness.md §4). Given a task and a submission .aril file it
+// compiles + runs the submission and grades stdout against the task's expected
+// sidecar, emitting one record in the harness §1 schema.
+//
+// The one model judgment in the pipeline — the blind error-taxonomy / idiom
+// classifier (harness §6) — is deliberately NOT here: this tool is the
+// deterministic half (compile? runs correctly?), so error_class stays empty for
+// the classifier pass to fill.
+//
+// Two modes:
+//   validate                         (default) grade every task's known-good
+//                                    reference.aril; assert every fixture is
+//                                    green (a red reference = broken task bank =
+//                                    tooling failure, exit 1). Emits one JSONL
+//                                    record per task to stdout.
+//   grade <task-dir> <submission>    emit exactly one JSONL record for one
+//                                    submission — the primitive the pilot
+//                                    (harness §9 item 4) calls per probe output.
+
+// --- harness §1 record schema. Empty string = JSON null: reference/control runs
+// carry no rung/arm, and the deterministic oracle sets no error_class. ---
+type Record = {
+  task_id:          string
+  stratum:          string
+  model:            string
+  rung:             string
+  arm:              string
+  trial:            int
+  language:         string
+  compile_ok:       bool
+  run_ok:           bool
+  iterations:       int
+  error_class:      string
+  idiom_divergence: string
+  submission:       string
+  transcript:       string
+}
+
+type TaskMeta = {
+  dir:       string
+  id:        string
+  stratum:   string
+  oracle:    string
+  reference: string
+  expected:  string
+  args:      []string
+}
+
+// runExample wall-clock cap (ms). Audit tasks are small, non-interactive; a
+// hang is a broken submission, not slow work.
+func runTimeoutMs(): int {
+  return 30000
+}
+
+func lessStr(a: string, b: string): bool {
+  return a < b
+}
+
+// runOk runs a command that must succeed; aborts (tooling failure) otherwise.
+func runOk(name: string, args: []string): string {
+  let r = run(name, args)
+  if r.code() != 0 {
+    fmt.println("audit-runner: command failed:", name, "exit", r.code())
+    fmt.println(r.out())
+    os.exit(1)
+  }
+  return strings.trimSpace(r.out())
+}
+
+func readFileOrEmpty(path: string): string {
+  let data = os.readFile(path) catch e { return "" }
+  return strings.fromBytes(data)
+}
+
+// chomp drops a single trailing newline so a hand-edited sidecar (editors add a
+// final newline) compares equal to the program's stdout. Same rule as the
+// corpus run-oracle.
+func chomp(s: string): string {
+  if strings.hasSuffix(s, "\n") {
+    return s[:s.len() - 1]
+  }
+  return s
+}
+
+func trimQuotes(s: string): string {
+  return strings.trimSuffix(strings.trimPrefix(s, "\""), "\"")
+}
+
+// tomlScalar extracts a TOML-lite string value: the inner of a leading quoted
+// run after the first `=`, else the pre-`#` text with surrounding quotes
+// stripped. (Same TOML-lite reader as the corpus manifest parser.)
+func tomlScalar(line: string): string {
+  let eq = strings.index(line, "=")
+  if eq < 0 { return "" }
+  var v = strings.trimSpace(line[eq + 1:])
+  if strings.hasPrefix(v, "\"") {
+    let rest = v[1:]
+    let j = strings.index(rest, "\"")
+    if j >= 0 { return rest[:j] }
+  }
+  let h = strings.index(v, "#")
+  if h >= 0 { v = v[:h] }
+  return trimQuotes(strings.trimSpace(v))
+}
+
+// tomlCodes extracts the quoted strings of an array value by scanning `"…"`
+// pairs after `=` (a `]` inside a quoted argv is preserved — the array-close and
+// commas are non-quote chars and are skipped naturally).
+func tomlCodes(line: string): []string {
+  let eq = strings.index(line, "=")
+  if eq < 0 { return []string{} }
+  var rest = line[eq + 1:]
+  var out = []string{}
+  while true {
+    let q1 = strings.index(rest, "\"")
+    if q1 < 0 { break }
+    rest = rest[q1 + 1:]
+    let q2 = strings.index(rest, "\"")
+    if q2 < 0 { break }
+    out = out.push(rest[:q2])
+    rest = rest[q2 + 1:]
+  }
+  return out
+}
+
+// parseTaskMeta reads the top-level keys of a task.toml. Scanning stops at the
+// first `[` table header ([controls]) — only the top-level grading keys matter
+// to the oracle; anchors/prompt/controls are for the harness and the human.
+func parseTaskMeta(dir: string, text: string): TaskMeta {
+  var m = TaskMeta{
+    dir: dir, id: "", stratum: "", oracle: "stdout-exact",
+    reference: "reference.aril", expected: "expected.txt", args: []string{},
+  }
+  for raw in strings.split(text, "\n") {
+    let line = strings.trimSpace(raw)
+    if strings.hasPrefix(line, "[") {
+      break
+    }
+    if strings.hasPrefix(line, "id") {
+      m.id = tomlScalar(line)
+    } else if strings.hasPrefix(line, "stratum") {
+      m.stratum = tomlScalar(line)
+    } else if strings.hasPrefix(line, "oracle") {
+      m.oracle = tomlScalar(line)
+    } else if strings.hasPrefix(line, "reference") {
+      m.reference = tomlScalar(line)
+    } else if strings.hasPrefix(line, "expected") {
+      m.expected = tomlScalar(line)
+    } else if strings.hasPrefix(line, "args") {
+      m.args = tomlCodes(line)
+    }
+  }
+  return m
+}
+
+func buildAril(tmp: string): string {
+  let binpath = pathJoin(tmp, "aril")
+  let r = run("go", ["build", "-o", binpath, "./cmd/aril"])
+  if r.code() != 0 {
+    fmt.println("audit-runner: building aril failed:")
+    fmt.println(r.out())
+    os.exit(1)
+  }
+  return binpath
+}
+
+// discoverTasks lists the git-tracked task directories (each holding a
+// task.toml), sorted for determinism.
+func discoverTasks(): []string {
+  let listed = runOk("git", ["ls-files", "audit/tasks"])
+  var dirs = []string{}
+  for ln in strings.split(listed, "\n") {
+    if strings.hasSuffix(ln, "/task.toml") {
+      dirs = dirs.push(pathDir(ln))
+    }
+  }
+  return sort.sorted(dirs, lessStr)
+}
+
+// gradeSubmission is the oracle: compile the submission, run it in the task dir,
+// and compare stdout to the expected sidecar (harness §4). compile_ok/run_ok are
+// the only judgments; error_class / idiom_divergence are left empty for the
+// blind classifier (§6). Built with --contracts=panic so a stated contract is
+// part of the behavioural check (inert when the submission has none), matching
+// the corpus run-oracle.
+func gradeSubmission(aril: string, tmp: string, m: TaskMeta, submission: string, model: string, rung: string, arm: string, trial: int): Record {
+  var rec = Record{
+    task_id: m.id, stratum: m.stratum, model: model, rung: rung, arm: arm,
+    trial: trial, language: "aril", compile_ok: false, run_ok: false,
+    iterations: 1, error_class: "", idiom_divergence: "",
+    submission: submission, transcript: "",
+  }
+  let outBin = pathJoin(tmp, m.id)
+  let b = run(aril, ["build", "-o", outBin, "-out-dir", outBin + "-gen", "--contracts=panic", submission])
+  if b.code() != 0 {
+    return rec
+  }
+  rec.compile_ok = true
+  let r = runExample(outBin, m.args, "", m.dir, runTimeoutMs())
+  if r.code() != 0 {
+    return rec
+  }
+  let expected = readFileOrEmpty(pathJoin(m.dir, m.expected))
+  if chomp(r.stdout()) == chomp(expected) {
+    rec.run_ok = true
+  }
+  return rec
+}
+
+func recordJson(rec: Record): string {
+  match json.serialize(rec) {
+    Ok(b) => return strings.fromBytes(b),
+    Err(e) => {
+      fmt.println("audit-runner: JSON serialise failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+// validate grades every task's known-good reference.aril and asserts each is
+// green. A red reference means the task bank is broken (fixture rots, compiler
+// regresses) — a tooling failure, exit 1 — never silent. Emits one JSONL record
+// per task to stdout (proving the serialize path end-to-end); the human summary
+// is the final line and the exit code.
+func validate(aril: string, tmp: string): int {
+  let tasks = discoverTasks()
+  var failures = 0
+  var total = 0
+  for dir in tasks {
+    let m = parseTaskMeta(dir, readFileOrEmpty(pathJoin(dir, "task.toml")))
+    let submission = pathJoin(dir, m.reference)
+    var rec = gradeSubmission(aril, tmp, m, submission, "reference", "", "", 0)
+    // The reference defines the intended idiom — ground truth, not a judgment,
+    // so it is safe to stamp here (unlike a probe submission).
+    rec.idiom_divergence = "intended"
+    fmt.println(recordJson(rec))
+    total = total + 1
+    if !rec.run_ok {
+      failures = failures + 1
+      fmt.println(fmt.sprintf("# FIXTURE FAILED: %s (compile_ok=%t run_ok=%t)", m.id, rec.compile_ok, rec.run_ok))
+    }
+  }
+  if failures > 0 {
+    fmt.println(fmt.sprintf("# audit-runner: %d/%d fixtures FAILED — broken task bank", failures, total))
+    return 1
+  }
+  fmt.println(fmt.sprintf("# audit-runner: validate OK — %d/%d fixtures green", total, total))
+  return 0
+}
+
+func mkdirTempOrDie(): string {
+  match mkdirTemp("", "audit-runner-") {
+    Ok(d) => return d,
+    Err(e) => {
+      fmt.println("audit-runner: mkdirTemp failed:", e)
+      os.exit(1)
+    },
+  }
+}
+
+func cleanup(tmp: string) {
+  match removeAll(tmp) {
+    Ok(_) => fmt.print(""),
+    Err(_) => fmt.print(""),
+  }
+}
+
+func main() {
+  // Run from the repo root so relative paths + git resolve regardless of cwd.
+  let root = runOk("git", ["rev-parse", "--show-toplevel"])
+  match chdir(root) {
+    Ok(_) => fmt.print(""),
+    Err(e) => {
+      fmt.println("audit-runner: chdir failed:", e)
+      os.exit(1)
+    },
+  }
+  let args = os.args
+  let tmp = mkdirTempOrDie()
+  let aril = buildAril(tmp)
+
+  if args.len() >= 2 && args[1] == "grade" {
+    if args.len() != 4 {
+      fmt.println("usage: audit-runner grade <task-dir> <submission.aril>")
+      cleanup(tmp)
+      os.exit(2)
+    }
+    let dir = args[2]
+    let m = parseTaskMeta(dir, readFileOrEmpty(pathJoin(dir, "task.toml")))
+    let rec = gradeSubmission(aril, tmp, m, args[3], "probe", "", "", 0)
+    fmt.println(recordJson(rec))
+    cleanup(tmp)
+    os.exit(0)
+  }
+
+  if args.len() >= 2 && args[1] != "validate" {
+    fmt.println("usage: audit-runner [validate | grade <task-dir> <submission.aril>]")
+    cleanup(tmp)
+    os.exit(2)
+  }
+
+  let code = validate(aril, tmp)
+  cleanup(tmp)
+  os.exit(code)
+}
