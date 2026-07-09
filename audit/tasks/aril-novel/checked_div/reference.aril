@@ -1,0 +1,20 @@
+import fmt
+
+// Aril-novel: a Result-returning function + exhaustive match on Ok/Err.
+// No exceptions, no null — the error is a value the caller must handle.
+func safeDiv(a: int, b: int): Result<int, error> {
+  if b == 0 {
+    return Err(error("division by zero"))
+  }
+  return Ok(a / b)
+}
+
+func main() {
+  let cases = [(10, 2), (7, 0), (9, 3)]
+  for pair in cases {
+    match safeDiv(pair.0, pair.1) {
+      Ok(q)  => fmt.println("ok", q),
+      Err(e) => fmt.println("err", e),
+    }
+  }
+}

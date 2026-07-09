@@ -1,0 +1,16 @@
+import fmt
+
+// Classic FizzBuzz over 1..=15. Prior-aligned: pure TS/Go intuition.
+func main() {
+  for i in 1..=15 {
+    if i % 15 == 0 {
+      fmt.println("FizzBuzz")
+    } else if i % 3 == 0 {
+      fmt.println("Fizz")
+    } else if i % 5 == 0 {
+      fmt.println("Buzz")
+    } else {
+      fmt.println(i)
+    }
+  }
+}
