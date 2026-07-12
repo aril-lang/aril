@@ -1,0 +1,19 @@
+import fmt
+import strings
+func count(m: Map<string, int>, k: string): int {
+  match m.get(k) {
+    Some(v) => return v,
+    None    => return 0,
+  }
+}
+func main() {
+  let text = "a b a c b a"
+  var counts = Map<string, int>{}
+  for w in strings.split(text, " ") {
+    counts.set(w, count(counts, w) + 1)
+  }
+  fmt.println(count(counts, "a"))
+  fmt.println(count(counts, "b"))
+  fmt.println(count(counts, "c"))
+  fmt.println(count(counts, "z"))
+}

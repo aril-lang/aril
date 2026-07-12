@@ -1,0 +1,14 @@
+import fmt
+import strings
+import strconv
+func main() {
+  let data = "10 20 30 40"
+  var total = 0
+  for part in strings.split(data, " ") {
+    match strconv.atoi(part) {
+      Ok(n)  => total = total + n,
+      Err(_) => {},
+    }
+  }
+  fmt.println(total)
+}

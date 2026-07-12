@@ -1,0 +1,16 @@
+import fmt
+func clamp(x: int, lo: int, hi: int): int {
+  if x < lo { return lo }
+  if x > hi { return hi }
+  return x
+}
+contract clamp {
+  requires lo <= hi
+  ensures result >= lo
+  ensures result <= hi
+}
+func main() {
+  fmt.println(clamp(5, 0, 10))
+  fmt.println(clamp(-3, 0, 10))
+  fmt.println(clamp(15, 0, 10))
+}
