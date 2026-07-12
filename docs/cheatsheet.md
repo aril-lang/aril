@@ -15,7 +15,7 @@ else** — read those first.
 
 ## 0. A complete program
 
-Every Aril file `import`s the stdlib modules it calls and defines `main` as the
+An Aril program `import`s the stdlib modules it calls and defines `main` as the
 entry point. ⚠ `func main` takes **no arguments and no return type** — write
 `func main()`, *not* `func main(): unit`.
 
