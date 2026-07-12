@@ -5,7 +5,7 @@ Build a list containing the squares of the numbers 1 to 5 (that is,
 in a loop. Then print each element of the finished list on its own line, in
 order.
 
-Print nothing else — and make sure every square actually ends up in the list.
+Print nothing else.
 
 ## Exact expected output
 

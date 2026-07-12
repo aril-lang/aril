@@ -7,7 +7,7 @@ func main() {
   for part in strings.split(data, " ") {
     match strconv.atoi(part) {
       Ok(n)  => total = total + n,
-      Err(_) => total = total + 0,
+      Err(_) => {},
     }
   }
   fmt.println(total)
