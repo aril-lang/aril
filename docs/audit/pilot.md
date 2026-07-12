@@ -18,20 +18,42 @@ findings are logged for AUDIT-4.
 - **Isolation** — the probe reads *only* the staged rung file(s); verified per
   probe by the tool-use count (1 read at L1, 2 at L2, no repository access).
 - **Cells run** — the Haiku 4.5 endpoint at L1 (cheatsheet only) and L2
-  (cheatsheet + `language-spec.md`), 10 tasks each, one-shot. Fable 5 and the
-  N>1 trials are AUDIT-2 work.
+  (cheatsheet + `docs/language-spec.md`), 10 tasks each, one-shot. **This is
+  thinner than the `harness.md §7` pilot slice** (two model endpoints, N≈3): the
+  slice was further reduced to Haiku-only / N=1 to de-risk the instrument first;
+  the second endpoint (Fable 5) and N>1 trials move to AUDIT-2.
 
-## Scoreboard (Haiku 4.5, one-shot, uniform verbatim context)
+## Scoreboard (Haiku 4.5, one-shot)
 
 | rung | compiling / 10 | dominant failure cause |
 |---|---|---|
 | **L1** (cheatsheet, as-shipped) | **0** | doc omission — no `import` lines, no `func main()` skeleton |
-| **L2** (+ `language-spec.md`) | **4** | genuine language surprises (the spec supplies imports/main) |
+| **L2** (+ `docs/language-spec.md`) | **4** | genuine language surprises (the spec supplies imports/main) |
 | **L1** (cheatsheet, *after* the doc fix) | **7** | genuine language/library surprises only |
+
+**Provenance.** All three numbers come from the *clean* runs: the real rung doc(s)
+read **verbatim**, byte-identical per probe, isolation verified by tool-use count.
+An earlier exploratory pass that hand-condensed the rung doc per task/model is
+**excluded** (it confounded the context — see protocol lesson 1). The one
+transcription slip (lesson 2) was caught and corrected, so the fixed-L1 figure is
+7, not 6.
+
+**Comparability caveat.** The three cells are **not** a single controlled series:
+`L1-as-shipped` and `L2` share the pre-fix cheatsheet, while `L1-after-fix` uses the
+*fixed* cheatsheet — the rows straddle the doc-fix boundary. So the `7 > 4`
+(fixed-L1 over L2) is **not** "one page beats the full spec"; the two cells aren't
+apples-to-apples. The sound reads are the two within-boundary comparisons:
+`L1-as-shipped 0 → L2 4` (spec recovers the doc gaps) and
+`L1-as-shipped 0 → L1-fixed 7` (the doc fix recovers them). AUDIT-2 re-runs L2
+against the fixed cheatsheet to close the gap.
 
 The **diagnostic descent** (`methodology.md §3`) reads cleanly: an L1 failure that
 an L2 (or a doc fix) recovers is a **docs** problem, not a language-design one. The
 0→7 L1 lift from a single doc section localizes the headline gap to the cheatsheet.
+
+(The cheatsheet fix *is* remediation, normally batched to AUDIT-4 by measurement-first
+— applied here as the deliberate exception the before/after descent required, and
+scoped to docs so the compiler stays frozen.)
 
 ## Findings (frequency-ranked; remediation bucket in brackets)
 
@@ -43,13 +65,17 @@ an L2 (or a doc fix) recovers is a **docs** problem, not a language-design one. 
    **Compiler side:** the rejection surfaces as a *raw Go diagnostic*
    ("func main must have no arguments and no return values"), not an Aril-source
    diagnostic — see F-godiag.
-3. **F-godiag** *[compiler — D10 gap, follow-up]* — several failures surface with
+3. **F-godiag** *[compiler — candidate D10 gap, follow-up]* — several failures surface with
    **Go terminology** (`undefined: fmt`, the main-signature message) rather than an
    Aril diagnostic in Aril terms. They carry `.aril` coordinates (via `//line`) but
    the *message* is Go's. Candidate D10 ("errors reported in Aril terminology") gap;
    a natural home for a future `hint`/diagnostics improvement.
-4. **F-else** *[trap/docs]* — `else` placed on a new line after `}` → E0112; Aril
-   follows Go's `} else {` same-line rule.
+4. **F-else** *[trap/docs — provisional]* — `else` placed on a new line after `}`
+   → E0112; Aril follows Go's `} else {` same-line rule. Evidence: a **Fable 5**
+   probe genuinely emitted `}`-then-newline-`else`. (Note: my transcription slip in
+   lesson 2 *coincidentally* produced the same shape in a Haiku submission — that
+   instance is operator error, corrected, and is **not** counted here.) Provisional
+   until AUDIT-2 re-confirms it in a clean verbatim-capture run.
 5. **F-stdlib-leak** *[trap/docs]* — Go/TS stdlib idioms leak: `fmt.Println`/
    `fmt.Printf` (capitalized), `sort.slice`/`sort.Slice`/`slices.SortFunc`,
    `text.split` (method form). Aril spellings: `fmt.println`, `sort.sorted(xs, less)`,
@@ -64,7 +90,7 @@ an L2 (or a doc fix) recovers is a **docs** problem, not a language-design one. 
 
 - **Uniform rung context is load-bearing.** A first pass hand-condensed the rung
   doc differently per task/model, confounding the model comparison. Fix adopted:
-  the rung is the *real* doc read verbatim (`docs/cheatsheet.md`, `language-spec.md`),
+  the rung is the *real* doc read verbatim (`docs/cheatsheet.md`, `docs/language-spec.md`),
   byte-identical for every probe. AUDIT-2 must hold the rung constant across cells.
 - **Capture the submission verbatim — never retype it.** Manually transcribing a
   probe's fenced block into a file introduced a transcription error (a correct
@@ -80,7 +106,9 @@ The confirmed LLM misses above are the seed of the human-newcomer calibration se
 each is a task + rung doc (no answer) a human volunteer can attempt, to check that
 an LLM miss proxies a human miss before AUDIT-2 trusts the intuition sub-score. The
 package is the task bank (`audit/tasks/`) paired with the two rung docs; the misses
-to calibrate first are F-import, F-main, F-else (the highest-frequency).
+to calibrate first are the highest-frequency **confirmed** ones — F-import and
+F-main (F-else is provisional pending a clean AUDIT-2 re-confirmation, so it joins
+the calibration set only once confirmed).
 
 ## What AUDIT-2 does with this
 
