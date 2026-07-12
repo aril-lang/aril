@@ -13,6 +13,24 @@ else** — read those first.
 > is the full target spelling. When a binding is missing, drop to Go (§Escape
 > hatch). The full surface is **[`language-spec.md`](language-spec.md)**.
 
+## 0. A complete program
+
+Every Aril file `import`s the stdlib modules it calls and defines `main` as the
+entry point. ⚠ `func main` takes **no arguments and no return type** — write
+`func main()`, *not* `func main(): unit`.
+
+```aril
+import fmt            // import each stdlib module you use (fmt, strings, strconv, sort, …)
+
+func main() {         // entry point — no arguments, no `: T` return
+  fmt.println("hello")
+}
+```
+
+The snippets below drop this `import` / `func main` wrapper for brevity — but a
+runnable program always needs both: an `import` line per module it calls, and a
+`func main() { … }`.
+
 ## 1. Bindings and values
 
 ```aril
