@@ -1,0 +1,13 @@
+import fmt
+func abs(n: int): int {
+  if n < 0 { return -n }
+  return n
+}
+contract abs {
+  ensures result >= 0
+}
+func main() {
+  fmt.println(abs(-5))
+  fmt.println(abs(3))
+  fmt.println(abs(0))
+}

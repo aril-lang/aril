@@ -1,0 +1,14 @@
+id       = "clamp_contract"
+stratum  = "contract-authoring"
+anchors  = ["T-Contract-Pred", "T-Func-Decl"]
+oracle   = "stdout-exact"
+args     = []
+
+prompt    = "prompt.md"
+reference = "reference.aril"
+expected  = "expected.txt"
+
+[controls]
+go   = "controls/clamp_contract.go"
+rust = "controls/clamp_contract.rs"
+ts   = "controls/clamp_contract.ts"

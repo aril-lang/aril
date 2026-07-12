@@ -1,0 +1,14 @@
+id       = "abs_contract"
+stratum  = "contract-authoring"
+anchors  = ["T-Contract-Pred", "T-Func-Decl"]
+oracle   = "stdout-exact"
+args     = []
+
+prompt    = "prompt.md"
+reference = "reference.aril"
+expected  = "expected.txt"
+
+[controls]
+go   = "controls/abs_contract.go"
+rust = "controls/abs_contract.rs"
+ts   = "controls/abs_contract.ts"

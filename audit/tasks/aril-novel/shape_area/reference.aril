@@ -1,0 +1,17 @@
+import fmt
+type Shape =
+  | Circle(r: int)
+  | Rect(w: int, h: int)
+
+func area(s: Shape): int {
+  match s {
+    Circle(r)  => r * r * 3,
+    Rect(w, h) => w * h,
+  }
+}
+func main() {
+  let shapes = [Circle(2), Rect(3, 5)]
+  for s in shapes {
+    fmt.println(area(s))
+  }
+}

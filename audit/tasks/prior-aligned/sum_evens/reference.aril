@@ -1,0 +1,8 @@
+import fmt
+func main() {
+  var total = 0
+  for i in 1..=10 {
+    if i % 2 == 0 { total = total + i }
+  }
+  fmt.println(total)
+}
