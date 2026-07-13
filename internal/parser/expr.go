@@ -922,6 +922,18 @@ func (p *parser) parsePrimary() (ast.Expr, *Diag) {
 			return &ast.ScopeRef{Span: spanFromToken(t)}, nil
 		case "spawn":
 			return p.parseSpawnExpr()
+		case "else":
+			// A newline ends the `if` construct (D11: a newline ends a
+			// construct — the same rule that makes postfix `catch` line-bound),
+			// so an `else` after a line break reads as a stray keyword here.
+			// Name the rule instead of the generic "unexpected keyword".
+			return nil, p.diag("E0112",
+				"`else` must be on the same line as the closing `}` of the `if` block (a newline ends the construct)",
+				t.Line, t.Col)
+		case "catch":
+			return nil, p.diag("E0112",
+				"`catch` must be on the same line as the expression it guards (a newline ends the construct)",
+				t.Line, t.Col)
 		}
 		return nil, p.diag("E0112", fmt.Sprintf("unexpected keyword %q in expression", t.Lexeme), t.Line, t.Col)
 	case lexer.KindIdent:

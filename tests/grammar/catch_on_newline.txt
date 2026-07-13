@@ -1,0 +1,11 @@
+--- TITLE ---
+E0112: postfix `catch` on a new line names the D11 newline-ends-construct rule
+
+--- INPUT ---
+func f() {
+  let n = strconv.atoi("5")
+  catch e { return }
+}
+
+--- ERRORS ---
+src.aril:3:3: error[E0112]: `catch` must be on the same line as the expression it guards (a newline ends the construct)
