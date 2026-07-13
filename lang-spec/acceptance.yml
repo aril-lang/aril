@@ -121,7 +121,6 @@ features:
   slice-empty-literal:         "[]T{} (T-Slice-Lit-Empty / Annot)"
   slice-index:                 "s[i] / s[i] = v"
   slice-slicing:               "s[lo:hi]"
-  slice-push:                  "xs.push(e) — functional append"
   slice-len:                   "xs.len()"
   map-literal:                 "Map<K, V>{ k: v, ... } or Map.new()"
   map-get:                     "m.get(k): Option<V>"
@@ -215,7 +214,7 @@ examples:
     - record-field-access
     - type-decl-record
     - slice-empty-literal
-    - slice-push
+    - list-push
     - var-binding
     - binding-fmt
 
@@ -300,7 +299,7 @@ examples:
     - defer-call
     - slice-literal
     - slice-empty-literal
-    - slice-push
+    - list-push
     - any-type
     - if-stmt
     - record-construction
@@ -320,7 +319,7 @@ examples:
     - channel-recv
     - channel-close
     - for-channel
-    - slice-push
+    - list-push
     - slice-len
     - slice-empty-literal
     - result-type
@@ -400,7 +399,7 @@ examples:
     - record-construction
     - record-field-access
     - type-decl-record
-    - slice-push
+    - list-push
     - slice-len
     - for-slice
     - if-stmt
@@ -491,7 +490,7 @@ examples:
     - for-slice
     - for-indexed-slice
     - if-stmt
-    - slice-push
+    - list-push
     - slice-len
     - slice-slicing
     - binding-strings
@@ -518,7 +517,7 @@ examples:
     - for-slice
     - for-indexed-slice
     - slice-empty-literal
-    - slice-push
+    - list-push
     - slice-len
     - slice-slicing
     - var-binding
@@ -601,7 +600,7 @@ examples:
     - tuple-field-access
     - map-literal
     - map-set
-    - slice-push
+    - list-push
     - while-loop
     - match-expr
     - match-variant-pattern
@@ -622,7 +621,7 @@ examples:
     - map-literal
     - map-set
     - map-get
-    - slice-push
+    - list-push
     - slice-len
     - while-loop
     - break-stmt
@@ -803,7 +802,7 @@ examples:
     - map-literal
     - map-get
     - map-set
-    - slice-push
+    - list-push
     - slice-len
     - slice-index
     - binding-bufio

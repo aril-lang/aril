@@ -20,15 +20,15 @@ type ColStats = {
 // parseRow splits a comma-separated line into integers.
 func parseRow(line: string): Result<[]int, error> {
   let fields = strings.split(line, ",")
-  var vals: []int = []int{}
+  let vals = List<int>{}
   for f in fields {
     let trimmed = strings.trimSpace(f)
     match strconv.atoi(trimmed) {
-      Ok(n)  => { vals = vals.push(n) },
+      Ok(n)  => { vals.push(n) },
       Err(e) => return Err(e),
     }
   }
-  return Ok(vals)
+  return Ok(vals.toSlice())
 }
 
 // initCol creates a ColStats for a column with a single seed value.
@@ -71,11 +71,11 @@ func main() {
   let lines = strings.split(data, "\n")
 
   // Collect non-empty lines
-  var nonEmpty: []string = []string{}
+  let nonEmpty = List<string>{}
   for ln in lines {
     let t = strings.trimSpace(ln)
     if t.len() > 0 {
-      nonEmpty = nonEmpty.push(t)
+      nonEmpty.push(t)
     }
   }
 
@@ -97,9 +97,9 @@ func main() {
     },
   }
 
-  var stats: []ColStats = []ColStats{}
+  let stats = List<ColStats>{}
   for i in 0..ncols {
-    stats = stats.push(initCol(strings.trimSpace(headers[i]), firstRow[i]))
+    stats.push(initCol(strings.trimSpace(headers[i]), firstRow[i]))
   }
 
   // Accumulate remaining rows
@@ -113,7 +113,7 @@ func main() {
       },
     }
     for i in 0..ncols {
-      stats[i] = accumCol(stats[i], row[i])
+      stats.set(i, accumCol(stats[i], row[i]))
     }
   }
 

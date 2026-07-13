@@ -206,26 +206,25 @@ slice value:
 ```
 []T:
   len(): int
-  push(e: T): []T                    [returns a NEW slice; the original is
-                                       unchanged at the header level. Idiomatic
-                                       use: `xs = xs.push(e)`]
   copy(): []T                        [shallow header-copy with fresh backing
                                        array; used when callers must isolate
                                        mutations]
 ```
 
-`push` does not mutate the receiver's header — it produces a new
-slice with the element appended. The backing array may be
-shared with the original if capacity allowed; callers that need
-isolation should `copy()` first. This matches the corpus
-convention (`xs = xs.push(v)` everywhere).
+`[]T` is a **value view** with **pure accessors only** — it has **no
+`push`** (D55). A slice header is a value, so a would-be `xs.push(e)`
+could only *return* a new slice, never grow the caller's view in place;
+the name would lie about mutation. Grow-in-place lives on the reference
+container `List<T>` (§List): `let l = List<T>{}; l.push(e)`. A leftover
+`xs.push(e)` on a slice fires a tailored **E0214** naming `List<T>`.
+(The `copy()` accessor stays — it honestly returns a new header.)
 
 These slice shortcuts apply only when the receiver is a slice (or
 string, for `len`/`bytes`/`runes`) — **not** when it is a user
-class/record value. A user type may declare its own `len()` /
-`push()` / … method; such a call dispatches to that method
-(`cache.len()`), never the builtin lowering (`len(cache)`, which
-would be a raw Go-backend leak). See `lowering-go.md` §Slice methods.
+class/record value. A user type may declare its own `len()` method;
+such a call dispatches to that method (`cache.len()`), never the builtin
+lowering (`len(cache)`, which would be a raw Go-backend leak). See
+`lowering-go.md` §Slice methods.
 
 Slices also support:
 - index read `s[i]: T` (T-Index-Slice, `type-system.md`),
@@ -355,7 +354,7 @@ shared by reference, never copied — the same machinery as
 (`l = l.push(e)`) is needed.
 
 This is the deliberate counterpart to the slice `[]T` (§Slice methods),
-a **value view** whose `push` returns a *new* header. The governing
+a **value view** with pure accessors only — no `push`. The governing
 invariant: a mutating-looking method must actually mutate — so the
 in-place operations live on `List` (a reference container), while `[]T`
 keeps pure, header-returning accessors. (The Rust `Vec` / slice split.)
@@ -713,7 +712,7 @@ sketch below for reviewers' orientation:
 |---|---|
 | `int`, `float64`, ... | identical Go primitives |
 | `string` | Go `string`; `s.len()` lowers to `len(s)` (byte length), `s.bytes()` to `[]byte(s)`, `s.runes()` to `[]rune(s)` (codepoint view) |
-| `[]T` | `[]T`; `xs.push(e)` lowers to `append(xs, e)`; `xs.len()` to `len(xs)`; `xs.copy()` to a fresh-backing clone (see `lowering-go.md` §Slice methods) |
+| `[]T` | `[]T`; a value view — pure accessors only (no `push`, D55): `xs.len()` lowers to `len(xs)`, `xs.copy()` to a fresh-backing clone; grow-in-place lives on `List<T>` (see `lowering-go.md` §Slice methods) |
 | `Option<T>` | tagged struct `{tag uint8; v T}` (zero-cost for `None`) |
 | `Result<T, E>` | tagged struct `{tag uint8; v T; e E}` |
 | `Map<K, V>` | wrapper around `map[K]V` plus `[]K` for insertion-order |

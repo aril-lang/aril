@@ -25,42 +25,42 @@ import strconv
 import strings
 
 type Graph = {
-  children: Map<int, []int>
-  parents:  Map<int, []int>
+  children: Map<int, List<int>>
+  parents:  Map<int, List<int>>
 }
 
-func addLink(adj: Map<int, []int>, u: int, v: int) {
+func addLink(adj: Map<int, List<int>>, u: int, v: int) {
   match adj.get(u) {
-    Some(lst) => adj.set(u, lst.push(v)),
-    None      => adj.set(u, [v]),
+    Some(lst) => lst.push(v),
+    None      => adj.set(u, List<int>{v}),
   }
 }
 
 func readEdges(): Result<(int, []int, []int, []int), error> {
   let n = try fmt.scan<int>()
-  var us: []int = []int{}
-  var vs: []int = []int{}
+  let us = List<int>{}
+  let vs = List<int>{}
   while true {
     let token = try fmt.scan<string>()
     if token == "BLOOD" { break }
     // First token of an edge line; second token is another scan.
     let u = try strconv.atoi(token)
     let v = try fmt.scan<int>()
-    us = us.push(u - 1)
-    vs = vs.push(v - 1)
+    us.push(u - 1)
+    vs.push(v - 1)
   }
-  var victims: []int = []int{}
+  let victims = List<int>{}
   while true {
     match fmt.scan<int>() {
       Err(_) => break,                         // EOF
-      Ok(u)  => victims = victims.push(u - 1),
+      Ok(u)  => victims.push(u - 1),
     }
   }
-  return Ok((n, us, vs, victims))
+  return Ok((n, us.toSlice(), vs.toSlice(), victims.toSlice()))
 }
 
 func buildGraph(us: []int, vs: []int): Graph {
-  let g = Graph{ children: Map<int, []int>{}, parents: Map<int, []int>{} }
+  let g = Graph{ children: Map<int, List<int>>{}, parents: Map<int, List<int>>{} }
   for (i, u) in us {
     let v = vs[i]
     addLink(g.children, u, v)
@@ -70,7 +70,7 @@ func buildGraph(us: []int, vs: []int): Graph {
 }
 
 // Recursive DFS marking reachable nodes in `visited`.
-func dfs(adj: Map<int, []int>, u: int, visited: []bool) {
+func dfs(adj: Map<int, List<int>>, u: int, visited: []bool) {
   visited[u] = true
   match adj.get(u) {
     Some(nbrs) => {
@@ -92,13 +92,13 @@ func solve(n: int, us: []int, vs: []int, victims: []int): []int {
     dfs(g.children, u, visitedChild)
     dfs(g.parents,  u, visitedParent)
   }
-  var suspects: []int = []int{}
+  let suspects = List<int>{}
   for i in 0..n {
     if !visitedChild[i] && !visitedParent[i] {
-      suspects = suspects.push(i)
+      suspects.push(i)
     }
   }
-  return suspects
+  return suspects.toSlice()
 }
 
 func main() {

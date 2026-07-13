@@ -11,11 +11,11 @@ import sync
 import time
 
 class Broker<T> {
-  var subs: []SendChan<T>
+  var subs: List<SendChan<T>>
   let lock: sync.Mutex
 
   static new(): Broker<T> {
-    return Broker<T>{ subs: []SendChan<T>{}, lock: sync.Mutex{} }
+    return Broker<T>{ subs: List<SendChan<T>>{}, lock: sync.Mutex{} }
   }
 
   subscribe(buf: int): RecvChan<T> {
@@ -23,7 +23,7 @@ class Broker<T> {
     defer lock.unlock()
 
     let ch = makeChannel<T>(buf)
-    subs = subs.push(ch)
+    subs.push(ch)
     return ch
   }
 
@@ -51,7 +51,7 @@ class Broker<T> {
     for ch in subs {
       ch.close()
     }
-    subs = []SendChan<T>{}
+    subs = List<SendChan<T>>{}
   }
 }
 

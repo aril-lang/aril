@@ -912,9 +912,12 @@ is the special case of this rule the bindgen pipeline will subsume.
 
 ## Slice methods
 
+`[]T` is a value view with **pure accessors only** — no `push` (D55;
+grow-in-place is `List<T>`, §List). A leftover `xs.push(e)` on a slice is a
+tailored E0214 in sema, never reaches lowering.
+
 ```
 s.len()           → len(s)
-s.push(e)         → append(s, e)              (returns the new slice)
 s.copy()          → append(s[:0:0], s...)     (fresh-backing clone: the
                                                 zero-cap reslice forces
                                                 append to allocate, so the
@@ -933,9 +936,9 @@ Slice index-write `s[i] = v` lowers to `s[i] = v` directly.
 
 **Receiver-type precondition.** These shortcuts apply only when the receiver
 sema-types to a slice (or, for `len`/`bytes`/`runes`, a string) — **not** to a
-user class/record value. A user type may declare its own `len()` / `push()` /
-… method; such a call dispatches to that method (`cache.len()`), never the
-builtin lowering (`len(cache)`, which would be a raw Go-backend leak — D10).
+user class/record value. A user type may declare its own `len()` method; such
+a call dispatches to that method (`cache.len()`), never the builtin lowering
+(`len(cache)`, which would be a raw Go-backend leak — D10).
 Codegen gates the shortcut on the receiver's sema type; a user Named receiver
 falls through to ordinary method dispatch (`builtins.md` §Slice methods).
 

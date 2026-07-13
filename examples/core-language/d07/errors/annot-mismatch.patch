@@ -1,9 +1,9 @@
 --- d07.aril
 +++ d07.aril
-@@ -42,7 +42,7 @@
-   for _ in 0..width {
-     timelines = timelines.push(0)
+@@ -43,7 +43,7 @@
+     tl0.push(0)
    }
+   var timelines: []int = tl0.toSlice()
 -  var splits = 0
 +  var splits: string = 0
  

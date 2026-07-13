@@ -22,19 +22,19 @@ func merge(intervals: []Interval): []Interval {
   // slice — Aril preserves immutability of the input.
   let sorted = sort.sorted(intervals, (a, b) => a.start < b.start)
 
-  var out: []Interval = []Interval{}
+  let out = List<Interval>{}
   var cur = sorted[0]
   for i in 1..sorted.len() {
     let nxt = sorted[i]
     if nxt.start <= cur.end {
       cur = Interval{ start: cur.start, end: max(cur.end, nxt.end) }
     } else {
-      out = out.push(cur)
+      out.push(cur)
       cur = nxt
     }
   }
-  out = out.push(cur)
-  return out
+  out.push(cur)
+  return out.toSlice()
 }
 
 func max(a: int, b: int): int {

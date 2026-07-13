@@ -62,9 +62,9 @@ func fetchAll(sources: []Source, timeout: time.Duration): Result<[]Page, error> 
     }
   }
   collect.close()
-  var out: []Page = []Page{}
-  for p in collect { out = out.push(p) }
-  return Ok(sortBySize(out))
+  let out = List<Page>{}
+  for p in collect { out.push(p) }
+  return Ok(sortBySize(out.toSlice()))
 }
 
 // Insertion sort by size — concurrent completion order is nondeterministic,

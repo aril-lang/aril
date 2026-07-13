@@ -1,6 +1,9 @@
 package sema
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // E0214 — an unknown member on a *concrete* Named receiver is reported in
 // Aril coordinates rather than leaking a go/types "has no field or method"
@@ -285,32 +288,49 @@ func use(): bool { return go() == Ok(1) }`
 	}
 }
 
-// E0215 — a slice `push` whose result is discarded is a silent no-op
-// (append semantics: `push` returns a new slice, never mutates in place).
-// Go would leak `append(xs, e) … is not used` against the lowered form.
-
-func TestDiscardedSlicePushFiresE0215(t *testing.T) {
-	// Statement position (a bare push followed by more code) — the
-	// unambiguously-discarded case the check targets.
+// `[]T` has no `push` (D55) — a slice is a value view, not a growable
+// container. A `xs.push(e)` now misses the slice method set → a tailored
+// E0214 teaching the List<T> replacement (E0215 was retired with the method:
+// it existed only to catch a discarded functional append, which no longer
+// exists). Grow-in-place lives on List<T>.
+func TestSlicePushFiresTailoredE0214(t *testing.T) {
 	src := "import fmt\nfunc use() {\n  var xs = [1, 2, 3]\n  xs.push(4)\n  fmt.println(xs.len())\n}"
-	if codes := runCheck(t, src); !contains(codes, "E0215") {
-		t.Errorf("expected E0215 (discarded slice push), got %v", codes)
+	codes := runCheck(t, src)
+	if !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (slice has no push), got %v", codes)
 	}
 }
 
-func TestAssignedSlicePushNoE0215(t *testing.T) {
-	src := "func use() {\n  var xs = [1, 2, 3]\n  xs = xs.push(4)\n}"
-	if codes := runCheck(t, src); contains(codes, "E0215") {
-		t.Errorf("assigned-back slice push must not fire E0215, got %v", codes)
+// The tailored message names List<T> (the migration target), not the generic
+// "no member" — the audit's teach-the-trap-loudly move.
+func TestSlicePushMessageNamesList(t *testing.T) {
+	src := "func use() {\n  var xs = [1, 2, 3]\n  xs.push(4)\n}"
+	msgs := runCheckMsgs(t, src)
+	found := false
+	for _, m := range msgs {
+		if strings.Contains(m, "no `push`") && strings.Contains(m, "List<T>") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a slice-push message naming List<T>, got %v", msgs)
 	}
 }
 
-// Stack `push` mutates in place, so a bare statement is legitimate — the
-// no-op diagnostic must not fire on it (gates on a slice receiver).
-func TestDiscardedStackPushNoE0215(t *testing.T) {
+// The pure slice accessors survive — len() and copy() still resolve cleanly.
+func TestSlicePureAccessorsClean(t *testing.T) {
+	src := "func use(): int {\n  var xs = [1, 2, 3]\n  let ys = xs.copy()\n  return xs.len() + ys.len()\n}"
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (slice len/copy survive), got %v", codes)
+	}
+}
+
+// Stack `push` mutates in place and is unaffected — a bare statement is
+// legitimate and resolves (the D55 removal is slice-only).
+func TestStackPushStillResolves(t *testing.T) {
 	src := "func use() {\n  var st = Stack<int>{}\n  st.push(4)\n}"
-	if codes := runCheck(t, src); contains(codes, "E0215") {
-		t.Errorf("Stack push statement must not fire E0215, got %v", codes)
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("Stack push must still resolve cleanly, got %v", codes)
 	}
 }
 

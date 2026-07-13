@@ -494,30 +494,18 @@ func (g *gen) emitCall(c *ast.Call) error {
 		}
 	}
 	// Slice method shortcuts per builtins.md §Slice methods:
-	//   xs.push(e) → append(xs, e)
 	//   xs.len()   → len(xs)
+	//   xs.copy()  → append(xs[:0:0], xs...)
+	// `[]T` is a value view with pure accessors only — it has no `push`
+	// (grow-in-place lives on List<T>, D55; sema fires a tailored E0214).
 	// Triggered when the callee is a Field access whose receiver
 	// is NOT a known stdlib namespace (e.g. fmt, os, strings), not a
 	// container, and — the sema tightening — not a user class/record
-	// value: a user type may declare its own `len()`/`push()` method, which
+	// value: a user type may declare its own `len()` method, which
 	// must dispatch as a method (`cache.len()`), never the slice builtin
 	// (`len(cache)`, a raw go/types leak — D10).
 	if f, ok := c.Callee.(*ast.Field); ok && !isStdlibNamespace(f.Receiver) && !g.isContainerReceiver(f.Receiver) && !g.isUserNamedReceiver(f.Receiver) {
 		switch f.Name {
-		case "push":
-			if len(c.Args) != 1 {
-				return fmt.Errorf("codegen: .push expects exactly one argument, got %d", len(c.Args))
-			}
-			g.b.WriteString("append(")
-			if err := g.emitExpr(f.Receiver); err != nil {
-				return err
-			}
-			g.b.WriteString(", ")
-			if err := g.emitExpr(c.Args[0]); err != nil {
-				return err
-			}
-			g.b.WriteByte(')')
-			return nil
 		case "len":
 			if len(c.Args) != 0 {
 				return fmt.Errorf("codegen: .len takes no arguments, got %d", len(c.Args))

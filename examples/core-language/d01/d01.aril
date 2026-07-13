@@ -20,15 +20,15 @@ type Step = {
 func readData(path: string): Result<[]Step, error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var out: []Step = []Step{}
+  let out = List<Step>{}
   for ln in strings.split(text, "\n") {
     let s = strings.trimSpace(ln)
     if s.len() == 0 { continue }
     let dir   = s[0:1]
     let count = try strconv.atoi(s[1:])
-    out = out.push(Step{ dir: dir, count: count })
+    out.push(Step{ dir: dir, count: count })
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 func solveSimple(steps: []Step): int {

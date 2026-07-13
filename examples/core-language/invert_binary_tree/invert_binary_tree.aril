@@ -22,12 +22,15 @@ func inorder<T>(t: Tree<T>): []T {
   match t {
     Leaf => []T{},
     Node(v, l, r) => {
-      var out = inorder(l)
-      out = out.push(v)
-      for x in inorder(r) {
-        out = out.push(x)
+      let out = List<T>{}
+      for x in inorder(l) {
+        out.push(x)
       }
-      out
+      out.push(v)
+      for x in inorder(r) {
+        out.push(x)
+      }
+      out.toSlice()
     },
   }
 }

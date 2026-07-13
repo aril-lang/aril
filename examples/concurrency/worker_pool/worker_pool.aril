@@ -56,11 +56,11 @@ func runPool(workerCount: int, jobs: []Job): Result<[]JobResult, error> {
   }
   resultCh.close()
 
-  var out: []JobResult = []JobResult{}
+  let out = List<JobResult>{}
   for r in resultCh {
-    out = out.push(r)
+    out.push(r)
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 // The producer goroutine feeds every job, *then* closes jobCh — never a send
@@ -90,11 +90,11 @@ channel resultCh {
 }
 
 func main() {
-  var jobs: []Job = []Job{}
+  let jobs = List<Job>{}
   for i in 1..=8 {
-    jobs = jobs.push(Job{ id: i, workN: i })
+    jobs.push(Job{ id: i, workN: i })
   }
-  match runPool(3, jobs) {
+  match runPool(3, jobs.toSlice()) {
     Ok(results) => {
       fmt.println("completed", results.len(), "jobs")
       for r in results {

@@ -8,4 +8,4 @@
 +  var d: string = 1
    while d <= n / 2 {
      if n % d == 0 {
-       var parts: []string = []string{}
+       let parts = List<string>{}

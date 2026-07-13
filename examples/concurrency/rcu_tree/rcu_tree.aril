@@ -71,11 +71,11 @@ func inorder(root: Option<Node>): []int {
   match root {
     None => return []int{},
     Some(n) => {
-      var out: []int = []int{}
-      for x in inorder(n.left)  { out = out.push(x) }
-      out = out.push(n.key)
-      for x in inorder(n.right) { out = out.push(x) }
-      return out
+      let out = List<int>{}
+      for x in inorder(n.left)  { out.push(x) }
+      out.push(n.key)
+      for x in inorder(n.right) { out.push(x) }
+      return out.toSlice()
     },
   }
 }
@@ -145,18 +145,18 @@ contract RcuTree {
 // Insert `k` into a sorted, de-duplicated list — the reference semantics the
 // tree must match, expressed without a tree.
 func sortedInsert(xs: []int, k: int): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var placed = false
   for x in xs {
     if x == k { placed = true }                      // already present — dedup
     if x > k && placed == false {
-      out = out.push(k)
+      out.push(k)
       placed = true
     }
-    out = out.push(x)
+    out.push(x)
   }
-  if placed == false { out = out.push(k) }
-  return out
+  if placed == false { out.push(k) }
+  return out.toSlice()
 }
 
 // The sequential oracle: fold every key into a sorted unique list.
@@ -194,15 +194,15 @@ func sumOf(xs: []int): int {
 // Deterministic key stream (a POSIX-style LCG) so the inserted SET — and hence
 // the final sorted traversal — is fixed regardless of thread interleaving.
 func genKeys(seed: int, count: int): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var x = seed
   var i = 0
   while i < count {
     x = (x * 1103515245 + 12345) % 2147483648
-    out = out.push(x % 1000)
+    out.push(x % 1000)
     i = i + 1
   }
-  return out
+  return out.toSlice()
 }
 
 func parseArg(idx: int, dflt: int): int {

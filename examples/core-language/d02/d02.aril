@@ -23,7 +23,7 @@ type Range = (int, int)
 func readData(path: string): Result<[]Range, error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var out: []Range = []Range{}
+  let out = List<Range>{}
   for ln in strings.split(text, "\n") {
     let row = strings.trimSpace(ln)
     if row.len() == 0 { continue }
@@ -33,10 +33,10 @@ func readData(path: string): Result<[]Range, error> {
       let parts = strings.split(r, "-")
       let st  = try strconv.atoi(parts[0])
       let fin = try strconv.atoi(parts[1])
-      out = out.push((st, fin))
+      out.push((st, fin))
     }
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 func checkSimple(s: string): bool {
@@ -50,13 +50,13 @@ func checkHard(s: string): bool {
   var d = 1
   while d <= n / 2 {
     if n % d == 0 {
-      var parts: []string = []string{}
+      let parts = List<string>{}
       var i = 0
       while i < n {
-        parts = parts.push(s[i:i+d])
+        parts.push(s[i:i+d])
         i = i + d
       }
-      let sorted = sort.sorted(parts, (a, b) => a < b)
+      let sorted = sort.sorted(parts.toSlice(), (a, b) => a < b)
       if sorted[0] == sorted[sorted.len() - 1] {
         return true
       }

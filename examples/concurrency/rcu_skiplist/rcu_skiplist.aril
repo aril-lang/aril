@@ -106,15 +106,15 @@ func findPath(head: Node, k: int): SearchPath {
     i = i - 1
   }
   // Full level-0 predecessor prefix — the clone set for the path-copy publish.
-  var path: []Node = [head]
+  let path = List<Node>{head}
   var cur = head.next[0]
   while true {
     match cur {
       None    => break,
-      Some(n) => if n.key < k { path = path.push(n); cur = n.next[0] } else { break },
+      Some(n) => if n.key < k { path.push(n); cur = n.next[0] } else { break },
     }
   }
-  return SearchPath{ path: path, update: update }
+  return SearchPath{ path: path.toSlice(), update: update }
 }
 
 // Index of `t` within `path` by reference identity, or None. Used by the
@@ -238,12 +238,12 @@ func containsFrom(head: Node, k: int): bool {
 
 // The level-0 key chain of a snapshot, in order (the sentinel's successors).
 func keysFrom(head: Node): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var cur = head.next[0]
   while true {
     match cur {
-      None    => return out,
-      Some(n) => { out = out.push(n.key); cur = n.next[0] },
+      None    => return out.toSlice(),
+      Some(n) => { out.push(n.key); cur = n.next[0] },
     }
   }
 }
@@ -468,23 +468,23 @@ func main() {
     Ok(n)  => n,
     Err(_) => { fmt.println("bad readers"); os.exit(2) },
   }
-  var ops: []int = []int{}
+  let ops = List<int>{}
   var i = 2
   while i < os.args.len() {
     match strconv.atoi(os.args[i]) {
-      Ok(v)  => ops = ops.push(v),
+      Ok(v)  => ops.push(v),
       Err(_) => { fmt.println("bad op:", os.args[i]); os.exit(2) },
     }
     i = i + 1
   }
 
-  match run(numReaders, ops) {
+  match run(numReaders, ops.toSlice()) {
     Ok(r) => {
-      var parts: []string = []string{}
-      for k in r.keys { parts = parts.push(strconv.itoa(k)) }
-      fmt.println("set:", strings.join(parts, " "))
+      let parts = List<string>{}
+      for k in r.keys { parts.push(strconv.itoa(k)) }
+      fmt.println("set:", strings.join(parts.toSlice(), " "))
       fmt.println("size:", r.keys.len())
-      fmt.println("matches-oracle:", if intSeqEq(r.keys, oracle(ops)) { "true" } else { "false" })
+      fmt.println("matches-oracle:", if intSeqEq(r.keys, oracle(ops.toSlice())) { "true" } else { "false" })
       fmt.println("consistent-snapshots:", if r.torn == 0 { "true" } else { "false" })
     },
     Err(e) => {

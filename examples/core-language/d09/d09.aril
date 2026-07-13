@@ -22,7 +22,7 @@ type Rect   = (Corner, Corner)
 func readData(path: string): Result<[]Corner, error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var out: []Corner = []Corner{}
+  let out = List<Corner>{}
   for ln in strings.split(text, "\n") {
     let s = strings.trimSpace(ln)
     if s.len() == 0 { continue }
@@ -32,9 +32,9 @@ func readData(path: string): Result<[]Corner, error> {
     }
     let x = try strconv.atoi(strings.trimSpace(parts[0]))
     let y = try strconv.atoi(strings.trimSpace(parts[1]))
-    out = out.push((x, y))
+    out.push((x, y))
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 func intMin(a: int, b: int): int { if a < b { return a }; return b }

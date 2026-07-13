@@ -29,11 +29,11 @@ func readData(path: string): Result<Graph, error> {
       return Err(error("bad line, expected `node:` prefix: " + ln))
     }
     let node = first[0:(first.len() - 1)]
-    var neighbours: []string = []string{}
+    let neighbours = List<string>{}
     for i in 1..items.len() {
-      neighbours = neighbours.push(items[i])
+      neighbours.push(items[i])
     }
-    adj.set(node, neighbours)
+    adj.set(node, neighbours.toSlice())
   }
   return Ok(adj)
 }

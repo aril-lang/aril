@@ -55,7 +55,7 @@ const K = 100       // just an alias for `let` — not a separate category
 | a record / object type | `type User = { id: string, name: int }` — a named value type; construct by name (`User{…}`) |
 | a tuple | `type Coord = (int, int)` |
 | a union / enum | a **sum type** (§4) |
-| `T[]` | `[]T` (a **value view** — `.push` returns a new header) |
+| `T[]` | `[]T` (a **value view** — pure accessors only, **no `.push`**; grow with `List<T>`) |
 | a growable list | `List<T>` — a **reference sequence** that mutates in place (the honest `Vec`; `[]T` is the value view) |
 | `Map<K,V>` / `Set<T>` | `Map<K, V>` / `Set<T>` (built-in generics; also `Stack<T>`, `List<T>`) |
 
@@ -137,9 +137,10 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
 
 ## 7. Collections — the sharp edges
 
-- Slice `xs.push(e)` **returns a new slice** (does not mutate): write
-  `xs = xs.push(e)`; discarding the result is an error (E0215). ⚠ (`Stack.push`
-  and `List.push` *do* mutate — the asymmetry is deliberate.)
+- Slice `[]T` is a **value view — no `.push`** (D55): a slice header can't grow
+  in place, so `xs.push(e)` is an error (tailored E0214 → use `List<T>`). Keep the
+  pure `xs.copy()` / `xs.len()` / `xs[i]` / `xs[a:b]` accessors. ⚠ Grow with a
+  `List<T>` (mutates in place), then `l.toSlice()` back to `[]T` at a boundary.
 - `List<T>` is the **growable reference sequence** (the honest mutable
   container; `[]T` is the value view). `l.push(e): unit` appends *in place*;
   `l[i]: T` reads (⚠ panics out of range) while `l.get(i): Option<T>` is the
@@ -225,7 +226,7 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `null` / `undefined` | none — `Option<T>` (`Some`/`None`) |
 | `try { } catch { }` block | `try` is prefix (`?`); `catch` is postfix + **must diverge** |
 | `throw` / exceptions | none — `Result<T, E>` |
-| `arr.push(x)` mutates | slice `push` **returns a new slice**; `xs = xs.push(x)` |
+| `arr.push(x)` mutates | slice `[]T` has **no `push`** (value view); grow with `List<T>` — `let l = List<int>{}; l.push(x)` |
 | `map[k]` → undefined on miss | zero value; use `m.has(k): bool` / `m.get(k): Option<V>` |
 | `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples compare field-wise |
 | same-shape records interchangeable | nominal named types — `A` ≠ `B` (E0201) |
