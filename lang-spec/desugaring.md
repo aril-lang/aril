@@ -124,7 +124,7 @@ name resolution — but E0502 is **reserved / not yet enforced in v1**
 (see `name-resolution.md` §Write-shadow), so in v1 such a write does
 reach desugaring and resolves to the closest binding (the local).
 
-## Stage 2 — (no-op; parser-level normalisation)
+## Stage 2 — parser-level normalisations
 
 Aril has no `ShortClosure` AST node — the parser already
 normalises the short form `(x, y) => x + y` into
