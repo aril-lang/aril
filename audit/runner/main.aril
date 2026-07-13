@@ -118,17 +118,17 @@ func tomlCodes(line: string): []string {
   let eq = strings.index(line, "=")
   if eq < 0 { return []string{} }
   var rest = line[eq + 1:]
-  var out = []string{}
+  var out = List<string>{}
   while true {
     let q1 = strings.index(rest, "\"")
     if q1 < 0 { break }
     rest = rest[q1 + 1:]
     let q2 = strings.index(rest, "\"")
     if q2 < 0 { break }
-    out = out.push(rest[:q2])
+    out.push(rest[:q2])
     rest = rest[q2 + 1:]
   }
-  return out
+  return out.toSlice()
 }
 
 // parseTaskMeta reads the top-level keys of a task.toml. Scanning stops at the
@@ -182,13 +182,13 @@ func buildAril(tmp: string): string {
 // task.toml), sorted for determinism.
 func discoverTasks(): []string {
   let listed = runOk("git", ["ls-files", "audit/tasks"])
-  var dirs = []string{}
+  var dirs = List<string>{}
   for ln in strings.split(listed, "\n") {
     if strings.hasSuffix(ln, "/task.toml") {
-      dirs = dirs.push(pathDir(ln))
+      dirs.push(pathDir(ln))
     }
   }
-  return sort.sorted(dirs, lessStr)
+  return sort.sorted(dirs.toSlice(), lessStr)
 }
 
 // gradeSubmission is the oracle: compile the submission, run it in the task dir,
