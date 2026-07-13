@@ -160,6 +160,14 @@ before any probe ran.
 | **L1** (fixed cheatsheet) | **9** | 7 → **9** |
 | **L2** (+ `docs/language-spec.md`) | **9** | 4 → **9** |
 
+> **On the deltas.** The "vs. original pilot" column is *not* a controlled series —
+> it folds two changes: the AUDIT-0 cheatsheet fix *and* the v0.20.0/v0.21.0
+> surface fixes. The original `L2 = 4` was measured against the *pre-fix* cheatsheet
+> (+ spec); this `L2 = 9` uses the *fixed* cheatsheet (+ spec). The sound reading is
+> the absolute re-baseline (both rungs now 9/10 on the fixed surface), not the raw
+> arrow. This is the deliberate "re-run against the fixed surface" AUDIT-2 was told
+> to establish, superseding the original pilot's straddled-boundary caveat.
+
 Per stratum (run_ok / 2), identical at both rungs:
 
 | stratum | L1 | L2 |
