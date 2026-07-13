@@ -323,7 +323,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		g.b.WriteString("}\n")
 		return nil
 	}
-	// Slice / other collection — Go-native index/value range.
+	// Slice / other collection — Go-native index/value range. A List is a
+	// wrapper, not a Go slice, so `for (i, x) in l` iterates its ordered
+	// view `l.ToSlice()` (a copy — safe for read-only iteration).
 	g.b.WriteString("for ")
 	g.b.WriteString(a)
 	g.b.WriteString(", ")
@@ -331,6 +333,9 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	g.b.WriteString(" := range ")
 	if err := g.emitExpr(iterExpr); err != nil {
 		return err
+	}
+	if id, ok := iterExpr.(*ast.Ident); ok && g.varKindOf(id) == "List" {
+		g.b.WriteString(".ToSlice()")
 	}
 	g.b.WriteString(" {\n")
 	g.indent++
@@ -430,13 +435,13 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 		// expose keys only via this short form; tuple-form
 		// `for (k, v) in m` and `m.entries()` come later.
 		if id, ok := iterExpr.(*ast.Ident); ok {
-			if k := g.varKindOf(id); k == "Map" || k == "Set" {
+			if k := g.varKindOf(id); k == "Map" || k == "Set" || k == "List" {
 				g.writeRangeHead(goIdent(idPat.Name), false)
 				if err := g.emitExpr(id); err != nil {
 					return err
 				}
-				// Iterate the insertion-order view via the exported
-				// accessor (Map keys / Set elements) so the same emission
+				// Iterate the ordered view via the exported accessor (Map
+				// keys / Set elements / List elements) so the same emission
 				// works against the arilrt package boundary in vendored
 				// mode. Returns a copy — safe for read-only iteration.
 				if k == "Map" {

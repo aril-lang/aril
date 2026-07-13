@@ -1,0 +1,139 @@
+--- TITLE ---
+predeclared List<T> — initialized literal, push/set/index/iterate, pop() + get() Option paths
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let xs = List<int>{1, 2, 3}
+  xs.push(4)
+  xs.set(0, 10)
+  fmt.println(xs.len())
+  fmt.println(xs[0])
+  for v in xs {
+    fmt.println(v)
+  }
+  match xs.pop() {
+    Some(v) => fmt.println("pop", v),
+    None => fmt.println("empty"),
+  }
+  match xs.get(9) {
+    Some(v) => fmt.println("got", v),
+    None => fmt.println("none"),
+  }
+}
+
+--- GO ---
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type List[T any] struct {
+	xs []T
+}
+
+func NewList[T any]() *List[T] {
+	return &List[T]{xs: nil}
+}
+func ListOf[T any](elems ...T) *List[T] {
+	xs := make([]T, len(elems))
+	copy(xs, elems)
+	return &List[T]{xs: xs}
+}
+func (l *List[T]) Len() int { return len(l.xs) }
+func (l *List[T]) Push(e T) {
+	l.xs = append(l.xs, e)
+}
+func (l *List[T]) At(i int) T { return l.xs[i] }
+func (l *List[T]) Get(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	return Option[T]{Tag: 1, V: l.xs[i]}
+}
+func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
+func (l *List[T]) Pop() Option[T] {
+	n := len(l.xs)
+	if n == 0 {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[n-1]
+	l.xs = l.xs[:n-1]
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) Insert(i int, e T) {
+	if i < 0 {
+		i = 0
+	}
+	if i > len(l.xs) {
+		i = len(l.xs)
+	}
+	var zero T
+	l.xs = append(l.xs, zero)
+	copy(l.xs[i+1:], l.xs[i:])
+	l.xs[i] = e
+}
+func (l *List[T]) RemoveAt(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[i]
+	l.xs = append(l.xs[:i], l.xs[i+1:]...)
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) ToSlice() []T {
+	out := make([]T, len(l.xs))
+	copy(out, l.xs)
+	return out
+}
+func main() {
+	var xs = ListOf[int](1, 2, 3)
+	xs.Push(4)
+	xs.Set(0, 10)
+	fmt.Println(xs.Len())
+	fmt.Println(xs.At(0))
+	for _, v := range xs.ToSlice() {
+		fmt.Println(v)
+	}
+	__aril_match_1 := xs.Pop()
+	switch __aril_match_1.Tag {
+	case 1:
+		v := __aril_match_1.V
+		fmt.Println("pop", v)
+	case 0:
+		fmt.Println("empty")
+	}
+	__aril_match_2 := xs.Get(9)
+	switch __aril_match_2.Tag {
+	case 1:
+		v := __aril_match_2.V
+		fmt.Println("got", v)
+	case 0:
+		fmt.Println("none")
+	}
+}
+
+--- STDOUT ---
+4
+10
+10
+2
+3
+4
+pop 4
+none
+
+--- EXIT ---
+0

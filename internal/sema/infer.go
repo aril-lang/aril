@@ -765,6 +765,10 @@ func (c *checker) staticContainerCtor(f *ast.Field, call *ast.Call) Type {
 		if len(call.TypeArgs) == 1 {
 			return &Stack{Elem: c.typeFromExpr(call.TypeArgs[0])}
 		}
+	case "List":
+		if len(call.TypeArgs) == 1 {
+			return &List{Elem: c.typeFromExpr(call.TypeArgs[0])}
+		}
 	}
 	return nil
 }

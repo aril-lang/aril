@@ -55,8 +55,9 @@ const K = 100       // just an alias for `let` — not a separate category
 | a record / object type | `type User = { id: string, name: int }` — a named value type; construct by name (`User{…}`) |
 | a tuple | `type Coord = (int, int)` |
 | a union / enum | a **sum type** (§4) |
-| `T[]` | `[]T` |
-| `Map<K,V>` / `Set<T>` | `Map<K, V>` / `Set<T>` (built-in generics; also `Stack<T>`) |
+| `T[]` | `[]T` (a **value view** — `.push` returns a new header) |
+| a growable list | `List<T>` — a **reference sequence** that mutates in place (the honest `Vec`; `[]T` is the value view) |
+| `Map<K,V>` / `Set<T>` | `Map<K, V>` / `Set<T>` (built-in generics; also `Stack<T>`, `List<T>`) |
 
 Generics: `<T>`, with only two constraints — `<K: Comparable>` and
 `<T: Ordered>` (no user-defined constraints in v1). ⚠ There is **no `enum` or
@@ -138,7 +139,15 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
 
 - Slice `xs.push(e)` **returns a new slice** (does not mutate): write
   `xs = xs.push(e)`; discarding the result is an error (E0215). ⚠ (`Stack.push`
-  *does* mutate — the asymmetry is deliberate.)
+  and `List.push` *do* mutate — the asymmetry is deliberate.)
+- `List<T>` is the **growable reference sequence** (the honest mutable
+  container; `[]T` is the value view). `l.push(e): unit` appends *in place*;
+  `l[i]: T` reads (⚠ panics out of range) while `l.get(i): Option<T>` is the
+  safe form; also `l.set(i, e)`, `l.pop(): Option<T>` (`None` on empty — *not*
+  `Stack`'s `Result`), `l.insert(i, e)`, `l.removeAt(i): Option<T>`,
+  `l.len()`, `l.toSlice(): []T`. No `l[i] = v` — use `l.set(i, e)`. Iterable:
+  `for x in l`, `for (i, x) in l`. Rule: a mutating-looking method must
+  actually mutate, so in-place ops live on `List`, not `[]T`.
 - `m[k]` on a `Map` returns the **zero value** on a miss (Go semantics) — it
   *cannot* tell "absent" from "present with the zero value". The honest forms:
   `m.has(k): bool` (presence) and `m.get(k): Option<V>` (`Some(v)` / `None`).

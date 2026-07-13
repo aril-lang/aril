@@ -813,6 +813,8 @@ func (g *gen) varKindOf(id *ast.Ident) string {
 		return "Set"
 	case *sema.Stack:
 		return "Stack"
+	case *sema.List:
+		return "List"
 	case *sema.Channel:
 		return "Channel"
 	case *sema.SendChan:

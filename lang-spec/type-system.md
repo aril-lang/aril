@@ -302,9 +302,9 @@ admitted sites, is **E0209 Dynamic widening requires reflect.box**:
 ```
 
 In particular, every element of a `[]Dynamic` literal, every
-value-position of a `Map<_, Dynamic>` entry, and every Set/Stack
-element of `Dynamic` element type whose static type is not
-already `Dynamic` must be wrapped in `reflect.box(_)`. There is
+value-position of a `Map<_, Dynamic>` entry, and every
+Set/Stack/List element of `Dynamic` element type whose static type is
+not already `Dynamic` must be wrapped in `reflect.box(_)`. There is
 no inference path that promotes a concrete-element collection
 literal to a `Dynamic`-element collection.
 
@@ -489,8 +489,23 @@ the header — see `../docs/language-spec.md` §Collections.)
                ──────────────────────────────────────
                        Γ ⊢ Stack<T>{ e_1, ..., e_n } : Stack<T>
 
+(T-List-Lit)   type_name = List<T>    n >= 0            [bare-value entries; see
+               for each entry e_i: Γ ⊢ e_i : T           ast.md §BraceLit — List
+               ──────────────────────────────────────    reuses the Set entry shape,
+                       Γ ⊢ List<T>{ e_1, ..., e_n } : List<T>   dispatched on type_name]
+
+       Unlike `Stack<T>{}` (always empty), a `List` literal accepts
+       initial elements; a mismatched entry `e_i` fires **E0201**
+       (list element type X, expected T).
+
+(T-Index-List) Γ ⊢ l : List<T>    Γ ⊢ i : int
+               ──────────────────────────────
+                       Γ ⊢ l[i] : T                  [raw `IndexExpr` — runtime panic
+                                                      out of range; total-API via
+                                                      `l.get(i)` in builtins.md]
+
 (T-Container-Method)
-               Γ ⊢ recv : C   C ∈ { Map<K,V>, Set<T>, Stack<T>, []T }
+               Γ ⊢ recv : C   C ∈ { Map<K,V>, Set<T>, Stack<T>, List<T>, []T }
                method m of C has predeclared signature (P̄): R   (builtins.md)
                Γ ⊢ a_i : P_i
                ────────────────────────────────────────────────────────────
@@ -498,10 +513,14 @@ the header — see `../docs/language-spec.md` §Collections.)
 
        The method set and its result types are the predeclared total
        methods catalogued in `builtins.md` (`m.get(k): Option<V>`,
-       `s.pop(): Result<T, error>`, `xs.push(e): []T`, …). Dispatch is
-       on the container kind, not on a nominal declaration — these are
-       built-in types, so the result type is read from the receiver's
-       type-arguments, mirroring the prelude methods codegen emits.
+       `s.pop(): Result<T, error>`, `xs.push(e): []T`,
+       `l.push(e): unit` / `l.pop(): Option<T>` on `List<T>`, …).
+       Dispatch is on the container kind, not on a nominal declaration —
+       these are built-in types, so the result type is read from the
+       receiver's type-arguments, mirroring the prelude methods codegen
+       emits. Note `List`'s `push` mutates in place and returns `unit`
+       (a reference container), whereas the slice `xs.push(e)` returns a
+       new `[]T` header (a value view) — see `builtins.md` §List.
 
 (T-Range)      Γ ⊢ lo : int    Γ ⊢ hi : int
                ──────────────────────────────────────
@@ -749,6 +768,7 @@ their per-step element type, defined in `builtins.md` under
 | Source type `I` | `IterElem(I)` |
 |---|---|
 | `[]T` | `T` (or `(int, T)` if `pat` is a 2-tuple pattern — indexed iteration) |
+| `List<T>` | `T` (or `(int, T)` if `pat` is a 2-tuple pattern — a sequence, indexed too) |
 | `string` | `rune` (UTF-8 codepoint iteration) |
 | `Map<K, V>` | `(K, V)` (insertion order) |
 | `Set<T>` | `T` (insertion order) |

@@ -444,7 +444,7 @@ func staticMethodName(className, methodName string) string {
 // (the vendored caller prefixes it with the package selector).
 func containerStaticCtorName(className, methodName string) (string, bool) {
 	switch className {
-	case "Map", "Set", "Stack":
+	case "Map", "Set", "Stack", "List":
 		switch methodName {
 		case "new":
 			return "New" + className, true

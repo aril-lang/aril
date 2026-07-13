@@ -1,0 +1,43 @@
+import fmt
+
+// list_demo — List<T>, the growable *reference* sequence: mutating methods
+// (push / insert / set / removeAt / pop) mutate in place, l[i] indexes, and a
+// List is iterable. Contrast with []T, the value view that only reads (D55).
+
+func evensUpTo(n: int): List<int> {
+    let out = List<int>{}
+    var i = 0
+    while i <= n {
+        if i % 2 == 0 {
+            out.push(i)
+        }
+        i = i + 1
+    }
+    return out
+}
+
+func main() {
+    let xs = evensUpTo(10)
+    fmt.println("count:", xs.len())
+
+    xs.insert(0, -2)
+    xs.set(1, 100)
+    match xs.removeAt(0) {
+        Some(v) => fmt.println("dropped:", v),
+        None => {},
+    }
+
+    fmt.println("first:", xs[0])
+
+    var sum = 0
+    for v in xs {
+        sum = sum + v
+    }
+    fmt.println("sum:", sum)
+
+    match xs.pop() {
+        Some(v) => fmt.println("popped:", v),
+        None => {},
+    }
+    fmt.println("len:", xs.len())
+}

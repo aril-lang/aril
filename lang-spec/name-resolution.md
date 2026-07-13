@@ -38,7 +38,7 @@ them inside-out — the closest match wins.
 5. **Predeclared (built-in) scope.** Identifiers shipped by the
    language itself — the primitive type names, the generic
    containers (`Option`, `Result`, `Map`, `Set`, `Stack`,
-   `Channel`, `SendChan`, `RecvChan`), variant constructors
+   `List`, `Channel`, `SendChan`, `RecvChan`), variant constructors
    (`Ok`, `Err`, `Some`, `None`), the `error` interface, the
    `Any` escape type, free functions (`panic`, `refEq`,
    `makeChannel`, `makeSlice`), and the conversion functions
@@ -52,7 +52,7 @@ A built-in **type** name may not be redeclared by user code. A
 is a predeclared type — a primitive (`bool`, `int`, `int8`..`int64`,
 `uint`..`uint64`, `float32`, `float64`, `byte`, `rune`, `string`),
 `error`, `Any`, `Dynamic`, `unit`, `Never`, or a built-in generic
-(`Result`, `Option`, `Map`, `Set`, `Stack`, `Channel`, `SendChan`,
+(`Result`, `Option`, `Map`, `Set`, `Stack`, `List`, `Channel`, `SendChan`,
 `RecvChan`) — is **E0118**. The reserved set is exactly the
 `SymBuiltinType` names of the predeclared scope.
 

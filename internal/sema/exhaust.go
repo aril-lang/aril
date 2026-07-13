@@ -354,7 +354,7 @@ func (c *checker) definitelyNotTryable(rt ast.TypeExpr) bool {
 		switch v.QName[0] {
 		case "Result", "Option":
 			return false
-		case "Map", "Set", "Stack":
+		case "Map", "Set", "Stack", "List":
 			return true
 		}
 		if sym := c.info.Symbol[v]; sym != nil {

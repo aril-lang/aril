@@ -1,0 +1,10 @@
+description = "List<T> — the growable reference sequence: push/insert/set/removeAt/pop mutate in place, l[i] indexes, iterate"
+source   = "hand-authored (CONTAINER-MODEL, D55)"
+category = "core-language"
+showcase = true
+forces   = ["list-literal", "list-push", "list-index", "list-pop", "for-list"]
+since    = "0.21"
+status   = "running"
+expects  = "run-pass"
+entry    = "list_demo.aril"
+expected_output = "expected-output.txt"

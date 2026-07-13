@@ -29,6 +29,8 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 			return g.emitSetBraceLit(b)
 		case "Stack":
 			return g.emitStackBraceLit(b)
+		case "List":
+			return g.emitListBraceLit(b)
 		}
 	}
 	// An empty `T{}` parses as BraceUnknown (no entries to commit a kind). The
@@ -269,6 +271,39 @@ func (g *gen) emitStackBraceLit(b *ast.BraceLit) error {
 		return err
 	}
 	g.b.WriteString("()")
+	return nil
+}
+
+// emitListBraceLit lowers `List<T>{}` → `NewList[T]()` and the initialized
+// `List<T>{a, b, c}` → `ListOf[T](a, b, c)` (builtins.md §List). Entries are
+// bare values (parsed as SetEntry).
+func (g *gen) emitListBraceLit(b *ast.BraceLit) error {
+	if len(b.Entries) == 0 {
+		g.b.WriteString(g.rt("NewList"))
+		if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
+			return err
+		}
+		g.b.WriteString("()")
+		return nil
+	}
+	g.b.WriteString(g.rt("ListOf"))
+	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
+		return err
+	}
+	g.b.WriteByte('(')
+	for i, e := range b.Entries {
+		if i > 0 {
+			g.b.WriteString(", ")
+		}
+		se, ok := e.(*ast.SetEntry)
+		if !ok {
+			return fmt.Errorf("codegen: non-value entry %T in List literal", e)
+		}
+		if err := g.emitExpr(se.Value); err != nil {
+			return err
+		}
+	}
+	g.b.WriteByte(')')
 	return nil
 }
 
@@ -580,7 +615,10 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// goes through the exported At accessor (not the unexported `m`
 		// field) so the same emission works across the arilrt package
 		// boundary in vendored mode.
-		if id, ok := v.Receiver.(*ast.Ident); ok && g.varKindOf(id) == "Map" {
+		if id, ok := v.Receiver.(*ast.Ident); ok && (g.varKindOf(id) == "Map" || g.varKindOf(id) == "List") {
+			// `l[i]` on a List lowers to `l.At(i)` (a Go bounds-checked slice
+			// index inside the wrapper) — the same exported-accessor path as
+			// Map's `m[k]`, so it works across the arilrt boundary in vendored mode.
 			if err := g.emitExpr(id); err != nil {
 				return err
 			}
@@ -924,7 +962,7 @@ func (g *gen) isContainerTypedExpr(receiver ast.Expr) bool {
 		return false
 	}
 	switch g.info.Type[receiver].(type) {
-	case *sema.Map, *sema.Set, *sema.Stack, *sema.AtomicPtr:
+	case *sema.Map, *sema.Set, *sema.Stack, *sema.List, *sema.AtomicPtr:
 		// AtomicPtr methods (load/store/swap/compareAndSwap) cross the arilrt
 		// boundary to the exported wrapper methods, like the container methods.
 		return true

@@ -35,7 +35,7 @@ func predeclaredSymbols() map[string]*Symbol {
 	// dual role once typing rules need to distinguish them.
 	out["error"] = &Symbol{Name: "error", Kind: SymBuiltinType, Type: &Builtin{N: "error"}}
 
-	for _, t := range []string{"Option", "Result", "Map", "Set", "Stack", "Channel", "SendChan", "RecvChan"} {
+	for _, t := range []string{"Option", "Result", "Map", "Set", "Stack", "List", "Channel", "SendChan", "RecvChan"} {
 		out[t] = &Symbol{Name: t, Kind: SymBuiltinType, Type: &Named{N: t}}
 	}
 	// `reflect.Kind` variants — qualified under `reflect.`, not

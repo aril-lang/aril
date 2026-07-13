@@ -131,6 +131,10 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		generic: true,
 		statics: map[string]bool{"new": true},
 	}
+	g.class["List"] = classInfo{
+		generic: true,
+		statics: map[string]bool{"new": true},
+	}
 	// `import reflect` is a Aril-internal module — signals that
 	// codegen should emit the reflection layer (Dynamic struct,
 	// TypeDescriptor, registry, helper funcs). It is NOT a
@@ -158,7 +162,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 	// Transitive deps: container methods produce Option / Result
 	// values, so any use of those containers forces those
 	// predeclared sums into the binary too.
-	if g.usesMap || g.usesStack {
+	if g.usesMap || g.usesStack || g.usesList {
 		g.usesOption = true
 	}
 	if g.usesStack {
@@ -425,6 +429,7 @@ type gen struct {
 	usesMap           bool
 	usesSet           bool
 	usesStack         bool
+	usesList          bool
 	usesReflect       bool
 	usesCmp           bool // an `Ordered` type-param bound → import "cmp" (G3b)
 	usesMakeSlice     bool
@@ -645,7 +650,7 @@ func (g *gen) sumOwnerName(owner string) string {
 // user type that merely shares the name.
 func isRuntimeTypeName(name string) bool {
 	switch name {
-	case "Option", "Result", "Map", "Set", "Stack", "Dynamic":
+	case "Option", "Result", "Map", "Set", "Stack", "List", "Dynamic":
 		return true
 	}
 	return false
@@ -678,7 +683,7 @@ func (g *gen) vendored() bool { return g.runtimePrefix != "" }
 // usesReflect is excluded: a reflection program emits inline (see
 // resolveRuntimeMode) and never reaches vendored().
 func (g *gen) usesRuntime() bool {
-	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack ||
+	return g.usesOption || g.usesResult || g.usesMap || g.usesSet || g.usesStack || g.usesList ||
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
 		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract ||

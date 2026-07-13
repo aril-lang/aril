@@ -50,7 +50,7 @@ func (c *checker) inferSliceLit(s *ast.SliceLit) Type {
 func containerBraceName(b *ast.BraceLit) string {
 	if len(b.TypeName.QName) == 1 {
 		switch b.TypeName.QName[0] {
-		case "Map", "Set", "Stack":
+		case "Map", "Set", "Stack", "List":
 			return b.TypeName.QName[0]
 		}
 	}
@@ -118,6 +118,25 @@ func (c *checker) inferContainerBraceLit(b *ast.BraceLit, name string) Type {
 			c.report("E0201", "Stack literal must be empty — push elements after construction", b.Span)
 		}
 		return &Stack{Elem: elem}
+	case "List":
+		// List<T>{a, b, c} is an initialized sequence — unlike Stack, entries
+		// are allowed (bare values, parsed as SetEntry) and checked against T.
+		var elem Type = &Unknown{}
+		if len(args) == 1 {
+			elem = c.typeFromExpr(args[0])
+		}
+		for _, e := range b.Entries {
+			se, ok := e.(*ast.SetEntry)
+			if !ok {
+				c.report("E0201", "List literal entry must be a bare value", e.NodeSpan())
+				continue
+			}
+			vt := c.inferExpr(se.Value)
+			if !c.fits(elem, se.Value, vt) {
+				c.report("E0201", "Type mismatch — list element is "+vt.String()+", expected "+elem.String(), se.Value.NodeSpan())
+			}
+		}
+		return &List{Elem: elem}
 	}
 	return &Unknown{}
 }
@@ -143,6 +162,11 @@ func (c *checker) inferIndex(ix *ast.Index) Type {
 	idx := c.inferExpr(ix.Idx)
 	switch r := recv.(type) {
 	case *Slice:
+		c.expectIntType(idx, ix.Idx)
+		return r.Elem
+	case *List:
+		// l[i] — raw index read (T-Index-List); lowers to l.At(i), a
+		// Go bounds-checked slice index (panics out-of-range, honest).
 		c.expectIntType(idx, ix.Idx)
 		return r.Elem
 	case *Map:
@@ -195,6 +219,11 @@ func (c *checker) inferBuiltinTypeCall(name string, call *ast.Call, args []Type)
 	case "Stack":
 		if len(call.TypeArgs) == 1 {
 			return &Stack{Elem: c.typeFromExpr(call.TypeArgs[0])}
+		}
+		return &Unknown{}
+	case "List":
+		if len(call.TypeArgs) == 1 {
+			return &List{Elem: c.typeFromExpr(call.TypeArgs[0])}
 		}
 		return &Unknown{}
 	}
@@ -325,6 +354,28 @@ func containerMethodType(recv Type, name string) *Func {
 		case "peek":
 			return &Func{Return: &Option{T: r.Elem}}
 		}
+	case *List:
+		// List<T> reference-container method set (builtins.md §List). Mutating
+		// methods return unit and mutate in place; pop/get/removeAt return
+		// Option (None on empty / out-of-range — Rust Vec shape, not Result).
+		switch name {
+		case "len":
+			return &Func{Return: &Builtin{N: "int"}}
+		case "push":
+			return &Func{Params: []Type{r.Elem}, Return: &Unit{}}
+		case "pop":
+			return &Func{Return: &Option{T: r.Elem}}
+		case "get":
+			return &Func{Params: []Type{&Builtin{N: "int"}}, Return: &Option{T: r.Elem}}
+		case "set":
+			return &Func{Params: []Type{&Builtin{N: "int"}, r.Elem}, Return: &Unit{}}
+		case "insert":
+			return &Func{Params: []Type{&Builtin{N: "int"}, r.Elem}, Return: &Unit{}}
+		case "removeAt":
+			return &Func{Params: []Type{&Builtin{N: "int"}}, Return: &Option{T: r.Elem}}
+		case "toSlice":
+			return &Func{Return: &Slice{Elem: r.Elem}}
+		}
 	case *AtomicPtr:
 		// atomic.Pointer<T> method set (docs/atomics-lock-free.md §Atomic
 		// references). T is a class reference, so "nil" is None: load/swap
@@ -412,7 +463,7 @@ func containerMethodType(recv Type, name string) *Func {
 // not fully known here (sound over complete, D38).
 func builtinMemberMiss(recv Type, name string) bool {
 	switch r := recv.(type) {
-	case *Map, *Set, *Stack, *Slice, *Channel, *SendChan, *RecvChan, *AtomicPtr:
+	case *Map, *Set, *Stack, *List, *Slice, *Channel, *SendChan, *RecvChan, *AtomicPtr:
 		return true
 	case *Option:
 		// `map` is a real method typed in inferMap (its U result is dynamic),

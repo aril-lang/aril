@@ -153,3 +153,80 @@ var emptyStack = emptyStackError{}
 type emptyStackError struct{}
 
 func (emptyStackError) Error() string { return "empty stack" }
+
+// List is a growable, indexable sequence — a reference container whose
+// mutating methods mutate in place (lang-spec/builtins.md §List). The
+// value primitive []T is a value view with pure accessors only; growth
+// lives here (the mutating-method-must-mutate invariant, D55).
+type List[T any] struct {
+	xs []T
+}
+
+// NewList builds an empty List (backs List<T>{} and List<T>.new()).
+func NewList[T any]() *List[T] {
+	return &List[T]{xs: nil}
+}
+
+// ListOf builds a List from initial elements (backs the initialized
+// literal List<T>{a, b, c}).
+func ListOf[T any](elems ...T) *List[T] {
+	xs := make([]T, len(elems))
+	copy(xs, elems)
+	return &List[T]{xs: xs}
+}
+
+func (l *List[T]) Len() int { return len(l.xs) }
+func (l *List[T]) Push(e T) { l.xs = append(l.xs, e) }
+
+// At is the raw index read backing `l[i]` — panics on out-of-range, like
+// a Go slice index. Get is the Option-returning bounds-checked form.
+func (l *List[T]) At(i int) T { return l.xs[i] }
+
+func (l *List[T]) Get(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	return Option[T]{Tag: 1, V: l.xs[i]}
+}
+
+func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
+
+func (l *List[T]) Pop() Option[T] {
+	n := len(l.xs)
+	if n == 0 {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[n-1]
+	l.xs = l.xs[:n-1]
+	return Option[T]{Tag: 1, V: v}
+}
+
+func (l *List[T]) Insert(i int, e T) {
+	if i < 0 {
+		i = 0
+	}
+	if i > len(l.xs) {
+		i = len(l.xs)
+	}
+	var zero T
+	l.xs = append(l.xs, zero)
+	copy(l.xs[i+1:], l.xs[i:])
+	l.xs[i] = e
+}
+
+func (l *List[T]) RemoveAt(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[i]
+	l.xs = append(l.xs[:i], l.xs[i+1:]...)
+	return Option[T]{Tag: 1, V: v}
+}
+
+// ToSlice returns a copy of the backing slice — the []T value view (the
+// List → []T bridge for a bound-Go API expecting a slice).
+func (l *List[T]) ToSlice() []T {
+	out := make([]T, len(l.xs))
+	copy(out, l.xs)
+	return out
+}
