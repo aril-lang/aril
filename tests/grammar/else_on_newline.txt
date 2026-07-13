@@ -1,0 +1,15 @@
+--- TITLE ---
+E0112: `else` on a new line after the `if` block names the D11 newline-ends-construct rule
+
+--- INPUT ---
+func f(x: int): int {
+  if x > 0 {
+    return 1
+  }
+  else {
+    return 2
+  }
+}
+
+--- ERRORS ---
+src.aril:5:3: error[E0112]: `else` must be on the same line as the closing `}` of the `if` block (a newline ends the construct)

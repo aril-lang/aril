@@ -497,6 +497,10 @@ VarStmt      = "var" ( Ident | "_" ) ( ":" TypeExpr )? ( "=" Expr )? ;
 AssignStmt   = LValue ( "=" | AssignOp ) Expr ;
 AssignOp     = "+=" | "-=" | "*=" | "/=" | "%=" ;   // desugared by parser to `lhs = lhs <op> rhs`
 LValue       = PostfixExpr ;                 // restricted by sema to writable shapes
+// The `else` must cuddle the closing `}` on the same line (`} else`) — a
+// newline ends the construct (D11 / §SyntaxNewlineSuppression, the same rule
+// that binds postfix `catch` to its subject). An `else` after a line break is
+// a stray keyword → E0112 naming the same-line rule (diagnostics.md §E0112).
 IfStmt       = "if" Expr Block ( "else" ( IfStmt | Block ) )? ;
 ForStmt      = "for" Pattern "in" Iterable LoopLabel? Block ;
 WhileStmt    = "while" Expr LoopLabel? Block ;
