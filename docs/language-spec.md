@@ -289,11 +289,12 @@ type Event =
   and `res.isOk()` / `res.isErr()` return `bool`, and `unwrapOr(fallback)`
   returns the held value (the `Some` payload / the `Ok` payload of type `T`)
   or `fallback` — the ergonomic default that avoids a full `match` for the
-  common cases. `Result` additionally carries `mapErr((e) => …)`, the
+  common cases. Both carry `map((x) => …)`, the payload-mapping combinator
+  that rewrites the `Some`/`Ok` value `T → U` (a `None`/`Err` untouched);
+  `Result` additionally carries its mirror `mapErr((e) => …)`, the
   error-conversion combinator that rewrites the `Err` payload `E → E2` (an
   `Ok` untouched) so a plain `try` can cross an error-type boundary without a
-  hand-written `match`. Still out of v1: the Ok-mapping `.map` and the
-  partial, panicking `.unwrap`.
+  hand-written `match`. Still out of v1: the partial, panicking `.unwrap`.
 
 Named-payload variants (e.g. `Node{value: T, left: Tree<T>}`) are park
 material; positional is the one obvious form for the typical small
