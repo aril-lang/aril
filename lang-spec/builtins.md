@@ -125,12 +125,19 @@ Option<T>:
   isSome(): bool                     [Tag == Some]
   isNone(): bool                     [Tag == None]
   unwrapOr(fallback: T): T           [the Some payload, else fallback]
+  map(f: (T) => U): Option<U>        [transform the Some payload; None untouched]
 ```
 
-`unwrapOr` is the total defaulting form — no `.unwrap` (partial,
-panicking) and no `.map` in v1; richer consumption stays
-`match`/`try` (see `T-Try-Option`). The methods lower to the
-exported arilrt method set (`lowering-go.md` §Container types).
+`unwrapOr` is the total defaulting form; `.unwrap` (partial,
+panicking) stays out of v1 — richer consumption is `match`/`try`
+(see `T-Try-Option`). `map` is the payload-mapping combinator
+(T-Option-Map): the mapper `f: (T) => U` rewrites the `Some`
+payload `T → U` and leaves a `None` untouched, so the value keeps
+flowing as an `Option<U>`. Like `mapErr` it lowers to a **free**
+helper (`arilrt.OptionMap`), not a method — a Go method cannot
+introduce the fresh `U` type parameter. The predicate/defaulting
+methods lower to the exported arilrt method set (`lowering-go.md`
+§Container types).
 
 The constructors `Some` and `None` are predeclared variants;
 they are usable unqualified.
@@ -152,6 +159,7 @@ Result<T, E>:
   isOk(): bool                       [Tag == Ok]
   isErr(): bool                      [Tag == Err]
   unwrapOr(fallback: T): T           [the Ok payload, else fallback]
+  map(f: (T) => U): Result<U, E>        [transform the Ok payload; Err untouched]
   mapErr(f: (E) => E2): Result<T, E2>   [transform the Err payload; Ok untouched]
 ```
 
@@ -161,17 +169,20 @@ type is admissible — `try` requires the inner `E` to equal the
 enclosing function's declared error type (no implicit
 conversion).
 
-`mapErr` is the **error-conversion** combinator (T-Result-MapErr):
-it rewrites the `Err` payload `E → E2` through the handler and
-leaves an `Ok` untouched, so the value keeps flowing as a
-`Result<T, E2>`. It is the bridge that lets a plain `try` cross an
-error-type boundary — `try f().mapErr((e) => Wrapped{…})` propagates
-where the enclosing function's error type differs from `f`'s, with
-no hand-written `match`. Still deliberately out of v1: the Ok-mapping
-`.map` and the partial, panicking `.unwrap` (richer Ok consumption
-stays `match` / `try` / `unwrapOr`). `mapErr` lowers to the free
-`arilrt.MapErr` helper (a Go method cannot introduce the fresh `E2`
-type parameter), the closure to a Go func literal.
+`map` is the **Ok-mapping** combinator (T-Result-Map) and `mapErr`
+the **error-conversion** one (T-Result-MapErr): `map` rewrites the
+`Ok` payload `T → U` and leaves an `Err` untouched (yielding
+`Result<U, E>`); `mapErr` rewrites the `Err` payload `E → E2` and
+leaves an `Ok` untouched (yielding `Result<T, E2>`). They are exact
+mirrors across the two variants. `mapErr` is the bridge that lets a
+plain `try` cross an error-type boundary — `try f().mapErr((e) =>
+Wrapped{…})` propagates where the enclosing function's error type
+differs from `f`'s, with no hand-written `match`. The partial,
+panicking `.unwrap` stays deliberately out of v1 (richer Ok
+consumption is `match` / `try` / `unwrapOr`). Both `map` and
+`mapErr` lower to a **free** helper (`arilrt.ResultMap` /
+`arilrt.MapErr`) — a Go method cannot introduce the fresh `U`/`E2`
+type parameter — the closure to a Go func literal.
 
 **Default error parameter.** When `E` is omitted from a written
 type — `Result<T>` rather than `Result<T, E>` — the second

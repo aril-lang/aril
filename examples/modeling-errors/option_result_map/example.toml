@@ -1,0 +1,10 @@
+description = "Option.map / Result.map — transform the Some/Ok payload, None/Err flows through (mirror of mapErr)"
+source   = "LANGUAGE-FIXES .map"
+category = "modeling-errors"
+showcase = false
+forces   = []
+since    = "0.20"
+status   = "running"
+expects  = "run-pass"
+entry    = "option_result_map.aril"
+expected_output = "expected-output.txt"

@@ -103,9 +103,11 @@ type Result<T, E> = | Ok(value: T) | Err(err: E)   // Result<T> defaults E = err
 ```
 
 - Absence → `Option<T>` (`Some(x)` / `None`). Failure → `Result<T, E>`.
-- Consume by `match`, or the total methods `isSome`/`isNone`/`unwrapOr`
-  (Option) and `isOk`/`isErr`/`unwrapOr`/`mapErr` (Result). ⚠ **No `.map`, no
-  panicking `.unwrap`** in v1 — use `match` or `try`.
+- Consume by `match`, or the total methods `isSome`/`isNone`/`unwrapOr`/`map`
+  (Option) and `isOk`/`isErr`/`unwrapOr`/`map`/`mapErr` (Result). `map`
+  transforms the `Some`/`Ok` payload (`None`/`Err` passes through); `mapErr`
+  transforms the `Err`. ⚠ **No panicking `.unwrap`** in v1 — use `match`,
+  `try`, or `unwrapOr`.
 
 **Error propagation** — three tools (canonical example: `error_handling`):
 

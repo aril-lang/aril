@@ -492,6 +492,15 @@ func (c *checker) inferCall(call *ast.Call) Type {
 	if c.isMapErrArityMiss(call) {
 		c.report("E0202", "Wrong arity in call to mapErr: expects 1 argument (a handler `(e) => …`), got "+strconv.Itoa(len(call.Args)), call.Span)
 	}
+	// `x.map(f)` — the payload-mapping combinator for Option/Result. Its result
+	// type depends on the mapper's return U (like mapErr's E2), so it is typed
+	// here rather than as a fixed containerMethodType Func.
+	if rt, handled := c.inferMap(call); handled {
+		return rt
+	}
+	if c.isMapArityMiss(call) {
+		c.report("E0202", "Wrong arity in call to map: expects 1 argument (a mapper `(x) => ...`), got "+strconv.Itoa(len(call.Args)), call.Span)
+	}
 	args := make([]Type, len(call.Args))
 	for i, a := range call.Args {
 		args[i] = c.inferExpr(a)
@@ -641,6 +650,63 @@ func (c *checker) isMapErrArityMiss(call *ast.Call) bool {
 	}
 	_, ok = c.info.Type[f.Receiver].(*Result)
 	return ok
+}
+
+// inferMap types `x.map(f)` — the payload-mapping combinator for Option and
+// Result (builtins.md §Option/§Result methods, the Some/Ok-side mirror of
+// mapErr). The mapper `f: (T) => U` transforms the payload; None/Err passes
+// through unchanged. `Option<T>.map` yields `Option<U>`, `Result<T, E>.map`
+// yields `Result<U, E>`, with U read from the mapper's inferred return. The
+// receiver was already typed by inferCall's callee walk, so it is read from
+// cache. Returns (resultType, true) when handled; (nil, false) otherwise —
+// non-Option/Result receivers fall through to the ordinary member path.
+func (c *checker) inferMap(call *ast.Call) (Type, bool) {
+	f, ok := call.Callee.(*ast.Field)
+	if !ok || f.Name != "map" || len(call.Args) != 1 {
+		return nil, false
+	}
+	var payload Type
+	switch r := c.info.Type[f.Receiver].(type) {
+	case *Option:
+		payload = r.T
+	case *Result:
+		payload = r.T
+	default:
+		return nil, false
+	}
+	// Pre-type an unannotated mapper param as the receiver's payload, so its
+	// body checks against the real type (mirrors inferResultMapErr).
+	if cl, ok := call.Args[0].(*ast.ClosureLit); ok {
+		c.closureExpect[cl] = &Func{Params: []Type{payload}, Return: &Unknown{}}
+	}
+	argT := c.inferExpr(call.Args[0])
+	u := Type(&Unknown{})
+	if fn, ok := argT.(*Func); ok && fn.Return != nil {
+		u = fn.Return
+	}
+	switch r := c.info.Type[f.Receiver].(type) {
+	case *Option:
+		return &Option{T: u}, true
+	case *Result:
+		return &Result{T: u, E: r.E}, true
+	}
+	return nil, false
+}
+
+// isMapArityMiss reports whether call is `x.map(...)` on an Option/Result
+// receiver with an argument count other than 1 — the shape inferMap does not
+// claim. Mirrors isMapErrArityMiss; catches the 0-/2+-arg misuse before it
+// leaks a go/types error from the OptionMap/ResultMap helper.
+func (c *checker) isMapArityMiss(call *ast.Call) bool {
+	f, ok := call.Callee.(*ast.Field)
+	if !ok || f.Name != "map" || len(call.Args) == 1 {
+		return false
+	}
+	switch c.info.Type[f.Receiver].(type) {
+	case *Option, *Result:
+		return true
+	}
+	return false
 }
 
 // staticMethodType returns the Func type of a user-class static method
