@@ -93,6 +93,14 @@ type Stack struct{ Elem Type }
 func (*Stack) typeMarker()      {}
 func (s *Stack) String() string { return "Stack<" + s.Elem.String() + ">" }
 
+// List — `List<T>`, the growable, indexable reference sequence. Mutating
+// methods mutate in place; the value primitive `[]T` (Slice) keeps only
+// pure accessors (builtins.md §List, D55).
+type List struct{ Elem Type }
+
+func (*List) typeMarker()      {}
+func (l *List) String() string { return "List<" + l.Elem.String() + ">" }
+
 // Result — `Result<T, E>`, the predeclared value/error sum. Payload
 // types feed match bindings: `Ok(v): T`, `Err(e): E` (builtins.md
 // §Result). Equality is structural over the components.
@@ -269,6 +277,9 @@ func equal(a, b Type) bool {
 	case *Stack:
 		y, ok := b.(*Stack)
 		return ok && equal(x.Elem, y.Elem)
+	case *List:
+		y, ok := b.(*List)
+		return ok && equal(x.Elem, y.Elem)
 	case *AtomicPtr:
 		y, ok := b.(*AtomicPtr)
 		return ok && equal(x.Elem, y.Elem)
@@ -346,7 +357,7 @@ func comparable(t Type) bool {
 			}
 		}
 		return true
-	case *Slice, *Map, *Set, *Stack, *Channel, *SendChan, *RecvChan, *Func, *Never, *Result, *Option, *AtomicPtr:
+	case *Slice, *Map, *Set, *Stack, *List, *Channel, *SendChan, *RecvChan, *Func, *Never, *Result, *Option, *AtomicPtr:
 		// Result / Option are matched, not compared with `==` in v1
 		// (their payloads may themselves be non-comparable). An atomic
 		// cell is mutated via its methods, never compared.

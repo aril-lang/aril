@@ -476,12 +476,19 @@ Invariants:
 
 - `kind == Record`  ⇒ every `entries[i]` is a `RecordEntry`.
 - `kind == Map`     ⇒ every `entries[i]` is a `MapEntry`.
-- `kind == Set`     ⇒ every `entries[i]` is a `SetEntry`.
+- `kind == Set`     ⇒ every `entries[i]` is a `SetEntry`. A
+  `List<T>{ e_1, ..., e_n }` literal shares this shape — its
+  bare-value entries also parse as `SetEntry`, so the parser
+  commits it to `Set` kind. `List` has **no** dedicated `BraceKind`;
+  sema/codegen dispatch `Set` vs `List` (rules `T-Set-Lit` /
+  `T-List-Lit`) on `type_name`, not on `kind`. Unlike `Stack`, a
+  `List` literal *may* be non-empty (each entry is type-checked
+  against `T`, `T-List-Lit`).
 - `kind == Stack`   ⇒ `entries.len() == 0` (`Stack<T>{}` is
   always empty; non-empty stacks come from `push`).
 - `kind == Unknown` ⇒ `entries.len() == 0`; sema resolves it from
-  `type_name`: an empty `Map`/`Set`/`Stack` container, or — when
-  `type_name` names a **class or record** — an empty (zero-value)
+  `type_name`: an empty `Map`/`Set`/`Stack`/`List` container, or —
+  when `type_name` names a **class or record** — an empty (zero-value)
   construction `T{}`, typed as `T` (consistent with a partial record
   literal, which already zero-fills omitted fields).
 

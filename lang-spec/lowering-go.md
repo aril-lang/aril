@@ -19,7 +19,7 @@ canonical `GO` / `STDOUT` / `EXIT` sections in fixtures).
 
 The runtime is the **`arilrt`** package — the single source of truth
 for the helpers codegen depends on (Option/Result and their boundary
-lifts, the Map/Set/Stack containers, the stdin scan helpers, the
+lifts, the Map/Set/Stack/List containers, the stdin scan helpers, the
 structured-concurrency group, the JSON round-trip, and the reflection
 layer). Codegen emits one of two forms, selectable per command:
 
@@ -254,12 +254,44 @@ type Set[T comparable] struct {
 type Stack[T any] struct {
     xs []T
 }
+
+type List[T any] struct {
+    xs []T
+}
 ```
 
 Method bodies for these types live in the `arilrt` package
 (`containers.go`). The codegen pass calls them by Go-qualified name; e.g.,
 `m.set(k, v)` in Aril IR lowers to `m.Set(k, v)` in Go (note
 the capital — runtime methods are exported).
+
+**`List<T>` — the reference-backed sequence.** `List<T>` lowers to a
+**pointer** to the wrapper — `*arilrt.List[T]` (vendored) / `*List[T]`
+(inline) — so it is shared by reference and never copied (like a class,
+and unlike the value-view slice `[]T`). Its exported method set:
+
+```go
+func NewList[T any]() *List[T]              // List<T>{} / List<T>.new()
+func ListOf[T any](xs ...T) *List[T]        // List<T>{a, b, c}
+func (l *List[T]) Len() int
+func (l *List[T]) Push(e T)                 // l.xs = append(l.xs, e) — mutates in place
+func (l *List[T]) At(i int) T               // raw index — panics out of range; backs l[i]
+func (l *List[T]) Get(i int) Option[T]      // bounds-checked — None out of range
+func (l *List[T]) Set(i int, e T)
+func (l *List[T]) Pop() Option[T]           // None on empty
+func (l *List[T]) Insert(i int, e T)
+func (l *List[T]) RemoveAt(i int) Option[T] // None out of range
+func (l *List[T]) ToSlice() []T             // a COPY of the backing slice
+```
+
+The Aril→Go method map is the usual capitalisation (`l.push(e)` →
+`l.Push(e)`, `l.removeAt(i)` → `l.RemoveAt(i)`, …). `Push` is
+append-in-place (`l.xs = append(l.xs, e)`) on the pointer receiver, so
+the append is visible through every alias — the honest-mutation contract
+(`builtins.md` §List). The index read `l[i]` lowers to `l.At(i)` (a raw
+Go slice index inside the wrapper, panicking out of range — the parallel
+of the slice `s[i]` → `s[i]` and map `m[k]` → `m.At(k)` forms); the
+`Option`-returning safe form is `l.get(i)` → `l.Get(i)`.
 
 **atomic.Pointer<T> — the generic atomic reference cell.** A first-class
 generic builtin (modelled like `Map`/`Set`, not a value-handle row), it lowers
@@ -312,6 +344,10 @@ Empty-state semantics (per `builtins.md`):
 - `Stack.new()`: `&Stack[T]{xs: nil}`. `Stack.pop()` returns
   `Result[T, error]` with the canonical empty-stack error
   (`arilrt.NewError("empty stack")`).
+- `List.new()`: `NewList[T]()` → `&List[T]{xs: nil}`. Pointer
+  receiver — `Push`/`Set`/`Insert`/`RemoveAt` mutate in place.
+  `List.pop()` / `.get(i)` / `.removeAt(i)` return `Option[T]`
+  (`None` = empty / out-of-range — no error value, unlike `Stack.pop`).
 
 **Container brace literals** (`Set<int>{1,2}`, `Map<K,V>{}`) lower to
 the same constructors, so the brace form and the `.new()` / `.from()`
@@ -326,6 +362,11 @@ form share one Go representation:
   — keeping the literal a single Go expression.
 - `Stack<T>{}` → `stackNew[T]()`. A `Stack` literal is always empty
   (`ast.md §BraceLit`); entries are a sema error.
+- `List<T>{}` → `NewList[T]()`. A non-empty `List<T>{a, b, c}` →
+  `ListOf[T](a, b, c)` — the elements pass straight to the variadic
+  constructor (no insertion IIFE needed, unlike `Map`), so both forms
+  stay single Go expressions. (Its entries parse as `SetEntry`;
+  `List` is dispatched from the type name, `ast.md §BraceLit`.)
 - An empty `T{}` where `T` names a **class or record** is zero-value
   construction: `&T{}` (class — reference type) / `T{}` (record). A
   fieldless class is the canonical behaviour-only interface implementor
@@ -962,6 +1003,18 @@ ForMapIR { iter: m : Map<K,V>, bind: (k, v), body: B }
 ForSetIR { iter: s : Set<T>, bind: x, body: B }
                                        ⟿
   for _, x := range s.Order() {               // insertion order
+    <lowering of B>
+  }
+
+ForListIR { iter: l : List<T>, bind: x, body: B, indexed: false }
+                                       ⟿
+  for _, x := range l.ToSlice() {             // ToSlice() copies the backing
+    <lowering of B>                           //  slice (index order)
+  }
+
+ForListIR { iter: l : List<T>, bind: (i, x), body: B, indexed: true }
+                                       ⟿
+  for i, x := range l.ToSlice() {
     <lowering of B>
   }
 

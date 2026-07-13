@@ -92,6 +92,10 @@ func unifyArg(param, arg Type, subst map[string]Type) {
 		if a, ok := arg.(*Stack); ok {
 			unifyArg(p.Elem, a.Elem, subst)
 		}
+	case *List:
+		if a, ok := arg.(*List); ok {
+			unifyArg(p.Elem, a.Elem, subst)
+		}
 	case *AtomicPtr:
 		if a, ok := arg.(*AtomicPtr); ok {
 			unifyArg(p.Elem, a.Elem, subst)
@@ -116,6 +120,8 @@ func substitute(t Type, subst map[string]Type) Type {
 		return &Set{Elem: substitute(x.Elem, subst)}
 	case *Stack:
 		return &Stack{Elem: substitute(x.Elem, subst)}
+	case *List:
+		return &List{Elem: substitute(x.Elem, subst)}
 	case *AtomicPtr:
 		return &AtomicPtr{Elem: substitute(x.Elem, subst)}
 	case *Func:

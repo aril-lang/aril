@@ -81,7 +81,9 @@ conceptually splits into eight stages applied in this order
    errgroup binding, context derivation, and trailing-expression
    Ok-wrap.
 7. **BraceLit canonicalisation** — `Map<K, V>{}` and friends
-   become explicit `Map.new()` / `.set(...)` / ... call chains.
+   become explicit `Map.new()` / `.set(...)` / ... call chains
+   (a `List<T>{...}` collapses instead to a single `ListOf`
+   constructor call).
 8. **For-loop normalisation** — `for x in iter` rewrites to a
    canonical iterator-protocol form depending on the iter type.
 
@@ -450,11 +452,26 @@ expression context is preserved).
   Block { ...                                         (analogous; Stack.new<T>(),
                                                        .push per element)
         }
+
+[[ BraceLit { kind: Set (type_name = List<T>), entries: [e_1, ..., e_n] } ]]
+                                                      ⟿
+  Call { callee: Ident ListOf, type_args: [T],        (a single variadic
+         args: [e_1, ..., e_n] }                       constructor call — NOT
+                                                       a `.push`-per-element
+                                                       Block; the empty case is
+                                                       `NewList<T>()`)
 ```
+
+`List` differs from `Map`/`Set`/`Stack`: its variadic constructor
+`ListOf<T>(...)` takes the elements directly, so the literal stays a
+single call rather than expanding to a mutation chain. (Its entries
+parse as `SetEntry` and `kind == Set`; `List` is dispatched from
+`type_name` — `ast.md §BraceLit`.)
 
 The empty case (`n == 0`) collapses to a `Block` with one
 `LetStmt` and a trailing `Var` — no `.set` / `.add` / `.push`
-statements. The IR shape is identical at the structural level.
+statements (for `List`, to a bare `NewList<T>()` call). The IR
+shape is identical at the structural level.
 
 `BraceLit { kind: Record R, ... }` keeps its shape — record
 literals are a single struct-construction, not a chain of
@@ -518,6 +535,16 @@ constructions; container-literal nodes are gone.
   ForSetIR { iter, bind: pat, elem_ty: T }
 
 [[ ForStmt { pat, iter } ]]
+  where iter : List<T>  and  pat is not a 2-tuple
+                                                      ⟿
+  ForListIR { iter, bind: pat, elem_ty: T, indexed: false }
+
+[[ ForStmt { pat: TuplePat{ [pat_i, pat_v] }, iter } ]]
+  where iter : List<T>
+                                                      ⟿
+  ForListIR { iter, bind: TuplePat{ [pat_i, pat_v] }, elem_ty: T, indexed: true }
+
+[[ ForStmt { pat, iter } ]]
   where iter : RecvChan<T>
                                                       ⟿
   ForChanIR { iter, bind: pat, elem_ty: T }
@@ -557,14 +584,16 @@ strings, maps, and channels.
 The IR after all stages contains:
 
 - **Expressions**: every AST `Expr` variant *except*
-  `TryExpr`, `MatchExpr`, and `BraceLit { kind: Map|Set|Stack }`.
+  `TryExpr`, `MatchExpr`, and `BraceLit { kind: Map|Set|Stack }`
+  (a `List<T>{...}` — a `kind: Set` BraceLit dispatched from
+  `type_name` — is likewise canonicalised away, to a `ListOf` call).
   `VariantExpr` remains in its **fully-typed** form (Stage 3
   promoted implicit Call/Ident shapes to typed `VariantExpr`).
   The new IR-only forms are: `MatchIR` (with
   `BranchIR.tag ∈ {VariantTag, LiteralValue}`), `ScopeIR`,
   `SpawnIR`, `ForRangeIR` (with optional `str_runes: bool` flag
-  for string iteration), `ForMapIR`, `ForSetIR`, `ForChanIR`,
-  `TopContextExpr` (background context), `UnreachableIR`.
+  for string iteration), `ForMapIR`, `ForSetIR`, `ForListIR`,
+  `ForChanIR`, `TopContextExpr` (background context), `UnreachableIR`.
 - **Statements**: same as AST but with the additions above and
   with implicit-receiver expansion baked in.
 - **Decls**: unchanged from AST.

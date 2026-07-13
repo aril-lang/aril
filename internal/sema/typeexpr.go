@@ -136,6 +136,11 @@ func (c *checker) namedTypeToType(v *ast.NamedType, seen map[string]bool) Type {
 				return &Stack{Elem: c.typeFromExprSeen(v.Args[0], seen)}
 			}
 			return &Unknown{}
+		case "List":
+			if len(v.Args) == 1 {
+				return &List{Elem: c.typeFromExprSeen(v.Args[0], seen)}
+			}
+			return &Unknown{}
 		case "Channel":
 			if len(v.Args) == 1 {
 				return &Channel{Elem: c.typeFromExprSeen(v.Args[0], seen)}

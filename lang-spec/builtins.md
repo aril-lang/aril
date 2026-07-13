@@ -330,6 +330,57 @@ Stack values are **not iterable** in v1 — there is no
 needs ordered iteration, drain by popping in a loop until
 `len() == 0`.
 
+## List
+
+```
+class List<T> {
+  static new(): List<T>
+
+  len(): int
+  push(e: T): unit                 [append in place — mutates the receiver]
+  pop(): Option<T>                 [remove+return the last element; None on empty]
+  get(i: int): Option<T>           [total — bounds-checked read; None if i out of range]
+  set(i: int, e: T): unit          [index write — mutates]
+  insert(i: int, e: T): unit       [insert at index i, shifting the tail right — mutates]
+  removeAt(i: int): Option<T>      [remove+return the element at i; None if out of range — mutates]
+  toSlice(): []T                   [a COPY of the backing slice — the List → []T value-view bridge]
+}
+```
+
+`List<T>` is the **growable, indexable reference-backed sequence** —
+the honest mutable container. It is a **reference type** (a pointer,
+shared by reference, never copied — the same machinery as
+`Stack`/`Map`/`Set`), so a mutating method (`push`, `set`, `insert`,
+`removeAt`) alters the value every alias sees; no reassignment
+(`l = l.push(e)`) is needed.
+
+This is the deliberate counterpart to the slice `[]T` (§Slice methods),
+a **value view** whose `push` returns a *new* header. The governing
+invariant: a mutating-looking method must actually mutate — so the
+in-place operations live on `List` (a reference container), while `[]T`
+keeps pure, header-returning accessors. (The Rust `Vec` / slice split.)
+
+The brace literal form is `List<T>{ e_1, ..., e_n }` (`T-List-Lit`) —
+elements in left-to-right order. Unlike `Stack<T>{}` (which must be
+empty), a `List` literal accepts and type-checks each entry against `T`;
+a mismatched element fires **E0201** (list element is X, expected Y).
+
+`pop()` returns `Option<T>` (`None` on empty — the Rust `Vec::pop`
+shape), **not** `Stack`'s `Result<T, error>`: dropping the last element
+of a list is an ordinary, non-exceptional query, so the empty case is
+`None` rather than a propagated error. `get` / `removeAt` are likewise
+`Option`-returning on an out-of-range index.
+
+Index read `l[i]: T` (`T-Index-List`) is the raw, bounds-panicking form
+(Go/TS index semantics — runtime panic when `i` is out of range);
+`l.get(i): Option<T>` is the total, `None`-returning safe form. There is
+no `l[i] = v` index-assignment form in v1 — use `l.set(i, e)`.
+
+Iteration: `for x in l { ... }` (`IterElem(List<T>) = T`), or
+`for (i, x) in l { ... }` (`(int, T)` — indexed). Unlike `Stack`
+(deliberately non-iterable), a `List` **is** iterable — it is a
+sequence.
+
 ## Channel
 
 ```
@@ -387,7 +438,7 @@ boxing helpers in their binary; reflection-free programs are
 unaffected.
 
 Unlike the container builtins above (`Map`, `Set`, `Stack`,
-`Channel`), `reflect` is a module of free functions rather than
+`List`, `Channel`), `reflect` is a module of free functions rather than
 a class — the surface is documented as **Types**, **Functions**,
 and **Constraints** subsections below rather than as a single
 `class` block.
@@ -607,6 +658,8 @@ extensibility — user types cannot opt in in v1.
 ```
 IterElem : Type → Type
   []T              → T                            [or (int, T) if pat is 2-tuple]
+  List<T>          → T                            [or (int, T) if pat is 2-tuple —
+                                                    a sequence, iterates in index order]
   string           → rune                         [UTF-8 codepoint iteration; matches
                                                     Go's `for _, r := range s`]
   Map<K, V>        → (K, V)                       [insertion order]
@@ -666,6 +719,7 @@ sketch below for reviewers' orientation:
 | `Map<K, V>` | wrapper around `map[K]V` plus `[]K` for insertion-order |
 | `Set<T>` | wrapper around `map[T]struct{}` plus `[]T` for order |
 | `Stack<T>` | wrapper around `[]T` with `len`-based push/pop; `pop()` checks length and returns `Err` on empty |
+| `List<T>` | pointer to a wrapper around `[]T`; `l.push(e)` appends **in place** (`l.xs = append(l.xs, e)`); `l[i]` lowers to `l.At(i)` (raw index, panics out of range); `l.get(i)` to the `Option`-returning `.Get(i)` |
 | `Channel<T>` | `chan T` |
 | `SendChan<T>` | `chan<- T` |
 | `RecvChan<T>` | `<-chan T` |

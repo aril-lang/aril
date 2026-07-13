@@ -606,7 +606,7 @@ PrimaryExpr  = Literal
              | "(" Expr ")"
              | TupleLit
              | SliceLit
-             | BraceLit                              // RecordLit / MapLit / SetLit / StackLit — disambiguated by content (see below)
+             | BraceLit                              // RecordLit / MapLit / SetLit / StackLit / ListLit — disambiguated by content (see below)
              | Block                                 // block-as-expression
              | IfExpr
              | MatchExpr
@@ -643,10 +643,12 @@ SliceLit     = "[" Newline? ( Expr ( "," Newline? Expr )* ","? Newline? )? "]"
              | SliceType "{" Newline? ( Expr ( "," Newline? Expr )* ","? Newline? )? "}"
              ;
 
-// BraceLit covers RecordLit / MapLit / SetLit / StackLit — all share
-// the `NamedType "{" ... "}"` prefix, so the production must accept
+// BraceLit covers RecordLit / MapLit / SetLit / StackLit / ListLit — all
+// share the `NamedType "{" ... "}"` prefix, so the production must accept
 // any of the entry shapes and let the parser commit on the first
-// entry.
+// entry. A ListLit (`List<T>{a, b, c}`) uses the SetEntry shape (bare
+// values), so the parser commits it to Set mode and sema/codegen
+// dispatch List vs Set from the type name (ast.md §BraceLit).
 BraceLit      = NamedType "{" Newline? BraceLitBody? "}" ;
 BraceLitBody  = RecordEntry ( "," Newline? RecordEntry )* ","? Newline?
               | MapEntry    ( "," Newline? MapEntry    )* ","? Newline?
@@ -662,10 +664,13 @@ SetEntry      = Expr ;                               // no `:` after — set ele
 // Parser-side disambiguation: with the first entry's first token,
 //   - `Ident ":"`                   → RecordEntry mode (continue with RecordEntry list).
 //   - `MapKey ":"`                  → MapEntry mode.
-//   - Anything else followed by `,`/`}` → SetEntry mode.
+//   - Anything else followed by `,`/`}` → SetEntry mode (a non-empty
+//                                       Set<T>{…} or List<T>{…}; sema/codegen
+//                                       pick List vs Set from the type name).
 //   - Empty `{}`                    → ambiguous at parse; type info from NamedType decides
 //                                       (RecordLit if all fields are `Option<_>`, StackLit
-//                                       for Stack<T>, empty Map / Set / etc. otherwise).
+//                                       for Stack<T>, ListLit for List<T>, empty Map / Set
+//                                       / etc. otherwise).
 
 ClosureLit   = "func" "(" ParamList? ")" ReturnAnnot? Block
              | "(" ShortParamList? ")" "=>" Expr        // short closure — type annotations optional

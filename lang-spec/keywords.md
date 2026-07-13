@@ -117,7 +117,7 @@ style) and is governed separately by the shadow diagnostics.
 - Types: `bool`, `int`, `int8`..`int64`, `uint`..`uint64`,
   `float32`, `float64`, `byte`, `rune`, `string`, `Any`,
   `Dynamic`, `error`.
-- Generic types: `Result`, `Option`, `Map`, `Set`, `Stack`,
+- Generic types: `Result`, `Option`, `Map`, `Set`, `Stack`, `List`,
   `Channel`, `SendChan`, `RecvChan`.
 - Variant constructors: `Ok`, `Err`, `Some`, `None`.
 - Functions: `panic`, `error`, `refEq`, `makeChannel`, `makeSlice`, `min`, `max`.

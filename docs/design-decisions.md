@@ -444,8 +444,8 @@ following appear outside `arilrt/reflect`:
 - A helper signature with `any` / `interface{}` parameter or
   return type where a Go type parameter would carry the static
   type through. Exception: the `Dynamic` payload field itself.
-- A `Map` / `Set` / `Stack` operation that resolves the element
-  type at runtime rather than via Go's compile-time generic
+- A `Map` / `Set` / `Stack` / `List` operation that resolves the
+  element type at runtime rather than via Go's compile-time generic
   monomorphisation.
 
 A PR exhibiting any of these patterns is presumed to break P1–P3
@@ -563,7 +563,7 @@ D18 established that Aril has a runtime and that it is part of the
 language contract. D26 makes it concrete: the runtime is a real,
 unit-tested Go package, **`arilrt`** — the single source of truth for
 the helpers the compiler's lowering depends on (Option/Result and their
-boundary lifts, the Map/Set/Stack containers, the stdin scan helpers,
+boundary lifts, the Map/Set/Stack/List containers, the stdin scan helpers,
 the structured-concurrency group, the JSON round-trip, and the
 reflection layer).
 
@@ -597,7 +597,7 @@ A user type declaration — `type`, `class`, `interface`, or `extern
 type` — may not reuse a built-in type name. That covers the primitives
 (`int`, `string`, `bool`, the sized integers, `float32`/`float64`,
 `byte`, `rune`), `error`, `Any`/`Dynamic`/`unit`/`Never`, and the
-built-in generics (`Result`, `Option`, `Map`, `Set`, `Stack`,
+built-in generics (`Result`, `Option`, `Map`, `Set`, `Stack`, `List`,
 `Channel`, `SendChan`, `RecvChan`). The compiler reports a single, clear
 error at the declaration site.
 

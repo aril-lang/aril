@@ -378,6 +378,8 @@ func iterSingleElem(t Type) Type {
 		return v.Elem
 	case *Set:
 		return v.Elem
+	case *List:
+		return v.Elem
 	case *Channel:
 		return v.Elem
 	case *RecvChan:
@@ -395,6 +397,8 @@ func iterSingleElem(t Type) Type {
 func iterPairElems(t Type) (Type, Type) {
 	switch v := t.(type) {
 	case *Slice:
+		return &Builtin{N: "int"}, v.Elem
+	case *List:
 		return &Builtin{N: "int"}, v.Elem
 	case *Map:
 		return v.Key, v.Val

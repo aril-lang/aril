@@ -99,9 +99,11 @@ method set. Required because Aril must faithfully represent types like
 `time.Duration` (a Go `type Duration int64` with methods). Syntax TBD;
 working placeholder `newtype UserId = string`.
 
-Generics use angle brackets: `List<T>`, `Map<string, int>`, `func<T>(...)`,
+Generics use angle brackets: `Box<T>`, `Map<string, int>`, `func<T>(...)`,
 `class LRU<K, V> { ... }`. Type parameters are unconstrained in v1
 (bounded generics — `<T extends Comparable>` — are park material).
+(`List<T>` is now a built-in container, not merely an illustration — see
+§Collections.)
 
 There is **no `any`**. Untyped dynamic values do not exist.
 
@@ -189,6 +191,38 @@ shadow each other.
   aliasing the original (e.g. the per-step working copy in a
   wavefront).
 - Iteration: `for v in s` (value), `for (i, v) in s` (index and value).
+
+### Lists: `List<T>`
+
+The **growable, indexable reference sequence** — the honest mutable
+counterpart to the slice `[]T`. Where a slice is a *value view* (its
+`.push` returns a new header, so you write `xs = xs.push(e)`), a `List`
+is a **reference type** (like a class): a mutating method changes the
+value in place, seen through every alias, with no reassignment. The rule
+of thumb — a mutating-looking method must actually mutate — is why the
+two coexist (the Rust `Vec` / slice split).
+
+- Construct empty: `List<T>{}` or `List<T>.new()`.
+- Literal with elements: `List<int>{ 1, 2, 3 }` — comma-separated values
+  without `:` (the same shape as a set literal; the type name selects
+  `List`). Each element is type-checked against `T`.
+- `l.push(e): unit` — append **in place** (mutates; no `l = …` needed).
+- `l.pop(): Option<T>` — remove and return the last element; `None` on
+  empty (the `Vec::pop` shape — *not* `Stack`'s `Result`).
+- `l.get(i): Option<T>` — bounds-checked read; `None` when out of range.
+- `l[i]: T` — raw index; out-of-bounds panics at the `.aril` site (the
+  honest raw operator, like a slice or TS index). Use `l.get(i)` for the
+  safe form.
+- `l.set(i, e): unit` — write at index `i` (mutates). There is **no**
+  `l[i] = v` index-assignment form in v1.
+- `l.insert(i, e): unit` — insert at index `i`, shifting the tail right.
+- `l.removeAt(i): Option<T>` — remove and return the element at `i`;
+  `None` when out of range.
+- `l.len(): int`.
+- `l.toSlice(): []T` — a copy of the backing slice; the bridge to a
+  bound-Go API that expects a `[]T`.
+- Iteration: `for x in l` (value), `for (i, x) in l` (index and value).
+  Unlike `Stack`, a `List` **is** iterable — it is a sequence.
 
 ### Maps: `Map<K, V>`
 

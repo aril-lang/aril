@@ -148,6 +148,7 @@ var predeclaredGenericArity = map[string]int{
 	"Map":      2,
 	"Set":      1,
 	"Stack":    1,
+	"List":     1,
 	"Channel":  1,
 	"SendChan": 1,
 	"RecvChan": 1,

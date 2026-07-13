@@ -88,6 +88,7 @@ features:
   for-indexed-slice:           "for (i, x) in []T"
   for-map:                     "for (k, v) in Map<K, V>"
   for-set:                     "for x in Set<T>"
+  for-list:                    "for x in List<T> / for (i, x) in List<T>"
   for-range:                   "for i in lo..hi or lo..=hi"
   for-string:                  "for r in str — rune iteration"
   for-channel:                 "for v in RecvChan<T>"
@@ -133,6 +134,13 @@ features:
   stack-literal:               "Stack<T>{} or Stack.new()"
   stack-push:                  "stk.push(e)"
   stack-pop:                   "stk.pop(): Result<T, error>"
+  list-literal:                "List<T>{} / List<T>{a, b, c} / List.new()"
+  list-push:                   "l.push(e): unit (mutates in place)"
+  list-pop:                    "l.pop(): Option<T>"
+  list-index:                  "l[i]: T (raw read) / l.get(i): Option<T>"
+  list-len:                    "l.len(): int"
+  list-insert:                 "l.insert(i, e) / l.set(i, e) / l.removeAt(i): Option<T>"
+  list-to-slice:               "l.toSlice(): []T (List → value-view bridge)"
 
   # ── Concurrency ──────────────────────────────────────────
   scope-block:                 "scope<T, error> { ... }"

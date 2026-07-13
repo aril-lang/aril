@@ -628,6 +628,66 @@ type arilEmptyStackError struct{}
 func (arilEmptyStackError) Error() string { return "empty stack" }
 `)
 	}
+	if g.usesList {
+		g.b.WriteString(`type List[T any] struct {
+	xs []T
+}
+func NewList[T any]() *List[T] {
+	return &List[T]{xs: nil}
+}
+func ListOf[T any](elems ...T) *List[T] {
+	xs := make([]T, len(elems))
+	copy(xs, elems)
+	return &List[T]{xs: xs}
+}
+func (l *List[T]) Len() int { return len(l.xs) }
+func (l *List[T]) Push(e T) {
+	l.xs = append(l.xs, e)
+}
+func (l *List[T]) At(i int) T { return l.xs[i] }
+func (l *List[T]) Get(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	return Option[T]{Tag: 1, V: l.xs[i]}
+}
+func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
+func (l *List[T]) Pop() Option[T] {
+	n := len(l.xs)
+	if n == 0 {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[n-1]
+	l.xs = l.xs[:n-1]
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) Insert(i int, e T) {
+	if i < 0 {
+		i = 0
+	}
+	if i > len(l.xs) {
+		i = len(l.xs)
+	}
+	var zero T
+	l.xs = append(l.xs, zero)
+	copy(l.xs[i+1:], l.xs[i:])
+	l.xs[i] = e
+}
+func (l *List[T]) RemoveAt(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[i]
+	l.xs = append(l.xs[:i], l.xs[i+1:]...)
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) ToSlice() []T {
+	out := make([]T, len(l.xs))
+	copy(out, l.xs)
+	return out
+}
+`)
+	}
 }
 
 // predeclaredPayloadField returns the Go-side struct field name
@@ -673,6 +733,8 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 					g.usesSet = true
 				case "Stack":
 					g.usesStack = true
+				case "List":
+					g.usesList = true
 				}
 				// A handle named in a type position (a param / return /
 				// field annotation) lowers to `*pkg.Sym` and so needs the
@@ -699,6 +761,8 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 				g.usesSet = true
 			case "Stack":
 				g.usesStack = true
+			case "List":
+				g.usesList = true
 			case "reflect":
 				g.usesReflect = true
 			case "makeSlice":

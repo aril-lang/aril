@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 98,
+    "total": 99,
     "parse_fail": 0,
     "sema_fail": 0,
     "emit_fail": 0,
-    "build_ok": 98,
+    "build_ok": 99,
     "diag_ok": 122,
     "diag_total": 122,
-    "run_ok": 98,
-    "run_total": 98
+    "run_ok": 99,
+    "run_total": 99
   },
   "files": [
     {
@@ -189,6 +189,11 @@
     },
     {
       "path": "examples/core-language/leetcode_3131/leetcode_3131.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/core-language/list_demo/list_demo.aril",
       "stage": "build",
       "blocker": ""
     },

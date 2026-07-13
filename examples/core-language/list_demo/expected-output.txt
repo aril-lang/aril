@@ -1,0 +1,6 @@
+count: 6
+dropped: -2
+first: 100
+sum: 130
+popped: 10
+len: 5
