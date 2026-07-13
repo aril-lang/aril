@@ -137,8 +137,10 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
 - Slice `xs.push(e)` **returns a new slice** (does not mutate): write
   `xs = xs.push(e)`; discarding the result is an error (E0215). ⚠ (`Stack.push`
   *does* mutate — the asymmetry is deliberate.)
-- `m[k]` on a `Map` returns the **zero value** on a miss (Go semantics); the
-  safe form is `m.get(k): Option<V>`.
+- `m[k]` on a `Map` returns the **zero value** on a miss (Go semantics) — it
+  *cannot* tell "absent" from "present with the zero value". The honest forms:
+  `m.has(k): bool` (presence) and `m.get(k): Option<V>` (`Some(v)` / `None`).
+  Also `m.set(k, v)`, `m.delete(k)`, `m.keys()`, `m.values()`, `m.len()`.
 - `==` compares tuples/records **field-wise**, but ⚠ **not class instances**
   (E0401 — use `refEq(a, b)`). ⚠ Records are **nominal named types** in v1: two
   same-shape records (`A`, `B`) are *not* interchangeable (E0201), unlike TS.
@@ -213,7 +215,7 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `try { } catch { }` block | `try` is prefix (`?`); `catch` is postfix + **must diverge** |
 | `throw` / exceptions | none — `Result<T, E>` |
 | `arr.push(x)` mutates | slice `push` **returns a new slice**; `xs = xs.push(x)` |
-| `map[k]` → undefined on miss | zero value; use `m.get(k): Option<V>` |
+| `map[k]` → undefined on miss | zero value; use `m.has(k): bool` / `m.get(k): Option<V>` |
 | `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples compare field-wise |
 | same-shape records interchangeable | nominal named types — `A` ≠ `B` (E0201) |
 | `Number(s)` / `int(s)` | `strconv.atoi(s): Result<int,error>` (E0205 on a cast) |
