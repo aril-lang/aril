@@ -469,6 +469,10 @@ type gen struct {
 	// usesMapErr — r.mapErr(f) lowers to the MapErr helper (a free function,
 	// since a Go method cannot introduce the fresh E2 type param).
 	usesMapErr bool
+	// usesResultMap / usesOptionMap — r.map(f) / o.map(f) lower to the
+	// ResultMap / OptionMap helpers (free functions, for the fresh U type param).
+	usesResultMap bool
+	usesOptionMap bool
 	// usesSlicesDedup — slices.dedup(xs) lowers to the SlicesDedup helper.
 	usesSlicesDedup bool
 	// usesBigInt — the `big` value-handle (BigInt) is used, so its runtime
@@ -678,7 +682,7 @@ func (g *gen) usesRuntime() bool {
 		g.usesMakeSlice || g.usesScan || g.usesScan2 || g.usesScan3 ||
 		g.usesResultOf || g.usesResultUnit || g.usesJSONParse || g.usesTryRecv ||
 		g.usesScope || g.usesSortSorted || g.usesSlicesReverse || g.usesSortedBy || g.usesSlicesDedup || g.usesChanContract ||
-		g.usesBigInt || g.usesMapErr || g.usesErrorsAs
+		g.usesBigInt || g.usesMapErr || g.usesResultMap || g.usesOptionMap || g.usesErrorsAs
 }
 
 func (g *gen) writeHeader(f *ast.File) {
@@ -840,6 +844,8 @@ func (g *gen) writeHeader(f *ast.File) {
 	g.writePredeclaredMakeSlice()
 	g.writePredeclaredResultOf()
 	g.writePredeclaredMapErr()
+	g.writePredeclaredResultMap()
+	g.writePredeclaredOptionMap()
 	g.writePredeclaredResultUnit()
 	g.writePredeclaredOptionOf()
 	g.writePredeclaredErrorsAs()

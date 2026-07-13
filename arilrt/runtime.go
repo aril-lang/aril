@@ -34,6 +34,17 @@ func (o Option[T]) UnwrapOr(fallback T) T {
 	return fallback
 }
 
+// OptionMap transforms the Some payload T→U (leaving None untouched), so the
+// value keeps flowing as an Option (builtins.md §Option methods). A free
+// function, not a method: a Go method cannot introduce the fresh U type
+// parameter, though the Aril surface spells it `o.map(f)`.
+func OptionMap[T any, U any](o Option[T], f func(T) U) Option[U] {
+	if o.Tag == 1 {
+		return Option[U]{Tag: 1, V: f(o.V)}
+	}
+	return Option[U]{Tag: 0}
+}
+
 // Result is the predeclared fallible sum: Tag 0 = Ok(V), Tag 1 = Err(E).
 type Result[T any, E any] struct {
 	Tag uint8
@@ -71,6 +82,17 @@ func MapErr[T any, E any, E2 any](r Result[T, E], f func(E) E2) Result[T, E2] {
 		return Result[T, E2]{Tag: 1, E: f(r.E)}
 	}
 	return Result[T, E2]{Tag: 0, V: r.V}
+}
+
+// ResultMap transforms the Ok payload T→U (leaving an Err untouched), so the
+// value keeps flowing as a Result (builtins.md §Result methods) — the Ok-side
+// mirror of MapErr. A free function, not a method (the fresh U type parameter),
+// though the Aril surface spells it `r.map(f)`.
+func ResultMap[T any, E any, U any](r Result[T, E], f func(T) U) Result[U, E] {
+	if r.Tag == 0 {
+		return Result[U, E]{Tag: 0, V: f(r.V)}
+	}
+	return Result[U, E]{Tag: 1, E: r.E}
 }
 
 // ResultOf folds a Go (T, error) pair into Result<T, error>: a non-nil

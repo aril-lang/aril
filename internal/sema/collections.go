@@ -405,16 +405,21 @@ func containerMethodType(recv Type, name string) *Func {
 //   - a primitive `*Builtin` with a closed method set (numeric/bool: no methods;
 //     string: len/bytes/runes; error: error() — the last two resolved above).
 //
-// `mapErr` on a Result is spared: it is a real method typed in inferCall (its E2
-// result is dynamic), not in containerMethodType. A `*Named`, a bare type
+// `mapErr` / `map` on a Result and `map` on an Option are spared: they are real
+// methods typed in inferCall (their E2/U result is dynamic), not in
+// containerMethodType. A `*Named`, a bare type
 // parameter, `Unknown`, `Any`, or `Dynamic` is NOT covered — its member set is
 // not fully known here (sound over complete, D38).
 func builtinMemberMiss(recv Type, name string) bool {
 	switch r := recv.(type) {
-	case *Map, *Set, *Stack, *Slice, *Option, *Channel, *SendChan, *RecvChan, *AtomicPtr:
+	case *Map, *Set, *Stack, *Slice, *Channel, *SendChan, *RecvChan, *AtomicPtr:
 		return true
+	case *Option:
+		// `map` is a real method typed in inferMap (its U result is dynamic),
+		// not in containerMethodType — spare it from the unknown-member miss.
+		return name != "map"
 	case *Result:
-		return name != "mapErr"
+		return name != "mapErr" && name != "map"
 	case *Builtin:
 		return isClosedMethodSetPrimitive(r.N)
 	}

@@ -33,6 +33,29 @@ func TestMapErr(t *testing.T) {
 	}
 }
 
+func TestResultMap(t *testing.T) {
+	// Ok payload is transformed T→U; Err is passed through untouched (its E
+	// preserved, the new U zero-valued). Mirror of MapErr.
+	okIn := ResultOk[int, string](3)
+	if got := ResultMap(okIn, func(v int) int { return v * 2 }); got.Tag != 0 || got.V != 6 {
+		t.Fatalf("ResultMap ok: %+v", got)
+	}
+	errIn := ResultErr[int, string]("boom")
+	if got := ResultMap(errIn, func(v int) int { return v * 2 }); got.Tag != 1 || got.E != "boom" {
+		t.Fatalf("ResultMap err: %+v", got)
+	}
+}
+
+func TestOptionMap(t *testing.T) {
+	// Some payload is transformed T→U; None is passed through untouched.
+	if got := OptionMap(OptionSome(3), func(v int) bool { return v > 0 }); got.Tag != 1 || got.V != true {
+		t.Fatalf("OptionMap some: %+v", got)
+	}
+	if got := OptionMap(OptionNone[int](), func(v int) bool { return v > 0 }); got.Tag != 0 {
+		t.Fatalf("OptionMap none: %+v", got)
+	}
+}
+
 func TestResultOfUnit(t *testing.T) {
 	// ResultOf folds (value, nil) → Ok, (zero, err) → Err.
 	if got := ResultOf(42, error(nil)); got.Tag != 0 || got.V != 42 {

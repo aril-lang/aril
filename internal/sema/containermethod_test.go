@@ -194,3 +194,40 @@ func TestResultMapErrHandlerParamTypedAsError(t *testing.T) {
 		t.Errorf("expected clean (mapErr handler param string), got %v", codes)
 	}
 }
+
+// Result.map transforms the Ok payload T→U (Err's E preserved), the new U read
+// from the mapper's return: `(x: int) => string` on Result<int, string> yields
+// Result<string, string>.
+func TestResultMapTypesNewOkPayload(t *testing.T) {
+	src := `func f(r: Result<int, string>) {
+  let x = r.map((v) => "n=" + v.toString())
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "x"); got == nil || got.String() != "Result<string, string>" {
+		t.Errorf("map result = %v; want Result<string, string>", got)
+	}
+}
+
+// Option.map transforms the Some payload T→U, staying an Option: `(x: int) =>
+// bool` on Option<int> yields Option<bool>. The mapper's unannotated param is
+// pre-typed as the receiver's payload (T-Option-Map).
+func TestOptionMapTypesNewPayload(t *testing.T) {
+	src := `func f(o: Option<int>) {
+  let x = o.map((v) => v > 0)
+}
+`
+	info := checkInfo(t, src)
+	if got := defTypeByName(info, "x"); got == nil || got.String() != "Option<bool>" {
+		t.Errorf("map result = %v; want Option<bool>", got)
+	}
+}
+
+// map with the wrong arity on an Option/Result receiver is a real method miss
+// (exactly one mapper arg) → E0202, not a go/types leak from the helper.
+func TestMapWrongArityFiresE0202(t *testing.T) {
+	src := `func f(o: Option<int>) { let _ = o.map() }`
+	if codes := runCheck(t, src); !contains(codes, "E0202") {
+		t.Errorf("expected E0202 (map arity), got %v", codes)
+	}
+}

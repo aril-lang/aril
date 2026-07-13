@@ -1,0 +1,29 @@
+// `.map` transforms the payload of an Option / Result without a hand-written
+// `match`: the mapper rewrites the `Some`/`Ok` value, while `None`/`Err` flows
+// through untouched. It is the Ok-side mirror of `.mapErr` (which rewrites the
+// Err side) — both let a value keep flowing through a pipeline.
+import fmt
+import strconv
+
+// Look a name up and, if present, format it — `None` short-circuits with no
+// branch of our own.
+func label(m: Map<string, int>, key: string): Option<string> {
+  return m.get(key).map((n) => key + "=" + strconv.itoa(n))
+}
+
+// Parse then double, staying in the Result world: a parse failure is carried
+// as `Err` untouched; a success is doubled by `.map`.
+func doubled(raw: string): Result<int> {
+  return strconv.atoi(raw).map((n) => n * 2)
+}
+
+func main() {
+  let scores: Map<string, int> = Map<string, int>{}
+  scores.set("alice", 3)
+
+  fmt.println(label(scores, "alice").unwrapOr("<absent>"))   // alice=3
+  fmt.println(label(scores, "bob").unwrapOr("<absent>"))     // <absent>
+
+  fmt.println(doubled("21").unwrapOr(-1))                    // 42
+  fmt.println(doubled("nope").unwrapOr(-1))                  // -1
+}

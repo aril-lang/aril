@@ -243,6 +243,36 @@ func (g *gen) emitCall(c *ast.Call) error {
 		g.b.WriteByte(')')
 		return nil
 	}
+	// r.map(f) / o.map(f) — transform the Ok/Some payload T→U, keeping the
+	// Err/None. Lowered to the free ResultMap / OptionMap helper (not a method:
+	// a Go method can't add the U type param), gated on sema typing the receiver
+	// as Result / Option. `ResultMap(recv, f)` / `OptionMap(recv, f)`.
+	if f, ok := c.Callee.(*ast.Field); ok && f.Name == "map" && len(c.Args) == 1 {
+		var helper string
+		switch {
+		case g.isResultReceiver(f.Receiver):
+			g.usesResultMap = true
+			g.usesResult = true // the helper references Result — force it, like the MapErr sibling
+			helper = "ResultMap"
+		case g.isOptionReceiver(f.Receiver):
+			g.usesOptionMap = true
+			g.usesOption = true
+			helper = "OptionMap"
+		}
+		if helper != "" {
+			g.b.WriteString(g.rt(helper))
+			g.b.WriteByte('(')
+			if err := g.emitExpr(f.Receiver); err != nil {
+				return err
+			}
+			g.b.WriteString(", ")
+			if err := g.emitExpr(c.Args[0]); err != nil {
+				return err
+			}
+			g.b.WriteByte(')')
+			return nil
+		}
+	}
 	// slices.reverse(xs) — returns a NEW reversed slice (Go's slices.Reverse is
 	// in-place), lowered to the SlicesReverse runtime helper. Gated on the sema
 	// `slices` module (like sort.sorted).

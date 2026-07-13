@@ -75,6 +75,41 @@ func (g *gen) writePredeclaredMapErr() {
 	g.b.WriteString("}\n")
 }
 
+// writePredeclaredResultMap emits the ResultMap helper backing `r.map(f)` — the
+// Ok-side payload-mapping combinator (builtins.md §Result methods), the mirror
+// of MapErr. A free function, not a method: a Go method cannot introduce the
+// fresh U type parameter. Requires the predeclared Result sum (usesResult,
+// forced alongside usesResultMap). Conditional on usage.
+func (g *gen) writePredeclaredResultMap() {
+	if !g.usesResultMap {
+		return
+	}
+	res := g.rt("Result")
+	g.b.WriteString("func ResultMap[T any, E any, U any](r " + res + "[T, E], f func(T) U) " + res + "[U, E] {\n")
+	g.b.WriteString("\tif r.Tag == 0 {\n")
+	g.b.WriteString("\t\treturn " + res + "[U, E]{Tag: 0, V: f(r.V)}\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + res + "[U, E]{Tag: 1, E: r.E}\n")
+	g.b.WriteString("}\n")
+}
+
+// writePredeclaredOptionMap emits the OptionMap helper backing `o.map(f)` — the
+// Some-side payload-mapping combinator (builtins.md §Option methods). A free
+// function (the fresh U type parameter). Requires the predeclared Option sum
+// (usesOption, forced alongside usesOptionMap). Conditional on usage.
+func (g *gen) writePredeclaredOptionMap() {
+	if !g.usesOptionMap {
+		return
+	}
+	opt := g.rt("Option")
+	g.b.WriteString("func OptionMap[T any, U any](o " + opt + "[T], f func(T) U) " + opt + "[U] {\n")
+	g.b.WriteString("\tif o.Tag == 1 {\n")
+	g.b.WriteString("\t\treturn " + opt + "[U]{Tag: 1, V: f(o.V)}\n")
+	g.b.WriteString("\t}\n")
+	g.b.WriteString("\treturn " + opt + "[U]{Tag: 0}\n")
+	g.b.WriteString("}\n")
+}
+
 // writePredeclaredMakeSlice emits the inline helper for the
 // `makeSlice<T>(n: int): []T` predeclared builtin (per
 // `lang-spec/builtins.md` §makeSlice). Returns a fresh slice
@@ -907,6 +942,18 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "mapErr" && len(v.Args) == 1 && g.isResultReceiver(f.Receiver) {
 				g.usesMapErr = true
 				g.usesResult = true // the MapErr helper references Result (sibling-parity with usesResultOf/usesScan)
+			}
+			// `x.map(f)` lowers to the free ResultMap/OptionMap helper — detected
+			// in the pre-walk (like mapErr) so the inline prelude emits the helper
+			// before the body. Gated on the sema receiver type.
+			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "map" && len(v.Args) == 1 {
+				if g.isResultReceiver(f.Receiver) {
+					g.usesResultMap = true
+					g.usesResult = true
+				} else if g.isOptionReceiver(f.Receiver) {
+					g.usesOptionMap = true
+					g.usesOption = true
+				}
 			}
 			if f, ok := v.Callee.(*ast.Field); ok && f.Name == "reverse" {
 				if recv, ok := f.Receiver.(*ast.Ident); ok && recv.Name == "slices" && g.isBuiltinModule(recv) {

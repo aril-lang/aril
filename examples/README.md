@@ -62,6 +62,7 @@ Go, which has no sum types.
 | `vending_machine` ★ | a **state machine** — exhaustive `match` over a sum-typed state |
 | `error_chain` | error chaining with `Result` + `.mapErr` boundary conversion |
 | `errors_as_types` | errors modelled as sum-typed values |
+| `option_result_map` | `Option.map` / `Result.map` — transform the `Some`/`Ok` payload, `None`/`Err` flows through (the Ok-side mirror of `.mapErr`) |
 
 ## `stdlib-binding/` — typed bindings over the Go standard library
 

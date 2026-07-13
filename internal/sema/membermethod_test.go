@@ -47,7 +47,9 @@ func use(): bool { let re = regexp.mustCompile("x")  return re.noSuchMethod("a")
 // not the go/types leak `type arilrt.Option[int] has no field or method …`.
 
 func TestUnknownOptionMemberFiresE0214(t *testing.T) {
-	src := `func use(o: Option<int>) { let _ = o.map() }`
+	// `map` is now a real Option method (inferMap), so use a name that is
+	// genuinely absent from the method set.
+	src := `func use(o: Option<int>) { let _ = o.frobnicate() }`
 	if codes := runCheck(t, src); !contains(codes, "E0214") {
 		t.Errorf("expected E0214 (unknown Option member), got %v", codes)
 	}

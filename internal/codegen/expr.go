@@ -958,6 +958,16 @@ func (g *gen) isResultReceiver(receiver ast.Expr) bool {
 	return ok
 }
 
+// isOptionReceiver reports whether sema typed receiver as Option — the gate for
+// lowering `o.map(f)` to the free OptionMap helper.
+func (g *gen) isOptionReceiver(receiver ast.Expr) bool {
+	if g.info == nil {
+		return false
+	}
+	_, ok := g.info.Type[receiver].(*sema.Option)
+	return ok
+}
+
 // isDurationReceiver reports whether sema typed receiver as the time.Duration
 // handle — the gate for lowering d.add/d.mul to Go operators (D37).
 func (g *gen) isDurationReceiver(receiver ast.Expr) bool {
