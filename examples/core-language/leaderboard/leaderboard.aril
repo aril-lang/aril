@@ -32,11 +32,11 @@ func main() {
   for p in rankByScore(players) {
     fmt.println(p.name, p.score)
   }
-  var teams = []string{}
+  let teams = List<string>{}
   for p in players {
-    teams = teams.push(p.team)
+    teams.push(p.team)
   }
-  fmt.println("teams:", slices.dedup(teams).len())
+  fmt.println("teams:", slices.dedup(teams.toSlice()).len())
 }
 
 // Load-bearing: ranking is non-descending by score AND preserves the roster size

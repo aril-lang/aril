@@ -18,14 +18,7 @@ matches = "errors/annot-mismatch.expected"
 origin  = "synthetic"
 
 [[error]]
-patch   = "errors/discarded-push.patch"   # `rows.push(...)` without assigning back — a silent no-op (append semantics)
-expect  = ["E0215"]
-stage   = "sema"
-matches = "errors/discarded-push.expected"
-origin  = "synthetic"
-
-[[error]]
-patch   = "errors/let-reassigned.patch"   # `let rows` then reassigned in the loop — `let` is immutable
+patch   = "errors/let-reassigned.patch"   # `let totalClean` then reassigned in the loop — `let` is immutable
 expect  = ["E0216"]
 stage   = "sema"
 matches = "errors/let-reassigned.expected"

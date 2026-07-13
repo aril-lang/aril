@@ -52,13 +52,13 @@ func isUnique<T: Comparable>(xs: []T, x: T): bool {
 
 // reversed returns a new slice with xs's elements in reverse order.
 func reversed<T>(xs: []T): []T {
-  var out = []T{}
+  let out = List<T>{}
   var i = xs.len() - 1
   while i >= 0 {
-    out = out.push(xs[i])
+    out.push(xs[i])
     i = i - 1
   }
-  return out
+  return out.toSlice()
 }
 
 // seqEq reports whether a and b are element-wise equal.

@@ -160,13 +160,13 @@ func lessStr(a: string, b: string): bool {
 // .aril files don't perturb the metric).
 func corpusFiles(): []string {
   let listed = runOk("git", ["ls-files", "examples", "user_tests"])
-  var files = []string{}
+  let files = List<string>{}
   for ln in strings.split(listed, "\n") {
     if strings.hasSuffix(ln, ".aril") {
-      files = files.push(ln)
+      files.push(ln)
     }
   }
-  return sort.sorted(files, lessStr)
+  return sort.sorted(files.toSlice(), lessStr)
 }
 
 func buildAril(tmp: string): string {
@@ -244,7 +244,7 @@ func tomlCodes(line: string): []string {
   // string must be kept. The array-close `]` and commas are non-quote chars and
   // are naturally skipped. (No corpus `args` line carries a trailing comment, so
   // there is nothing after the array to guard against.)
-  var out = []string{}
+  let out = List<string>{}
   var rest = v
   while true {
     let q1 = strings.index(rest, "\"")
@@ -252,10 +252,10 @@ func tomlCodes(line: string): []string {
     rest = rest[q1 + 1:]
     let q2 = strings.index(rest, "\"")
     if q2 < 0 { break }
-    out = out.push(rest[:q2])
+    out.push(rest[:q2])
     rest = rest[q2 + 1:]
   }
-  return out
+  return out.toSlice()
 }
 
 func readFileOrEmpty(path: string): string {
@@ -277,17 +277,17 @@ func parseNegCases(manifest: string, text: string): []NegCase {
       entry = tomlScalar(line)
     }
   }
-  var cases = []NegCase{}
+  let cases = List<NegCase>{}
   var cur = NegCase{ dir: dir, entry: entry, patch: "", expect: []string{}, stage: "", matches: "" }
   var inCase = false
   for raw in strings.split(text, "\n") {
     let line = strings.trimSpace(raw)
     if line == "[[error]]" {
-      if inCase { cases = cases.push(cur) }
+      if inCase { cases.push(cur) }
       cur = NegCase{ dir: dir, entry: entry, patch: "", expect: []string{}, stage: "", matches: "" }
       inCase = true
     } else if strings.hasPrefix(line, "[") {
-      if inCase { cases = cases.push(cur) }
+      if inCase { cases.push(cur) }
       inCase = false
     } else if inCase {
       if strings.hasPrefix(line, "patch") {
@@ -301,21 +301,21 @@ func parseNegCases(manifest: string, text: string): []NegCase {
       }
     }
   }
-  if inCase { cases = cases.push(cur) }
-  return cases
+  if inCase { cases.push(cur) }
+  return cases.toSlice()
 }
 
 // emittedCodes returns the E-codes appearing as `error[E…]` in compiler
 // output (a findall over the combined stream).
 func emittedCodes(re: Regexp, combined: string): []string {
-  var out = []string{}
+  let out = List<string>{}
   for m in re.findAll(combined, -1) {
     if m.len() > 7 {
       // strip the leading "error[" (6 chars) and the trailing "]".
-      out = out.push(m[6:m.len() - 1])
+      out.push(m[6:m.len() - 1])
     }
   }
-  return out
+  return out.toSlice()
 }
 
 func copyFile(src: string, dst: string) {
@@ -350,13 +350,13 @@ func mustCompile(expr: string): Regexp {
 func evalNegatives(aril: string): EvalResult {
   let rx = mustCompile("error\\[E[0-9]+\\]")
   let listed = runOk("git", ["ls-files", "examples"])
-  var manifests = []string{}
+  let manifestsAcc = List<string>{}
   for ln in strings.split(listed, "\n") {
     if pathBase(ln) == "example.toml" {
-      manifests = manifests.push(ln)
+      manifestsAcc.push(ln)
     }
   }
-  manifests = sort.sorted(manifests, lessStr)
+  let manifests = sort.sorted(manifestsAcc.toSlice(), lessStr)
 
   var work = ""
   match mkdirTemp("", "corpus-neg-") {
@@ -369,7 +369,7 @@ func evalNegatives(aril: string): EvalResult {
 
   var diagOk = 0
   var diagTotal = 0
-  var misses = []Miss{}
+  let misses = List<Miss>{}
   for mf in manifests {
     let text = readFileOrEmpty(mf)
     for c in parseNegCases(mf, text) {
@@ -418,7 +418,7 @@ func evalNegatives(aril: string): EvalResult {
         }
       }
       if r.code() == 0 {
-        misses = misses.push(Miss{ case: caseLabel, want: want, got: got })
+        misses.push(Miss{ case: caseLabel, want: want, got: got })
         continue
       }
       let emitted = emittedCodes(rx, combined)
@@ -442,7 +442,7 @@ func evalNegatives(aril: string): EvalResult {
       if ok {
         diagOk = diagOk + 1
       } else {
-        misses = misses.push(Miss{ case: caseLabel, want: want, got: got })
+        misses.push(Miss{ case: caseLabel, want: want, got: got })
       }
     }
   }
@@ -450,7 +450,7 @@ func evalNegatives(aril: string): EvalResult {
     Ok(_) => fmt.print(""),
     Err(_) => fmt.print(""),
   }
-  return EvalResult{ diag_ok: diagOk, diag_total: diagTotal, misses: sort.sorted(misses, lessMiss) }
+  return EvalResult{ diag_ok: diagOk, diag_total: diagTotal, misses: sort.sorted(misses.toSlice(), lessMiss) }
 }
 
 // --- run_ok: the behavioural metric (run each run-pass example) ---
@@ -558,17 +558,17 @@ func parseRunSpec(manifest: string, text: string): RunSpec {
 // already-built binary. Mirrors parseNegCases's block scan. Empty when the
 // manifest has no `[[case]]` blocks (the single-invocation default).
 func parseRunCases(text: string): []RunCase {
-  var cases = []RunCase{}
+  let cases = List<RunCase>{}
   var cur = RunCase{ args: []string{}, stdin: "", expectedOutput: "", expectedExit: 0 }
   var inCase = false
   for raw in strings.split(text, "\n") {
     let line = strings.trimSpace(raw)
     if line == "[[case]]" {
-      if inCase { cases = cases.push(cur) }
+      if inCase { cases.push(cur) }
       cur = RunCase{ args: []string{}, stdin: "", expectedOutput: "", expectedExit: 0 }
       inCase = true
     } else if strings.hasPrefix(line, "[") {
-      if inCase { cases = cases.push(cur) }
+      if inCase { cases.push(cur) }
       inCase = false
     } else if inCase {
       if strings.hasPrefix(line, "args") {
@@ -585,8 +585,8 @@ func parseRunCases(text: string): []RunCase {
       }
     }
   }
-  if inCase { cases = cases.push(cur) }
-  return cases
+  if inCase { cases.push(cur) }
+  return cases.toSlice()
 }
 
 func lessRunRow(a: RunRow, b: RunRow): bool {
@@ -891,19 +891,19 @@ func runWorker(aril: string, cache: []CacheEntry, jobs: RecvChan<WorkItem>, resu
 // the committed cache file.
 func evalRuns(aril: string, tmp: string, persistCache: bool): RunEval {
   let listed = runOk("git", ["ls-files", "examples", "user_tests"])
-  var manifests = []string{}
+  let manifestsAcc = List<string>{}
   for ln in strings.split(listed, "\n") {
     if pathBase(ln) == "example.toml" {
-      manifests = manifests.push(ln)
+      manifestsAcc.push(ln)
     }
   }
-  manifests = sort.sorted(manifests, lessStr)
+  let manifests = sort.sorted(manifestsAcc.toSlice(), lessStr)
 
-  var specs = []RunSpec{}
+  let specs = List<RunSpec>{}
   for mf in manifests {
     let spec = parseRunSpec(mf, readFileOrEmpty(mf))
     if spec.expects == "run-pass" && spec.entry != "" {
-      specs = specs.push(spec)
+      specs.push(spec)
     }
   }
 
@@ -940,23 +940,23 @@ func evalRuns(aril: string, tmp: string, persistCache: bool): RunEval {
   }
 
   var nOk = 0
-  var fails = []RunRow{}
-  var fresh = []CacheEntry{}
+  let fails = List<RunRow>{}
+  let fresh = List<CacheEntry>{}
   for _ in 0..n {
     let res = results.recv()
     if res.row.status == "ok" {
       nOk = nOk + 1
     } else {
-      fails = fails.push(res.row)
+      fails.push(res.row)
     }
     if res.key != "" {
-      fresh = fresh.push(CacheEntry{ key: res.key, status: res.row.status, code: res.row.code })
+      fresh.push(CacheEntry{ key: res.key, status: res.row.status, code: res.row.code })
     }
   }
   if persistCache {
-    writeCache(fresh)
+    writeCache(fresh.toSlice())
   }
-  return RunEval{ run_ok: nOk, run_total: n, fails: sort.sorted(fails, lessRunRow) }
+  return RunEval{ run_ok: nOk, run_total: n, fails: sort.sorted(fails.toSlice(), lessRunRow) }
 }
 
 // --- collect ---
@@ -973,14 +973,14 @@ func collect(measureRun: bool, persistCache: bool): Status {
   let aril = buildAril(tmp)
   let outp = pathJoin(tmp, "out")
   let files = corpusFiles()
-  var rows = []Row{}
+  let rows = List<Row>{}
   var nparse = 0
   var nsema = 0
   var nemit = 0
   var nbuild = 0
   for f in files {
     let row = classify(aril, f, outp)
-    rows = rows.push(row)
+    rows.push(row)
     if row.stage == "build" {
       nbuild = nbuild + 1
     } else if row.stage == "emit" {
@@ -1013,7 +1013,7 @@ func collect(measureRun: bool, persistCache: bool): Status {
       run_ok: rv.run_ok,
       run_total: rv.run_total,
     },
-    files: rows,
+    files: rows.toSlice(),
     diag_misses: ev.misses,
     run_fails: rv.fails,
   }

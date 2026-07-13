@@ -11,14 +11,14 @@ import fmt
 import os
 
 func solve(n: int): []int {
-  var cuts: []int = []int{}
+  let cuts = List<int>{}
   var m = n
   while m > 1 {
     let half = m / 2
-    cuts = cuts.push(half)
+    cuts.push(half)
     m = m - half
   }
-  return cuts
+  return cuts.toSlice()
 }
 
 func main() {

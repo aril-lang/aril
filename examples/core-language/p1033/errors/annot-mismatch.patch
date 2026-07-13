@@ -1,11 +1,11 @@
 --- p1033.aril
 +++ p1033.aril
-@@ -74,7 +74,7 @@
+@@ -91,7 +91,7 @@
      visited.set((n - 1, n - 1), true)
    }
  
 -  var walls = 0
 +  var walls: string = 0
-   while queue.len() > 0 {
-     let p = queue[0]
-     queue = queue[1:]
+   while head < queue.len() {
+     let p = queue[head]
+     head = head + 1

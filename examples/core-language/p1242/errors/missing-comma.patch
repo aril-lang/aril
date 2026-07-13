@@ -1,11 +1,11 @@
 --- p1242.aril
 +++ p1242.aril
 @@ -29,7 +29,7 @@
-   parents:  Map<int, []int>
+   parents:  Map<int, List<int>>
  }
  
--func addLink(adj: Map<int, []int>, u: int, v: int) {
-+func addLink(adj: Map<int, []int>, u: int v: int) {
+-func addLink(adj: Map<int, List<int>>, u: int, v: int) {
++func addLink(adj: Map<int, List<int>>, u: int v: int) {
    match adj.get(u) {
-     Some(lst) => adj.set(u, lst.push(v)),
-     None      => adj.set(u, [v]),
+     Some(lst) => lst.push(v),
+     None      => adj.set(u, List<int>{v}),

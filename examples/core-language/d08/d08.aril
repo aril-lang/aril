@@ -24,11 +24,12 @@ import strings
 
 type Point = (int, int, int)
 type Pair  = (int, int, float64)
+type Comp  = (int, int)
 
 func readData(path: string): Result<[]Point, error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var out: []Point = []Point{}
+  let out = List<Point>{}
   for ln in strings.split(text, "\n") {
     let s = strings.trimSpace(ln)
     if s.len() == 0 { continue }
@@ -39,9 +40,9 @@ func readData(path: string): Result<[]Point, error> {
     let x = try strconv.atoi(strings.trimSpace(parts[0]))
     let y = try strconv.atoi(strings.trimSpace(parts[1]))
     let z = try strconv.atoi(strings.trimSpace(parts[2]))
-    out = out.push((x, y, z))
+    out.push((x, y, z))
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 func dist(a: Point, b: Point): float64 {
@@ -56,13 +57,13 @@ class DSU {
   var sz: []int
 
   static new(n: int): DSU {
-    var id: []int = []int{}
-    var sz: []int = []int{}
+    let id = List<int>{}
+    let sz = List<int>{}
     for i in 0..n {
-      id = id.push(i)
-      sz = sz.push(1)
+      id.push(i)
+      sz.push(1)
     }
-    return DSU{ id: id, sz: sz }
+    return DSU{ id: id.toSlice(), sz: sz.toSlice() }
   }
 
   // Find with path compression. The function is recursive; `id` is a
@@ -94,14 +95,14 @@ class DSU {
 
   // Component sizes (root index, size), sorted descending by size.
   // Inner-loop name `s` chosen to avoid shadowing the field `sz`.
-  components(): [](int, int) {
-    var out: [](int, int) = [](int, int){}
+  components(): []Comp {
+    let out = List<Comp>{}
     for (i, s) in sz {
       if id[i] == i {
-        out = out.push((i, s))
+        out.push((i, s))
       }
     }
-    return sort.sorted(out, (a, b) => a.1 > b.1)
+    return sort.sorted(out.toSlice(), (a, b) => a.1 > b.1)
   }
 }
 
@@ -136,14 +137,14 @@ func solveHard(points: []Point, pairs: []Pair): Result<int, error> {
 }
 
 func buildPairs(points: []Point): []Pair {
-  var pairs: []Pair = []Pair{}
+  let pairs = List<Pair>{}
   let n = points.len()
   for i in 0..n {
     for j in (i + 1)..n {
-      pairs = pairs.push((i, j, dist(points[i], points[j])))
+      pairs.push((i, j, dist(points[i], points[j])))
     }
   }
-  return sort.sorted(pairs, (a, b) => a.2 < b.2)
+  return sort.sorted(pairs.toSlice(), (a, b) => a.2 < b.2)
 }
 
 func main() {

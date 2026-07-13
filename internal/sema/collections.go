@@ -392,11 +392,12 @@ func containerMethodType(recv Type, name string) *Func {
 			return &Func{Params: []Type{&Option{T: r.Elem}, &Option{T: r.Elem}}, Return: &Builtin{N: "bool"}}
 		}
 	case *Slice:
+		// `[]T` is a value view with PURE accessors only — no `push`. Grow-in-
+		// place lives on the reference container `List<T>` (the mutating-method-
+		// must-mutate invariant, D55). A `xs.push(e)` now misses → tailored E0214.
 		switch name {
 		case "len":
 			return &Func{Return: &Builtin{N: "int"}}
-		case "push":
-			return &Func{Params: []Type{r.Elem}, Return: &Slice{Elem: r.Elem}}
 		case "copy":
 			return &Func{Return: &Slice{Elem: r.Elem}}
 		}

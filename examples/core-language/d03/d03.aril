@@ -6,8 +6,8 @@
 // largest L=2 number (Simple) and L=12 number (Hard).
 //
 // Forces: per-character digit parsing, a monotonic stack over `int`,
-// stack slicing — `Stack<T>` doesn't expose slicing directly, so we
-// model the stack as a `var []int` and use `[a:b]`.
+// modelled as a `List<int>` — push to grow, pop to truncate back down
+// to the retained depth.
 //
 // Algorithm: maintain a non-increasing stack of length ≤ L. For each
 // new digit d at position idx (with budget max_depth = min(remaining,
@@ -23,24 +23,24 @@ import strings
 func readData(path: string): Result<[][]int, error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var out: [][]int = [][]int{}
+  let out = List<[]int>{}
   for ln in strings.split(text, "\n") {
     let s = strings.trimSpace(ln)
     if s.len() == 0 { continue }
-    var line: []int = []int{}
+    let line = List<int>{}
     var i = 0
     while i < s.len() {
       let n = try strconv.atoi(s[i:i+1])
-      line = line.push(n)
+      line.push(n)
       i = i + 1
     }
-    out = out.push(line)
+    out.push(line.toSlice())
   }
-  return Ok(out)
+  return Ok(out.toSlice())
 }
 
 func solveLine(line: []int, length: int): int {
-  var stack: []int = []int{}
+  let stack = List<int>{}
   for (idx, d) in line {
     var sp = stack.len()
     let remaining = line.len() - idx
@@ -48,9 +48,11 @@ func solveLine(line: []int, length: int): int {
     while sp > length - maxDepth && d > stack[sp - 1] {
       sp = sp - 1
     }
-    stack = stack[0:sp]
+    while stack.len() > sp {
+      let _ = stack.pop()
+    }
     if sp < length {
-      stack = stack.push(d)
+      stack.push(d)
     }
   }
   // The stack holds the digits, most-significant first.

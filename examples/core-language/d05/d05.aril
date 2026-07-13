@@ -22,8 +22,8 @@ type Range = (int, int)
 func readData(path: string): Result<([]Range, []int), error> {
   let data = try os.readFile(path)
   let text = strings.fromBytes(data)
-  var freshDB: []Range = []Range{}
-  var store:   []int   = []int{}
+  let freshDB = List<Range>{}
+  let store   = List<int>{}
   var inFresh = true
   for ln in strings.split(text, "\n") {
     let s = strings.trimSpace(ln)
@@ -35,19 +35,19 @@ func readData(path: string): Result<([]Range, []int), error> {
       let parts = strings.split(s, "-")
       let st  = try strconv.atoi(parts[0])
       let fin = try strconv.atoi(parts[1])
-      freshDB = freshDB.push((st, fin))
+      freshDB.push((st, fin))
     } else {
       let n = try strconv.atoi(s)
-      store = store.push(n)
+      store.push(n)
     }
   }
-  return Ok((freshDB, store))
+  return Ok((freshDB.toSlice(), store.toSlice()))
 }
 
 func collapse(ranges: []Range): []Range {
   if ranges.len() == 0 { return ranges }
   let sorted = sort.sorted(ranges, (a, b) => a.0 < b.0)
-  var out: []Range = []Range{}
+  let out = List<Range>{}
   var cur = sorted[0]
   for i in 1..sorted.len() {
     let r = sorted[i]
@@ -55,12 +55,12 @@ func collapse(ranges: []Range): []Range {
       let merged = if cur.1 > r.1 { cur.1 } else { r.1 }
       cur = (cur.0, merged)
     } else {
-      out = out.push(cur)
+      out.push(cur)
       cur = r
     }
   }
-  out = out.push(cur)
-  return out
+  out.push(cur)
+  return out.toSlice()
 }
 
 func main() {

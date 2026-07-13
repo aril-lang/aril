@@ -27,9 +27,9 @@ func main() {
 }
 
 func run(text: string) {
-  var lines: []string = []string{}
+  let lines = List<string>{}
   for ln in strings.split(text, "\n") {
-    if ln.len() > 0 { lines = lines.push(ln) }
+    if ln.len() > 0 { lines.push(ln) }
   }
   if lines.len() == 0 {
     fmt.println("empty input")
@@ -38,10 +38,11 @@ func run(text: string) {
   let width = lines[0].len()
 
   var beams: Set<int> = Set<int>{}
-  var timelines: []int = []int{}
+  let tl0 = List<int>{}
   for _ in 0..width {
-    timelines = timelines.push(0)
+    tl0.push(0)
   }
+  var timelines: []int = tl0.toSlice()
   var splits = 0
 
   for ln in lines {

@@ -29,14 +29,14 @@ import std/pred   // isSorted, allDistinct — contract predicate vocabulary
 func uniqueSorted(xs: []int): []int {
   let sorted = sort.sorted(xs, (a, b) => a < b)
   let seen = Set<int>{}
-  var out: []int = []int{}
+  let out = List<int>{}
   for x in sorted {
     if !seen.has(x) {
       seen.add(x)
-      out = out.push(x)
+      out.push(x)
     }
   }
-  return out
+  return out.toSlice()
 }
 
 // ---- predicate helpers for the contract --------------------------------
@@ -66,11 +66,11 @@ func allPresent(xs: []int, result: []int): bool {
 // ---- output helpers ----------------------------------------------------
 
 func joinInts(xs: []int): string {
-  var parts: []string = []string{}
+  let parts = List<string>{}
   for x in xs {
-    parts = parts.push(strconv.itoa(x))
+    parts.push(strconv.itoa(x))
   }
-  return strings.join(parts, " ")
+  return strings.join(parts.toSlice(), " ")
 }
 
 // ---- main --------------------------------------------------------------
@@ -82,7 +82,7 @@ func main() {
   }
 
   let raw = strings.split(os.args[1], " ")
-  var nums: []int = []int{}
+  let nums = List<int>{}
   for s in raw {
     match strconv.atoi(s) {
       Err(e) => {
@@ -90,7 +90,7 @@ func main() {
         os.exit(1)
       },
       Ok(n) => {
-        nums = nums.push(n)
+        nums.push(n)
       },
     }
   }
@@ -100,11 +100,12 @@ func main() {
     os.exit(1)
   }
 
-  let sorted   = sort.sorted(nums, (a, b) => a < b)
-  let unique   = uniqueSorted(nums)
-  let reversed = slices.reverse(nums)
-  let maxVal   = slices.max(nums)
-  let minVal   = slices.min(nums)
+  let src      = nums.toSlice()
+  let sorted   = sort.sorted(src, (a, b) => a < b)
+  let unique   = uniqueSorted(src)
+  let reversed = slices.reverse(src)
+  let maxVal   = slices.max(src)
+  let minVal   = slices.min(src)
 
   fmt.println("sorted:", joinInts(sorted))
   fmt.println("unique:", joinInts(unique))

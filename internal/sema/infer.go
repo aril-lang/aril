@@ -891,7 +891,14 @@ func (c *checker) inferField(f *ast.Field) Type {
 		// Sound-over-complete (D38): only fully-known kinds fire — a bare type
 		// parameter, Any/Dynamic, or an Unknown receiver stays silent.
 		if builtinMemberMiss(recv, f.Name) {
-			c.report("E0214", "Type "+recv.String()+" has no member `"+f.Name+"`", f.Span)
+			if _, isSlice := recv.(*Slice); isSlice && f.Name == "push" {
+				// The removed slice mutation-liar (D55): teach the honest container
+				// rather than leak the generic "no member" for the one name a
+				// TS/Go newcomer most expects on a slice.
+				c.report("E0214", "`"+recv.String()+"` has no `push` — a slice is a value view, not a growable container. Use `List<T>` for in-place growth: `let l = List<T>{}; l.push(e)`", f.Span)
+			} else {
+				c.report("E0214", "Type "+recv.String()+" has no member `"+f.Name+"`", f.Span)
+			}
 		}
 		return &Unknown{}
 	}

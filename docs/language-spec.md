@@ -166,8 +166,10 @@ shadow each other.
   string) — the general-purpose extremum builtins (`math.min` / `math.max` are
   float64-only). They lower to Go's builtin `min` / `max`.
 - `s.len(): int`.
-- `s.push(v): []T` — returns a new slice header (may grow underlying
-  storage). Idiomatic re-assignment: `s = s.push(v)` when `s` is `var`.
+- `[]T` is a **value view** — no `push` (a slice header can't grow in
+  place, so the name would lie; D55). To grow a sequence, use the reference
+  container `List<T>` (`let l = List<int>{}; l.push(e)`), then `l.toSlice()`
+  back to a `[]T` at a boundary. The pure `s.copy(): []T` accessor stays.
 - Indexing: `s[i]` — out-of-bounds panics at the `.aril` site.
 - Safe access: `s.get(i): Option<T>`.
 - Slicing: `s[a:b]: []T` — half-open view into the same backing array.
@@ -873,9 +875,9 @@ let pages = try scope<[]Page, error> {
   }
   // Trailing expression — evaluated AFTER every spawn has joined.
   results.close()
-  var out: []Page = []Page{}
-  for p in results { out = out.push(p) }
-  out
+  let out = List<Page>{}
+  for p in results { out.push(p) }
+  out.toSlice()
 }
 ```
 

@@ -6,11 +6,11 @@
 import fmt
 
 func mapEach(xs: []int, f: (int) => string): []string {
-  var out = makeSlice<string>(0)
+  let out = List<string>{}
   for x in xs {
-    out = out.push(f(x))
+    out.push(f(x))
   }
-  return out
+  return out.toSlice()
 }
 
 func main() {

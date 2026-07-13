@@ -59,9 +59,9 @@ func fetchRegion(ctx: context.Context, region: Region):
     }
     // Trailing expression — runs after every spawn has joined.
     itemCh.close()
-    var out: []string = []string{}
-    for s in itemCh { out = out.push(s) }
-    out
+    let out = List<string>{}
+    for s in itemCh { out.push(s) }
+    out.toSlice()
   }
 }
 
@@ -94,9 +94,9 @@ func main() {
       }
     }
     regionCh.close()
-    var byRegion: [][]string = [][]string{}
-    for items in regionCh { byRegion = byRegion.push(items) }
-    byRegion
+    let byRegion = List<[]string>{}
+    for items in regionCh { byRegion.push(items) }
+    byRegion.toSlice()
   }
 
   match result {

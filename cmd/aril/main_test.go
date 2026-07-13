@@ -907,14 +907,14 @@ func sumRange(xs: []int, lo: int, hi: int): int {
 }
 
 func prefixSums(xs: []int): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var acc = 0
   for i in 0..xs.len() loop scan {
     acc = acc + xs[i]
     if i == 2 { acc = acc + xs[i] }
-    out = out.push(acc)
+    out.push(acc)
   }
-  return out
+  return out.toSlice()
 }
 
 func main() {

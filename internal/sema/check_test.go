@@ -26,6 +26,27 @@ func runCheck(t *testing.T, src string) []string {
 	return codes
 }
 
+// runCheckMsgs is runCheck but returns the full diagnostic messages — used to
+// assert a *tailored* message (e.g. the slice-push hint naming List<T>), not
+// just its code.
+func runCheckMsgs(t *testing.T, src string) []string {
+	t.Helper()
+	toks, lerr := lexer.LexFile(src, "test.aril")
+	if lerr != nil {
+		t.Fatalf("lex: %v", lerr)
+	}
+	f, perr := parser.ParseFile(toks, "test.aril")
+	if perr != nil {
+		t.Fatalf("parse: %v", perr)
+	}
+	_, diags := Check(f, "test.aril")
+	msgs := make([]string, 0, len(diags))
+	for _, d := range diags {
+		msgs = append(msgs, d.Message)
+	}
+	return msgs
+}
+
 // TestTypeParamConstraint: the built-in constraints `Ordered` / `Comparable`
 // are accepted; an unknown bound is E0119.
 func TestTypeParamConstraint(t *testing.T) {

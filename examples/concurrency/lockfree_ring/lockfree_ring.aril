@@ -46,17 +46,17 @@ class RingBuffer {
   // Build an empty ring of `capacity` cells, stamping cell i with seq = i
   // (the state in which a producer at pos i may fill it).
   static new(capacity: int): RingBuffer {
-    var cells: []Cell = []Cell{}
+    let cells = List<Cell>{}
     var i = 0
     while i < capacity {
       let c = Cell{ seq: atomic.Int64{}, data: 0 }
       c.seq.store(int64(i))
-      cells = cells.push(c)
+      cells.push(c)
       i = i + 1
     }
     return RingBuffer{
       capacity:   int64(capacity),
-      cells:      cells,
+      cells:      cells.toSlice(),
       enqueuePos: atomic.Int64{},
       dequeuePos: atomic.Int64{},
     }

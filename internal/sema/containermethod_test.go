@@ -60,11 +60,14 @@ func TestMapKeysIsSliceOfKey(t *testing.T) {
 	}
 }
 
-func TestSlicePushReturnsSlice(t *testing.T) {
-	src := `func f(xs: []int): []int { return xs.push(1) }
+// `[]T` lost `.push` (D55) — a slice is a value view. `xs.push(1)` now misses
+// the slice method set → E0214 (the pure accessors len/copy survive; grow-in-
+// place moved to List<T>). Covered in depth in membermethod_test.go.
+func TestSlicePushNoLongerResolves(t *testing.T) {
+	src := `func f(xs: []int) { xs.push(1) }
 `
-	if codes := runCheck(t, src); len(codes) != 0 {
-		t.Errorf("expected clean (push:[]int), got %v", codes)
+	if codes := runCheck(t, src); !contains(codes, "E0214") {
+		t.Errorf("expected E0214 (slice has no push), got %v", codes)
 	}
 }
 

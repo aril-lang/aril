@@ -5,8 +5,8 @@
 // move that hits a wall (out-of-bounds or non-`.`) counts. Output the
 // wall-count × 9 (problem-specific weighting).
 //
-// Forces: a slice-as-queue idiom (`queue = queue.push(p)` to enqueue;
-// `queue[0]` + `queue = queue[1:]` to dequeue), a `Map<Coord, bool>`
+// Forces: a List-as-queue idiom (`queue.push(p)` to enqueue; a `head`
+// cursor + `queue[head]` to dequeue), a `Map<Coord, bool>`
 // keyed by a record (record structural equality (§Expressions)
 // gives the comparable property the map needs), `Option<Coord>` for
 // move results, and sum-typed direction enum with exhaustive match.
@@ -67,33 +67,34 @@ contract advance {
 
 func readGrid(): Result<[]string, error> {
   let n = try fmt.scan<int>()
-  var rows: []string = []string{}
+  let rows = List<string>{}
   for _ in 0..n {
     let row = try fmt.scan<string>()
     if row.len() != n {
       return Err(error("malformatted input row: " + row))
     }
-    rows = rows.push(row)
+    rows.push(row)
   }
-  return Ok(rows)
+  return Ok(rows.toSlice())
 }
 
 func solve(grid: []string): int {
   let n = grid.len()
-  var queue: []Coord = []Coord{}
+  let queue = List<Coord>{}
   var visited: Map<Coord, bool> = Map<Coord, bool>{}
+  var head = 0
 
-  queue = queue.push((0, 0))
+  queue.push((0, 0))
   visited.set((0, 0), true)
   if n > 1 {
-    queue = queue.push((n - 1, n - 1))
+    queue.push((n - 1, n - 1))
     visited.set((n - 1, n - 1), true)
   }
 
   var walls = 0
-  while queue.len() > 0 {
-    let p = queue[0]
-    queue = queue[1:]
+  while head < queue.len() {
+    let p = queue[head]
+    head = head + 1
 
     for d in allDirections {
       match advance(grid, p, d) {
@@ -102,7 +103,7 @@ func solve(grid: []string): int {
           match visited.get(next) {
             Some(_) => {},
             None    => {
-              queue = queue.push(next)
+              queue.push(next)
               visited.set(next, true)
             },
           }

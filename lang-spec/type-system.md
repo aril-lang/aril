@@ -513,14 +513,14 @@ the header — see `../docs/language-spec.md` §Collections.)
 
        The method set and its result types are the predeclared total
        methods catalogued in `builtins.md` (`m.get(k): Option<V>`,
-       `s.pop(): Result<T, error>`, `xs.push(e): []T`,
+       `s.pop(): Result<T, error>` on `Stack<T>`,
        `l.push(e): unit` / `l.pop(): Option<T>` on `List<T>`, …).
        Dispatch is on the container kind, not on a nominal declaration —
        these are built-in types, so the result type is read from the
        receiver's type-arguments, mirroring the prelude methods codegen
-       emits. Note `List`'s `push` mutates in place and returns `unit`
-       (a reference container), whereas the slice `xs.push(e)` returns a
-       new `[]T` header (a value view) — see `builtins.md` §List.
+       emits. Note `List`'s `push` mutates in place (a reference
+       container); the slice `[]T` is a value view with **no** `push` —
+       pure accessors `.len()`/`.copy()` only (D55) — see `builtins.md` §List.
 
 (T-Range)      Γ ⊢ lo : int    Γ ⊢ hi : int
                ──────────────────────────────────────
@@ -534,8 +534,8 @@ checking — the expected type at the use-site (annotation, return
 position, or argument slot) supplies `K`/`V`/`T`. When no
 expected type is reachable, sema emits **E0208 Cannot infer
 literal type**, asking for an explicit annotation. Built-in
-operations on collection types (`.get`, `.set`, `.has`, `.push`,
-`.pop`, etc.) are typed by `T-Call` against their predeclared
+operations on collection types (`.get`, `.set`, `.has`, `.push`
+on `List`/`Stack`, `.pop`, etc.) are typed by `T-Call` against their predeclared
 signatures in `builtins.md`; this file does not re-state them.
 
 ### Sum-type construction and patterns

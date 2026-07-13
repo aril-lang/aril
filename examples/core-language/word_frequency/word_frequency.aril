@@ -40,11 +40,11 @@ func countWords(text: string): Map<string, int> {
 }
 
 func topN(counts: Map<string, int>, n: int): []WordCount {
-  var pairs: []WordCount = []WordCount{}
+  let pairs = List<WordCount>{}
   for (k, v) in counts {
-    pairs = pairs.push(WordCount{ word: k, count: v })
+    pairs.push(WordCount{ word: k, count: v })
   }
-  let sorted = sort.sorted(pairs, (a, b) => (a.count > b.count || (a.count == b.count && a.word < b.word)))
+  let sorted = sort.sorted(pairs.toSlice(), (a, b) => (a.count > b.count || (a.count == b.count && a.word < b.word)))
   let limit = if sorted.len() < n { sorted.len() } else { n }
   return sorted[0:limit]
 }

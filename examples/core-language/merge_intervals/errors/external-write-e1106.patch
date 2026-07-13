@@ -7,5 +7,5 @@
 -      cur = Interval{ start: cur.start, end: max(cur.end, nxt.end) }
 +      cur.end = max(cur.end, nxt.end)
      } else {
-       out = out.push(cur)
+       out.push(cur)
        cur = nxt

@@ -33,13 +33,13 @@ func reverse(head: Option<Node>): Option<Node> {
 
 // The node values, head to tail.
 func toValues(head: Option<Node>): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var cur = head
   while true {
     match cur {
-      None       => return out,
+      None       => return out.toSlice(),
       Some(node) => {
-        out = out.push(node.value)
+        out.push(node.value)
         cur = node.next
       },
     }
@@ -47,13 +47,13 @@ func toValues(head: Option<Node>): []int {
 }
 
 func reversedInts(xs: []int): []int {
-  var out: []int = []int{}
+  let out = List<int>{}
   var i = xs.len() - 1
   while i >= 0 {
-    out = out.push(xs[i])
+    out.push(xs[i])
     i = i - 1
   }
-  return out
+  return out.toSlice()
 }
 
 func intsEq(a: []int, b: []int): bool {
