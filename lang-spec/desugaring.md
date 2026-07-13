@@ -153,6 +153,23 @@ sema lands, the duplication is benign for the only writable
 shapes v1 admits (plain identifier, field access, slice / map
 index).
 
+This stage also includes the **`Result<T>` default error type**
+(§Result-Default). `Result` is the only predeclared generic with a
+defaultable parameter: written with a single type argument, the parser
+fills the error type with the predeclared `error`, so every downstream
+consumer (sema resolution, arity check, codegen lowering) sees one
+canonical two-argument shape:
+
+```
+[[ NamedType { qname: ["Result"], args: [T] } ]]
+                                                  ⟿
+  NamedType { qname: ["Result"], args: [T, NamedType { qname: ["error"] }] }
+```
+
+The synthesised `error` argument carries the whole instantiation's span.
+`Result` (zero args) and `Result<A, B, C>` (three) remain arity errors
+(**E0207**); only the one-arg form defaults.
+
 `const` is a surface alias for `let` and produces an identical
 `LetStmt` AST node — implementers shouldn't introduce a
 separate `ConstStmt` form.

@@ -206,6 +206,20 @@ func (p *parser) parseTypeExpr() (ast.TypeExpr, *Diag) {
 		}
 		endLine, endCol = closeTok.Line, closeTok.Col+1
 	}
+	// `Result<T>` defaults its error type to `error` (desugaring.md
+	// §Result-Default): normalize the one-arg form to `Result<T, error>`
+	// so every downstream consumer (sema resolution, arity check, codegen
+	// lowering) sees the full two-arg shape uniformly. The synthetic
+	// `error` arg carries the whole instantiation's span.
+	if len(qname) == 1 && qname[0] == "Result" && len(args) == 1 {
+		args = append(args, &ast.NamedType{
+			Span: ast.Span{
+				StartLine: startLine, StartCol: startCol,
+				EndLine: endLine, EndCol: endCol,
+			},
+			QName: []string{"error"},
+		})
+	}
 	return &ast.NamedType{
 		Span: ast.Span{
 			StartLine: startLine, StartCol: startCol,

@@ -181,7 +181,8 @@ applies anywhere a `Result` type appears (declarations, return
 types, parameter types, generic arguments, including in spec
 files such as `type-system.md` §Dynamic and §reflect below).
 Writing `Result<T, E>` with an explicit `E` is required when
-`E ≠ error`.
+`E ≠ error`. Mechanically the one-arg form is normalised to the
+two-arg shape at parse time (`desugaring.md` §Stage 2, Result-Default).
 
 `Ok` / `Err` are predeclared variants, unqualified usable.
 

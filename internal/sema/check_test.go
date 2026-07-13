@@ -996,6 +996,16 @@ func TestTooManyGenericArgsFiresE0207(t *testing.T) {
 	}
 }
 
+// Result<T> defaults its error type to `error` (desugaring.md §Result-Default),
+// so the single-arg form is well-formed — no arity error.
+func TestResultSingleArgDefaultsErrorNoArity(t *testing.T) {
+	src := `func ok(): Result<int> { return Ok(1) }
+`
+	if codes := runCheck(t, src); contains(codes, "E0207") {
+		t.Errorf("Result<int> should default E = error, got E0207: %v", codes)
+	}
+}
+
 func TestNonCyclicAliasPasses(t *testing.T) {
 	src := `type Cents = int
 type Total = Cents
