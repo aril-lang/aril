@@ -665,8 +665,9 @@ func (c *checker) inferMap(call *ast.Call) (Type, bool) {
 	if !ok || f.Name != "map" || len(call.Args) != 1 {
 		return nil, false
 	}
+	recv := c.info.Type[f.Receiver]
 	var payload Type
-	switch r := c.info.Type[f.Receiver].(type) {
+	switch r := recv.(type) {
 	case *Option:
 		payload = r.T
 	case *Result:
@@ -684,7 +685,9 @@ func (c *checker) inferMap(call *ast.Call) (Type, bool) {
 	if fn, ok := argT.(*Func); ok && fn.Return != nil {
 		u = fn.Return
 	}
-	switch r := c.info.Type[f.Receiver].(type) {
+	// recv is already known Option/Result here (the guard switch above returned
+	// otherwise); re-discriminate the cached type to carry the Result's E.
+	switch r := recv.(type) {
 	case *Option:
 		return &Option{T: u}, true
 	case *Result:
