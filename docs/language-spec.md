@@ -421,6 +421,9 @@ so `(T, error)`-returning Go functions bind directly to `Result<T,
 error>`. The built-in `error(msg: string): error` constructs a basic
 error. A `class` may declare `implements error` for typed errors.
 
+The error type defaults to `error`, so `Result<T>` is shorthand for
+`Result<T, error>` — write the explicit `E` only when `E ≠ error`.
+
 Note: a `class implements error` must define `error(): string` to
 satisfy the interface — that method shares its identifier with the
 free-function constructor `error(msg: string): error`. Inside the

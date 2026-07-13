@@ -1,0 +1,67 @@
+--- TITLE ---
+Result<T> (default error) lowers to arilrt.Result[T, error]
+
+--- INPUT ---
+import fmt
+import strconv
+
+// Single-arg Result<int>: the error type defaults to `error`, so the
+// emitted Go signature is the full Result[int, error] and a bare stdlib
+// error propagates through `try` with no .mapErr bridge.
+func parse(raw: string): Result<int> {
+  let n = try strconv.atoi(raw)
+  return Ok(n * 2)
+}
+
+func main() {
+  match parse("21") {
+    Ok(v)  => fmt.println("ok", v),
+    Err(e) => fmt.println("err", e.error()),
+  }
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func parse(raw string) Result[int, error] {
+	__aril_try_1 := ResultOf(strconv.Atoi(raw))
+	if __aril_try_1.Tag == 1 {
+		return Result[int, error]{Tag: 1, E: __aril_try_1.E}
+	}
+	var n = __aril_try_1.V
+	return ResultOk[int, error](n * 2)
+}
+func main() {
+	__aril_match_1 := parse("21")
+	switch __aril_match_1.Tag {
+	case 0:
+		v := __aril_match_1.V
+		fmt.Println("ok", v)
+	case 1:
+		e := __aril_match_1.E
+		fmt.Println("err", e.Error())
+	}
+}
