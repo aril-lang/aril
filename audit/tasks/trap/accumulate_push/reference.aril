@@ -1,8 +1,8 @@
 import fmt
 func main() {
-  var xs = []int{}
+  var xs = List<int>{}
   for i in 1..=5 {
-    xs = xs.push(i * i)
+    xs.push(i * i)
   }
   for x in xs {
     fmt.println(x)
