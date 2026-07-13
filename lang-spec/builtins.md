@@ -340,8 +340,8 @@ class List<T> {
   push(e: T): unit                 [append in place — mutates the receiver]
   pop(): Option<T>                 [remove+return the last element; None on empty]
   get(i: int): Option<T>           [total — bounds-checked read; None if i out of range]
-  set(i: int, e: T): unit          [index write — mutates]
-  insert(i: int, e: T): unit       [insert at index i, shifting the tail right — mutates]
+  set(i: int, e: T): unit          [index write — mutates; panics if i out of range]
+  insert(i: int, e: T): unit       [insert at index i (clamped to [0, len]), shifting the tail right — mutates]
   removeAt(i: int): Option<T>      [remove+return the element at i; None if out of range — mutates]
   toSlice(): []T                   [a COPY of the backing slice — the List → []T value-view bridge]
 }
