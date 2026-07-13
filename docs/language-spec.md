@@ -197,12 +197,12 @@ shadow each other.
 ### Lists: `List<T>`
 
 The **growable, indexable reference sequence** — the honest mutable
-counterpart to the slice `[]T`. Where a slice is a *value view* (its
-`.push` returns a new header, so you write `xs = xs.push(e)`), a `List`
-is a **reference type** (like a class): a mutating method changes the
-value in place, seen through every alias, with no reassignment. The rule
-of thumb — a mutating-looking method must actually mutate — is why the
-two coexist (the Rust `Vec` / slice split).
+counterpart to the slice `[]T`. Where a slice is a *value view* with pure
+accessors only (no `.push` — a header can't grow in place; §Slices), a
+`List` is a **reference type** (like a class): a mutating method changes
+the value in place, seen through every alias, with no reassignment. The
+rule of thumb — a mutating-looking method must actually mutate — is why
+the two coexist (the Rust `Vec` / slice split).
 
 - Construct empty: `List<T>{}` or `List<T>.new()`.
 - Literal with elements: `List<int>{ 1, 2, 3 }` — comma-separated values
