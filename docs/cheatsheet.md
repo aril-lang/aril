@@ -158,6 +158,9 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
   same-shape records (`A`, `B`) are *not* interchangeable (E0201), unlike TS.
 - `string → int` is **not** a cast (`int(s)` is E0205) — use `strconv.atoi`
   (`Result`) / `strconv.itoa`.
+- To **print** a non-string, you don't convert first: `fmt.println(i)` and
+  `"${i}"` take any type (`%v`). `strconv.itoa` is only for when you need the
+  `string` value itself.
 
 ## 8. Classes (state + behavior + interfaces)
 
@@ -227,6 +230,7 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `try { } catch { }` block | `try` is prefix (`?`); `catch` is postfix + **must diverge** |
 | `throw` / exceptions | none — `Result<T, E>` |
 | `arr.push(x)` mutates | slice `[]T` has **no `push`** (value view); grow with `List<T>` — `let l = List<int>{}; l.push(x)` |
+| `sort.Slice(xs, …)` in place (Go) | slice is a value view — `sort.sorted(xs, less)` returns a **new** slice (`sort.sortedBy(xs, key)` by a key); `sort.Slice` is E0217 |
 | `map[k]` → undefined on miss | zero value; use `m.has(k): bool` / `m.get(k): Option<V>` |
 | `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples compare field-wise |
 | same-shape records interchangeable | nominal named types — `A` ≠ `B` (E0201) |
