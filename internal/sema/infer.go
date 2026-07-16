@@ -2,6 +2,7 @@ package sema
 
 import (
 	"strconv"
+	"unicode"
 
 	"github.com/aril-lang/aril/internal/ast"
 	"github.com/aril-lang/aril/internal/binding"
@@ -984,23 +985,41 @@ func (c *checker) unboundStdlibMember(f *ast.Field) bool {
 	if binding.IsMember(recv.Name, f.Name) {
 		return false
 	}
-	c.report("E0217", "Module `"+recv.Name+"` has no bound member `"+f.Name+"`"+stdlibMemberHint(recv.Name), f.Span)
+	c.report("E0217", "Module `"+recv.Name+"` has no bound member `"+f.Name+"`"+memberMissHint(recv.Name, f.Name), f.Span)
 	return true
 }
 
-// stdlibMemberHint returns a tailored trailing hint for an E0217 unbound-member
-// miss on a bound stdlib namespace whose Go idiom leaks (the AUDIT-2 F-sort
-// cluster: `sort.Slice`/`sort.slice`/`sort.sort`/`sort.by` reach for Go's
-// in-place-sort spelling instead of Aril's `sort.sorted`). It names the actual
-// binding so the diagnostic *teaches the trap*, not just reports the miss
-// (D38/D41 tailored-hint precedent, mirrors the E0214 slice→`List<T>` hint).
-// Empty for a namespace with no known idiom trap — the base message stands.
-func stdlibMemberHint(module string) string {
+// memberMissHint returns a tailored trailing hint for an E0217 unbound-member
+// miss on a bound stdlib namespace, so the diagnostic *teaches the trap* rather
+// than only reporting the miss (D38/D41 tailored-hint precedent, mirrors the
+// E0214 slice→`List<T>` hint). Two AUDIT-2 leakage clusters:
+//   - Casing: Aril lowercases the first letter of Go's exported names, so a
+//     Go-PascalCase reach (`strings.Fields`, `math.Sqrt`) misses the bound
+//     lowercase spelling — a general "did you mean" recovers it.
+//   - Rename: `sort.*` reaches for Go's in-place `sort.Slice` idiom; Aril's
+//     copy-returning `sort.sorted` is a rename, not just a case change, so it
+//     needs a namespace-specific hint.
+//
+// Empty when neither applies — the base message stands (sound-over-complete).
+func memberMissHint(module, member string) string {
+	if lower := lowerFirst(member); lower != member && binding.IsMember(module, lower) {
+		return " — did you mean `" + module + "." + lower + "`? Aril lowercases the first letter of Go's exported names"
+	}
 	switch module {
 	case "sort":
 		return " — sort a slice with `sort.sorted(xs, less)` (e.g. descending: `sort.sorted(xs, (a, b) => a > b)`), or by a key with `sort.sortedBy(xs, key)`"
 	}
 	return ""
+}
+
+// lowerFirst lowercases the first rune of s (Go exported → Aril camelCase).
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToLower(r[0])
+	return string(r)
 }
 
 // unknownMember reports an Aril-coordinate diagnostic (E0214) when a

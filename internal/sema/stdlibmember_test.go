@@ -90,3 +90,32 @@ func use(xs: []int) { sort.by(xs, (x) => x) }`,
 		})
 	}
 }
+
+// The AUDIT-2 casing cluster: Aril lowercases the first letter of Go's exported
+// names, so a Go-PascalCase reach misses the bound lowercase spelling. E0217
+// carries a general "did you mean" naming the real member, across namespaces
+// (not just one hard-coded module).
+func TestCaseVariantMemberMissCarriesDidYouMeanHint(t *testing.T) {
+	cases := []struct{ name, src, want string }{
+		{"strings-Fields", `import strings
+func use(s: string): []string { return strings.Fields(s) }`, "did you mean `strings.fields`?"},
+		{"strings-ToUpper", `import strings
+func use(s: string): string { return strings.ToUpper(s) }`, "did you mean `strings.toUpper`?"},
+		{"math-Sqrt", `import math
+func use(x: float): float { return math.Sqrt(x) }`, "did you mean `math.sqrt`?"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			msgs := runCheckMsgs(t, c.src)
+			found := false
+			for _, m := range msgs {
+				if strings.Contains(m, c.want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("expected E0217 message to carry %q, got %v", c.want, msgs)
+			}
+		})
+	}
+}
