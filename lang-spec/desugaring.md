@@ -287,6 +287,12 @@ a **custom, mandatorily-diverging** handler instead of the implicit
   }
 ```
 
+The `Err` binder desugars to `IdentPat x`, so a **discard** binder (`catch _`)
+is an `IdentPat _`, not a `WildcardPat`. Codegen treats a payload `IdentPat _`
+as a wildcard and emits **no** Go binding (an emitted `_ := <tmp>.E` is illegal
+Go — "no new variables on left side of :="), following the wildcard → no-bind
+rule (`lowering-go.md` §MatchIR).
+
 The `FromCatch` tag carries two catch-specific obligations a plain `match` does
 not (checked by sema, T-Catch): the subject must be a `Result` (E0410), and the
 handler `block` must **diverge** — `return` / `os.exit` / `panic` (E0409). It

@@ -1,0 +1,63 @@
+--- TITLE ---
+`expr catch _ { block }` — the discard binding of the postfix catch form
+(desugaring.md §Catch). The `_` names no error variable; its desugared
+`Err(_)` arm carries the `_` as an identifier, so payload binding must emit
+NO Go binding line (an emitted `_ := <tmp>.E` is illegal Go — "no new
+variables on left side of :="). The handler still must diverge (sema E0409).
+Regression guard for the AUDIT-2 F-catch-discard miscompile (match.go
+§bindSubPattern).
+
+--- INPUT ---
+import fmt
+import strconv
+
+func firstOr(s: string, fallback: int): int {
+  let n = strconv.atoi(s) catch _ {
+    return fallback
+  }
+  return n
+}
+
+func main() {
+  fmt.println(firstOr("42", -1))
+  fmt.println(firstOr("nope", -1))
+}
+
+--- GO ---
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func ResultOf[T any](v T, err error) Result[T, error] {
+	if err != nil {
+		return ResultErr[T, error](err)
+	}
+	return ResultOk[T, error](v)
+}
+func firstOr(s string, fallback int) int {
+	__aril_catch_1 := ResultOf(strconv.Atoi(s))
+	if __aril_catch_1.Tag == 1 {
+		return fallback
+	}
+	var n = __aril_catch_1.V
+	return n
+}
+func main() {
+	fmt.Println(firstOr("42", -1))
+	fmt.Println(firstOr("nope", -1))
+}
