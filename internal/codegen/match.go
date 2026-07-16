@@ -808,6 +808,12 @@ func (g *gen) emitPayloadBindings(vp *ast.VariantPat, subjectExpr string) error 
 func (g *gen) bindSubPattern(sub ast.Pattern, valueExpr string) error {
 	switch sp := sub.(type) {
 	case *ast.IdentPat:
+		// A `_` payload binding is a discard — bind nothing (`_ := x` is
+		// illegal Go). Reached when `_` arrives as an IdentPat, not a
+		// WildcardPat (desugaring.md §Catch; lowering-go.md §MatchIR).
+		if sp.Name == "_" {
+			return nil
+		}
 		g.writeIndent()
 		g.b.WriteString(goIdent(sp.Name))
 		g.b.WriteString(" := ")
