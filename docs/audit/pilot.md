@@ -10,6 +10,10 @@ the calibration/protocol lessons that shape AUDIT-2.
 > **re-run** (against the fixed v0.21.0 surface, after the LANGUAGE-FIXES and
 > CONTAINER-MODEL epochs) is the current headline — jump to
 > [§ AUDIT-1 re-run](#audit-1-re-run-fixed-surface-2026-07-13).
+>
+> **AUDIT-2 (the full model × rung × task × N sweep this pilot sized) has run** —
+> see [`audit2.md`](audit2.md) for the intuition scoreboard, the iterative arm,
+> and the findings.
 
 **Scope.** Measurement-first: no compiler change. The one remediation applied is a
 doc calibration (the cheatsheet fix below), validated before/after; all other
