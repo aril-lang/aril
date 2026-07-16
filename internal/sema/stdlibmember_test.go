@@ -61,12 +61,14 @@ func use(): bool { let re = regexp.mustCompile("x")  return re.matchString("x") 
 // the diagnostic teaches the trap (D38/D41 tailored-hint precedent). The real
 // bindings `sort.sorted`/`sort.sortedBy` stay silent (covered above too).
 func TestSortMemberMissCarriesSortedHint(t *testing.T) {
-	// The forms AUDIT-2 models reached for (sort.Slice/slice/sort/by).
+	// The forms AUDIT-2 models reached for (sort.Slice/Sort/sort/by). Uses
+	// unambiguous Go spellings that will never be bound under those names, so
+	// the witnesses don't depend on a future binding staying absent.
 	cases := []string{
 		`import sort
 func use(xs: []int) { sort.Slice(xs, (i, j) => xs[i] > xs[j]) }`,
 		`import sort
-func use(xs: []int) { sort.slice(xs, (i, j) => xs[i] > xs[j]) }`,
+func use(xs: []int) { sort.Sort(xs) }`,
 		`import sort
 func use(xs: []int) { sort.sort(xs) }`,
 		`import sort
