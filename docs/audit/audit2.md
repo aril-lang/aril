@@ -167,11 +167,14 @@ the sum-type + exhaustive `match` (shape_area 34/34), and the `List<int>{}` +
 ## Learnability (iterative arm)
 
 Recovery is cheap and near-total. Iterations-to-green (self-reported check.sh
-runs, over 347 passing cells): **1→325, 2→15, 3→2, 4→16, 5→1, 8→1; mean 1.11.**
-All 11 non-`sort_desc` one-shot failures reached green with feedback (the L1
-syntax slips in 1 extra iteration; the `catch _` bug via a rewrite). The **only**
-construct that resists the compiler loop is `sort_desc` at L1/L2 — a
-diagnostic-quality gap, not a learnability gap.
+runs) over the **347 passing** cells: **1→325, 2→15, 3→2, 4→4, 8→1; mean 1.11**
+(90% green on the first write; one lucky `sort_desc` recovery took 8). The **13
+non-recovering** cells — every one `sort_desc` at L1/L2 — instead ran to the K=4
+cap and beyond (12 stopped at 4 attempts, 1 at 5) *without* reaching green; they
+are excluded from the passing histogram above. All 11 non-`sort_desc` one-shot
+failures reached green with feedback (the L1 syntax slips in 1 extra iteration;
+the `catch _` bug via a rewrite). The **only** construct that resists the compiler
+loop is `sort_desc` at L1/L2 — a diagnostic-quality gap, not a learnability gap.
 
 ## Verdict and hand-off
 
