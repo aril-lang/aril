@@ -984,8 +984,23 @@ func (c *checker) unboundStdlibMember(f *ast.Field) bool {
 	if binding.IsMember(recv.Name, f.Name) {
 		return false
 	}
-	c.report("E0217", "Module `"+recv.Name+"` has no bound member `"+f.Name+"`", f.Span)
+	c.report("E0217", "Module `"+recv.Name+"` has no bound member `"+f.Name+"`"+stdlibMemberHint(recv.Name), f.Span)
 	return true
+}
+
+// stdlibMemberHint returns a tailored trailing hint for an E0217 unbound-member
+// miss on a bound stdlib namespace whose Go idiom leaks (the AUDIT-2 F-sort
+// cluster: `sort.Slice`/`sort.slice`/`sort.sort`/`sort.by` reach for Go's
+// in-place-sort spelling instead of Aril's `sort.sorted`). It names the actual
+// binding so the diagnostic *teaches the trap*, not just reports the miss
+// (D38/D41 tailored-hint precedent, mirrors the E0214 slice→`List<T>` hint).
+// Empty for a namespace with no known idiom trap — the base message stands.
+func stdlibMemberHint(module string) string {
+	switch module {
+	case "sort":
+		return " — sort a slice with `sort.sorted(xs, less)` (e.g. descending: `sort.sorted(xs, (a, b) => a > b)`), or by a key with `sort.sortedBy(xs, key)`"
+	}
+	return ""
 }
 
 // unknownMember reports an Aril-coordinate diagnostic (E0214) when a

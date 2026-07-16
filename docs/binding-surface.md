@@ -631,10 +631,12 @@ sort.sorted<T>(s: []T, less: (T, T) => bool): []T
 
 // Convenience: sort by an `Ord`-comparable key extractor.
 sort.sortedBy<T, K>(s: []T, key: (T) => K): []T
-
-// In-place mutation variant (matches Go's sort.Slice, takes a `var` slice).
-sort.slice<T>(s: []T, less: (int, int) => bool)
 ```
+
+There is no in-place `sort.slice`/`sort.Slice` variant: a `[]T` slice is a
+value view (D55), so an in-place sort would mutate a copy. `sort.sorted`
+returns a new slice, which is the honest shape — a `sort.*` miss (a Go
+`sort.Slice` reach) is diagnosed with E0217 pointing at `sort.sorted`.
 
 ## slices
 

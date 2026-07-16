@@ -1,6 +1,9 @@
 package sema
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // E0217 — an unknown member on a *bound stdlib namespace* (`strings.foo`) is
 // reported in Aril coordinates rather than leaking a raw `go build`
@@ -48,6 +51,41 @@ func use(): bool { let re = regexp.mustCompile("x")  return re.matchString("x") 
 		t.Run(c.name, func(t *testing.T) {
 			if codes := runCheck(t, c.src); contains(codes, "E0217") {
 				t.Errorf("E0217 must not fire on a bound member, got %v", codes)
+			}
+		})
+	}
+}
+
+// The AUDIT-2 F-sort cluster: an unbound `sort.*` member (a Go `sort.Slice`
+// idiom leaking) fires E0217 with a *tailored* hint naming `sort.sorted`, so
+// the diagnostic teaches the trap (D38/D41 tailored-hint precedent). The real
+// bindings `sort.sorted`/`sort.sortedBy` stay silent (covered above too).
+func TestSortMemberMissCarriesSortedHint(t *testing.T) {
+	// The forms AUDIT-2 models reached for (sort.Slice/Sort/sort/by). Uses
+	// unambiguous Go spellings that will never be bound under those names, so
+	// the witnesses don't depend on a future binding staying absent.
+	cases := []string{
+		`import sort
+func use(xs: []int) { sort.Slice(xs, (i, j) => xs[i] > xs[j]) }`,
+		`import sort
+func use(xs: []int) { sort.Sort(xs) }`,
+		`import sort
+func use(xs: []int) { sort.sort(xs) }`,
+		`import sort
+func use(xs: []int) { sort.by(xs, (x) => x) }`,
+	}
+	const want = "`sort.sorted(xs, less)`"
+	for _, src := range cases {
+		t.Run("", func(t *testing.T) {
+			msgs := runCheckMsgs(t, src)
+			found := false
+			for _, m := range msgs {
+				if strings.Contains(m, want) {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("expected E0217 message to carry the sort.sorted hint %q, got %v", want, msgs)
 			}
 		})
 	}
