@@ -50,7 +50,7 @@ internal struct layout, not the Aril value:
 | record `Point{x:1,y:2}` | `{1 2}` | `{x: 1, y: 2}` |
 | tuple `(1,"a")` | `{1 a}` | `(1, "a")` |
 | `Some(5)` / `None` | `{1 5}` / `{0 0}` | `Some(5)` / `None` |
-| `Ok(5)` / `Err("boom")` | `{0 5 <nil>}` / `{1 0 boom}` | `Ok(5)` / `Err("boom")` |
+| `Ok(5)` / `Err("boom")` | `{0 5 <nil>}` / `{1 0 boom}` (the `<nil>` is `Result<T,error>`'s empty `E`; `Result<T,string>` → `{0 5 }`) | `Ok(5)` / `Err("boom")` |
 | sum `Circle(2.0)` / `Square(3.0)` | `{0 2 0}` / `{1 0 3}` | `Circle(2.0)` / `Square(3.0)` |
 
 The sum-type / `Result` renderings are the worst: the leading integer is the
@@ -142,7 +142,7 @@ false mental model, and giving a spot-check with literals false confidence.
   gotcha row. Low remediation cost, notable because Aril is otherwise strict
   about numeric types (see the loud-and-good list).
 
-### T5 — Map/Set iteration is insertion-ordered, but the spec says "unspecified — matches Go" [silent-lie · doc-vs-impl]
+### T5 — Map/Set iteration is insertion-ordered, but the spec says "unspecified — matches Go" [silent · latent-trap · doc-vs-impl]
 
 `for (k,v) in m` and `for x in s` iterate in **insertion order, deterministically**
 (verified stable across repeated runs) — the runtime is a hand-rolled ordered
