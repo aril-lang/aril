@@ -1,44 +1,65 @@
-package arilrt
+--- TITLE ---
+A bare `m[k]` index over a Map whose value type is a container coalesces a miss to the empty container, not a nil pointer (lowering-go.md §Container defaulting; T13)
 
-// containers.go — the predeclared container types Map / Set / Stack
-// (lang-spec/builtins.md §Map / §Set / §Stack, lowering-go.md §Container
-// types). Insertion order is preserved for deterministic iteration.
-// Methods are exported so vendored-mode code in another package can call
-// them; inline single-file mode uses the same spellings without the
-// package selector.
+--- INPUT ---
+import fmt
 
-// Map is an insertion-ordered map.
+func main() {
+  let m = Map<string, List<int>>{}
+  let v = m["absent"]
+  v.push(1)
+  v.push(2)
+  fmt.println(v.len())
+  let s = Map<int, Set<int>>{}
+  let got = s[99]
+  got.add(7)
+  got.add(7)
+  fmt.println(got.len())
+  let plain = Map<string, int>{}
+  fmt.println(plain["missing"])
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
 type Map[K comparable, V any] struct {
 	m     map[K]V
 	order []K
 }
 
-// NewMap builds an empty Map.
 func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{m: map[K]V{}, order: nil}
 }
-
 func (m *Map[K, V]) Len() int     { return len(m.order) }
 func (m *Map[K, V]) Has(k K) bool { _, ok := m.m[k]; return ok }
-
-// At is the raw index read backing `m[k]`: V's zero value for a missing
-// key (Go map semantics). Get is the Option-returning form.
-func (m *Map[K, V]) At(k K) V { return m.m[k] }
-
+func (m *Map[K, V]) At(k K) V     { return m.m[k] }
 func (m *Map[K, V]) Get(k K) Option[V] {
 	if v, ok := m.m[k]; ok {
 		return Option[V]{Tag: 1, V: v}
 	}
 	return Option[V]{Tag: 0}
 }
-
 func (m *Map[K, V]) Set(k K, v V) {
 	if _, ok := m.m[k]; !ok {
 		m.order = append(m.order, k)
 	}
 	m.m[k] = v
 }
-
 func (m *Map[K, V]) Delete(k K) {
 	if _, ok := m.m[k]; !ok {
 		return
@@ -51,13 +72,11 @@ func (m *Map[K, V]) Delete(k K) {
 		}
 	}
 }
-
 func (m *Map[K, V]) Keys() []K {
 	out := make([]K, len(m.order))
 	copy(out, m.order)
 	return out
 }
-
 func (m *Map[K, V]) Values() []V {
 	out := make([]V, 0, len(m.order))
 	for _, k := range m.order {
@@ -66,18 +85,14 @@ func (m *Map[K, V]) Values() []V {
 	return out
 }
 
-// Set is an insertion-ordered set.
 type Set[T comparable] struct {
 	m     map[T]struct{}
 	order []T
 }
 
-// NewSet builds an empty Set.
 func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{m: map[T]struct{}{}, order: nil}
 }
-
-// SetFrom builds a Set from a slice, preserving first-seen order.
 func SetFrom[T comparable](elems []T) *Set[T] {
 	s := NewSet[T]()
 	for _, e := range elems {
@@ -85,10 +100,8 @@ func SetFrom[T comparable](elems []T) *Set[T] {
 	}
 	return s
 }
-
 func (s *Set[T]) Len() int     { return len(s.order) }
 func (s *Set[T]) Has(e T) bool { _, ok := s.m[e]; return ok }
-
 func (s *Set[T]) Add(e T) {
 	if _, ok := s.m[e]; ok {
 		return
@@ -96,7 +109,6 @@ func (s *Set[T]) Add(e T) {
 	s.m[e] = struct{}{}
 	s.order = append(s.order, e)
 }
-
 func (s *Set[T]) Delete(e T) {
 	if _, ok := s.m[e]; !ok {
 		return
@@ -109,88 +121,36 @@ func (s *Set[T]) Delete(e T) {
 		}
 	}
 }
-
 func (s *Set[T]) ToSlice() []T {
 	out := make([]T, len(s.order))
 	copy(out, s.order)
 	return out
 }
 
-// Stack is a LIFO stack.
-type Stack[T any] struct {
-	xs []T
-}
-
-// NewStack builds an empty Stack.
-func NewStack[T any]() *Stack[T] {
-	return &Stack[T]{xs: nil}
-}
-
-func (s *Stack[T]) Len() int { return len(s.xs) }
-func (s *Stack[T]) Push(e T) { s.xs = append(s.xs, e) }
-
-func (s *Stack[T]) Pop() Result[T, error] {
-	n := len(s.xs)
-	if n == 0 {
-		var zero T
-		return Result[T, error]{Tag: 1, E: emptyStack, V: zero}
-	}
-	v := s.xs[n-1]
-	s.xs = s.xs[:n-1]
-	return Result[T, error]{Tag: 0, V: v}
-}
-
-func (s *Stack[T]) Peek() Option[T] {
-	n := len(s.xs)
-	if n == 0 {
-		return Option[T]{Tag: 0}
-	}
-	return Option[T]{Tag: 1, V: s.xs[n-1]}
-}
-
-var emptyStack = emptyStackError{}
-
-type emptyStackError struct{}
-
-func (emptyStackError) Error() string { return "empty stack" }
-
-// List is a growable, indexable sequence — a reference container whose
-// mutating methods mutate in place (lang-spec/builtins.md §List). The
-// value primitive []T is a value view with pure accessors only; growth
-// lives here (the mutating-method-must-mutate invariant, D55).
 type List[T any] struct {
 	xs []T
 }
 
-// NewList builds an empty List (backs List<T>{} and List<T>.new()).
 func NewList[T any]() *List[T] {
 	return &List[T]{xs: nil}
 }
-
-// ListOf builds a List from initial elements (backs the initialized
-// literal List<T>{a, b, c}).
 func ListOf[T any](elems ...T) *List[T] {
 	xs := make([]T, len(elems))
 	copy(xs, elems)
 	return &List[T]{xs: xs}
 }
-
 func (l *List[T]) Len() int { return len(l.xs) }
-func (l *List[T]) Push(e T) { l.xs = append(l.xs, e) }
-
-// At is the raw index read backing `l[i]` — panics on out-of-range, like
-// a Go slice index. Get is the Option-returning bounds-checked form.
+func (l *List[T]) Push(e T) {
+	l.xs = append(l.xs, e)
+}
 func (l *List[T]) At(i int) T { return l.xs[i] }
-
 func (l *List[T]) Get(i int) Option[T] {
 	if i < 0 || i >= len(l.xs) {
 		return Option[T]{Tag: 0}
 	}
 	return Option[T]{Tag: 1, V: l.xs[i]}
 }
-
 func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
-
 func (l *List[T]) Pop() Option[T] {
 	n := len(l.xs)
 	if n == 0 {
@@ -200,7 +160,6 @@ func (l *List[T]) Pop() Option[T] {
 	l.xs = l.xs[:n-1]
 	return Option[T]{Tag: 1, V: v}
 }
-
 func (l *List[T]) Insert(i int, e T) {
 	if i < 0 {
 		i = 0
@@ -213,7 +172,6 @@ func (l *List[T]) Insert(i int, e T) {
 	copy(l.xs[i+1:], l.xs[i:])
 	l.xs[i] = e
 }
-
 func (l *List[T]) RemoveAt(i int) Option[T] {
 	if i < 0 || i >= len(l.xs) {
 		return Option[T]{Tag: 0}
@@ -222,46 +180,42 @@ func (l *List[T]) RemoveAt(i int) Option[T] {
 	l.xs = append(l.xs[:i], l.xs[i+1:]...)
 	return Option[T]{Tag: 1, V: v}
 }
-
-// ToSlice returns a copy of the backing slice — the []T value view (the
-// List → []T bridge for a bound-Go API expecting a slice).
 func (l *List[T]) ToSlice() []T {
 	out := make([]T, len(l.xs))
 	copy(out, l.xs)
 	return out
 }
-
-// Coalesce{List,Map,Set,Stack} back a bare `m[k]` / `l[i]` index whose
-// element type is itself a reference container: `.At` returns V's zero
-// value on a miss/out-of-bounds, which for a container V is a nil
-// pointer that would segfault on first use. These substitute the empty
-// container so the miss stays usable and the "no nil" promise holds
-// (lowering-go.md §Container defaulting, T13). Go infers the element
-// type parameters from the argument, so no type args are emitted.
 func CoalesceList[T any](p *List[T]) *List[T] {
 	if p == nil {
 		return NewList[T]()
 	}
 	return p
 }
-
-func CoalesceMap[K comparable, V any](p *Map[K, V]) *Map[K, V] {
-	if p == nil {
-		return NewMap[K, V]()
-	}
-	return p
-}
-
 func CoalesceSet[T comparable](p *Set[T]) *Set[T] {
 	if p == nil {
 		return NewSet[T]()
 	}
 	return p
 }
-
-func CoalesceStack[T any](p *Stack[T]) *Stack[T] {
-	if p == nil {
-		return NewStack[T]()
-	}
-	return p
+func main() {
+	var m = NewMap[string, *List[int]]()
+	var v = CoalesceList(m.At("absent"))
+	v.Push(1)
+	v.Push(2)
+	fmt.Println(v.Len())
+	var s = NewMap[int, *Set[int]]()
+	var got = CoalesceSet(s.At(99))
+	got.Add(7)
+	got.Add(7)
+	fmt.Println(got.Len())
+	var plain = NewMap[string, int]()
+	fmt.Println(plain.At("missing"))
 }
+
+--- STDOUT ---
+2
+1
+0
+
+--- EXIT ---
+0

@@ -756,6 +756,14 @@ func (g *gen) emitExpr(e ast.Expr) error {
 			// `l[i]` on a List lowers to `l.At(i)` (a Go bounds-checked slice
 			// index inside the wrapper) — the same exported-accessor path as
 			// Map's `m[k]`, so it works across the arilrt boundary in vendored mode.
+			// When the element type is itself a reference container, `.At`'s
+			// zero-value-on-miss is a nil pointer; wrap it in the Coalesce
+			// helper so a miss yields the empty container, not nil (T13).
+			kind := g.indexMapValueContainerKind(id)
+			if kind != "" {
+				g.b.WriteString(g.rt("Coalesce" + kind))
+				g.b.WriteByte('(')
+			}
 			if err := g.emitExpr(id); err != nil {
 				return err
 			}
@@ -764,6 +772,9 @@ func (g *gen) emitExpr(e ast.Expr) error {
 				return err
 			}
 			g.b.WriteByte(')')
+			if kind != "" {
+				g.b.WriteByte(')')
+			}
 			return nil
 		}
 		if err := g.emitExpr(v.Receiver); err != nil {

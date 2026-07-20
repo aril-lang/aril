@@ -688,6 +688,25 @@ func (l *List[T]) ToSlice() []T {
 }
 `)
 	}
+	// Coalesce helpers back a bare `m[k]`/`l[i]` index whose element is
+	// itself a container: `.At`'s zero-value-on-miss is a nil pointer, so
+	// the miss is substituted with the empty container (lowering-go.md
+	// §Container defaulting, T13). Emitted only when such an index was
+	// seen, gated per kind so an unrelated container program is
+	// byte-identical. The element container type is defined above (it
+	// appears in the outer container's type args → its usesX flag is set).
+	if g.usesCoalesceList {
+		g.b.WriteString("func CoalesceList[T any](p *List[T]) *List[T] {\n\tif p == nil {\n\t\treturn NewList[T]()\n\t}\n\treturn p\n}\n")
+	}
+	if g.usesCoalesceMap {
+		g.b.WriteString("func CoalesceMap[K comparable, V any](p *Map[K, V]) *Map[K, V] {\n\tif p == nil {\n\t\treturn NewMap[K, V]()\n\t}\n\treturn p\n}\n")
+	}
+	if g.usesCoalesceSet {
+		g.b.WriteString("func CoalesceSet[T comparable](p *Set[T]) *Set[T] {\n\tif p == nil {\n\t\treturn NewSet[T]()\n\t}\n\treturn p\n}\n")
+	}
+	if g.usesCoalesceStack {
+		g.b.WriteString("func CoalesceStack[T any](p *Stack[T]) *Stack[T] {\n\tif p == nil {\n\t\treturn NewStack[T]()\n\t}\n\treturn p\n}\n")
+	}
 }
 
 // predeclaredPayloadField returns the Go-side struct field name
@@ -1171,6 +1190,13 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 		case *ast.Unary:
 			walk(v.Operand)
 		case *ast.Index:
+			// A bare `m[k]`/`l[i]` whose element is itself a container
+			// lowers through the Coalesce helper (nil-miss → empty, T13).
+			// Detect it with the same test the emitter uses so inline mode
+			// carries the helper exactly when the emit path references it.
+			if id, ok := v.Receiver.(*ast.Ident); ok && (g.varKindOf(id) == "Map" || g.varKindOf(id) == "List") {
+				g.markCoalesceUsed(g.indexMapValueContainerKind(id))
+			}
 			walk(v.Receiver)
 			walk(v.Idx)
 		case *ast.Slice:

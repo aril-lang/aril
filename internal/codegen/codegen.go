@@ -452,6 +452,14 @@ type gen struct {
 	usesSet           bool
 	usesStack         bool
 	usesList          bool
+	// usesCoalesce{List,Map,Set,Stack}: a bare `m[k]`/`l[i]` index whose
+	// element type is that container kind was emitted, needing the inline
+	// Coalesce helper (nil-miss → empty container, T13). Set in the
+	// predeclared pre-walk; vendored mode always carries the helpers.
+	usesCoalesceList  bool
+	usesCoalesceMap   bool
+	usesCoalesceSet   bool
+	usesCoalesceStack bool
 	usesReflect       bool
 	usesCmp           bool // an `Ordered` type-param bound → import "cmp" (G3b)
 	usesMakeSlice     bool

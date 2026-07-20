@@ -412,6 +412,16 @@ type is known there:
   defaults; only a reference container's nil is a landmine. (This also
   closes a codegen crash on the bare-`var` form — the empty initializer
   previously reached the expression emitter as a nil node.)
+- **Bare `Map` index whose value is a container.** `m[k]` lowers to
+  `m.At(k)`, which returns V's zero value on a miss (Go map semantics) —
+  a nil pointer when V is itself a `List`/`Map`/`Set`/`Stack`. The read
+  is wrapped in a `Coalesce{List,Map,Set,Stack}` runtime helper so a miss
+  yields the empty container: `m["absent"]` → `CoalesceList(m.At("absent"))`
+  (Go infers the element type from the argument). This is Map-only — a
+  `List` index `.At(i)` *panics* on out-of-bounds (loud, not a silent
+  nil) and holds no nil in-bounds, so it needs no coalescing. A Map with
+  a **scalar** value keeps the bare `m.At(k)` (`0`/`""` is the honest
+  miss value; `.get(k): Option<V>` remains the explicit form). (T13.)
 
 A **non-defaultable reference field** — a bare user `class`, whose zero
 value is likewise a nil pointer but which has no empty constructor — is
