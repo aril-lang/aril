@@ -1,8 +1,9 @@
 package main
 
-import "strings"
-
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // explainTrace reframes a Go panic block into a native Aril trace: it
 // translates the runtime message, keeps only `.aril` (user) frames with
@@ -112,6 +113,49 @@ func TestExplainTracePassthrough(t *testing.T) {
 	in := "hello\nworld\nregular program output\n"
 	if got := explainTrace(in); got != in {
 		t.Errorf("passthrough altered non-panic input:\ngot:  %q\nwant: %q", got, in)
+	}
+}
+
+// A method whose name starts with `func` (e.g. `funcDecl`) is NOT a
+// closure — the closure heuristic keys on `.funcN` (dot + digit), so it
+// renders as a normal method, while a real `.func1` closure gets the label.
+func TestExplainTraceFuncNamedMethodVsClosure(t *testing.T) {
+	in := `panic: runtime error: nil dereference
+
+goroutine 1 [running]:
+main.(*Parser).funcDecl(...)
+	/tmp/x/parse.aril:12
+main.main.func1()
+	/tmp/x/parse.aril:30
+main.main()
+	/tmp/x/parse.aril:31 +0x1
+`
+	got := explainTrace(in)
+	if !strings.Contains(got, "at Parser.funcDecl") {
+		t.Errorf("a method named funcDecl must not be labeled a closure:\n%s", got)
+	}
+	if !strings.Contains(got, "<closure>") {
+		t.Errorf("a real .func1 frame must get the closure label:\n%s", got)
+	}
+}
+
+// A `created by … in goroutine N` spawn-site frame is kept (T3 concurrency
+// debugging) and reads "spawned at", not "at".
+func TestExplainTraceSpawnSite(t *testing.T) {
+	in := `panic: runtime error: index out of range [3] with length 2
+
+goroutine 34 [running]:
+main.worker(...)
+	/tmp/x/pool.aril:8
+created by main.run in goroutine 1
+	/tmp/x/pool.aril:20 +0x5
+`
+	got := explainTrace(in)
+	if !strings.Contains(got, "at worker") || !strings.Contains(got, "(pool.aril:8)") {
+		t.Errorf("panicking frame lost:\n%s", got)
+	}
+	if !strings.Contains(got, "spawned at run") || !strings.Contains(got, "(pool.aril:20)") {
+		t.Errorf("spawn-site frame lost or mislabeled:\n%s", got)
 	}
 }
 

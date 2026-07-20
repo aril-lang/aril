@@ -85,7 +85,11 @@ func explainTrace(input string) string {
 		}
 	}
 	for _, f := range frames {
-		fmt.Fprintf(&b, "  at %-*s  (%s)\n", width, f.symbol, f.loc)
+		prefix := "at"
+		if f.spawnSite {
+			prefix = "spawned at"
+		}
+		fmt.Fprintf(&b, "  %s %-*s  (%s)\n", prefix, width, f.symbol, f.loc)
 	}
 	if len(frames) == 0 {
 		// A recognised panic with no user frame (e.g. the crash is entirely
@@ -99,10 +103,13 @@ func explainTrace(input string) string {
 }
 
 // arilFrame is one kept user frame: a prettified Aril symbol + its native
-// `file:line`.
+// `file:line`. spawnSite marks a `created by …` frame — the point a
+// panicking goroutine was `spawn`ed from — so it reads "spawned at" rather
+// than "at" (T3 concurrency debugging).
 type arilFrame struct {
-	symbol string
-	loc    string
+	symbol    string
+	loc       string
+	spawnSite bool
 }
 
 var (
@@ -111,6 +118,10 @@ var (
 	locRe = regexp.MustCompile(`^\t(.+):(\d+)(?: \+0x[0-9a-fA-F]+)?$`)
 	// A method symbol `pkg.(*Type).method` or `pkg.Type.method`.
 	ptrRecvRe = regexp.MustCompile(`\(\*([^)]+)\)`)
+	// A closure / IIFE / spawn-body frame: Go spells it `.funcN` (dot +
+	// digit). Anchored on the digit so a method literally named `funcDecl`
+	// is not mislabeled a closure.
+	closureRe = regexp.MustCompile(`\.func\d`)
 )
 
 // parseFrames walks the goroutine trace, pairing each symbol line with its
@@ -123,9 +134,15 @@ func parseFrames(lines []string) ([]arilFrame, int) {
 	hidden := 0
 	for i := 0; i+1 < len(lines); i++ {
 		sym := lines[i]
-		// A symbol line has no leading tab and looks like a call `name(...)`.
-		if sym == "" || strings.HasPrefix(sym, "\t") || !strings.Contains(sym, "(") {
+		if sym == "" || strings.HasPrefix(sym, "\t") {
 			continue
+		}
+		// A `created by pkg.Fn in goroutine N` line is the spawn site of the
+		// current goroutine — its symbol has no `name(...)` shape, so handle
+		// it before the call-shape gate to keep its `.aril` coordinate.
+		spawn := strings.HasPrefix(sym, "created by ")
+		if !spawn && !strings.Contains(sym, "(") {
+			continue // not a symbol line
 		}
 		m := locRe.FindStringSubmatch(lines[i+1])
 		if m == nil {
@@ -135,6 +152,19 @@ func parseFrames(lines []string) ([]arilFrame, int) {
 		file, line := m[1], m[2]
 		if !strings.HasSuffix(file, ".aril") {
 			hidden++ // runtime / arilrt / synthesised frame
+			continue
+		}
+		if spawn {
+			// `created by main.worker in goroutine 6` → the `main.worker` part.
+			fn := strings.TrimPrefix(sym, "created by ")
+			if j := strings.Index(fn, " in goroutine"); j >= 0 {
+				fn = fn[:j]
+			}
+			frames = append(frames, arilFrame{
+				symbol:    prettifyUserSymbol(fn),
+				loc:       baseName(file) + ":" + line,
+				spawnSite: true,
+			})
 			continue
 		}
 		frames = append(frames, arilFrame{
@@ -160,12 +190,14 @@ func prettifyUserSymbol(sym string) string {
 		}
 	}
 	sym = strings.TrimPrefix(sym, "main.")
-	// `main.main.func1` (closure / IIFE / spawn body) → a closure label.
-	if strings.Contains(sym, ".func") {
+	// `(*Grid).at` → `Grid.at`; a value receiver `Grid.at` is already fine.
+	// Done before the closure check so a closure label reads cleanly
+	// (`(*Grid).scan.func1` → `Grid.scan.func1`).
+	sym = ptrRecvRe.ReplaceAllString(sym, "$1")
+	// `main.func1` (closure / IIFE / spawn body) → a closure label.
+	if closureRe.MatchString(sym) {
 		return "<closure> (" + sym + ")"
 	}
-	// `(*Grid).at` → `Grid.at`; a value receiver `Grid.at` is already fine.
-	sym = ptrRecvRe.ReplaceAllString(sym, "$1")
 	if sym == "main" {
 		return "main"
 	}

@@ -13,7 +13,7 @@ Demonstrated on the real traces the AUDIT-3 hunt surfaced (`./prog 2>&1 | aril e
 ```
 # integer 10/0
 panic: runtime error: integer divide by zero        panic: division by zero
-goroutine 1 [running:]                          ⇒     at main  (p1.aril:8)
+goroutine 1 [running]:                          ⇒     at main  (p1.aril:8)
 main.main() … /…/p1.aril:8 +0x9
 
 # user method + arilrt frame (index-out-of-range)
