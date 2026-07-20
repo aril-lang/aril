@@ -93,6 +93,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		variant:           map[string]variantInfo{},
 		class:             map[string]classInfo{},
 		fieldTypes:        map[string]map[string]ast.TypeExpr{},
+		fieldOrder:        map[string][]string{},
 		usedGoPkgs:        map[string]bool{},
 		externFunc:        map[string]*ast.ExternFuncDecl{},
 		externType:        map[string]*ast.ExternTypeDecl{},
@@ -236,10 +237,13 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			}
 			if rb, ok := td.Body.(*ast.RecordTypeBody); ok {
 				fts := map[string]ast.TypeExpr{}
+				order := make([]string, 0, len(rb.Fields))
 				for _, fd := range rb.Fields {
 					fts[fd.Name] = fd.DeclType
+					order = append(order, fd.Name)
 				}
 				g.fieldTypes[td.Name] = fts
+				g.fieldOrder[td.Name] = order
 			}
 		}
 		if cd, ok := d.(*ast.ClassDecl); ok {
@@ -255,10 +259,13 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			}
 			g.class[cd.Name] = ci
 			fts := map[string]ast.TypeExpr{}
+			order := make([]string, 0, len(cd.Fields))
 			for _, cf := range cd.Fields {
 				fts[cf.Name] = cf.DeclType
+				order = append(order, cf.Name)
 			}
 			g.fieldTypes[cd.Name] = fts
+			g.fieldOrder[cd.Name] = order
 		}
 	}
 	// Register the predeclared Kind variants per
@@ -405,6 +412,12 @@ type gen struct {
 	// `Envelope{ q: None, … }` — gets its type args stamped from the
 	// field's declared type (§Constructor type-argument stamping).
 	fieldTypes map[string]map[string]ast.TypeExpr
+	// fieldOrder maps a record/class name to its field names in
+	// declaration order. emitBraceLit walks it to fill omitted
+	// reference-container fields with the empty constructor (never a Go
+	// nil) — the map alone is unordered, so a deterministic fixture needs
+	// this list (lowering-go.md §Container defaulting).
+	fieldOrder map[string][]string
 	// matchTempCounter generates unique temp names for the
 	// subject of a `match` when any arm binds payload fields.
 	// Per `lowering-go.md` §MatchIR — capture subject once to

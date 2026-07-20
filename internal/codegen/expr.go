@@ -15,6 +15,46 @@ import (
 // field/method-name resolution helpers they rely on. Split out of
 // the codegen.go god-file; behaviour-preserving.
 
+// containerCtorName returns the arilrt empty-constructor name for a
+// builtin reference-container type expression (List/Map/Set/Stack) and
+// true, or "" and false for any other type. The empty container is the
+// safe zero value of a reference container — never a Go nil
+// (lowering-go.md §Container defaulting; T2/T13/bug#3).
+func containerCtorName(t ast.TypeExpr) (string, bool) {
+	nt, ok := t.(*ast.NamedType)
+	if !ok || len(nt.QName) != 1 {
+		return "", false
+	}
+	switch nt.QName[0] {
+	case "List":
+		return "NewList", true
+	case "Map":
+		return "NewMap", true
+	case "Set":
+		return "NewSet", true
+	case "Stack":
+		return "NewStack", true
+	}
+	return "", false
+}
+
+// emitEmptyContainer writes the empty constructor for a container type
+// expression — `List<int>` → `NewList[int]()`. It reports whether t was
+// a container (and thus whether anything was written), so callers can
+// fall back to a different default for non-container types.
+func (g *gen) emitEmptyContainer(t ast.TypeExpr) (bool, error) {
+	ctor, ok := containerCtorName(t)
+	if !ok {
+		return false, nil
+	}
+	g.b.WriteString(g.rt(ctor))
+	if err := g.emitTypeArgs(t.(*ast.NamedType).Args); err != nil {
+		return false, err
+	}
+	g.b.WriteString("()")
+	return true, nil
+}
+
 // emitBraceLit lowers a brace literal. A record literal becomes a Go
 // struct literal `TypeName{ field: value, … }` (same-package field
 // names map directly). Map / Set / Stack literals lower to the
@@ -164,6 +204,13 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 			return err
 		}
 	}
+	// Fill omitted reference-container fields with the empty constructor.
+	// Go's zero value for a `*arilrt.List[T]` field is a nil pointer, which
+	// segfaults on first use (T2); the empty container is the sound default
+	// and honours the "no nil" promise (lowering-go.md §Container defaulting).
+	if err := g.fillOmittedContainerFields(name, b.Entries, len(b.Entries) > 0); err != nil {
+		return err
+	}
 	g.b.WriteByte('}')
 	if len(preds) > 0 {
 		g.b.WriteByte('\n')
@@ -175,6 +222,46 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 		g.indent--
 		g.writeIndent()
 		g.b.WriteString("}()")
+	}
+	return nil
+}
+
+// fillOmittedContainerFields appends `Field: NewList[T]()` entries for
+// every declared reference-container field of type `name` that the
+// literal omitted, so the field defaults to an empty container rather
+// than a Go nil pointer (T2). `wrote` is whether the caller already
+// emitted at least one keyed entry (governs the leading comma). Fields
+// are walked in declaration order (g.fieldOrder) for deterministic
+// output. Non-container omitted fields are left to Go's zero value,
+// which is safe for scalars/Option/records (nil-safety.md §Container
+// defaulting).
+func (g *gen) fillOmittedContainerFields(name string, entries []ast.BraceEntry, wrote bool) error {
+	fts, ok := g.fieldTypes[name]
+	if !ok {
+		return nil
+	}
+	present := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		if re, ok := e.(*ast.RecordEntry); ok {
+			present[re.Name] = true
+		}
+	}
+	for _, fn := range g.fieldOrder[name] {
+		if present[fn] {
+			continue
+		}
+		if _, isContainer := containerCtorName(fts[fn]); !isContainer {
+			continue
+		}
+		if wrote {
+			g.b.WriteString(", ")
+		}
+		g.b.WriteString(exportFieldName(fn))
+		g.b.WriteString(": ")
+		if _, err := g.emitEmptyContainer(fts[fn]); err != nil {
+			return err
+		}
+		wrote = true
 	}
 	return nil
 }

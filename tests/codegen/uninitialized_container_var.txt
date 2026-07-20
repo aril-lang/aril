@@ -1,0 +1,110 @@
+--- TITLE ---
+`var l: List<T>` with no initializer defaults to the empty constructor; a scalar `var` keeps Go's zero value (nil-safety §Container defaulting; bug#3)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  var l: List<int>
+  l.push(1)
+  l.push(2)
+  let ll = l
+  fmt.println(ll.len())
+  var n: int
+  n = 5
+  fmt.println(n)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type List[T any] struct {
+	xs []T
+}
+
+func NewList[T any]() *List[T] {
+	return &List[T]{xs: nil}
+}
+func ListOf[T any](elems ...T) *List[T] {
+	xs := make([]T, len(elems))
+	copy(xs, elems)
+	return &List[T]{xs: xs}
+}
+func (l *List[T]) Len() int { return len(l.xs) }
+func (l *List[T]) Push(e T) {
+	l.xs = append(l.xs, e)
+}
+func (l *List[T]) At(i int) T { return l.xs[i] }
+func (l *List[T]) Get(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	return Option[T]{Tag: 1, V: l.xs[i]}
+}
+func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
+func (l *List[T]) Pop() Option[T] {
+	n := len(l.xs)
+	if n == 0 {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[n-1]
+	l.xs = l.xs[:n-1]
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) Insert(i int, e T) {
+	if i < 0 {
+		i = 0
+	}
+	if i > len(l.xs) {
+		i = len(l.xs)
+	}
+	var zero T
+	l.xs = append(l.xs, zero)
+	copy(l.xs[i+1:], l.xs[i:])
+	l.xs[i] = e
+}
+func (l *List[T]) RemoveAt(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[i]
+	l.xs = append(l.xs[:i], l.xs[i+1:]...)
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) ToSlice() []T {
+	out := make([]T, len(l.xs))
+	copy(out, l.xs)
+	return out
+}
+func main() {
+	var l *List[int] = NewList[int]()
+	l.Push(1)
+	l.Push(2)
+	var ll = l
+	fmt.Println(ll.Len())
+	var n int
+	n = 5
+	fmt.Println(n)
+}
+
+--- STDOUT ---
+2
+5
+
+--- EXIT ---
+0

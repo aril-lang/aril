@@ -370,8 +370,9 @@ form share one Go representation:
 - An empty `T{}` where `T` names a **class or record** is zero-value
   construction: `&T{}` (class — reference type) / `T{}` (record). A
   fieldless class is the canonical behaviour-only interface implementor
-  (strategy/visitor); a field-bearing `T{}` zero-fills, like a partial
-  record literal.
+  (strategy/visitor); a field-bearing `T{}` zero-fills its fields, with
+  reference-container fields defaulted per §Container defaulting below (a
+  partial record literal does the same).
 - An empty `pkg.Type{}` where `pkg.Type` names a **constructable stdlib
   value handle** (`sync.Mutex{}`, `sync.WaitGroup{}`) lowers to the bare
   Go value struct `pkg.Type{}` (no `&` — a local var is addressable, so
@@ -389,6 +390,36 @@ form share one Go representation:
   composite literal at build).
 - Obtain-only handles (regexp.Regexp, net.Conn) are not constructable — a brace
   literal on them is rejected in sema (E0218), pointing at the constructor.
+
+### Container defaulting
+
+A builtin **reference container** (`List` / `Map` / `Set` / `Stack`)
+lowers to a Go pointer (`*arilrt.List[T]`, …), whose Go zero value is a
+nil pointer — dereferenced on the first `.push` / `.set` / `.add` into a
+raw `SIGSEGV`. That would contradict the language's headline promise
+(*no `null` / `nil` / `undefined`*), so a container's **zero value is the
+empty container, never nil**. Codegen substitutes the empty constructor
+at every site that can produce a container zero value, because the static
+type is known there:
+
+- **Omitted record/class field.** A partial literal `Bag{ n: 5 }` that
+  leaves a `List<int>` field unwritten emits `Items: NewList[int]()` for
+  it (walking the declared fields in order), not Go's nil. All-omitted
+  `Bag{}` fills every container field the same way.
+- **Uninitialized `var`.** `var l: List<int>` (no initializer) lowers to
+  `var l *List[int] = NewList[int]()`. A non-container `var x: T` keeps
+  Go's safe zero value (`var x T`) — `0` / `""` / `false` are honest
+  defaults; only a reference container's nil is a landmine. (This also
+  closes a codegen crash on the bare-`var` form — the empty initializer
+  previously reached the expression emitter as a nil node.)
+
+A **non-defaultable reference field** — a bare user `class`, whose zero
+value is likewise a nil pointer but which has no empty constructor — is
+not silently defaulted: omitting it is a sema error (see
+`diagnostics.md`), and the author either provides it or types it
+`Option<Class>` (which safely zero-defaults to `None`). `Option`, records
+(recursively), and tuples already zero to safe values, so only
+builtin-containers and bare class references need this treatment.
 
 **Constructor type-argument stamping.** A constructor call
 (`Ok`/`Err`/`Some`/`None`) constrains only the type parameter its
