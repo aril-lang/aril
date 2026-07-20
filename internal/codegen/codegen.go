@@ -94,6 +94,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 		class:             map[string]classInfo{},
 		fieldTypes:        map[string]map[string]ast.TypeExpr{},
 		fieldOrder:        map[string][]string{},
+		typeParams:        map[string][]string{},
 		usedGoPkgs:        map[string]bool{},
 		externFunc:        map[string]*ast.ExternFuncDecl{},
 		externType:        map[string]*ast.ExternTypeDecl{},
@@ -244,6 +245,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 				}
 				g.fieldTypes[td.Name] = fts
 				g.fieldOrder[td.Name] = order
+				g.typeParams[td.Name] = ast.TypeParamNames(td.TypeParams)
 			}
 		}
 		if cd, ok := d.(*ast.ClassDecl); ok {
@@ -266,6 +268,7 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			}
 			g.fieldTypes[cd.Name] = fts
 			g.fieldOrder[cd.Name] = order
+			g.typeParams[cd.Name] = ast.TypeParamNames(cd.TypeParams)
 		}
 	}
 	// Register the predeclared Kind variants per
@@ -418,6 +421,12 @@ type gen struct {
 	// nil) — the map alone is unordered, so a deterministic fixture needs
 	// this list (lowering-go.md §Container defaulting).
 	fieldOrder map[string][]string
+	// typeParams maps a record/class name to its declared type-parameter
+	// names, so the omitted-container-field fill can substitute the
+	// concrete construction args for the field's declared params — a
+	// `List<T>` field of `Box<int>{…}` fills as `NewList[int]()`, never
+	// the out-of-scope `NewList[T]()` (lowering-go.md §Container defaulting).
+	typeParams map[string][]string
 	// matchTempCounter generates unique temp names for the
 	// subject of a `match` when any arm binds payload fields.
 	// Per `lowering-go.md` §MatchIR — capture subject once to

@@ -1,18 +1,27 @@
 --- TITLE ---
-`var l: List<T>` with no initializer defaults to the empty constructor; a scalar `var` keeps Go's zero value (lowering-go.md §Container defaulting; bug#3)
+An omitted container field of a generic record/class fills with the concrete instantiation's type args — `Box<int>` → NewList[int](), never the out-of-scope NewList[T] (lowering-go.md §Container defaulting)
 
 --- INPUT ---
 import fmt
 
+class Box<T> {
+  var items: List<T>
+  var label: string
+}
+
+type Wrap<T> = { items: List<T>, n: int }
+
 func main() {
-  var l: List<int>
-  l.push(1)
-  l.push(2)
-  let ll = l
-  fmt.println(ll.len())
-  var n: int
-  n = 5
-  fmt.println(n)
+  let b = Box<int>{ label: "hi" }
+  b.items.push(5)
+  let bi = b.items
+  fmt.println(bi.len())
+  fmt.println(b.label)
+  let w = Wrap<string>{ n: 4 }
+  w.items.push("x")
+  let wi = w.items
+  fmt.println(wi.len())
+  fmt.println(w.n)
 }
 
 --- GO ---
@@ -91,20 +100,34 @@ func (l *List[T]) ToSlice() []T {
 	copy(out, l.xs)
 	return out
 }
+
+type Box[T any] struct {
+	Items *List[T] `json:"items"`
+	Label string   `json:"label"`
+}
+type Wrap[T any] struct {
+	Items *List[T] `json:"items"`
+	N     int      `json:"n"`
+}
+
 func main() {
-	var l *List[int] = NewList[int]()
-	l.Push(1)
-	l.Push(2)
-	var ll = l
-	fmt.Println(ll.Len())
-	var n int
-	n = 5
-	fmt.Println(n)
+	var b = &Box[int]{Label: "hi", Items: NewList[int]()}
+	b.Items.Push(5)
+	var bi = b.Items
+	fmt.Println(bi.Len())
+	fmt.Println(b.Label)
+	var w = Wrap[string]{N: 4, Items: NewList[string]()}
+	w.Items.Push("x")
+	var wi = w.Items
+	fmt.Println(wi.Len())
+	fmt.Println(w.N)
 }
 
 --- STDOUT ---
-2
-5
+1
+hi
+1
+4
 
 --- EXIT ---
 0

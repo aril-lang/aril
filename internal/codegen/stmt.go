@@ -393,7 +393,7 @@ func (g *gen) emitLetOrVar(span ast.Span, name string, declType ast.TypeExpr, va
 	// `var x: T` with no initializer. A container zero value must be the
 	// empty constructor, not Go's nil pointer, or first use segfaults and
 	// an uninitialized `var l: List<int>` even crashed codegen (bug#3);
-	// other types keep Go's safe zero value `var x T` (nil-safety.md
+	// other types keep Go's safe zero value `var x T` (lowering-go.md
 	// §Container defaulting).
 	if value == nil {
 		if declType != nil {

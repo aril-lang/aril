@@ -208,7 +208,7 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 	// Go's zero value for a `*arilrt.List[T]` field is a nil pointer, which
 	// segfaults on first use (T2); the empty container is the sound default
 	// and honours the "no nil" promise (lowering-go.md §Container defaulting).
-	if err := g.fillOmittedContainerFields(name, b.Entries, len(b.Entries) > 0); err != nil {
+	if err := g.fillOmittedContainerFields(name, b.TypeName.Args, b.Entries, len(b.Entries) > 0); err != nil {
 		return err
 	}
 	g.b.WriteByte('}')
@@ -229,13 +229,17 @@ func (g *gen) emitBraceLit(b *ast.BraceLit) error {
 // fillOmittedContainerFields appends `Field: NewList[T]()` entries for
 // every declared reference-container field of type `name` that the
 // literal omitted, so the field defaults to an empty container rather
-// than a Go nil pointer (T2). `wrote` is whether the caller already
-// emitted at least one keyed entry (governs the leading comma). Fields
-// are walked in declaration order (g.fieldOrder) for deterministic
-// output. Non-container omitted fields are left to Go's zero value,
-// which is safe for scalars/Option/records (nil-safety.md §Container
+// than a Go nil pointer (T2). `args` are the construction's concrete
+// type arguments (`Box<int>{…}` → [int]); a `List<T>` field is
+// substituted to `List<int>` before emit so the fill never references
+// the enclosing type's parameter `T`, which is out of scope at the
+// construction site (would leak a raw Go `undefined: T`). `wrote` is
+// whether the caller already emitted at least one keyed entry (governs
+// the leading comma). Fields are walked in declaration order for
+// deterministic output; non-container omitted fields keep Go's zero
+// value, safe for scalars/Option/records (lowering-go.md §Container
 // defaulting).
-func (g *gen) fillOmittedContainerFields(name string, entries []ast.BraceEntry, wrote bool) error {
+func (g *gen) fillOmittedContainerFields(name string, args []ast.TypeExpr, entries []ast.BraceEntry, wrote bool) error {
 	fts, ok := g.fieldTypes[name]
 	if !ok {
 		return nil
@@ -244,6 +248,14 @@ func (g *gen) fillOmittedContainerFields(name string, entries []ast.BraceEntry, 
 	for _, e := range entries {
 		if re, ok := e.(*ast.RecordEntry); ok {
 			present[re.Name] = true
+		}
+	}
+	// Map the type's declared parameters to the construction's concrete
+	// args (empty for a non-generic type — substitution is then a no-op).
+	subst := map[string]ast.TypeExpr{}
+	if params := g.typeParams[name]; len(params) == len(args) {
+		for i, p := range params {
+			subst[p] = args[i]
 		}
 	}
 	for _, fn := range g.fieldOrder[name] {
@@ -258,12 +270,50 @@ func (g *gen) fillOmittedContainerFields(name string, entries []ast.BraceEntry, 
 		}
 		g.b.WriteString(exportFieldName(fn))
 		g.b.WriteString(": ")
-		if _, err := g.emitEmptyContainer(fts[fn]); err != nil {
+		if _, err := g.emitEmptyContainer(substTypeParams(fts[fn], subst)); err != nil {
 			return err
 		}
 		wrote = true
 	}
 	return nil
+}
+
+// substTypeParams returns t with every bare type-parameter reference
+// replaced per subst (a `NamedType` of one segment, no args, whose name
+// is a key). Container/generic type arguments are rewritten recursively
+// (`List<T>` → `List<int>`, `Map<K,V>` → `Map<string,int>`). A no-op
+// when subst is empty or t names no parameter. Only the NamedType shape
+// carries parameters in a container field type, so other TypeExpr kinds
+// pass through unchanged.
+func substTypeParams(t ast.TypeExpr, subst map[string]ast.TypeExpr) ast.TypeExpr {
+	if len(subst) == 0 {
+		return t
+	}
+	nt, ok := t.(*ast.NamedType)
+	if !ok {
+		return t
+	}
+	if len(nt.QName) == 1 && len(nt.Args) == 0 {
+		if repl, ok := subst[nt.QName[0]]; ok {
+			return repl
+		}
+		return t
+	}
+	if len(nt.Args) == 0 {
+		return t
+	}
+	newArgs := make([]ast.TypeExpr, len(nt.Args))
+	changed := false
+	for i, a := range nt.Args {
+		newArgs[i] = substTypeParams(a, subst)
+		if newArgs[i] != a {
+			changed = true
+		}
+	}
+	if !changed {
+		return t
+	}
+	return &ast.NamedType{Span: nt.Span, QName: nt.QName, Args: newArgs}
 }
 
 // emitSetBraceLit lowers `Set<T>{}` → `NewSet[T]()` and

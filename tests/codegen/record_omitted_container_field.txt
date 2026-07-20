@@ -1,5 +1,5 @@
 --- TITLE ---
-Omitted reference-container record fields default to the empty constructor, not a Go nil (nil-safety §Container defaulting; T2)
+Omitted reference-container record fields default to the empty constructor, not a Go nil (lowering-go.md §Container defaulting; T2)
 
 --- INPUT ---
 import fmt
