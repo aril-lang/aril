@@ -813,6 +813,57 @@ func (g *gen) varKindOf(id *ast.Ident) string {
 	return ""
 }
 
+// indexMapValueContainerKind reports the builtin-container kind (List/
+// Map/Set/Stack) of the *value* type a bare `m[k]` index over a Map
+// yields, or "" when the value is not a reference container. A Map miss
+// makes `.At` return V's zero value silently — a nil pointer for a
+// container V — which the index lowering coalesces to an empty container
+// (lowering-go.md §Container defaulting, T13). Restricted to Map: a List
+// `.At` panics on out-of-bounds (loud) and holds no nil in-bounds, so it
+// has no silent-nil miss. recv must be an already-classified Map Ident.
+func (g *gen) indexMapValueContainerKind(recv *ast.Ident) string {
+	if g.info == nil {
+		return ""
+	}
+	t := g.info.Type[recv]
+	if t == nil {
+		if sym := g.info.Symbol[recv]; sym != nil {
+			t = sym.Type
+		}
+	}
+	mt, ok := t.(*sema.Map)
+	if !ok {
+		return ""
+	}
+	switch mt.Val.(type) {
+	case *sema.List:
+		return "List"
+	case *sema.Map:
+		return "Map"
+	case *sema.Set:
+		return "Set"
+	case *sema.Stack:
+		return "Stack"
+	}
+	return ""
+}
+
+// markCoalesceUsed records that a container-element index of the given
+// kind was seen, so inline mode emits the matching Coalesce helper. A
+// "" kind (non-container element) is a no-op.
+func (g *gen) markCoalesceUsed(kind string) {
+	switch kind {
+	case "List":
+		g.usesCoalesceList = true
+	case "Map":
+		g.usesCoalesceMap = true
+	case "Set":
+		g.usesCoalesceSet = true
+	case "Stack":
+		g.usesCoalesceStack = true
+	}
+}
+
 // isStdlibNamespace reports whether expr is an Ident whose name
 // is in the hardcoded stdlib binding registry. Used by emitCall
 // to keep `fmt.println` from being interpreted as a slice
