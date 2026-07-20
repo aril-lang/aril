@@ -10,7 +10,7 @@ func main() {
   var h = H{ xs: List<int>{10, 20}, tags: Map<string, int>{} }
   h.xs.push(30)
   h.tags.set("a", 1)
-  h.tags.set("b", 2)
+  h.tags["b"] = 2
   for x in h.xs { fmt.println(x) }
   for (i, x) in h.xs { fmt.println(i) }
   for k in h.tags { fmt.println(k) }

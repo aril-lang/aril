@@ -218,10 +218,14 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 		// `m.set(k, val)` — the wrapper's set() updates both the
 		// internal map and the insertion-order slice. Direct
 		// `m.m[k] = val` would bypass that and break iteration
-		// order for any later `.entries()`/`.keys()` call.
+		// order for any later `.entries()`/`.keys()` call. Classified
+		// by the receiver's sema *type* so a member access `rec.mapField`
+		// (an `*ast.Field`, not an Ident) lowers to `.Set` too, instead of
+		// leaking a raw Go "cannot assign to …" (bug#4, the write sibling
+		// of the index read).
 		if idx, ok := v.LValue.(*ast.Index); ok {
-			if id, ok := idx.Receiver.(*ast.Ident); ok && g.varKindOf(id) == "Map" {
-				if err := g.emitExpr(id); err != nil {
+			if g.exprContainerKind(idx.Receiver) == "Map" {
+				if err := g.emitExpr(idx.Receiver); err != nil {
 					return err
 				}
 				g.b.WriteString(".Set(")

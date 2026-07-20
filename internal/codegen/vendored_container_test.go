@@ -91,3 +91,23 @@ func main() {
 		}
 	}
 }
+
+// A Map-field index *write* `rec.mapField[k] = v` must lower to `.Set` too
+// (the write sibling of the index read), not a raw Go `rec.mapField.At(k) =
+// v`, which does not build (bug#4).
+func TestVendoredMapFieldIndexWrite(t *testing.T) {
+	got := emitVendored(t, `import fmt
+type H = { tags: Map<string, int> }
+func main() {
+  var h = H{ tags: Map<string, int>{} }
+  h.tags["a"] = 1
+  fmt.println(h.tags["a"])
+}
+`)
+	if !strings.Contains(got, `h.Tags.Set("a", 1)`) {
+		t.Errorf("Map-field index write did not lower to .Set:\n%s", got)
+	}
+	if strings.Contains(got, `h.Tags.At("a") = `) {
+		t.Errorf("Map-field index write leaked a non-assignable .At LValue:\n%s", got)
+	}
+}
