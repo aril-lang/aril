@@ -34,7 +34,7 @@ import (
 // self-stamps its git revision + commit date via runtime/debug build info
 // (versionString), so the reported version advances on every merged PR between
 // bumps without a manual edit.
-const version = "0.22.1-dev"
+const version = "0.23.0-dev"
 
 func main() {
 	if len(os.Args) < 2 {
