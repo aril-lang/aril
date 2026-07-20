@@ -1,11 +1,31 @@
 # `aril explain` — native Aril panic traces (design note)
 
-**Status: exploratory design, not yet implemented.** This is the *playground* for
-the mechanism — the shape is meant to be built and played with here before it is
-formalised. **RFC-0011 is reserved** for the eventual formalisation (number
-claimed in `docs/rfcs/`, RFC deliberately not written yet); this note graduates
-into it once the design is validated in practice. The project documents a debug
-mode before wiring it.
+**Status: exploratory — v0 implemented (`aril explain`), v1 not yet.** This is the
+*playground* for the mechanism — built and played with here before it is
+formalised. The **v0** post-hoc text filter (`cmd/aril/explain.go`) ships and is
+demonstrated below; the **v1** symbol sidecar, `aril guard`, and the in-process
+`recover` are not yet built. **RFC-0011 is reserved** for the eventual
+formalisation (number claimed in `docs/rfcs/`, RFC deliberately not written yet);
+this note graduates into it once the design is validated in practice.
+
+Demonstrated on the real traces the AUDIT-3 hunt surfaced (`./prog 2>&1 | aril explain`):
+
+```
+# integer 10/0
+panic: runtime error: integer divide by zero        panic: division by zero
+goroutine 1 [running:]                          ⇒     at main  (p1.aril:8)
+main.main() … /…/p1.aril:8 +0x9
+
+# user method + arilrt frame (index-out-of-range)
+panic: runtime error: index out of range [50] …     panic: index out of range [50], length 2
+aril-output/arilrt.(*List[...]).At(…) …         ⇒     at Grid.at  (um.aril:8)
+main.(*Grid).at(…) … /…/um.aril:8                     at main     (um.aril:13)
+main.main() … /…/um.aril:13                           … 1 internal frame(s) hidden
+```
+
+Note even v0 renders the method frame natively (`main.(*Grid).at` → `Grid.at`, a
+syntactic heuristic) and hides the arilrt frame by its `gen/arilrt/*.go` path — no
+symbol map needed; v1 covers only the harder mangled/closure frames.
 
 ## Why
 

@@ -61,6 +61,8 @@ func main() {
 		os.Exit(cmdUpgrade(os.Args[2:]))
 	case "clean":
 		os.Exit(cmdClean(os.Args[2:]))
+	case "explain":
+		os.Exit(cmdExplain(os.Args[2:]))
 	case "help", "-h", "--help":
 		usage(os.Stdout)
 	default:
@@ -646,6 +648,7 @@ Commands:
   get                          fetch the project's declared [dependencies] into the cache
   upgrade [<dep>...]           raise ranged dependency floors to newest-compatible + re-lock
   clean  [-gen] [-bin] [<dir>] remove the aril-out build-artifact directory
+  explain [<file>]             reframe a Go panic trace into a native Aril view (reads stdin)
   version                      print the compiler version
   help                         print this message
 
