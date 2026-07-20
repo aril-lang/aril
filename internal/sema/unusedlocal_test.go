@@ -92,6 +92,17 @@ func main() {
 		t.Errorf("a re-let must not also fire E0221 on the shadowed binding, got %v", codes)
 	}
 
+	// A re-let whose second binding is also unused reports E0222 only,
+	// not a redundant E0221 on the same line (the re-declaration is not
+	// recorded as an unused candidate).
+	if codes := runCheck(t, `func main() {
+  let x = 1
+  let x = 2
+}
+`); hasCode(codes, "E0221") {
+		t.Errorf("an unused re-let must report E0222 only, not also E0221, got %v", codes)
+	}
+
 	// Shadowing in a nested block is fine.
 	if codes := runCheck(t, `import fmt
 func main() {

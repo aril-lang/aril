@@ -324,11 +324,14 @@ func (c *checker) resolveStmt(s ast.Stmt, scope *Scope) {
 		if v.Name != "" && v.Name != "_" {
 			c.checkReservedName(v.Name, v.Span)
 			vsym := &Symbol{Name: v.Name, Kind: SymLocal, Decl: v, Type: &Unknown{}}
-			if prev := scope.declare(vsym); prev != nil {
+			prev := scope.declare(vsym)
+			if prev != nil {
 				c.report("E0222", "`"+v.Name+"` is already declared in this block — a nested `{ … }` block shadows instead", v.Span)
 			}
 			c.info.Def[v] = vsym
-			c.recordUnusedCandidate(v.Name, vsym, v.Span, scope)
+			if prev == nil {
+				c.recordUnusedCandidate(v.Name, vsym, v.Span, scope)
+			}
 		}
 	case *ast.AssignStmt:
 		c.resolveExpr(v.LValue, scope)
@@ -410,15 +413,18 @@ func (c *checker) bindPattern(p ast.Pattern, scope *Scope, decl any) {
 		}
 		c.checkReservedName(v.Name, v.Span)
 		sym := &Symbol{Name: v.Name, Kind: SymLocal, Decl: decl, Type: &Unknown{}}
-		if prev := scope.declare(sym); prev != nil {
+		prev := scope.declare(sym)
+		if prev != nil {
 			c.report("E0222", "`"+v.Name+"` is already declared in this block — a nested `{ … }` block shadows instead", v.Span)
 		}
 		c.info.Def[v] = sym
 		// A `let` binding is checked for use; a `for`/`match`/`catch`
 		// pattern binding is not (an ignored one gets the codegen `_ =`
 		// guard, lowering-go.md §MatchIR), so record only let-introduced
-		// locals for the unused-local pass.
-		if _, isLet := decl.(*ast.LetStmt); isLet {
+		// locals for the unused-local pass. A re-declaration (prev != nil)
+		// is skipped — it already erred with E0222, so a second "unused"
+		// note on the same line would be redundant.
+		if _, isLet := decl.(*ast.LetStmt); isLet && prev == nil {
 			c.recordUnusedCandidate(v.Name, sym, v.Span, scope)
 		}
 	case *ast.VariantPat:
