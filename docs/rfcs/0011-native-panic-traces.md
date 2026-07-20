@@ -3,6 +3,7 @@
 | RFC | 0011 |
 | Title | Native panic traces (`aril explain`) |
 | Status | reserved |
+| Created | 2026-07-20 |
 
 # RFC-0011 — Native panic traces (`aril explain`)
 
@@ -19,6 +20,13 @@ practice, that note graduates into this RFC.
 states `draft | accepted | implemented | superseded`, see
 [`0000-process.md`](0000-process.md)) — it only claims the number so it is not
 reused while the mechanism is being played with.
+
+**Deliberate exception to §Numbering.** `0000-process.md` says a new RFC takes the
+next free number with *"no reservations, no gaps"*. This claims 0011 *ahead* of
+writing the RFC — a conscious one-off while the mechanism is validated in the
+design note. The *no-gaps* half is honoured (0011 is a real file + an index row,
+not a skipped number); only the *no-reservations* half is waived, self-documented
+here. If the exploration is abandoned, this stub is deleted and the number freed.
 
 **Context:** the intermediate remediation for the AUDIT-3 compiler-bug *"runtime
 panics carry raw Go text"* — it fixes the *presentation* of a runtime panic
