@@ -72,8 +72,10 @@ func main() {
 	for i := 0; i < 3; i++ {
 		switch i {
 		case 0:
-			fmt.Println("a")
-			fmt.Println("b")
+			{
+				fmt.Println("a")
+				fmt.Println("b")
+			}
 		default:
 			fmt.Println("c")
 		}

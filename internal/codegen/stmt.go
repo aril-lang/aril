@@ -149,10 +149,24 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 		if m, ok := v.Expr.(*ast.MatchExpr); ok {
 			return g.emitMatchAsStmt(m)
 		}
-		// Block-as-expression in statement position: run the
-		// statements inline, discarding the trailing value.
+		// Block-as-expression in statement position: emit a real Go
+		// block `{ … }` so it gets its own lexical scope. Inlining the
+		// statements bare (no braces) put the block's locals in the
+		// enclosing Go scope, so a binding shadowing an outer one
+		// collided — `let x = 1; { let x = 2 }` leaked a raw Go `x
+		// redeclared in this block` (bug#2). A nested block now shadows
+		// like `if {}`/`for {}` do.
 		if blk, ok := v.Expr.(*ast.Block); ok {
-			return g.emitBlockBody(blk)
+			g.writeIndent()
+			g.b.WriteString("{\n")
+			g.indent++
+			if err := g.emitBlockBody(blk); err != nil {
+				return err
+			}
+			g.indent--
+			g.writeIndent()
+			g.b.WriteString("}\n")
+			return nil
 		}
 		// IfExpr in statement position: same shape as an if-statement.
 		if ie, ok := v.Expr.(*ast.IfExpr); ok {
@@ -197,14 +211,22 @@ func (g *gen) emitStmt(s ast.Stmt) error {
 	case *ast.LetStmt:
 		switch pat := v.Pattern.(type) {
 		case *ast.IdentPat:
-			return g.emitLetOrVar(v.Span, pat.Name, v.DeclType, v.Value)
+			if err := g.emitLetOrVar(v.Span, pat.Name, v.DeclType, v.Value); err != nil {
+				return err
+			}
+			g.emitContractOnlyLocalGuard(pat.Name, g.symOf(pat))
+			return nil
 		case *ast.TuplePat:
 			return g.emitDestructureLet(v.Span, pat, v.Value)
 		default:
 			return fmt.Errorf("codegen: unsupported `let` pattern %T", v.Pattern)
 		}
 	case *ast.VarStmt:
-		return g.emitLetOrVar(v.Span, v.Name, v.DeclType, v.Value)
+		if err := g.emitLetOrVar(v.Span, v.Name, v.DeclType, v.Value); err != nil {
+			return err
+		}
+		g.emitContractOnlyLocalGuard(v.Name, g.symOf(v))
+		return nil
 	case *ast.AssignStmt:
 		// `total = total + try f()` / `m[try k()] = v` — hoist nested
 		// try preambles before any of the assignment is emitted. LValue
@@ -350,6 +372,35 @@ func patternBindsNothing(p ast.Pattern) bool {
 func (g *gen) nextDestructureTemp() string {
 	g.destructureTempCounter++
 	return fmt.Sprintf("__aril_destructure_%d", g.destructureTempCounter)
+}
+
+// symOf returns the sema symbol a declaration node bound, or nil.
+func (g *gen) symOf(n ast.Node) *sema.Symbol {
+	if g.info == nil {
+		return nil
+	}
+	return g.info.Def[n]
+}
+
+// emitContractOnlyLocalGuard emits a `_ = name` bind-and-ignore for a
+// local that only a contract predicate references (UsedInContract, never
+// Used). Under --contracts=off the predicate is elided, so without the
+// guard Go rejects "declared and not used" — the same raw-Go leak the
+// unused-local check (E0221) diagnoses for a truly dead binding, but here
+// the binding is intentional, so it is suppressed rather than flagged.
+// Only emitted in an elided mode; under panic the predicate itself uses
+// the local.
+func (g *gen) emitContractOnlyLocalGuard(name string, sym *sema.Symbol) {
+	if g.contractMode == "panic" {
+		return
+	}
+	if sym == nil || sym.Used || !sym.UsedInContract {
+		return
+	}
+	g.writeIndent()
+	g.b.WriteString("_ = ")
+	g.b.WriteString(goIdent(name))
+	g.b.WriteByte('\n')
 }
 
 // emitLetOrVar lowers both `let` and `var` to Go's `var name [T] = value`.

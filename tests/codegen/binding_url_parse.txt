@@ -48,10 +48,12 @@ func main() {
 	switch __aril_match_1.Tag {
 	case 0:
 		u := __aril_match_1.V
-		fmt.Println(u.Scheme)
-		fmt.Println(u.Host)
-		fmt.Println(u.Path)
-		fmt.Println(u.String())
+		{
+			fmt.Println(u.Scheme)
+			fmt.Println(u.Host)
+			fmt.Println(u.Path)
+			fmt.Println(u.String())
+		}
 	case 1:
 		fmt.Println("parse failed")
 	}

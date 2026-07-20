@@ -48,14 +48,32 @@ func CheckFiles(files []*ast.File, paths []string) (*Info, []*Diag) {
 	// contract's named subjects against the inferred types of the program's
 	// bindings, which are only known after body checking.
 	c.checkChannelContracts(files, paths)
+	// Unused-local check runs last: every use — a body reference, a loop
+	// invariant, a channel contract — has been recorded, and the inferred
+	// types the channel exemption needs are available (E0221, bug#1).
+	c.reportUnusedLocals()
 	sortDiags(c.diags)
 	return c.info, c.diags
+}
+
+// unusedLocal is a recorded `let`/`var` binding awaiting the deferred
+// unused-local pass (reportUnusedLocals).
+type unusedLocal struct {
+	name  string
+	sym   *Symbol
+	span  ast.Span
+	scope *Scope
 }
 
 type checker struct {
 	file  string
 	info  *Info
 	diags []*Diag
+
+	// unusedLocals accumulates every `let`/`var` local binding for the
+	// deferred unused-local pass (reportUnusedLocals), which runs after
+	// all uses are recorded (bug#1, E0221).
+	unusedLocals []unusedLocal
 
 	// Per-body context, set before walking each function / method
 	// body in Barrier C. v1 is single-threaded so plain fields are

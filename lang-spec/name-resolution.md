@@ -193,6 +193,33 @@ shadowing). The warning exists because re-reads of the source
 by a human will often pick the *outer* binding, so the writer
 should rename or annotate.
 
+## Local bindings
+
+A `let`/`var` introduces a binding in the current block scope. Two
+hard rules keep a mistake from leaking as a raw Go compiler message
+(D10); both replace a `go/types` "…" leak with an Aril-coordinate
+diagnostic.
+
+- **Unused local — E0221 (error).** A `let`/`var` local that nothing
+  references. Go rejects it ("declared and not used"); Aril diagnoses
+  it in source terms. A reference through a read, an assignment, a call,
+  a field access, or a loop `invariant` counts as use (a predicate
+  reference counts even though the predicate is elided under
+  `--contracts=off`). **Channel** bindings are exempt — they participate
+  in `select` / `spawn` / channel contracts in ways plain
+  reference-tracking does not see, and an unused channel is a benign
+  resource, not a landmine. The intended discard is `let _ = e` (`_`
+  binds nothing). A `for`/`match`/`catch` pattern binding is **not**
+  checked — an ignored one lowers with a bind-and-ignore guard
+  (`lowering-go.md` §MatchIR), so `match r { Ok(v) => 0, … }` need not
+  use `v`.
+- **Same-block re-declaration — E0222 (error).** A second `let`/`var`
+  of a name already bound **in the same block**. Rename it, or move it
+  into a nested `{ … }` block to *shadow* intentionally. A nested block
+  has its own scope (it lowers to a real Go `{ … }`), so
+  `let x = 1; { let x = 2; … }` is legal shadowing — reserved as the
+  soft warning E0503 above, never E0222.
+
 ## Special names
 
 - **`this`** — receiver of an instance method. See above.

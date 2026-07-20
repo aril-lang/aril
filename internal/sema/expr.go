@@ -19,7 +19,13 @@ func (c *checker) resolveExpr(e ast.Expr, scope *Scope) {
 		}
 		if sym := scope.lookup(v.Name); sym != nil {
 			c.info.Symbol[v] = sym
-			if !c.invariantResolve {
+			if c.invariantResolve {
+				// A contract-predicate reference: counts as "referenced" for
+				// the unused-local check (E0221) but not for the codegen
+				// bind-and-ignore guard, which must still fire when the
+				// predicate is elided (--contracts=off).
+				sym.UsedInContract = true
+			} else {
 				sym.Used = true // marks the resolved binding referenced (§MatchIR unused-binding)
 			}
 		} else {

@@ -46,9 +46,13 @@ func apply(pos int, s Step) int {
 	switch __aril_match_1.Tag {
 	case 0:
 		n := __aril_match_1.ForwardN
-		p = p + n
+		{
+			p = p + n
+		}
 	case 1:
-		p = 0
+		{
+			p = 0
+		}
 	}
 	return p
 }

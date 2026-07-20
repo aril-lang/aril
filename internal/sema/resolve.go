@@ -261,6 +261,47 @@ func (c *checker) resolveBlock(b *ast.Block, parent *Scope) {
 	}
 }
 
+// recordUnusedCandidate remembers a `let`/`var` local so the deferred
+// unused-local pass can flag it (E0221) if nothing ever referenced it.
+// The check is deferred to a final pass (reportUnusedLocals) because a
+// use may be recorded in a later phase — a loop `invariant` (resolution),
+// a body reference (Barrier C), or a channel contract (last) — and the
+// channel-type exemption needs the inferred type. The scope is captured
+// so the pass can skip a binding shadowed by a same-scope re-declaration.
+func (c *checker) recordUnusedCandidate(name string, sym *Symbol, span ast.Span, scope *Scope) {
+	if sym == nil {
+		return
+	}
+	c.unusedLocals = append(c.unusedLocals, unusedLocal{name: name, sym: sym, span: span, scope: scope})
+}
+
+// reportUnusedLocals is the deferred pass: after all phases have recorded
+// every use, flag each `let`/`var` local that stayed unreferenced. Go
+// rejects an unused local ("declared and not used") with a raw go/types
+// message; we diagnose it in Aril terms (E0221, D10). Candidates are
+// recorded in source order, so the diagnostics are deterministic.
+func (c *checker) reportUnusedLocals() {
+	for _, u := range c.unusedLocals {
+		if u.sym.Used || u.sym.UsedInContract {
+			continue
+		}
+		// Skip a binding shadowed by a same-scope re-declaration (the
+		// scope's current occupant differs) — that mistake is already
+		// E0222, so a second "unused" note would be redundant noise.
+		if u.scope.names[u.name] != u.sym {
+			continue
+		}
+		// A channel binding is exempt: channels participate in `select`,
+		// `spawn`, and name-based channel contracts (RFC-0007) in ways the
+		// Used flag does not capture, and an unused channel is a benign
+		// resource, not a nil landmine. Only value bindings are checked.
+		if isChannelType(u.sym.Type) {
+			continue
+		}
+		c.report("E0221", "Unused local `"+u.name+"` — reference it, or bind `_` to discard", u.span)
+	}
+}
+
 func (c *checker) resolveStmt(s ast.Stmt, scope *Scope) {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
@@ -283,8 +324,11 @@ func (c *checker) resolveStmt(s ast.Stmt, scope *Scope) {
 		if v.Name != "" && v.Name != "_" {
 			c.checkReservedName(v.Name, v.Span)
 			vsym := &Symbol{Name: v.Name, Kind: SymLocal, Decl: v, Type: &Unknown{}}
-			scope.declare(vsym)
+			if prev := scope.declare(vsym); prev != nil {
+				c.report("E0222", "`"+v.Name+"` is already declared in this block — a nested `{ … }` block shadows instead", v.Span)
+			}
 			c.info.Def[v] = vsym
+			c.recordUnusedCandidate(v.Name, vsym, v.Span, scope)
 		}
 	case *ast.AssignStmt:
 		c.resolveExpr(v.LValue, scope)
@@ -366,8 +410,17 @@ func (c *checker) bindPattern(p ast.Pattern, scope *Scope, decl any) {
 		}
 		c.checkReservedName(v.Name, v.Span)
 		sym := &Symbol{Name: v.Name, Kind: SymLocal, Decl: decl, Type: &Unknown{}}
-		scope.declare(sym)
+		if prev := scope.declare(sym); prev != nil {
+			c.report("E0222", "`"+v.Name+"` is already declared in this block — a nested `{ … }` block shadows instead", v.Span)
+		}
 		c.info.Def[v] = sym
+		// A `let` binding is checked for use; a `for`/`match`/`catch`
+		// pattern binding is not (an ignored one gets the codegen `_ =`
+		// guard, lowering-go.md §MatchIR), so record only let-introduced
+		// locals for the unused-local pass.
+		if _, isLet := decl.(*ast.LetStmt); isLet {
+			c.recordUnusedCandidate(v.Name, sym, v.Span, scope)
+		}
 	case *ast.VariantPat:
 		for _, sub := range v.Sub {
 			c.bindPattern(sub, scope, decl)

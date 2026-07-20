@@ -8,9 +8,9 @@ func TestContainerBraceLitClean(t *testing.T) {
 	src := `import fmt
 func main() {
   let s = Set<int>{ 1, 2, 3 }
-  let e = Set<int>{}
-  let m = Map<string, int>{ "a": 1 }
-  let st = Stack<int>{}
+  let _ = Set<int>{}
+  let _ = Map<string, int>{ "a": 1 }
+  let _ = Stack<int>{}
   fmt.println(s.len())
 }
 `

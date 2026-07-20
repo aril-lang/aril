@@ -170,7 +170,7 @@ func TestEmitConstructionInvariant(t *testing.T) {
 }
 
 func main() {
-  let v = Interval{ start: 1, end: 5 }
+  let _ = Interval{ start: 1, end: 5 }
 }
 
 contract Interval {
@@ -201,7 +201,7 @@ contract Interval {
 }
 
 func main() {
-  let v = Interval{ start: 1, end: 5 }
+  let _ = Interval{ start: 1, end: 5 }
 }
 `, "off")
 	if off != noContract {
