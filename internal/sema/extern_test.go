@@ -43,7 +43,7 @@ extern impl Cmd {
 }
 func use(): int {
   let c = command("ls")
-  let d: string = c.dir
+  let _: string = c.dir
   return c.run()
 }
 `

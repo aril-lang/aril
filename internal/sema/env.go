@@ -30,8 +30,16 @@ type Symbol struct {
 	Type Type // Unknown until Sema-2 fills it
 	Decl any  // *ast.TypeDecl / *ast.ClassDecl / *ast.FuncDecl / *ast.LetStmt / *ast.Param / *ast.Variant / nil
 	// Used: a value reference resolved to this binding. Drives the
-	// bind-and-ignore guard (lowering-go.md §MatchIR).
+	// bind-and-ignore guard (lowering-go.md §MatchIR). A reference inside
+	// a contract predicate (loop `invariant`, `requires`/`ensures`) does
+	// NOT set Used — that predicate is elided under --contracts=off, so
+	// the guard must still fire — it sets UsedInContract instead.
 	Used bool
+	// UsedInContract: a reference resolved to this binding from within a
+	// contract predicate. Kept apart from Used so the codegen bind-and-
+	// ignore guard is unaffected, while the unused-local check (E0221)
+	// still counts a binding a contract mentions as referenced.
+	UsedInContract bool
 }
 
 // Scope is one frame in the lexical-scope chain.

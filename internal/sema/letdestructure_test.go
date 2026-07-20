@@ -25,7 +25,7 @@ func f() {
 
 func TestLetDestructureWildcardClean(t *testing.T) {
 	src := `func pair(): (int, int) { return (1, 2) }
-func f() { let (a, _) = pair() }
+func f(): int { let (a, _) = pair(); return a }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean, got %v", codes)

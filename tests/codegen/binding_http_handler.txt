@@ -65,6 +65,8 @@ func main() {
 	__aril_match_1 := ResultUnit(http.ListenAndServe(":8080", handler))
 	switch __aril_match_1.Tag {
 	case 0:
+		{
+		}
 	case 1:
 		e := __aril_match_1.E
 		log.Fatal(e)

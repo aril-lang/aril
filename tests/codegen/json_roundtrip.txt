@@ -121,13 +121,15 @@ func show(it Item) {
 	switch __aril_match_1.Tag {
 	case 0:
 		p := __aril_match_1.V
-		__aril_match_2 := p.Name
-		switch __aril_match_2.Tag {
-		case 1:
-			s := __aril_match_2.V
-			fmt.Println(p.Id, s)
-		case 0:
-			fmt.Println(p.Id, "none")
+		{
+			__aril_match_2 := p.Name
+			switch __aril_match_2.Tag {
+			case 1:
+				s := __aril_match_2.V
+				fmt.Println(p.Id, s)
+			case 0:
+				fmt.Println(p.Id, "none")
+			}
 		}
 	case 1:
 		e := __aril_match_1.E

@@ -80,9 +80,13 @@ func (_arilSelf *Bag) take() Option[int] {
 	switch __aril_match_1.Tag {
 	case 1:
 		t := __aril_match_1.V
-		result = OptionSome(t)
-		_arilSelf.clear()
+		{
+			result = OptionSome(t)
+			_arilSelf.clear()
+		}
 	case 0:
+		{
+		}
 	}
 	return result
 }

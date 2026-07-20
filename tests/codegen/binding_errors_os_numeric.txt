@@ -90,14 +90,16 @@ func main() {
 	__aril_match_2 := ResultUnit(os.WriteFile("rt.txt", []byte(payload), 420))
 	switch __aril_match_2.Tag {
 	case 0:
-		__aril_match_3 := ResultOf(os.ReadFile("rt.txt"))
-		switch __aril_match_3.Tag {
-		case 0:
-			data := __aril_match_3.V
-			fmt.Println("round-trip:", string(data))
-		case 1:
-			re := __aril_match_3.E
-			fmt.Println("read err:", re)
+		{
+			__aril_match_3 := ResultOf(os.ReadFile("rt.txt"))
+			switch __aril_match_3.Tag {
+			case 0:
+				data := __aril_match_3.V
+				fmt.Println("round-trip:", string(data))
+			case 1:
+				re := __aril_match_3.E
+				fmt.Println("read err:", re)
+			}
 		}
 	case 1:
 		we := __aril_match_2.E

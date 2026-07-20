@@ -47,8 +47,10 @@ func main() {
 		switch __aril_match_1.Tag {
 		case 1:
 			e := __aril_match_1.E
-			fmt.Println("err:", e)
-			os.Exit(1)
+			{
+				fmt.Println("err:", e)
+				os.Exit(1)
+			}
 		case 0:
 			x := __aril_match_1.V
 			return x

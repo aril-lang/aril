@@ -1,0 +1,36 @@
+--- TITLE ---
+A bare `{ … }` statement block gets its own Go scope, so a binding shadows an outer one instead of colliding (bug#2)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let x = 1
+  {
+    let x = 2
+    fmt.println(x)
+  }
+  fmt.println(x)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func main() {
+	var x = 1
+	{
+		var x = 2
+		fmt.Println(x)
+	}
+	fmt.Println(x)
+}
+
+--- STDOUT ---
+2
+1
+
+--- EXIT ---
+0

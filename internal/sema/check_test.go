@@ -758,7 +758,7 @@ func TestSortSortedClosureParamTypedFromElem(t *testing.T) {
 type Interval = { start: int, end: int }
 func main() {
   let xs = [Interval{start: 1, end: 2}]
-  let ys = sort.sorted(xs, (a, b) => a.start < b.start)
+  let _ = sort.sorted(xs, (a, b) => a.start < b.start)
 }
 `
 	toks, lerr := lexer.LexFile(src, "test.aril")
@@ -1080,9 +1080,9 @@ func TestLetAnnotationMismatchFiresE0201(t *testing.T) {
 
 func TestLetAnnotationMatchPasses(t *testing.T) {
 	src := `func main() {
-  let x: int = 3
-  let s: string = "ok"
-  let b: bool = true
+  let _: int = 3
+  let _: string = "ok"
+  let _: bool = true
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1171,7 +1171,7 @@ func TestTransparentAliasMatchesUnderlying(t *testing.T) {
 	src := `type Cents = int
 func price(): Cents { return 100 }
 func main() {
-  let total: int = price()
+  let _: int = price()
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1240,7 +1240,7 @@ func TestMapWrongKeyTypeFiresE0201(t *testing.T) {
 func TestMakeSliceInfersType(t *testing.T) {
 	src := `func main() {
   let xs = makeSlice<int>(3)
-  let n: int = xs[0]
+  let _: int = xs[0]
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1250,8 +1250,8 @@ func TestMakeSliceInfersType(t *testing.T) {
 
 func TestSizedIntLiteralNarrows(t *testing.T) {
 	src := `func main() {
-  let x: int8 = 5
-  let y: byte = 200
+  let _: int8 = 5
+  let _: byte = 200
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1285,8 +1285,8 @@ func TestIllegalConversionFiresE0205(t *testing.T) {
 
 func TestValidConversionPasses(t *testing.T) {
 	src := `func main() {
-  let s = string(65)
-  let r = int('a')
+  let _ = string(65)
+  let _ = int('a')
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1309,7 +1309,7 @@ func TestRefEqSameClassPasses(t *testing.T) {
 func main() {
   let a = Node(1)
   let b = Node(2)
-  let same = refEq(a, b)
+  let _ = refEq(a, b)
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1388,7 +1388,7 @@ func TestMapIntLiteralKeyPasses(t *testing.T) {
 
 func TestSliceLiteralNarrowsToSizedElem(t *testing.T) {
 	src := `func main() {
-  let xs: []byte = [1, 2, 3]
+  let _: []byte = [1, 2, 3]
 }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
@@ -1468,7 +1468,7 @@ func TestDynamicPassthroughPasses(t *testing.T) {
 
 func TestReflectParamImplicitWidenPasses(t *testing.T) {
 	src := `import reflect
-func main() { let t = reflect.typeOf(5) }
+func main() { let _ = reflect.typeOf(5) }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean (reflect.* implicit widen), got %v", codes)
@@ -1565,7 +1565,7 @@ func main() { let _ = Counter(0).get() }
 
 func TestGenericExplicitTypeArgReturnPasses(t *testing.T) {
 	src := `func id<T>(x: T): T { return x }
-func main() { let n: int = id<int>(5) }
+func main() { let _: int = id<int>(5) }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean (explicit type arg), got %v", codes)
@@ -1574,7 +1574,7 @@ func main() { let n: int = id<int>(5) }
 
 func TestGenericInferredTypeArgReturnPasses(t *testing.T) {
 	src := `func id<T>(x: T): T { return x }
-func main() { let n: int = id(5) }
+func main() { let _: int = id(5) }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean (inferred type arg), got %v", codes)
@@ -1601,7 +1601,7 @@ func main() { let n: string = id<int>(5) }
 
 func TestGenericSliceInferencePasses(t *testing.T) {
 	src := `func first<T>(xs: []T): T { return xs[0] }
-func main() { let n: int = first<int>(makeSlice<int>(3)) }
+func main() { let _: int = first<int>(makeSlice<int>(3)) }
 `
 	if codes := runCheck(t, src); len(codes) != 0 {
 		t.Errorf("expected clean (slice generic infer), got %v", codes)
@@ -1687,7 +1687,7 @@ func TestChannelMethodsAndForClean(t *testing.T) {
 func main() {
   let ch = makeChannel<int>(2)
   ch.send(1)
-  let x = ch.recv()
+  let _ = ch.recv()
   ch.close()
   for v in ch {
     fmt.println(v)
@@ -1754,7 +1754,7 @@ func TestScopeSpawnClean(t *testing.T) {
 	// trailing value is clean.
 	src := `func main() {
   let ch = makeChannel<int>(2)
-  let total = scope<int, error> {
+  let _ = scope<int, error> {
     spawn { ch.send(1); return Ok(()) }
     let a = ch.recv()
     a
