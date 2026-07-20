@@ -279,10 +279,33 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	}
 	g.line(s.Span.StartLine)
 	g.writeIndent()
-	if id, ok := iterExpr.(*ast.Ident); ok && g.varKindOf(id) == "Map" {
+	if g.exprContainerKind(iterExpr) == "Map" {
 		// `for (k, v) in m` — deterministic over insertion order; the
 		// value is fetched per key. A `_` key still needs a name to
-		// index with when the value is bound.
+		// index with when the value is bound. Classified by the sema type
+		// so a member access `rec.mapField` (not an Ident) routes here
+		// instead of leaking a raw Go `range` (bug#4). A non-Ident
+		// receiver is hoisted to a temp so `Keys()` + per-key `At()` do
+		// not re-evaluate a side-effecting expression; a bare Ident is
+		// re-emitted inline (byte-identical to before).
+		recv := ""
+		if _, isIdent := iterExpr.(*ast.Ident); !isIdent {
+			recv = g.nextMatchTemp()
+			g.b.WriteString(recv)
+			g.b.WriteString(" := ")
+			if err := g.emitExpr(iterExpr); err != nil {
+				return err
+			}
+			g.b.WriteByte('\n')
+			g.writeIndent()
+		}
+		emitRecv := func() error {
+			if recv != "" {
+				g.b.WriteString(recv)
+				return nil
+			}
+			return g.emitExpr(iterExpr)
+		}
 		keyVar := a
 		if keyVar == "_" && b != "_" {
 			keyVar = g.nextMatchTemp()
@@ -290,7 +313,7 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 		g.b.WriteString("for _, ")
 		g.b.WriteString(keyVar)
 		g.b.WriteString(" := range ")
-		if err := g.emitExpr(id); err != nil {
+		if err := emitRecv(); err != nil {
 			return err
 		}
 		g.b.WriteString(".Keys() {\n")
@@ -304,7 +327,7 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 			g.writeIndent()
 			g.b.WriteString(b)
 			g.b.WriteString(" := ")
-			if err := g.emitExpr(id); err != nil {
+			if err := emitRecv(); err != nil {
 				return err
 			}
 			g.b.WriteString(".At(")
@@ -334,7 +357,10 @@ func (g *gen) emitForTuple(s *ast.ForStmt, tp *ast.TuplePat) error {
 	if err := g.emitExpr(iterExpr); err != nil {
 		return err
 	}
-	if id, ok := iterExpr.(*ast.Ident); ok && g.varKindOf(id) == "List" {
+	// A List is a wrapper, not a Go slice — iterate its ordered view.
+	// Classified by the sema type so `rec.listField` routes here too
+	// (bug#4); a single emission, so no hoist needed.
+	if g.exprContainerKind(iterExpr) == "List" {
 		g.b.WriteString(".ToSlice()")
 	}
 	g.b.WriteString(" {\n")
@@ -434,34 +460,35 @@ func (g *gen) emitForStmt(s *ast.ForStmt) error {
 		// (Go's bare `range m.m` is randomised). For now we
 		// expose keys only via this short form; tuple-form
 		// `for (k, v) in m` and `m.entries()` come later.
-		if id, ok := iterExpr.(*ast.Ident); ok {
-			if k := g.varKindOf(id); k == "Map" || k == "Set" || k == "List" {
-				g.writeRangeHead(goIdent(idPat.Name), false)
-				if err := g.emitExpr(id); err != nil {
-					return err
-				}
-				// Iterate the ordered view via the exported accessor (Map
-				// keys / Set elements / List elements) so the same emission
-				// works against the arilrt package boundary in vendored
-				// mode. Returns a copy — safe for read-only iteration.
-				if k == "Map" {
-					g.b.WriteString(".Keys() {\n")
-				} else {
-					g.b.WriteString(".ToSlice() {\n")
-				}
-				break
+		// Classify by the iterable's sema *type*, so a member access
+		// `rec.listField` (an `*ast.Field`, not an Ident) routes through
+		// the container intercept instead of leaking a raw Go `range` over
+		// `*arilrt.List` (bug#4).
+		if k := g.exprContainerKind(iterExpr); k == "Map" || k == "Set" || k == "List" {
+			g.writeRangeHead(goIdent(idPat.Name), false)
+			if err := g.emitExpr(iterExpr); err != nil {
+				return err
 			}
+			// Iterate the ordered view via the exported accessor (Map
+			// keys / Set elements / List elements) so the same emission
+			// works against the arilrt package boundary in vendored
+			// mode. Returns a copy — safe for read-only iteration.
+			if k == "Map" {
+				g.b.WriteString(".Keys() {\n")
+			} else {
+				g.b.WriteString(".ToSlice() {\n")
+			}
+			break
+		} else if k == "Channel" || k == "RecvChan" {
 			// Channel iteration — `for v in ch` drains the channel
 			// until it closes (lowering-go.md §For-loops, ForChanIR).
 			// Go's `range ch` yields the element directly, no index.
-			if k := g.varKindOf(id); k == "Channel" || k == "RecvChan" {
-				g.writeRangeHead(goIdent(idPat.Name), true)
-				if err := g.emitExpr(id); err != nil {
-					return err
-				}
-				g.b.WriteString(" {\n")
-				break
+			g.writeRangeHead(goIdent(idPat.Name), true)
+			if err := g.emitExpr(iterExpr); err != nil {
+				return err
 			}
+			g.b.WriteString(" {\n")
+			break
 		}
 		g.writeRangeHead(goIdent(idPat.Name), false)
 		if err := g.emitExpr(iterExpr); err != nil {

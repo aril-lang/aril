@@ -738,16 +738,15 @@ func (g *gen) userSumCtorArgsFromExpect(info variantInfo, expect ast.TypeExpr) (
 }
 
 // isContainerReceiver reports whether the receiver expression
-// resolves to a predeclared-container instance (Map / Set /
-// Stack). Used by emitCall to suppress the slice-method
+// resolves to a predeclared-container instance (Map / Set / Stack /
+// List / channel). Used by emitCall to suppress the slice-method
 // shortcut on container instances whose method names happen to
-// collide with slice methods (`.len()`, `.push()`).
+// collide with slice methods (`.len()`, `.push()`). Classified by the
+// sema type of any expression, so a member access `rec.listField.len()`
+// dispatches as the container method `.Len()` rather than leaking a raw
+// Go `len(*arilrt.List)` (bug#4).
 func (g *gen) isContainerReceiver(e ast.Expr) bool {
-	id, ok := e.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	return g.varKindOf(id) != ""
+	return g.exprContainerKind(e) != ""
 }
 
 // isUserNamedReceiver reports whether e sema-types to a user-declared class or
@@ -768,11 +767,7 @@ func (g *gen) isUserNamedReceiver(e ast.Expr) bool {
 // calls (`.send` / `.recv` / `.tryRecv` / `.close`) to Go channel
 // operators rather than method dispatch.
 func (g *gen) isChannelReceiver(e ast.Expr) bool {
-	id, ok := e.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	switch g.varKindOf(id) {
+	switch g.exprContainerKind(e) {
 	case "Channel", "SendChan", "RecvChan":
 		return true
 	}
@@ -785,13 +780,26 @@ func (g *gen) isChannelReceiver(e ast.Expr) bool {
 // instance. This replaces codegen's former shallow varKind tracker
 // with sema as the single source of truth.
 func (g *gen) varKindOf(id *ast.Ident) string {
+	return g.exprContainerKind(id)
+}
+
+// exprContainerKind is varKindOf generalised to any expression: it reads
+// the container kind of the sema-inferred type of `e`, so a `for`/index
+// intercept keys off the receiver's *type*, not a bare `*ast.Ident`. A
+// member access `rec.listField` (an `*ast.Field`, not an Ident) or any
+// other expression whose type is a container is classified correctly,
+// instead of falling through to a raw Go `range`/index that leaks a
+// go/types error (bug#4; lowering-go.md §For-loops).
+func (g *gen) exprContainerKind(e ast.Expr) string {
 	if g.info == nil {
 		return ""
 	}
-	t := g.info.Type[id]
+	t := g.info.Type[e]
 	if t == nil {
-		if sym := g.info.Symbol[id]; sym != nil {
-			t = sym.Type
+		if id, ok := e.(*ast.Ident); ok {
+			if sym := g.info.Symbol[id]; sym != nil {
+				t = sym.Type
+			}
 		}
 	}
 	switch t.(type) {
@@ -820,15 +828,18 @@ func (g *gen) varKindOf(id *ast.Ident) string {
 // container V — which the index lowering coalesces to an empty container
 // (lowering-go.md §Container defaulting, T13). Restricted to Map: a List
 // `.At` panics on out-of-bounds (loud) and holds no nil in-bounds, so it
-// has no silent-nil miss. recv must be an already-classified Map Ident.
-func (g *gen) indexMapValueContainerKind(recv *ast.Ident) string {
+// has no silent-nil miss. recv is any expression already classified as a
+// Map (an Ident or a member access such as `rec.mapField`).
+func (g *gen) indexMapValueContainerKind(recv ast.Expr) string {
 	if g.info == nil {
 		return ""
 	}
 	t := g.info.Type[recv]
 	if t == nil {
-		if sym := g.info.Symbol[recv]; sym != nil {
-			t = sym.Type
+		if id, ok := recv.(*ast.Ident); ok {
+			if sym := g.info.Symbol[id]; sym != nil {
+				t = sym.Type
+			}
 		}
 	}
 	mt, ok := t.(*sema.Map)

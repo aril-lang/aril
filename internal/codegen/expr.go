@@ -369,11 +369,17 @@ func (g *gen) emitMapBraceLit(b *ast.BraceLit) error {
 	if len(b.TypeName.Args) != 2 {
 		return fmt.Errorf("codegen: Map literal needs key and value type arguments — write Map<K,V>{…}")
 	}
-	g.b.WriteString("func() *Map")
+	// The IIFE's type + constructor must carry the runtime prefix
+	// (`arilrt.Map` / `arilrt.NewMap`) in vendored mode, exactly like the
+	// empty-literal path above; a bare `Map`/`NewMap` here leaked a raw Go
+	// `undefined: Map` for a non-empty Map literal across the package
+	// boundary (fixtures use inline mode, where the prefix is empty, so
+	// they never caught it).
+	g.b.WriteString("func() *" + g.rt("Map"))
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
-	g.b.WriteString(" { m := NewMap")
+	g.b.WriteString(" { m := " + g.rt("NewMap"))
 	if err := g.emitTypeArgs(b.TypeName.Args); err != nil {
 		return err
 	}
@@ -752,19 +758,23 @@ func (g *gen) emitExpr(e ast.Expr) error {
 		// goes through the exported At accessor (not the unexported `m`
 		// field) so the same emission works across the arilrt package
 		// boundary in vendored mode.
-		if id, ok := v.Receiver.(*ast.Ident); ok && (g.varKindOf(id) == "Map" || g.varKindOf(id) == "List") {
+		// Classified by the receiver's sema *type*, so a member access
+		// `rec.mapField[k]` (an `*ast.Field`, not an Ident) lowers through
+		// `.At` too instead of leaking a raw Go `cannot index …*arilrt.Map`
+		// (bug#4).
+		if rk := g.exprContainerKind(v.Receiver); rk == "Map" || rk == "List" {
 			// `l[i]` on a List lowers to `l.At(i)` (a Go bounds-checked slice
 			// index inside the wrapper) — the same exported-accessor path as
 			// Map's `m[k]`, so it works across the arilrt boundary in vendored mode.
 			// When the element type is itself a reference container, `.At`'s
 			// zero-value-on-miss is a nil pointer; wrap it in the Coalesce
 			// helper so a miss yields the empty container, not nil (T13).
-			kind := g.indexMapValueContainerKind(id)
+			kind := g.indexMapValueContainerKind(v.Receiver)
 			if kind != "" {
 				g.b.WriteString(g.rt("Coalesce" + kind))
 				g.b.WriteByte('(')
 			}
-			if err := g.emitExpr(id); err != nil {
+			if err := g.emitExpr(v.Receiver); err != nil {
 				return err
 			}
 			g.b.WriteString(".At(")
