@@ -32,6 +32,8 @@ This directory holds:
 | 0007 | accepted | Channel contracts (trace contracts) |
 | 0008 | accepted | External modules: the dependency & build system |
 | 0009 | accepted | Build-artifact layout |
+| 0010 | implemented | Module-aware bindgen (cold-start Go consumption) |
+| 0011 | reserved | Native panic traces (`aril explain`) |
 
 ## How to write an RFC
 
