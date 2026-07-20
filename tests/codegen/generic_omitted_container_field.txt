@@ -1,0 +1,133 @@
+--- TITLE ---
+An omitted container field of a generic record/class fills with the concrete instantiation's type args — `Box<int>` → NewList[int](), never the out-of-scope NewList[T] (lowering-go.md §Container defaulting)
+
+--- INPUT ---
+import fmt
+
+class Box<T> {
+  var items: List<T>
+  var label: string
+}
+
+type Wrap<T> = { items: List<T>, n: int }
+
+func main() {
+  let b = Box<int>{ label: "hi" }
+  b.items.push(5)
+  let bi = b.items
+  fmt.println(bi.len())
+  fmt.println(b.label)
+  let w = Wrap<string>{ n: 4 }
+  w.items.push("x")
+  let wi = w.items
+  fmt.println(wi.len())
+  fmt.println(w.n)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Option[T any] struct {
+	Tag uint8
+	V   T
+}
+
+func OptionSome[T any](value T) Option[T] {
+	return Option[T]{Tag: 1, V: value}
+}
+func OptionNone[T any]() Option[T] {
+	return Option[T]{Tag: 0}
+}
+
+type List[T any] struct {
+	xs []T
+}
+
+func NewList[T any]() *List[T] {
+	return &List[T]{xs: nil}
+}
+func ListOf[T any](elems ...T) *List[T] {
+	xs := make([]T, len(elems))
+	copy(xs, elems)
+	return &List[T]{xs: xs}
+}
+func (l *List[T]) Len() int { return len(l.xs) }
+func (l *List[T]) Push(e T) {
+	l.xs = append(l.xs, e)
+}
+func (l *List[T]) At(i int) T { return l.xs[i] }
+func (l *List[T]) Get(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	return Option[T]{Tag: 1, V: l.xs[i]}
+}
+func (l *List[T]) Set(i int, e T) { l.xs[i] = e }
+func (l *List[T]) Pop() Option[T] {
+	n := len(l.xs)
+	if n == 0 {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[n-1]
+	l.xs = l.xs[:n-1]
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) Insert(i int, e T) {
+	if i < 0 {
+		i = 0
+	}
+	if i > len(l.xs) {
+		i = len(l.xs)
+	}
+	var zero T
+	l.xs = append(l.xs, zero)
+	copy(l.xs[i+1:], l.xs[i:])
+	l.xs[i] = e
+}
+func (l *List[T]) RemoveAt(i int) Option[T] {
+	if i < 0 || i >= len(l.xs) {
+		return Option[T]{Tag: 0}
+	}
+	v := l.xs[i]
+	l.xs = append(l.xs[:i], l.xs[i+1:]...)
+	return Option[T]{Tag: 1, V: v}
+}
+func (l *List[T]) ToSlice() []T {
+	out := make([]T, len(l.xs))
+	copy(out, l.xs)
+	return out
+}
+
+type Box[T any] struct {
+	Items *List[T] `json:"items"`
+	Label string   `json:"label"`
+}
+type Wrap[T any] struct {
+	Items *List[T] `json:"items"`
+	N     int      `json:"n"`
+}
+
+func main() {
+	var b = &Box[int]{Label: "hi", Items: NewList[int]()}
+	b.Items.Push(5)
+	var bi = b.Items
+	fmt.Println(bi.Len())
+	fmt.Println(b.Label)
+	var w = Wrap[string]{N: 4, Items: NewList[string]()}
+	w.Items.Push("x")
+	var wi = w.Items
+	fmt.Println(wi.Len())
+	fmt.Println(w.N)
+}
+
+--- STDOUT ---
+1
+hi
+1
+4
+
+--- EXIT ---
+0

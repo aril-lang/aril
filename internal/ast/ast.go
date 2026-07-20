@@ -205,8 +205,10 @@ func (n *SumTypeBody) NodeKind() string { return "SumTypeBody" }
 func (n *SumTypeBody) typeBodyMarker()  {}
 
 // RecordTypeBody — `type T = { f1: T1, f2: T2, ... }`. Nominal
-// record (D14): the declared name is its identity. All fields are
-// required in v1.
+// record (D14): the declared name is its identity. A literal may omit
+// a field whose zero value is safe (partial construction); an omitted
+// field with no safe default — a bare user `class` — is E0220
+// (lowering-go.md §Container defaulting).
 type RecordTypeBody struct {
 	Span   Span
 	Fields []*FieldDecl

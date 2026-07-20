@@ -390,6 +390,23 @@ func (g *gen) emitLetOrVar(span ast.Span, name string, declType ast.TypeExpr, va
 			return err
 		}
 	}
+	// `var x: T` with no initializer. A container zero value must be the
+	// empty constructor, not Go's nil pointer, or first use segfaults and
+	// an uninitialized `var l: List<int>` even crashed codegen (bug#3);
+	// other types keep Go's safe zero value `var x T` (lowering-go.md
+	// §Container defaulting).
+	if value == nil {
+		if declType != nil {
+			if _, isContainer := containerCtorName(declType); isContainer {
+				g.b.WriteString(" = ")
+				if _, err := g.emitEmptyContainer(declType); err != nil {
+					return err
+				}
+			}
+		}
+		g.b.WriteByte('\n')
+		return nil
+	}
 	g.b.WriteString(" = ")
 	// A type annotation gives the value an expected type — thread it
 	// so a predeclared Result/Option constructor gets explicit type

@@ -353,6 +353,17 @@ func (c *checker) inferBraceLit(b *ast.BraceLit) Type {
 			c.inferExpr(en.Value)
 		}
 	}
+	// Partial construction: a record/class literal may omit fields, which
+	// take their zero value. That is safe for scalars (0/""), Option
+	// (None), reference-containers (defaulted to the empty container in
+	// codegen), and records/tuples built recursively from safe fields —
+	// but a bare user `class` field zeroes to a nil pointer with no empty
+	// constructor, so omitting it is an unsound partial build (E0220). The
+	// author provides it or types it Option<Class> (→ None). (T2 policy;
+	// lowering-go.md §Container defaulting.)
+	if isClassOrRecordNamed(rt) {
+		c.checkOmittedFields(rt, b)
+	}
 	if b.Kind == ast.BraceRecord {
 		return rt
 	}
@@ -418,6 +429,89 @@ func (c *checker) recordFieldType(t Type, name string) Type {
 		}
 	}
 	return nil
+}
+
+// checkOmittedFields reports E0220 for every declared field of a
+// record/class literal that the author omitted and whose type has no
+// safe zero value (a bare user `class`). Fields with a safe default —
+// scalars, Option, reference-containers, records built from safe fields
+// — may be omitted (partial construction). See lowering-go.md
+// §Container defaulting.
+func (c *checker) checkOmittedFields(rt Type, b *ast.BraceLit) {
+	named, ok := rt.(*Named)
+	if !ok {
+		return
+	}
+	present := make(map[string]bool, len(b.Entries))
+	for _, e := range b.Entries {
+		if re, ok := e.(*ast.RecordEntry); ok {
+			present[re.Name] = true
+		}
+	}
+	check := func(name string, declType ast.TypeExpr) {
+		if present[name] {
+			return
+		}
+		ft := c.typeFromExpr(declType)
+		if c.hasSafeDefault(ft, map[string]bool{}) {
+			return
+		}
+		c.report("E0220", "Field "+name+" of "+named.N+" must be provided — its type "+ft.String()+
+			" has no safe default; provide it or make the field `Option<"+ft.String()+">`", b.Span)
+	}
+	switch d := named.Decl.(type) {
+	case *ast.TypeDecl:
+		if rb, ok := d.Body.(*ast.RecordTypeBody); ok {
+			for _, f := range rb.Fields {
+				check(f.Name, f.DeclType)
+			}
+		}
+	case *ast.ClassDecl:
+		for _, f := range d.Fields {
+			check(f.Name, f.DeclType)
+		}
+	}
+}
+
+// hasSafeDefault reports whether a field of type t may be safely omitted
+// from a record/class literal — i.e. its zero value is not a nil
+// landmine. A bare user `class` reference (nil pointer, no empty
+// constructor) is the sole non-defaultable case in scope; a record is
+// safe only when every field is (recursion guarded by name against a
+// self-referential record). Scalars, Option, reference-containers
+// (codegen-defaulted), tuples of safe fields, and everything else zero
+// to safe values. (lowering-go.md §Container defaulting.)
+func (c *checker) hasSafeDefault(t Type, visited map[string]bool) bool {
+	switch v := t.(type) {
+	case *Named:
+		if _, isClass := v.Decl.(*ast.ClassDecl); isClass {
+			return false
+		}
+		if td, ok := v.Decl.(*ast.TypeDecl); ok {
+			if rb, ok := td.Body.(*ast.RecordTypeBody); ok {
+				if visited[v.N] {
+					return true // self-referential record: break the cycle
+				}
+				visited[v.N] = true
+				for _, f := range rb.Fields {
+					if !c.hasSafeDefault(c.typeFromExpr(f.DeclType), visited) {
+						return false
+					}
+				}
+				return true
+			}
+		}
+		return true
+	case *Tuple:
+		for _, comp := range v.Comps {
+			if !c.hasSafeDefault(comp, visited) {
+				return false
+			}
+		}
+		return true
+	default:
+		return true
+	}
 }
 
 func (c *checker) inferIdent(id *ast.Ident) Type {

@@ -490,7 +490,9 @@ Invariants:
   `type_name`: an empty `Map`/`Set`/`Stack`/`List` container, or —
   when `type_name` names a **class or record** — an empty (zero-value)
   construction `T{}`, typed as `T` (consistent with a partial record
-  literal, which already zero-fills omitted fields).
+  literal, which zero-fills omitted fields; reference-container fields
+  default to the empty container and an omitted non-defaultable `class`
+  field is E0220 — `lowering-go.md` §Container defaulting).
 
 Mixing entry shapes in one literal is a parse error: the parser
 commits after the first entry and rejects deviation.
