@@ -1194,8 +1194,8 @@ func (g *gen) detectPredeclaredUsage(f *ast.File) {
 			// lowers through the Coalesce helper (nil-miss → empty, T13).
 			// Detect it with the same test the emitter uses so inline mode
 			// carries the helper exactly when the emit path references it.
-			if id, ok := v.Receiver.(*ast.Ident); ok && (g.varKindOf(id) == "Map" || g.varKindOf(id) == "List") {
-				g.markCoalesceUsed(g.indexMapValueContainerKind(id))
+			if rk := g.exprContainerKind(v.Receiver); rk == "Map" || rk == "List" {
+				g.markCoalesceUsed(g.indexMapValueContainerKind(v.Receiver))
 			}
 			walk(v.Receiver)
 			walk(v.Idx)
