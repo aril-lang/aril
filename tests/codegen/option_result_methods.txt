@@ -46,6 +46,12 @@ func OptionSome[T any](value T) Option[T] {
 func OptionNone[T any]() Option[T] {
 	return Option[T]{Tag: 0}
 }
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 func (o Option[T]) IsSome() bool { return o.Tag == 1 }
 func (o Option[T]) IsNone() bool { return o.Tag == 0 }
 func (o Option[T]) UnwrapOr(fallback T) T {
@@ -66,6 +72,12 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 }
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
+}
+func (r Result[T, E]) String() string {
+	if r.Tag == 0 {
+		return fmt.Sprintf("Ok(%v)", r.V)
+	}
+	return fmt.Sprintf("Err(%v)", r.E)
 }
 func (r Result[T, E]) IsOk() bool  { return r.Tag == 0 }
 func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }

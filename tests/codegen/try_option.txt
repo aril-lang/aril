@@ -51,6 +51,12 @@ func OptionSome[T any](value T) Option[T] {
 func OptionNone[T any]() Option[T] {
 	return Option[T]{Tag: 0}
 }
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 func first_even(xs []int) Option[int] {
 	for _, x := range xs {
 		if x == 0 {

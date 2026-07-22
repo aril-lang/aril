@@ -259,6 +259,12 @@ func OptionSome[T any](value T) Option[T] {
 func OptionNone[T any]() Option[T] {
 	return Option[T]{Tag: 0}
 }
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 
 type Result[T any, E any] struct {
 	Tag uint8
@@ -271,6 +277,12 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 }
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
+}
+func (r Result[T, E]) String() string {
+	if r.Tag == 0 {
+		return fmt.Sprintf("Ok(%v)", r.V)
+	}
+	return fmt.Sprintf("Err(%v)", r.E)
 }
 
 type Point struct {

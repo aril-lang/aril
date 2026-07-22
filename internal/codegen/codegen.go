@@ -461,9 +461,13 @@ type gen struct {
 	usesCoalesceSet   bool
 	usesCoalesceStack bool
 	usesReflect       bool
-	usesCmp           bool // an `Ordered` type-param bound → import "cmp" (G3b)
-	usesMakeSlice     bool
-	usesScan          bool
+	// usesStringerFmt: a generated record/sum String() (emitTypeDecl, D56)
+	// was emitted into main and calls fmt.Sprintf — main needs `import fmt`
+	// in both runtime modes (the method lives in main, not arilrt).
+	usesStringerFmt bool
+	usesCmp         bool // an `Ordered` type-param bound → import "cmp" (G3b)
+	usesMakeSlice   bool
+	usesScan        bool
 	// usesScan2 / usesScan3 — the multi-value stdin bindings
 	// `fmt.scan2<A,B>()` / `fmt.scan3<A,B,C>()`, lowered to the
 	// Scan2 / Scan3 helpers (Result<(A,B[,C]), error>).
@@ -815,6 +819,17 @@ func (g *gen) writeHeader(f *ast.File) {
 	}
 	if g.usesJSONParse && !g.vendored() {
 		add("encoding/json")
+	}
+	// The inline Option/Result/List/Map/Set/Stack String() methods (D56,
+	// fmt.Stringer) call fmt.Sprintf, so single-file mode needs fmt whenever
+	// any of them is emitted; vendored mode carries them in arilrt (its own
+	// fmt import). A generated record/sum String() (emitTypeDecl) sets
+	// usesStringerFmt directly — that method lives in main in both modes.
+	if !g.vendored() && (g.usesOption || g.usesResult || g.usesList || g.usesMap || g.usesSet || g.usesStack) {
+		add("fmt")
+	}
+	if g.usesStringerFmt {
+		add("fmt")
 	}
 	// The inline ErrorsAs helper (writePredeclaredErrorsAs) calls errors.As;
 	// vendored mode carries it in arilrt (arilrt/errors.go).

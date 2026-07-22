@@ -46,6 +46,12 @@ func ResultOk[T any, E any](value T) Result[T, E] {
 func ResultErr[T any, E any](err E) Result[T, E] {
 	return Result[T, E]{Tag: 1, E: err}
 }
+func (r Result[T, E]) String() string {
+	if r.Tag == 0 {
+		return fmt.Sprintf("Ok(%v)", r.V)
+	}
+	return fmt.Sprintf("Err(%v)", r.E)
+}
 func half(n int) Result[int, string] {
 	if n%2 == 0 {
 		return ResultOk[int, string](n / 2)

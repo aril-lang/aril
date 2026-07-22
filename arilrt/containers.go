@@ -1,11 +1,18 @@
 package arilrt
 
+import "fmt"
+
 // containers.go — the predeclared container types Map / Set / Stack
 // (lang-spec/builtins.md §Map / §Set / §Stack, lowering-go.md §Container
 // types). Insertion order is preserved for deterministic iteration.
 // Methods are exported so vendored-mode code in another package can call
 // them; inline single-file mode uses the same spellings without the
 // package selector.
+//
+// Each type carries a String() (fmt.Stringer) so `fmt`/`${}` render the
+// Aril value, not Go's raw `%v` lowering (D56, lang-spec/lowering-go.md
+// §Stringer generation). Elements are rendered with `%v` so a nested
+// composite re-dispatches to its own String() — recursion is total.
 
 // Map is an insertion-ordered map.
 type Map[K comparable, V any] struct {
@@ -66,6 +73,17 @@ func (m *Map[K, V]) Values() []V {
 	return out
 }
 
+func (m *Map[K, V]) String() string {
+	s := "{"
+	for i, k := range m.order {
+		if i > 0 {
+			s += ", "
+		}
+		s += fmt.Sprintf("%v: %v", k, m.m[k])
+	}
+	return s + "}"
+}
+
 // Set is an insertion-ordered set.
 type Set[T comparable] struct {
 	m     map[T]struct{}
@@ -116,6 +134,17 @@ func (s *Set[T]) ToSlice() []T {
 	return out
 }
 
+func (s *Set[T]) String() string {
+	out := "{"
+	for i, e := range s.order {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "}"
+}
+
 // Stack is a LIFO stack.
 type Stack[T any] struct {
 	xs []T
@@ -146,6 +175,19 @@ func (s *Stack[T]) Peek() Option[T] {
 		return Option[T]{Tag: 0}
 	}
 	return Option[T]{Tag: 1, V: s.xs[n-1]}
+}
+
+// String renders the stack bottom-to-top as `[a, b, c]` (the top is the
+// last element) — a plain contents view, the debug rendering (D56).
+func (s *Stack[T]) String() string {
+	out := "["
+	for i, e := range s.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "]"
 }
 
 var emptyStack = emptyStackError{}
@@ -229,6 +271,17 @@ func (l *List[T]) ToSlice() []T {
 	out := make([]T, len(l.xs))
 	copy(out, l.xs)
 	return out
+}
+
+func (l *List[T]) String() string {
+	out := "["
+	for i, x := range l.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", x)
+	}
+	return out + "]"
 }
 
 // Coalesce{List,Map,Set,Stack} back a bare `m[k]` / `l[i]` index whose

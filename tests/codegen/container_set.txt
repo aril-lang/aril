@@ -60,6 +60,16 @@ func (s *Set[T]) ToSlice() []T {
 	copy(out, s.order)
 	return out
 }
+func (s *Set[T]) String() string {
+	out := "{"
+	for i, e := range s.order {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "}"
+}
 func main() {
 	var s = NewSet[int]()
 	s.Add(1)
