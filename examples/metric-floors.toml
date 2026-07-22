@@ -32,7 +32,7 @@ build_ok_min = 100  # current build_ok; strict ratchet (raised 99→100 in the
                     # ATOMICS-BINDING: lockfree_ring (scalar atomic.Int64),
                     # lockfree_stack (generic Treiber over atomic.Pointer<T>),
                     # rcu_skiplist + rcu_tree (RCU over atomic.Pointer<T>))
-diag_ok_min  = 116  # headroom below current diag_ok (122/122) so an individual
+diag_ok_min  = 116  # headroom below current diag_ok (124/124) so an individual
                     # imprecise message is a penalty, not a red (raised 88→116 at
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
