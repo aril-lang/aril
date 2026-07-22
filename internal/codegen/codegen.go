@@ -288,6 +288,16 @@ func EmitFilesWithOptions(files []*ast.File, paths []string, info *sema.Info, op
 			g.variant[name] = variantInfo{owner: "Kind", tag: i}
 		}
 	}
+	// A generated record/sum String() (D56) lands in main and calls
+	// fmt.Sprintf when it renders any field/payload — main then needs
+	// `import fmt`. Decided here (before writeHeader emits imports) since
+	// emitTypeDecl runs after the header.
+	for _, d := range f.Decls {
+		if td, ok := d.(*ast.TypeDecl); ok && typeDeclStringerUsesFmt(td) {
+			g.usesStringerFmt = true
+			break
+		}
+	}
 	g.writeHeader(f)
 	// Contract re-entrancy guard (RFC-0006, panic mode): a contract
 	// predicate may call the contracted (or a mutually-contracted) function

@@ -334,6 +334,63 @@ func main() {
 	}
 }
 
+// TestEmitRunUserTypeString is the D56 guard for the codegen-generated
+// String() on user records + sum types: records render by field name, sum
+// variants by name (payload positional, nullary bare), recursive sums recurse
+// through the *T self-ref field. Compile-and-run so the emitted method and its
+// fmt import are actually exercised (not just string-compared).
+func TestEmitRunUserTypeString(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not available")
+	}
+	src := `import fmt
+
+type Point = { x: int, y: int }
+
+type Tree =
+  | Leaf
+  | Node(value: int, left: Tree, right: Tree)
+
+func main() {
+  fmt.println(Point{x: 1, y: 2})
+  fmt.println(Node(5, Node(3, Leaf, Leaf), Leaf))
+  fmt.println(Leaf)
+}
+`
+	out := emitString(t, src)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(out), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	mod := "module aril-codegen-test\n\ngo 1.22\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	cmd := exec.Command("go", "run", "./...")
+	cmd.Dir = dir
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go run failed: %v", err)
+	}
+	want := "{x: 1, y: 2}\nNode(5, Node(3, Leaf, Leaf), Leaf)\nLeaf\n"
+	if got := string(stdout); got != want {
+		t.Errorf("user-type stdout =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestRecordStringFieldClashSkipsStringer guards the D56 collision edge: a
+// record field whose exported Go name is `String` would clash with the
+// generated method, so no String() is emitted (Go's default rendering stays)
+// — the emitted Go must still compile.
+func TestRecordStringFieldClashSkipsStringer(t *testing.T) {
+	src := `type Weird = { string: int, y: int }
+`
+	out := emitString(t, src)
+	if strings.Contains(out, "func (_arilSelf Weird) String()") {
+		t.Errorf("String() must be skipped for a record with a `String`-named field, got:\n%s", out)
+	}
+}
+
 // TestErrorCtorLowersToErrorsNew locks the `error(msg)` free-constructor
 // lowering and its shadow-safety: the genuine builtin lowers to
 // errors.New, but a user decl that shadows `error` is called normally

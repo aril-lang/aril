@@ -233,6 +233,9 @@ type Bag struct {
 	N     int               `json:"n"`
 }
 
+func (_arilSelf Bag) String() string {
+	return fmt.Sprintf("{items: %v, tags: %v, seen: %v, n: %v}", _arilSelf.Items, _arilSelf.Tags, _arilSelf.Seen, _arilSelf.N)
+}
 func main() {
 	var full = Bag{N: 7, Items: NewList[int](), Tags: NewMap[string, int](), Seen: NewSet[int]()}
 	full.Items.Push(1)

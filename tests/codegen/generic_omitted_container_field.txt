@@ -126,6 +126,9 @@ type Wrap[T any] struct {
 	N     int      `json:"n"`
 }
 
+func (_arilSelf Wrap[T]) String() string {
+	return fmt.Sprintf("{items: %v, n: %v}", _arilSelf.Items, _arilSelf.N)
+}
 func main() {
 	var b = &Box[int]{Label: "hi", Items: NewList[int]()}
 	b.Items.Push(5)

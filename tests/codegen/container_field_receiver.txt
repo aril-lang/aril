@@ -176,6 +176,9 @@ type H struct {
 	Tags *Map[string, int] `json:"tags"`
 }
 
+func (_arilSelf H) String() string {
+	return fmt.Sprintf("{xs: %v, tags: %v}", _arilSelf.Xs, _arilSelf.Tags)
+}
 func main() {
 	var h = H{Xs: ListOf[int](10, 20), Tags: NewMap[string, int]()}
 	h.Xs.Push(30)

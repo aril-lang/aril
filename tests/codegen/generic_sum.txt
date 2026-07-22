@@ -38,6 +38,15 @@ func TreeLeaf[T any]() Tree[T] {
 func TreeNode[T any](value T, left Tree[T], right Tree[T]) Tree[T] {
 	return Tree[T]{Tag: 1, NodeValue: value, NodeLeft: &left, NodeRight: &right}
 }
+func (_arilSelf Tree[T]) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Leaf"
+	case 1:
+		return fmt.Sprintf("Node(%v, %v, %v)", _arilSelf.NodeValue, _arilSelf.NodeLeft, _arilSelf.NodeRight)
+	}
+	return ""
+}
 func sum(t Tree[int]) int {
 	__aril_match_1 := t
 	switch __aril_match_1.Tag {
