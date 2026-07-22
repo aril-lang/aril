@@ -254,7 +254,7 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `async` / `await` / `go f()` | uncolored: `scope { spawn { … } }` |
 | structural interfaces (Go) | nominal: `class C implements I` |
 | `fn` / `function` | `func`; methods omit it |
-| `5 / 2` → `2.5` | integer division **truncates** → `2`; fixed-width ints **wrap** silently (`int8(127)+1` → `-128`) |
+| `5 / 2` → `2.5` | integer division **truncates** → `2`; fixed-width ints **wrap** at runtime (an `int8` at 127 `+ 1` → `-128`; a constant overflow is caught at compile time) |
 | `10 / 0` → `Infinity` | integer divide-by-zero **panics** at runtime (float `1.0/0.0` → `+Inf`) |
 | `s[i] = v` on a slice is "pure" | ⚠ it **mutates** the shared backing array (even via `let`); `[]T` forbids *growth*, not element writes — and `List` forbids `l[i]=v` (use `l.set`) |
 | discarding a `Result` is caught | silently **dropped** (no must-use) — bind it and `match`/`try`/`catch` |

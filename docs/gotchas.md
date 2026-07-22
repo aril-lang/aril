@@ -37,14 +37,22 @@ zero — see [Formatting and bindings](#formatting-and-bindings) below).
 
 ### Fixed-width integers wrap silently on overflow **≈Go/Rust**
 
-There is no auto-promotion to a bignum. Overflow, underflow, and narrowing all
-wrap modulo the type width, with no panic:
+There is no auto-promotion to a bignum: at **runtime**, overflow, underflow, and
+narrowing all wrap modulo the type width, with no panic.
 
 ```aril
-fmt.println(int8(127) + 1)   // -128   (wraps)
-fmt.println(int8(300))       // 44     (narrowing wraps)
-// uint 0 - 1  →  18446744073709551615
+var x: int8 = 127
+x = x + 1                  // -128   (overflow wraps)
+let big = 300
+fmt.println(int8(big))     // 44     (narrowing wraps)
+var u: uint = 0
+u = u - 1                  // 18446744073709551615  (underflow wraps)
 ```
+
+The wrap is a *runtime-value* behaviour. A **constant** overflow written
+literally — `int8(127) + 1`, `int8(300)` — is instead caught at compile time
+(like a constant `10 / 0`), so the operands above are bound to variables to
+exercise the runtime wrap.
 
 ### `0.1 + 0.2` prints `0.3` on literals but `0.30000000000000004` on variables **Aril-specific**
 
