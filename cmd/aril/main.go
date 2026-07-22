@@ -177,9 +177,10 @@ func cmdBuild(args []string) int {
 	out := fs.String("o", "", "output binary path (default: <out-dir>/bin/<name>)")
 	outDirFlag := fs.String("out-dir", "", "build-artifact directory (default: ./aril-out; RFC-0009)")
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
+	race := fs.Bool("race", false, "build with Go's race detector so a data race across `spawn` is reported at runtime (needs a C toolchain)")
 	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-out-dir <dir>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -236,8 +237,15 @@ func cmdBuild(args []string) int {
 	// Build the root main package (".") rather than "./..." — vendored
 	// mode adds the arilrt subpackage to the module, and `go build -o
 	// <file> ./...` refuses to write multiple packages to one output.
-	// arilrt is pulled in as main's dependency either way.
-	cmd := exec.Command("go", "build", "-o", absOut, ".")
+	// arilrt is pulled in as main's dependency either way. `-race` (opt-in)
+	// forwards to the Go toolchain so an unsynchronised `spawn` capture is
+	// reported at runtime (AUDIT-3 T3; needs cgo).
+	goArgs := []string{"build"}
+	if *race {
+		goArgs = append(goArgs, "-race")
+	}
+	goArgs = append(goArgs, "-o", absOut, ".")
+	cmd := exec.Command("go", goArgs...)
 	cmd.Dir = src.dir
 	cmd.Env = hermeticGoEnv()
 	cmd.Stdout = os.Stdout
@@ -498,9 +506,10 @@ func cmdRun(args []string) int {
 	fs.SetOutput(os.Stderr)
 	outDirFlag := fs.String("out-dir", "", "build-artifact directory (default: ./aril-out; RFC-0009)")
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
+	race := fs.Bool("race", false, "build with Go's race detector so a data race across `spawn` is reported at runtime (needs a C toolchain)")
 	contracts := addContractsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril run [-out-dir <dir>] [-inline-runtime] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril run [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -543,8 +552,16 @@ func cmdRun(args []string) int {
 
 	// Run the root main package (".") not "./..." — vendored mode adds
 	// the arilrt subpackage and `go run ./...` would try to run multiple
-	// packages. arilrt is compiled as main's dependency.
-	cmd := exec.Command("go", "run", ".")
+	// packages. arilrt is compiled as main's dependency. `-race` (opt-in)
+	// forwards to the Go toolchain so an unsynchronised `spawn` capture is
+	// reported at runtime (AUDIT-3 T3; needs cgo, whose absence surfaces as
+	// the toolchain's own error).
+	goArgs := []string{"run"}
+	if *race {
+		goArgs = append(goArgs, "-race")
+	}
+	goArgs = append(goArgs, ".")
+	cmd := exec.Command("go", goArgs...)
 	cmd.Dir = src.dir
 	cmd.Env = hermeticGoEnv()
 	cmd.Stdin = os.Stdin
@@ -641,8 +658,8 @@ Usage:
 
 Commands:
   emit   [-no-line] <file.aril>  print the lowered Go source to stdout
-  build  [-o out] <file.aril>    compile to a native binary (default: aril-out/bin/<name>)
-  run    <file.aril>             compile and execute (stdio passed through)
+  build  [-o out] [-race] <file.aril>  compile to a native binary (default: aril-out/bin/<name>)
+  run    [-race] <file.aril>           compile and execute (stdio passed through)
   repl                         interactive prompt (RFC-0003 skeleton)
   import <go/import/path>      generate Aril foreign bindings from a Go package
   get                          fetch the project's declared [dependencies] into the cache

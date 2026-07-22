@@ -991,3 +991,68 @@ contract dbl {
 		t.Errorf("--contracts=panic stderr = %q; want an ensures violation mapped to the .aril", stderr)
 	}
 }
+
+// raceUnsupported reports whether a `-race` run failed because the toolchain
+// lacks race-detector support (no cgo / unsupported platform) rather than
+// because it found a race. Lets the -race tests skip on such runners instead
+// of flaking red.
+func raceUnsupported(stderr string) bool {
+	return strings.Contains(stderr, "requires cgo") ||
+		strings.Contains(stderr, "race detector not supported") ||
+		strings.Contains(stderr, "-race is not supported")
+}
+
+// TestRunRaceDetectsSpawnRace is the AUDIT-3 T3 remediation guard: a `var`
+// mutated across `spawn`s is a silent data race (compiles, runs, prints a
+// wrong nondeterministic count). `aril run` alone cannot see it; `aril run
+// -race` forwards Go's race detector so the race is *reported*. Asserts both
+// halves: silent without the flag, caught with it.
+func TestRunRaceDetectsSpawnRace(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "race.aril")
+	src := `import fmt
+
+func main() {
+  var counter = 0
+  scope<unit, error> {
+    for _ in 1..=1000 {
+      spawn { counter = counter + 1; return Ok(()) }
+    }
+  } catch e { return }
+  fmt.println(counter)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Without -race the race is silent: the program runs to completion (exit 0).
+	if _, stderr, exit := runAril(t, "run", path); exit != 0 {
+		t.Fatalf("plain run of the racy program exit = %d; want 0 (race is silent)\nstderr: %s", exit, stderr)
+	}
+	// With -race the detector fires: non-zero exit + a DATA RACE report.
+	_, stderr, exit := runAril(t, "run", "-race", path)
+	if raceUnsupported(stderr) {
+		t.Skipf("race detector unavailable on this runner: %s", stderr)
+	}
+	if exit == 0 {
+		t.Fatalf("run -race of the racy program exit = 0; want a reported race\nstderr: %s", stderr)
+	}
+	if !strings.Contains(stderr, "DATA RACE") {
+		t.Errorf("run -race stderr missing \"DATA RACE\"; got:\n%s", stderr)
+	}
+}
+
+// TestRunRaceCleanProgram checks the flag is inert on a race-free program:
+// -race must not perturb a correct program's output or exit code.
+func TestRunRaceCleanProgram(t *testing.T) {
+	stdout, stderr, exit := runAril(t, "run", "-race", "examples/core-language/hello/hello.aril")
+	if raceUnsupported(stderr) {
+		t.Skipf("race detector unavailable on this runner: %s", stderr)
+	}
+	if exit != 0 {
+		t.Fatalf("run -race of a clean program exit = %d; want 0\nstderr: %s", exit, stderr)
+	}
+	if stdout != "Aril is rising.\n" {
+		t.Errorf("run -race stdout = %q; want %q", stdout, "Aril is rising.\n")
+	}
+}
