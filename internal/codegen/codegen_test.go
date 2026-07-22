@@ -288,6 +288,52 @@ func main() {
 	}
 }
 
+// TestEmitRunCompositeString is the D56 end-to-end guard: a program that
+// prints composites must render the Aril value (via the generated
+// fmt.Stringer String()), not Go's raw `%v` lowering (`&{[1 2 3]}` etc.).
+// Compile-and-run in inline mode so the inline-prelude String() methods are
+// exercised (vendored mode is covered by arilrt's unit tests + the corpus).
+func TestEmitRunCompositeString(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not available")
+	}
+	src := `import fmt
+
+func main() {
+  fmt.println(List<int>{1, 2, 3})
+  let m = Map<string, int>.new()
+  m.set("a", 1)
+  fmt.println(m)
+  let s = Set<int>.new()
+  s.add(7)
+  fmt.println(s)
+  fmt.println(Some(5))
+  let r: Result<int, string> = Ok(9)
+  fmt.println(r)
+  fmt.println(List<Option<int>>{Some(1), Some(2)})
+}
+`
+	out := emitString(t, src)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(out), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	mod := "module aril-codegen-test\n\ngo 1.22\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	cmd := exec.Command("go", "run", "./...")
+	cmd.Dir = dir
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go run failed: %v", err)
+	}
+	want := "[1, 2, 3]\n{a: 1}\n{7}\nSome(5)\nOk(9)\n[Some(1), Some(2)]\n"
+	if got := string(stdout); got != want {
+		t.Errorf("composite stdout =\n%q\nwant\n%q", got, want)
+	}
+}
+
 // TestErrorCtorLowersToErrorsNew locks the `error(msg)` free-constructor
 // lowering and its shadow-safety: the genuine builtin lowers to
 // errors.New, but a user decl that shadows `error` is called normally

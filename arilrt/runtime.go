@@ -1,5 +1,7 @@
 package arilrt
 
+import "fmt"
+
 // runtime.go — Option / Result and their boundary-lift helpers.
 //
 // Struct shapes are the contract (lang-spec/lowering-go.md §Container
@@ -25,6 +27,15 @@ func (o Option[T]) IsSome() bool { return o.Tag == 1 }
 
 // IsNone reports whether the option is empty (builtins.md §Option methods).
 func (o Option[T]) IsNone() bool { return o.Tag == 0 }
+
+// String renders Some(v) / None (fmt.Stringer, D56); the payload uses %v so
+// a nested composite re-dispatches to its own String().
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 
 // UnwrapOr returns the held value, or fallback when None (builtins.md §Option methods).
 func (o Option[T]) UnwrapOr(fallback T) T {
@@ -63,6 +74,15 @@ func (r Result[T, E]) IsOk() bool { return r.Tag == 0 }
 
 // IsErr reports whether the result is Err (builtins.md §Result methods).
 func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }
+
+// String renders Ok(v) / Err(e) (fmt.Stringer, D56). For Result<T, error>
+// the Err payload is a Go error, whose %v is its Error() message (Err(boom)).
+func (r Result[T, E]) String() string {
+	if r.Tag == 0 {
+		return fmt.Sprintf("Ok(%v)", r.V)
+	}
+	return fmt.Sprintf("Err(%v)", r.E)
+}
 
 // UnwrapOr returns the Ok value, or fallback when Err (builtins.md §Result methods).
 func (r Result[T, E]) UnwrapOr(fallback T) T {

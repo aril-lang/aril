@@ -38,6 +38,9 @@ func (g *gen) writePredeclaredSums() {
 		g.b.WriteString("type Option[T any] struct {\n\tTag uint8\n\tV   T\n}\n")
 		g.b.WriteString("func OptionSome[T any](value T) Option[T] {\n\treturn Option[T]{Tag: 1, V: value}\n}\n")
 		g.b.WriteString("func OptionNone[T any]() Option[T] {\n\treturn Option[T]{Tag: 0}\n}\n")
+		// String() (fmt.Stringer, D56) — emitted whenever Option is present, so
+		// `fmt.println`/`${}` render Some(v)/None, not Go's `{1 5}`/`{0 0}` leak.
+		g.b.WriteString("func (o Option[T]) String() string {\n\tif o.Tag == 1 {\n\t\treturn fmt.Sprintf(\"Some(%v)\", o.V)\n\t}\n\treturn \"None\"\n}\n")
 		if g.usesOptionMethods {
 			// Query/defaulting methods, mirroring arilrt's exported set.
 			g.b.WriteString("func (o Option[T]) IsSome() bool { return o.Tag == 1 }\n")
@@ -49,6 +52,9 @@ func (g *gen) writePredeclaredSums() {
 		g.b.WriteString("type Result[T any, E any] struct {\n\tTag uint8\n\tV   T\n\tE   E\n}\n")
 		g.b.WriteString("func ResultOk[T any, E any](value T) Result[T, E] {\n\treturn Result[T, E]{Tag: 0, V: value}\n}\n")
 		g.b.WriteString("func ResultErr[T any, E any](err E) Result[T, E] {\n\treturn Result[T, E]{Tag: 1, E: err}\n}\n")
+		// String() (fmt.Stringer, D56) — Ok(v)/Err(e); an `error` payload's %v
+		// is its Error() message (Err(boom)), not Go's `{1 0 boom}` leak.
+		g.b.WriteString("func (r Result[T, E]) String() string {\n\tif r.Tag == 0 {\n\t\treturn fmt.Sprintf(\"Ok(%v)\", r.V)\n\t}\n\treturn fmt.Sprintf(\"Err(%v)\", r.E)\n}\n")
 		if g.usesResultMethods {
 			g.b.WriteString("func (r Result[T, E]) IsOk() bool { return r.Tag == 0 }\n")
 			g.b.WriteString("func (r Result[T, E]) IsErr() bool { return r.Tag == 1 }\n")
@@ -547,6 +553,16 @@ func (m *Map[K, V]) Values() []V {
 	}
 	return out
 }
+func (m *Map[K, V]) String() string {
+	s := "{"
+	for i, k := range m.order {
+		if i > 0 {
+			s += ", "
+		}
+		s += fmt.Sprintf("%v: %v", k, m.m[k])
+	}
+	return s + "}"
+}
 `)
 	}
 	if g.usesSet {
@@ -590,6 +606,16 @@ func (s *Set[T]) ToSlice() []T {
 	copy(out, s.order)
 	return out
 }
+func (s *Set[T]) String() string {
+	out := "{"
+	for i, e := range s.order {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "}"
+}
 `)
 	}
 	if g.usesStack {
@@ -619,6 +645,16 @@ func (s *Stack[T]) Peek() Option[T] {
 		return Option[T]{Tag: 0}
 	}
 	return Option[T]{Tag: 1, V: s.xs[n-1]}
+}
+func (s *Stack[T]) String() string {
+	out := "["
+	for i, e := range s.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "]"
 }
 
 var arilEmptyStack = arilEmptyStackError{}
@@ -685,6 +721,16 @@ func (l *List[T]) ToSlice() []T {
 	out := make([]T, len(l.xs))
 	copy(out, l.xs)
 	return out
+}
+func (l *List[T]) String() string {
+	out := "["
+	for i, x := range l.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", x)
+	}
+	return out + "]"
 }
 `)
 	}

@@ -40,6 +40,12 @@ func OptionSome[T any](value T) Option[T] {
 func OptionNone[T any]() Option[T] {
 	return Option[T]{Tag: 0}
 }
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 
 type Map[K comparable, V any] struct {
 	m     map[K]V
@@ -88,6 +94,16 @@ func (m *Map[K, V]) Values() []V {
 	}
 	return out
 }
+func (m *Map[K, V]) String() string {
+	s := "{"
+	for i, k := range m.order {
+		if i > 0 {
+			s += ", "
+		}
+		s += fmt.Sprintf("%v: %v", k, m.m[k])
+	}
+	return s + "}"
+}
 
 type Set[T comparable] struct {
 	m     map[T]struct{}
@@ -129,6 +145,16 @@ func (s *Set[T]) ToSlice() []T {
 	out := make([]T, len(s.order))
 	copy(out, s.order)
 	return out
+}
+func (s *Set[T]) String() string {
+	out := "{"
+	for i, e := range s.order {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", e)
+	}
+	return out + "}"
 }
 
 type List[T any] struct {
@@ -188,6 +214,16 @@ func (l *List[T]) ToSlice() []T {
 	out := make([]T, len(l.xs))
 	copy(out, l.xs)
 	return out
+}
+func (l *List[T]) String() string {
+	out := "["
+	for i, x := range l.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", x)
+	}
+	return out + "]"
 }
 
 type Bag struct {

@@ -41,6 +41,12 @@ func OptionSome[T any](value T) Option[T] {
 func OptionNone[T any]() Option[T] {
 	return Option[T]{Tag: 0}
 }
+func (o Option[T]) String() string {
+	if o.Tag == 1 {
+		return fmt.Sprintf("Some(%v)", o.V)
+	}
+	return "None"
+}
 
 type List[T any] struct {
 	xs []T
@@ -99,6 +105,16 @@ func (l *List[T]) ToSlice() []T {
 	out := make([]T, len(l.xs))
 	copy(out, l.xs)
 	return out
+}
+func (l *List[T]) String() string {
+	out := "["
+	for i, x := range l.xs {
+		if i > 0 {
+			out += ", "
+		}
+		out += fmt.Sprintf("%v", x)
+	}
+	return out + "]"
 }
 
 type Box[T any] struct {
