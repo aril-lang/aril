@@ -37,7 +37,17 @@ container/field is *defaulted***.
 
 ## The findings, frequency × severity ranked
 
-### T1 — Printing any composite value leaks Go's `%v` [FLAGSHIP · silent-lie · very-high frequency]
+### T1 — Printing any composite value leaks Go's `%v` [FLAGSHIP · silent-lie · very-high frequency] — REMEDIATED (R3, D56)
+
+> **Remediated** by the R3 COMPOSITE-STRING epoch: every Aril composite now
+> lowers with a generated `fmt.Stringer` `String()`, so `fmt.println`/`${}`
+> render the Aril value (`[1, 2, 3]`, `{a: 1, b: 2}`, `Some(5)`, `Circle(2)`,
+> `{x: 1, y: 2}`), not the Go layout below. Nested composites recurse. Still
+> as noted: floats keep Go's `%v` (`2.0`→`2`, the T10 row); *tuples* and
+> *class* instances are deferred (anonymous struct / user-`String` collision).
+> See `lang-spec/lowering-go.md` §Stringer generation. The original finding is
+> preserved below for the record.
+
 
 `fmt.println(x)` and `"${x}"` interpolation of **any** composite render Go's
 internal struct layout, not the Aril value:

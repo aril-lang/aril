@@ -161,6 +161,11 @@ fit any typed position). `defer call` runs at **function** exit (LIFO), like Go.
 - To **print** a non-string, you don't convert first: `fmt.println(i)` and
   `"${i}"` take any type (`%v`). `strconv.itoa` is only for when you need the
   `string` value itself.
+- **Composites print as their Aril value**, not Go's internal layout:
+  `List<int>{1,2,3}` → `[1, 2, 3]`, a `Map` → `{a: 1, b: 2}`, `Some(5)`/`None`,
+  `Ok(9)`/`Err(…)`, a record → `{x: 1, y: 2}`, a sum → `Circle(2)`/`Leaf`
+  (nested composites recurse). Floats keep Go's form (`2.0`→`2`); a *tuple* or
+  *class* instance still prints Go's raw shape (no generated formatter yet).
 
 ## 8. Classes (state + behavior + interfaces)
 
