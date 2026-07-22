@@ -208,14 +208,26 @@ remain on the target surface.
 math.sqrt(x: float64): float64
 math.abs(x: float64):  float64
 math.pow(x: float64, y: float64): float64
+math.exp(x: float64):  float64                          // e**x
 math.log(x: float64):  float64                          // natural log
 math.log10(x: float64): float64
 math.log2(x: float64): float64
+math.sin(x: float64):  float64
+math.cos(x: float64):  float64
+math.tan(x: float64):  float64
 math.floor(x: float64): float64
 math.ceil(x: float64): float64
+math.round(x: float64): float64                         // half AWAY from zero (Go, not JS's half-to-+∞)
+math.trunc(x: float64): float64                         // toward zero
+math.hypot(p: float64, q: float64): float64
+math.mod(x: float64, y: float64): float64               // floating-point remainder (Go math.Mod)
 math.min(a: float64, b: float64): float64
 math.max(a: float64, b: float64): float64
 math.pi: float64
+
+// The bound set above is the whole `math` surface; a member outside it
+// (e.g. cbrt, remainder, signbit) gives a clean E0217 "no bound member".
+// `round`/`trunc` carry Go's semantics, which differ from JavaScript's Math.
 
 // Integer min/max have no Go-stdlib referent (Go's math.{Min,Max} are
 // float-typed). User code uses `if a < b { a } else { b }` for now;
