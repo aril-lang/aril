@@ -45,6 +45,17 @@ var (
 	SigGo   = Sig{Tag: 2}
 )
 
+func (_arilSelf Sig) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Stop"
+	case 1:
+		return "Slow"
+	case 2:
+		return "Go"
+	}
+	return ""
+}
 func label(s Sig) string {
 	return func() string {
 		switch s.Tag {

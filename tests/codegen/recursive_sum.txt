@@ -38,6 +38,15 @@ var (
 func TreeNode(left Tree, right Tree) Tree {
 	return Tree{Tag: 1, NodeLeft: &left, NodeRight: &right}
 }
+func (_arilSelf Tree) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Leaf"
+	case 1:
+		return fmt.Sprintf("Node(%v, %v)", _arilSelf.NodeLeft, _arilSelf.NodeRight)
+	}
+	return ""
+}
 func count(t Tree) int {
 	__aril_match_1 := t
 	switch __aril_match_1.Tag {

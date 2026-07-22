@@ -40,6 +40,15 @@ var (
 func OutcomeGood(n int) Outcome {
 	return Outcome{Tag: 1, GoodN: n}
 }
+func (_arilSelf Outcome) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Bad"
+	case 1:
+		return fmt.Sprintf("Good(%v)", _arilSelf.GoodN)
+	}
+	return ""
+}
 func pick(o Outcome) int {
 	__aril_match_1 := o
 	switch __aril_match_1.Tag {

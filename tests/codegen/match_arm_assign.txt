@@ -40,6 +40,15 @@ var (
 func StepForward(n int) Step {
 	return Step{Tag: 0, ForwardN: n}
 }
+func (_arilSelf Step) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return fmt.Sprintf("Forward(%v)", _arilSelf.ForwardN)
+	case 1:
+		return "Reset"
+	}
+	return ""
+}
 func apply(pos int, s Step) int {
 	var p = pos
 	__aril_match_1 := s

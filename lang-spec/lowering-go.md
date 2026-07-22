@@ -208,6 +208,53 @@ struct printing) has a `%v` rendering, so interpolation is total
 over any hole type. A hole may not contain a nested string
 literal in v1 (lexer E0120, see `diagnostics.md`).
 
+## Stringer generation
+
+Every Aril composite lowers with a generated `String()` (Go's
+`fmt.Stringer`), so the `%v` verb behind `fmt.println` and every `${}`
+hole (§String interpolation) renders the **Aril** value, not Go's
+internal struct/slice layout. Without it a composite dumps the raw
+lowering — `List<int>{1,2,3}` → `&{[1 2 3]}`, a sum → the tag plus every
+sibling variant's zero-padded fields — so the generated method is what
+makes the "a `%v` rendering for every value type" promise legible (D56).
+
+Rendering grammar (the contract):
+
+| kind | form | example |
+|---|---|---|
+| `List<T>` / `Stack<T>` | `[e, …]` | `[1, 2, 3]` |
+| `Map<K,V>` | `{k: v, …}` (insertion order) | `{a: 1, b: 2}` |
+| `Set<T>` | `{e, …}` | `{3}` |
+| `Option<T>` | `Some(v)` / `None` | `Some(5)` |
+| `Result<T,E>` | `Ok(v)` / `Err(e)` | `Err(boom)` |
+| record | `{field: v, …}` | `{x: 1, y: 2}` |
+| sum variant | `Variant(v, …)` / bare name | `Circle(2)` / `Leaf` |
+
+Rules:
+
+- **Elements/payloads render with `%v`**, so a nested composite
+  re-dispatches to its own `String()` — recursion is total over a finite
+  value (a recursive sum's self-ref `*T` field recurses through the tree;
+  a nil `*T` is fmt's `<nil>`, never a panic).
+- **Strings are unquoted** (`Some("hi")` → `Some(hi)`), matching Go's
+  `%v` element rendering.
+- **Floats keep Go's `%v`** (`Circle(2.0)` → `Circle(2)`); precise
+  decimal float text is a separate concern, not part of this rule.
+- **Sum payloads render positionally**, matching the constructor spelling
+  (`Node(5, …)`, not `Node(value: 5, …)`); a nullary variant is its bare
+  name.
+- **Where the method lives:** the arilrt runtime types
+  (`List`/`Map`/`Set`/`Stack` — pointer receiver, since they pointer-lower;
+  `Option`/`Result` — value receiver) carry a hand-written `String()`,
+  mirrored byte-for-byte in the inline prelude; user records and sums get
+  a codegen-generated one in `emitTypeDecl`. `main` imports `fmt`
+  whenever a generated `String()` calls `fmt.Sprintf`.
+- **Not generated for:** tuples (they lower to *anonymous* structs — Go
+  forbids a method on an unnamed type) and classes (a class may define its
+  own `String`); a record whose field's exported Go name is `String`
+  (would clash with the method) keeps Go's default rendering. These are
+  deferred surfaces, not silent gaps.
+
 A module-level `let Name [: T] = Value` (ast.md §TopLevelLet) lowers
 to a Go **package-level `var`**:
 

@@ -39,6 +39,16 @@ var (
 	DirS = Dir{Tag: 1}
 )
 
+func (_arilSelf Dir) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "N"
+	case 1:
+		return "S"
+	}
+	return ""
+}
+
 type Info struct {
 	At struct {
 		_0 int
@@ -46,6 +56,11 @@ type Info struct {
 	} `json:"at"`
 	Dir Dir `json:"dir"`
 }
+
+func (_arilSelf Info) String() string {
+	return fmt.Sprintf("{at: %v, dir: %v}", _arilSelf.At, _arilSelf.Dir)
+}
+
 type Step struct {
 	Tag      uint8
 	MoveInfo Info
@@ -58,6 +73,15 @@ func StepMove(info Info) Step {
 }
 func StepStop(info Info, why string) Step {
 	return Step{Tag: 1, StopInfo: info, StopWhy: why}
+}
+func (_arilSelf Step) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return fmt.Sprintf("Move(%v)", _arilSelf.MoveInfo)
+	case 1:
+		return fmt.Sprintf("Stop(%v, %v)", _arilSelf.StopInfo, _arilSelf.StopWhy)
+	}
+	return ""
 }
 func describe(s Step) int {
 	return func() int {

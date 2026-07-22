@@ -30,6 +30,17 @@ var (
 	ColorBlue  = Color{Tag: 2}
 )
 
+func (_arilSelf Color) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Red"
+	case 1:
+		return "Green"
+	case 2:
+		return "Blue"
+	}
+	return ""
+}
 func main() {
 	var c Color = ColorRed
 	switch c.Tag {

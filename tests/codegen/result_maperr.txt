@@ -71,6 +71,9 @@ type ParseError struct {
 	Detail string `json:"detail"`
 }
 
+func (_arilSelf ParseError) String() string {
+	return fmt.Sprintf("{detail: %v}", _arilSelf.Detail)
+}
 func parsePositive(s string) Result[int, ParseError] {
 	__aril_try_1 := MapErr(ResultOf(strconv.Atoi(s)), func(e error) ParseError {
 		return ParseError{Detail: e.Error()}

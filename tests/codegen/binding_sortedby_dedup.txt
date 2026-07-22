@@ -50,6 +50,9 @@ type P struct {
 	Age  int    `json:"age"`
 }
 
+func (_arilSelf P) String() string {
+	return fmt.Sprintf("{name: %v, age: %v}", _arilSelf.Name, _arilSelf.Age)
+}
 func main() {
 	var ppl = []P{P{Name: "c", Age: 30}, P{Name: "a", Age: 20}, P{Name: "b", Age: 20}}
 	for _, p := range SortedBy(ppl, func(x P) int {

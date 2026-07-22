@@ -115,6 +115,9 @@ type Item struct {
 	Name Option[string] `json:"name"`
 }
 
+func (_arilSelf Item) String() string {
+	return fmt.Sprintf("{id: %v, name: %v}", _arilSelf.Id, _arilSelf.Name)
+}
 func roundtrip(it Item) Result[Item, error] {
 	__aril_try_1 := ResultOf(json.Marshal(it))
 	if __aril_try_1.Tag == 1 {

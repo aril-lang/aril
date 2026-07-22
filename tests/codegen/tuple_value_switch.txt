@@ -35,6 +35,16 @@ var (
 	LightGreen = Light{Tag: 1}
 )
 
+func (_arilSelf Light) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Red"
+	case 1:
+		return "Green"
+	}
+	return ""
+}
+
 type Cmd struct {
 	Tag        uint8
 	StopReason int
@@ -46,6 +56,15 @@ var (
 
 func CmdStop(reason int) Cmd {
 	return Cmd{Tag: 1, StopReason: reason}
+}
+func (_arilSelf Cmd) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return "Go"
+	case 1:
+		return fmt.Sprintf("Stop(%v)", _arilSelf.StopReason)
+	}
+	return ""
 }
 func step(l Light, c Cmd) int {
 	__aril_match_1 := l

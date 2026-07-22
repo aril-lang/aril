@@ -52,6 +52,7 @@ func (g *gen) emitTypeDecl(td *ast.TypeDecl) error {
 		}
 		g.indent--
 		g.b.WriteString("}\n")
+		g.emitRecordStringer(td, body)
 		return nil
 	case *ast.SumTypeBody:
 		// Lower to a tagged struct per lowering-go.md §MatchIR.
@@ -174,9 +175,113 @@ func (g *gen) emitTypeDecl(td *ast.TypeDecl) error {
 			}
 			g.b.WriteString("}\n}\n")
 		}
+		g.emitSumStringer(td, body)
 		return nil
 	}
 	return fmt.Errorf("codegen: unhandled TypeBody %T", td.Body)
+}
+
+// emitRecordStringer emits a fmt.Stringer String() for a record so `%v`
+// (fmt.println / ${}) renders `{x: 1, y: 2}` by field name, not Go's raw
+// `{1 2}` (D56, lang-spec/lowering-go.md §Stringer generation). The
+// receiver is a value (records lower to value structs). SKIPPED when a
+// field's exported Go name is `String` — that would clash with the method
+// (Go forbids a field and method of the same name); a documented, rare
+// limitation (leaves the record on Go's default rendering).
+func (g *gen) emitRecordStringer(td *ast.TypeDecl, body *ast.RecordTypeBody) {
+	if recordFieldClashesStringer(body) {
+		return
+	}
+	g.b.WriteString("func (" + methodRecvName + " ")
+	g.b.WriteString(goIdent(td.Name))
+	g.emitTypeParamBrackets(td.TypeParams, false) // receiver: type params without constraints
+	g.b.WriteString(") String() string {\n\treturn ")
+	if len(body.Fields) == 0 {
+		// Dead by sema (an empty record is E0112), kept defensively: renders
+		// `{}` with no fmt (stringerUsesFmt agrees → no spurious `import fmt`).
+		g.b.WriteString("\"{}\"\n}\n")
+		return
+	}
+	format := "{"
+	for i, f := range body.Fields {
+		if i > 0 {
+			format += ", "
+		}
+		format += f.Name + ": %v" // f.Name is an ASCII ident — literal-safe
+	}
+	format += "}"
+	g.b.WriteString("fmt.Sprintf(" + strconv.Quote(format))
+	for _, f := range body.Fields {
+		g.b.WriteString(", " + methodRecvName + "." + exportFieldName(f.Name))
+	}
+	g.b.WriteString(")\n}\n")
+}
+
+// emitSumStringer emits a fmt.Stringer String() for a sum type so `%v`
+// renders `Circle(2)` / `Red` by variant name (payload positional, matching
+// the constructor spelling), not Go's tag+sibling-field dump `{0 2 0}` (D56).
+// A self-ref payload field is a `*T` whose `%v` re-dispatches to this same
+// String() — recursion is total over the (finite) tree.
+func (g *gen) emitSumStringer(td *ast.TypeDecl, body *ast.SumTypeBody) {
+	g.b.WriteString("func (" + methodRecvName + " ")
+	g.b.WriteString(goIdent(td.Name))
+	g.emitTypeParamBrackets(td.TypeParams, false)
+	g.b.WriteString(") String() string {\n\tswitch " + methodRecvName + ".Tag {\n")
+	for i, v := range body.Variants {
+		g.b.WriteString("\tcase " + strconv.Itoa(i) + ":\n\t\treturn ")
+		if len(v.Fields) == 0 {
+			g.b.WriteString(strconv.Quote(v.Name) + "\n")
+			continue
+		}
+		format := v.Name + "("
+		for j := range v.Fields {
+			if j > 0 {
+				format += ", "
+			}
+			format += "%v"
+		}
+		format += ")"
+		g.b.WriteString("fmt.Sprintf(" + strconv.Quote(format))
+		for _, f := range v.Fields {
+			g.b.WriteString(", " + methodRecvName + "." + payloadFieldName(v.Name, f.Name))
+		}
+		g.b.WriteString(")\n")
+	}
+	// The tag always matches a case (constructors are the only way to build
+	// the value); the trailing return satisfies Go's control-flow analysis.
+	g.b.WriteString("\t}\n\treturn \"\"\n}\n")
+}
+
+// recordFieldClashesStringer reports whether any record field's exported Go
+// name is `String`, which would collide with the generated String() method
+// (see emitRecordStringer). Shared with stringerUsesFmt so the import gate
+// and the emission agree on which records are skipped.
+func recordFieldClashesStringer(body *ast.RecordTypeBody) bool {
+	for _, f := range body.Fields {
+		if exportFieldName(f.Name) == "String" {
+			return true
+		}
+	}
+	return false
+}
+
+// typeDeclStringerUsesFmt reports whether the String() generated for this
+// record/sum references fmt.Sprintf — true iff it renders at least one
+// payload/field (an empty record → `"{}"`, a pure-nullary enum → quoted
+// literals, both fmt-free). Drives usesStringerFmt so main pulls `import
+// fmt` exactly when a generated String() needs it (no unused-import error).
+func typeDeclStringerUsesFmt(td *ast.TypeDecl) bool {
+	switch body := td.Body.(type) {
+	case *ast.RecordTypeBody:
+		return len(body.Fields) > 0 && !recordFieldClashesStringer(body)
+	case *ast.SumTypeBody:
+		for _, v := range body.Variants {
+			if len(v.Fields) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // emitClassDecl lowers a ClassDecl per lowering-go.md

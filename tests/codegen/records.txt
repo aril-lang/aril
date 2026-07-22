@@ -23,6 +23,9 @@ type Point struct {
 	Y int `json:"y"`
 }
 
+func (_arilSelf Point) String() string {
+	return fmt.Sprintf("{x: %v, y: %v}", _arilSelf.X, _arilSelf.Y)
+}
 func main() {
 	var p = Point{X: 3, Y: 4}
 	if p.X > 0 {

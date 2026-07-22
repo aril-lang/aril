@@ -31,6 +31,15 @@ var (
 func MaybeJust(value int) Maybe {
 	return Maybe{Tag: 0, JustValue: value}
 }
+func (_arilSelf Maybe) String() string {
+	switch _arilSelf.Tag {
+	case 0:
+		return fmt.Sprintf("Just(%v)", _arilSelf.JustValue)
+	case 1:
+		return "Nothing"
+	}
+	return ""
+}
 func main() {
 	var m = MaybeJust(42)
 	__aril_match_1 := m
