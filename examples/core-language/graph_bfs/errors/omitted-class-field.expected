@@ -1,0 +1,2 @@
+error[E0220]: Field cost of Edge must be provided
+has no safe default

@@ -1,0 +1,14 @@
+--- graph_bfs.aril
++++ graph_bfs.aril
+@@ -80,3 +80,11 @@
+     fmt.println("deg", i, g.adj[i].len())
+   }
+ }
++
++// A record field typed as a bare user `class` has no safe default, so
++// omitting it is E0220 (this function is never called; sema still checks it).
++class Weight { var w: int }
++type Edge = { to: int, cost: Weight }
++func strayEdge(): Edge {
++  return Edge{ to: 3 }
++}

@@ -1,0 +1,82 @@
+// Breadth-first shortest paths over an undirected graph, adjacency list as
+// `Map<int, List<int>>` held in a record field.
+//
+// This example is the *live* regression guard for the R1/R2 nil-safety +
+// container-diagnostic fixes (audit3 T2/T13/bug#3/bug#4). It is a real
+// algorithm, not a repro — but it deliberately routes through every surface
+// those bugs lived on, so a regression breaks the corpus, not just a fixture:
+//
+//   • T2   — `Graph{}` is constructed with its `adj` Map field *omitted*;
+//            the field defaults to an empty Map, not a nil SIGSEGV.
+//   • bug#3 — `var dist: List<int>` is declared with no initializer;
+//            it defaults to an empty list, not a codegen crash.
+//   • T13  — `g.adj[u]` is a bare index over a Map whose value is a List;
+//            an unlinked node (5) is a *miss* that must yield an empty list,
+//            never nil. `g.adj[5].len()` == 0.
+//   • bug#4 — `g.adj.get`/`g.adj.set` (a method over a container *field*),
+//            `for w in g.adj[u]` (a `for` over a field-index expression), and
+//            `g.adj[i].len()` (a method chained onto one) all lower through
+//            the wrapper API instead of leaking raw Go over `*arilrt.Map`.
+
+import fmt
+
+type Graph = {
+  adj: Map<int, List<int>>
+}
+
+// Add an undirected edge. `g.adj.get`/`g.adj.set` dispatch as methods on the
+// container-typed *field* `g.adj` (bug#4). The shared Map reference means the
+// mutation persists through the by-value `Graph` copy (records are shallow).
+func link(g: Graph, u: int, v: int) {
+  match g.adj.get(u) {
+    Some(lst) => lst.push(v),
+    None      => g.adj.set(u, List<int>{v}),
+  }
+  match g.adj.get(v) {
+    Some(lst) => lst.push(u),
+    None      => g.adj.set(v, List<int>{u}),
+  }
+}
+
+func bfs(g: Graph, src: int, n: int): List<int> {
+  var dist: List<int>            // bug#3: uninitialized container var → empty
+  for _ in 0..n { dist.push(-1) }
+  dist.set(src, 0)
+
+  var frontier = List<int>{ src }
+  while frontier.len() > 0 {
+    var next = List<int>{}
+    for u in frontier {
+      let du = dist.get(u).unwrapOr(0)
+      for w in g.adj[u] {         // T13 + bug#4: `for` over a field-index
+        if dist.get(w).unwrapOr(-1) < 0 {
+          dist.set(w, du + 1)
+          next.push(w)
+        }
+      }
+    }
+    frontier = next
+  }
+  return dist
+}
+
+func main() {
+  let g = Graph{}                 // T2: the `adj` Map field is omitted → empty
+  link(g, 0, 1)
+  link(g, 0, 2)
+  link(g, 1, 3)
+  link(g, 2, 3)
+  link(g, 3, 4)
+  // node 5 is intentionally isolated — its adjacency is a Map *miss*.
+
+  let dist = bfs(g, 0, 6)
+  for i in 0..6 {
+    fmt.println("dist", i, dist.get(i).unwrapOr(-1))
+  }
+  // Degrees: a bare `g.adj[i]` index over `Map<int, List<int>>`. Node 5 was
+  // never linked, so `g.adj[5]` is a miss — it must yield an *empty* list
+  // (T13), never a nil crash; `.len()` chains a method onto the field-index.
+  for i in 0..6 {
+    fmt.println("deg", i, g.adj[i].len())
+  }
+}

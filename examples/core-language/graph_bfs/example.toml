@@ -1,0 +1,36 @@
+description = "BFS shortest paths over a Map<int, List<int>> adjacency list"
+source   = "synthetic — R1/R2 nil-safety + container-diagnostic live regression guard"
+category = "core-language"
+showcase = false
+forces   = []   # TODO backfill against lang-spec artefact IDs
+since    = "0.23"
+status   = "running"
+expects  = "run-pass"
+entry    = "graph_bfs.aril"
+expected_output = "expected-output.txt"
+
+# The container-diagnostic fixes (R1/R2) as negative cases: each patch
+# introduces one error into the base program, and the .expected sidecar is
+# the ideal Aril-coordinate message (D10). These are the diag_ok side of the
+# same surfaces the run program exercises positively.
+
+[[error]]
+patch   = "errors/unused-local.patch"       # a `let` nothing references (bug#1)
+expect  = ["E0221"]
+stage   = "sema"
+matches = "errors/unused-local.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/block-redeclare.patch"    # same-block re-`let` (bug#2)
+expect  = ["E0222"]
+stage   = "sema"
+matches = "errors/block-redeclare.expected"
+origin  = "synthetic"
+
+[[error]]
+patch   = "errors/omitted-class-field.patch" # omit a bare user-class field (T2 policy)
+expect  = ["E0220"]
+stage   = "sema"
+matches = "errors/omitted-class-field.expected"
+origin  = "synthetic"
