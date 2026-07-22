@@ -1,0 +1,10 @@
+--- graph_bfs.aril
++++ graph_bfs.aril
+@@ -62,6 +62,7 @@
+ 
+ func main() {
+   let g = Graph{}                 // T2: the `adj` Map field is omitted → empty
++  let stray = 42
+   link(g, 0, 1)
+   link(g, 0, 2)
+   link(g, 1, 3)

@@ -1,0 +1,12 @@
+dist 0 0
+dist 1 1
+dist 2 1
+dist 3 2
+dist 4 3
+dist 5 -1
+deg 0 2
+deg 1 2
+deg 2 2
+deg 3 3
+deg 4 1
+deg 5 0

@@ -45,6 +45,7 @@ category.
 | `match_on_tuples` | `match` on tuple patterns |
 | `interfaces` | interface conformance |
 | `defer_demo` | `defer` semantics |
+| `graph_bfs` | BFS over a `Map<int, List<int>>` adjacency list; the live regression guard for the nil-safety + container-diagnostic fixes (omitted-field / uninit-var container defaulting, bare-index-miss→empty, container-field receivers, + E0220/E0221/E0222 negative cases) |
 | `d01`…`d11` | Advent of Code 2025 — algorithmic control flow + data structures |
 | `p1033`…`p1820` | Timus problems — algorithmic |
 | `hello` | toolchain smoke test |

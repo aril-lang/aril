@@ -20,7 +20,12 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 99   # current build_ok; strict ratchet (raised 98→99 in
+build_ok_min = 100  # current build_ok; strict ratchet (raised 99→100 in the
+                    # NIL-SAFETY+DIAG-CLEANUP follow-on — graph_bfs, the live
+                    # regression guard for the R1/R2 container fixes: T2 omitted
+                    # Map field, bug#3 uninit List var, T13 bare Map<int,List>
+                    # index miss→empty, bug#4 for/index/method over a container
+                    # field); prior 98→99 in
                     # CONTAINER-MODEL — the list_demo example exercises the new
                     # List<T> reference container; prior 97→98 LANGUAGE-FIXES
                     # (option_result_map: Option.map / Result.map); 93→97 across
@@ -32,7 +37,9 @@ diag_ok_min  = 116  # headroom below current diag_ok (122/122) so an individual
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 99   # current run_ok; strict ratchet (raised 98→99 in
+run_ok_min   = 100  # current run_ok; strict ratchet (raised 99→100 in the
+                    # NIL-SAFETY+DIAG-CLEANUP follow-on — graph_bfs runs, exercising
+                    # the R1/R2 container fixes end-to-end); prior 98→99 in
                     # CONTAINER-MODEL — list_demo runs, exercising List<T> mutate-in-
                     # place / index / iterate; prior 97→98 LANGUAGE-FIXES
                     # (option_result_map runs); 93→97 across ATOMICS-BINDING: the four

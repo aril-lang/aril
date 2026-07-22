@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 99 / 99 examples build end-to-end** (floor 99).
-- **diag_ok — 121 / 121 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 99 / 99 run-pass examples build and run as specified** (floor 99; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **build_ok — 100 / 100 examples build end-to-end** (floor 100).
+- **diag_ok — 124 / 124 negative cases produce their expected diagnostic** (floor 116).
+- **run_ok — 100 / 100 run-pass examples build and run as specified** (floor 100; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 99 |
+| ✅ build (full pipeline) | 100 |
 | emit / codegen fail | 0 |
 | sema fail | 0 |
 | parse fail | 0 |
@@ -49,6 +49,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/core-language/defer_demo/defer_demo.aril` | build | — |
 | `examples/core-language/fizzbuzz/fizzbuzz.aril` | build | — |
 | `examples/core-language/grade_classifier/grade_classifier.aril` | build | — |
+| `examples/core-language/graph_bfs/graph_bfs.aril` | build | — |
 | `examples/core-language/hailstone/hailstone.aril` | build | — |
 | `examples/core-language/hello/hello.aril` | build | — |
 | `examples/core-language/interfaces/interfaces.aril` | build | — |
@@ -123,7 +124,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
 Negative cases whose `.expected` records the **ideal** user-facing diagnostic that the compiler does not yet emit (e.g. a parser message still leaking internal token-kind names). This is the backlog the `diag_ok` metric grows toward; closing a row means improving the diagnostic, not the test.
 
-**0 of 121 cases fall short of the ideal.**
+**0 of 124 cases fall short of the ideal.**
 
 | Case | Ideal (`.expected`) | Actual |
 |---|---|---|
@@ -132,7 +133,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**0 of 99 run-pass examples fall short of run_ok.**
+**0 of 100 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|
