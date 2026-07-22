@@ -31,7 +31,11 @@
   `"hello ${name}, ${count + 1} left"` — which evaluate each hole and
   splice its value in (lowering to `fmt.Sprintf` with a `%v` per hole, so
   any value type interpolates). A bare `$` not followed by `{` is literal;
-  a hole may not itself contain a string literal in v1.
+  a hole may not itself contain a string literal in v1. Composites render
+  legibly — a container/record/sum interpolates (and prints) as its Aril
+  value (`[1, 2, 3]`, `{x: 1, y: 2}`, `Some(5)`, `Circle(2)`), not Go's
+  raw layout, via a generated `String()` (see the formal §Stringer
+  generation).
 - Rune literals: single-quoted character: `'a'`, `'('`, `'\n'`, `'ÿ'`.
   A rune literal is of type `rune`. Same escape set as strings.
 - Integer literals: `42`, `0xFF`, `0o755`, `0b1010`, with `_` separators

@@ -197,8 +197,8 @@ func (g *gen) emitRecordStringer(td *ast.TypeDecl, body *ast.RecordTypeBody) {
 	g.emitTypeParamBrackets(td.TypeParams, false) // receiver: type params without constraints
 	g.b.WriteString(") String() string {\n\treturn ")
 	if len(body.Fields) == 0 {
-		// An empty record renders `{}` — no fmt needed (stringerUsesFmt
-		// agrees, so no spurious `import fmt`).
+		// Dead by sema (an empty record is E0112), kept defensively: renders
+		// `{}` with no fmt (stringerUsesFmt agrees → no spurious `import fmt`).
 		g.b.WriteString("\"{}\"\n}\n")
 		return
 	}
