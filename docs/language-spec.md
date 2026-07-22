@@ -239,8 +239,11 @@ the two coexist (the Rust `Vec` / slice split).
 - `m.get(k): Option<V>` — `Option`-wrapped to remove Go's
   zero-value-with-ok pitfall.
 - `m.set(k, v)`, `m.has(k): bool`, `m.delete(k)`, `m.len(): int`.
-- Iteration: `for k in m` (keys, order unspecified — matches Go) and
-  `for (k, v) in m` (entries).
+- Iteration: `for k in m` (keys) and `for (k, v) in m` (entries), in
+  **insertion order** — the order keys were first inserted, deterministic
+  across runs. Aril's `Map` keeps an insertion-order list beside the backing
+  Go map, so iteration is a *guarantee*, not Go's randomised order (it protects
+  the TS/JS `Map` prior). Deleting then re-inserting a key moves it to the end.
 
 ### Sets: `Set<T>`
 
@@ -255,8 +258,9 @@ for membership tests; re-implementing one per example wastes pages.
 - `s.has(v): bool`.
 - `s.delete(v)`.
 - `s.len(): int`.
-- Iteration: `for v in s` — order unspecified (matches Go's
-  map-backed set idiom).
+- Iteration: `for v in s` — in **insertion order**, deterministic across runs
+  (the same ordering guarantee as `Map` — a set keeps an insertion-order list
+  beside its backing map, not Go's randomised order).
 
 Set operations (`union`, `intersect`, `difference`) are park material;
 v1 needs only the four core ops.

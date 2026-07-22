@@ -94,6 +94,13 @@ func TestMapInsertionOrder(t *testing.T) {
 	if m.Has("b") || m.Len() != 1 {
 		t.Fatalf("after delete: len=%d hasB=%v", m.Len(), m.Has("b"))
 	}
+	// Re-inserting a deleted key appends it at the end (delete drops it from the
+	// order list, so the next Set is a fresh insertion) — the guarantee the
+	// language-spec §Maps prose commits to.
+	m.Set("b", 3)
+	if got := m.Keys(); len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("re-insert after delete should move key to end: %v", got)
+	}
 }
 
 func TestSetDedupAndOrder(t *testing.T) {

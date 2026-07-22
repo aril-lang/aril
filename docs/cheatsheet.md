@@ -4,7 +4,9 @@ Aril has TypeScript-style *syntax* with an ML-family *type system* (sum types,
 exhaustive `match`, `Option`/`Result`), and compiles to Go. If you know TS, most
 of this reads at sight — this page is about the **differences**, in the order
 you meet them. Rows marked ⚠ **look like a familiar idiom but mean something
-else** — read those first.
+else** — read those first. For the full catalog of behaviours that differ from a
+TS/Go/Rust prior (with the *why* behind each), see
+[`gotchas.md`](gotchas.md).
 
 > **This page teaches the language, not the library.** *Which* modules exist and
 > their exact API spelling is reference material — look it up, don't guess:
@@ -201,6 +203,14 @@ Channels are **method-based**: `makeChannel<T>(cap)`, `ch.send(v)`, `ch.recv()`,
 `ch.close()`, `for v in ch { … }` (ends on close). ⚠ Go's `ch <- v` / `<-ch`
 don't exist except `<-ch` **inside a `select` case**.
 
+⚠ A `scope` **joins** its `spawn`s, but that is not capture safety: a `spawn`
+that **mutates a captured outer `var`** is a silent data race (a wrong,
+nondeterministic answer, no diagnostic). Share mutable state through an
+`atomic` ([`atomics-lock-free.md`](atomics-lock-free.md)) or a channel, never a
+plain captured `var`;
+build/run with **`-race`** (`aril run -race`) to *detect* one. See
+[`gotchas.md`](gotchas.md) §Concurrency.
+
 ## 10. Contracts (an Aril differentiator)
 
 Executable spec written *beside* the code, enforced with `--contracts=panic`,
@@ -244,3 +254,13 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `async` / `await` / `go f()` | uncolored: `scope { spawn { … } }` |
 | structural interfaces (Go) | nominal: `class C implements I` |
 | `fn` / `function` | `func`; methods omit it |
+| `5 / 2` → `2.5` | integer division **truncates** → `2`; fixed-width ints **wrap** silently (`int8(127)+1` → `-128`) |
+| `10 / 0` → `Infinity` | integer divide-by-zero **panics** at runtime (float `1.0/0.0` → `+Inf`) |
+| `s[i] = v` on a slice is "pure" | ⚠ it **mutates** the shared backing array (even via `let`); `[]T` forbids *growth*, not element writes — and `List` forbids `l[i]=v` (use `l.set`) |
+| discarding a `Result` is caught | silently **dropped** (no must-use) — bind it and `match`/`try`/`catch` |
+| `var` shared into `spawn` is safe | ⚠ **data race** — mutate via `atomic`/channel, not a captured `var`; detect with `aril run -race` |
+| `x ?? fallback` short-circuits | `x.unwrapOr(fallback)` evaluates `fallback` **eagerly** (matches Rust) |
+
+The full set — floats, strings/runes, shallow record copy, `defer` in a loop,
+`os.exit` vs `defer`, and the *reassuring* priors that do transfer — is in
+[`gotchas.md`](gotchas.md).
