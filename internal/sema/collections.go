@@ -238,6 +238,31 @@ func (c *checker) inferBuiltinTypeCall(name string, call *ast.Call, args []Type)
 	return &Unknown{}
 }
 
+// inferBuiltinVariantCall types a built-in variant constructor call
+// (`Some`/`Ok`/`Err`) as its Option/Result sum, with the payload type
+// taken from the argument. The tag whose payload the constructor does
+// not carry stays Unknown (`Ok(v)` cannot pin E, `Err(e)` cannot pin
+// the ok-payload) — a subsequent annotation or unification refines it.
+// `None` is nullary and never reaches here as a call.
+func (c *checker) inferBuiltinVariantCall(name string, args []Type) Type {
+	payload := Type(&Unknown{})
+	if len(args) == 1 {
+		payload = args[0]
+	}
+	switch name {
+	case "Some":
+		return &Option{T: payload}
+	case "Ok":
+		return &Result{T: payload, E: &Unknown{}}
+	case "Err":
+		return &Result{T: &Unknown{}, E: payload}
+	case "None":
+		// A `None()` call form (rare); its element type is uninferrable.
+		return &Option{T: &Unknown{}}
+	}
+	return &Unknown{}
+}
+
 // inferBuiltinFuncCall types calls to the predeclared free
 // functions sema models: refEq (E0206) and makeSlice.
 func (c *checker) inferBuiltinFuncCall(name string, call *ast.Call, args []Type) Type {
@@ -659,6 +684,18 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 	if c.satisfiesInterface(want, got) {
 		return true
 	}
+	// Covariant Option/Result payloads: a `Some(...)` / `Ok(...)` / `Err(...)`
+	// constructor fits an annotated `Option<Shape>` / `Result<_, error>` /
+	// `Option<int64>` when the payload conforms to the expected type. A
+	// constructor-inferred value carries a concrete payload, so raw structural
+	// `equal` (types.go) would reject a conforming-but-not-identical payload —
+	// Go's own assignability accepts the lowered `ResultErr(MyErr{…})` at a
+	// `Result[_, error]` position, so sema must too (T-Variant-Payload
+	// covariance). Recursing on the constructor's arg expr also picks up
+	// sized-int-literal narrowing (`Some(5)` @ `Option<int64>`).
+	if c.constructorPayloadFits(want, e, got) {
+		return true
+	}
 	if intLiteralAdaptsTo(want, e) {
 		c.info.Type[e] = want
 		c.checkIntLitRange(want, e)
@@ -676,6 +713,83 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 				c.info.Type[e] = want
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// constructorPayloadFits admits a *directly-visible* variant constructor at an
+// annotated Option/Result position: `Some(a)` / `Ok(a)` / `Err(a)` fits when
+// the payload arg conforms to the target payload type. Recursing `fits` on the
+// arg *expr* covers sized-int-literal narrowing (`Some(5)` @ `Option<int64>`)
+// and interface conformance a type-only check can't.
+//
+// Only a directly-visible constructor is admitted: codegen stamps the target
+// payload type into the constructor's Go type args (`ResultErr[int64, error]`),
+// so covariance lowers. A stored/returned covariant sum (`return helper()` where
+// `helper(): Result<_, MyErr>` reaches a `Result<_, error>` position) is *not*
+// admitted — Go generics are invariant, so it could never lower, and accepting
+// it would only turn a clean E0203 into a raw go/types leak (D10). Falling
+// through here reports E0203 (matching a non-covariant mismatch). Unknown /
+// generic payloads are handled earlier by `fits`'s non-concrete guard and
+// `equal`'s Unknown/Generic short-circuit, so they never reach here.
+func (c *checker) constructorPayloadFits(want Type, e ast.Expr, got Type) bool {
+	call, ok := unparen(e).(*ast.Call)
+	if !ok {
+		return false
+	}
+	id, ok := call.Callee.(*ast.Ident)
+	if !ok || len(call.Args) != 1 {
+		return false
+	}
+	switch id.Name {
+	case "Some":
+		if w, ok := want.(*Option); ok {
+			if _, ok := got.(*Option); ok {
+				return c.payloadArgFits(w.T, call.Args[0])
+			}
+		}
+	case "Ok":
+		if w, ok := want.(*Result); ok {
+			if _, ok := got.(*Result); ok {
+				return c.payloadArgFits(w.T, call.Args[0])
+			}
+		}
+	case "Err":
+		if w, ok := want.(*Result); ok {
+			if _, ok := got.(*Result); ok {
+				return c.payloadArgFits(w.E, call.Args[0])
+			}
+		}
+	}
+	return false
+}
+
+// payloadArgFits reports whether a constructor payload arg fits `want`: `fits`
+// on the arg expr (int-literal narrowing, interface satisfaction, nested sums),
+// plus the class→`error` boundary (D43) that `fits` itself does not cover.
+func (c *checker) payloadArgFits(want Type, arg ast.Expr) bool {
+	got := c.info.Type[arg]
+	if c.fits(want, arg, got) {
+		return true
+	}
+	return isErrorBuiltin(want) && classConformsToError(got)
+}
+
+// classConformsToError reports whether `got` is a class whose `implements`
+// list names the builtin `error` (the D43 class-error boundary).
+func classConformsToError(got Type) bool {
+	n, ok := got.(*Named)
+	if !ok {
+		return false
+	}
+	cd, ok := n.Decl.(*ast.ClassDecl)
+	if !ok {
+		return false
+	}
+	for _, impl := range cd.Implements {
+		if nt, ok := impl.(*ast.NamedType); ok && len(nt.QName) == 1 && nt.QName[0] == "error" {
+			return true
 		}
 	}
 	return false

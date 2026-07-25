@@ -35,4 +35,9 @@ func main() {
 
   let miss = find(tokens, "99")
   fmt.println("missing", miss.unwrapOr(-1), "none", miss.isNone())
+
+  // A value whose type is inferred straight from a `Some(...)` constructor —
+  // no annotation, no signature — still resolves the total Option methods.
+  let direct = Some(42)
+  fmt.println("direct", direct.unwrapOr(0), direct.isSome())
 }

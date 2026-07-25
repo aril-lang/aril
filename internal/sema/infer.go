@@ -261,10 +261,22 @@ func (c *checker) inferSpawn(s *ast.SpawnExpr) Type {
 	// frame is a Result, so a `try` on an Option there is ill-formed
 	// (E0408, flagged via curSpawnFrame in tryResultType).
 	savedForbidden, savedSpawnFrame := c.curTryForbidden, c.curSpawnFrame
+	savedReturn, savedAcc := c.curReturn, c.returnAcc
 	c.curTryForbidden = false
 	c.curSpawnFrame = true
+	// The frame's declared return is `Result<unit, error>`, so a `return
+	// Ok(())` / `return Err(e)` in the body checks against it (E0203), not
+	// the enclosing function's return type. (Previously masked because a
+	// constructor-inferred `Ok(())` typed as Unknown; now that Some/Ok/Err
+	// carry their sum type, the frame return must be set here.) `returnAcc`
+	// is cleared too: the frame's returns belong to it, not an enclosing
+	// un-annotated closure whose return accumulator would otherwise collect
+	// this `Ok(())` and mis-fire an inconsistent-return E0203.
+	c.curReturn = &Result{T: &Unit{}, E: &Builtin{N: "error"}}
+	c.returnAcc = nil
 	c.checkBlock(s.Body)
 	c.curTryForbidden, c.curSpawnFrame = savedForbidden, savedSpawnFrame
+	c.curReturn, c.returnAcc = savedReturn, savedAcc
 	return &Unit{}
 }
 
@@ -624,6 +636,15 @@ func (c *checker) inferCall(call *ast.Call) Type {
 			case SymUserVariant:
 				// Payload-variant constructor: its value is the sum.
 				ret = sym.Type
+			case SymBuiltinVariant:
+				// Built-in `Option`/`Result` constructor (`Some`/`Ok`/`Err`):
+				// the value's static type is the sum, inferred from the
+				// payload argument. This lets a constructor-inferred receiver
+				// (`let o = Some(5)`) reach the same Option/Result method
+				// lowering as a signature-typed one (builtins.md §Option/
+				// §Result methods). `None` is nullary and appears as a bare
+				// ident, not a call — its element type is uninferrable here.
+				ret = c.inferBuiltinVariantCall(id.Name, args)
 			case SymBuiltinType:
 				ret = c.inferBuiltinTypeCall(id.Name, call, args)
 			case SymBuiltinFunc:

@@ -197,16 +197,13 @@ The fallback is a normal argument, so it is computed *before* `unwrapOr` runs �
 even when the receiver is `Some`/`Ok` and the fallback is discarded:
 
 ```aril
-let n = strconv.atoi("5").unwrapOr(fallback())   // fallback() ALWAYS runs
+let n = Some(5).unwrapOr(fallback())   // fallback() ALWAYS runs
 ```
 
 This matches Rust exactly (which is why Rust ships a separate lazy
 `unwrap_or_else`); it diverges from a TS developer's `??` / `?.` short-circuit
 intuition. Keep the fallback cheap and side-effect-free, or guard with a `match`
-when it isn't. *(Note: today these combinators resolve on a receiver whose type
-comes from a signature — `atoi(...)`, `m.get(...)`, a typed return — but not yet
-on one inferred straight from a `Some(...)`/`Ok(...)` constructor; write the
-value through a `.get()`/typed boundary in the meantime.)*
+when it isn't.
 
 ### `.recv()` on a closed channel returns the zero value with no signal **≈Go, half of it**
 

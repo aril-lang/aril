@@ -1766,6 +1766,199 @@ func TestScopeSpawnClean(t *testing.T) {
 	}
 }
 
+func TestBuiltinVariantCtorTypesAsSum(t *testing.T) {
+	// A `Some(...)`/`Ok(...)`/`Err(...)` constructor call is typed as its
+	// Option/Result sum (payload from the argument), so a constructor-
+	// inferred receiver reaches the same builtin method-lowering path as a
+	// signature-typed one (builtins.md §Option/§Result methods). Regression
+	// for the D10 leak where `let o = Some(5); o.unwrapOr(-1)` emitted the
+	// raw lowercase method name.
+	src := `func main() {
+  let o = Some(5)
+  let r = Ok(3)
+  let e = Err("boom")
+}
+`
+	toks, lerr := lexer.LexFile(src, "test.aril")
+	if lerr != nil {
+		t.Fatalf("lex: %v", lerr)
+	}
+	f, perr := parser.ParseFile(toks, "test.aril")
+	if perr != nil {
+		t.Fatalf("parse: %v", perr)
+	}
+	info, _ := Check(f, "test.aril")
+	fn := f.Decls[0].(*ast.FuncDecl)
+	checkLetIsType := func(idx int, want string, pred func(Type) bool) {
+		ls, ok := fn.Body.Stmts[idx].(*ast.LetStmt)
+		if !ok {
+			t.Fatalf("stmt %d is not a let", idx)
+		}
+		if got := info.Type[ls.Value]; !pred(got) {
+			t.Errorf("let %d value type = %v; want %s", idx, got, want)
+		}
+	}
+	checkLetIsType(0, "Option", func(ty Type) bool { _, ok := ty.(*Option); return ok })
+	checkLetIsType(1, "Result", func(ty Type) bool { _, ok := ty.(*Result); return ok })
+	checkLetIsType(2, "Result", func(ty Type) bool { _, ok := ty.(*Result); return ok })
+}
+
+func TestConstructorInferredReceiverMethodClean(t *testing.T) {
+	// The whole chain compiles clean: a constructor-inferred Option receiver
+	// resolves isSome/isNone/unwrapOr/map without a diagnostic (the fix reaches
+	// the same path as a `.get()`-typed receiver).
+	src := `import fmt
+func main() {
+  let o = Some(5)
+  fmt.println(o.isSome(), o.isNone(), o.unwrapOr(-1))
+  fmt.println(Some(7).unwrapOr(-1))
+  let doubled = Some(10).map((x) => x * 2)
+  fmt.println(doubled.unwrapOr(0))
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (constructor-inferred Option methods), got %v", codes)
+	}
+}
+
+func TestSpawnFrameReturnTypedResult(t *testing.T) {
+	// A spawn body is a Result<unit, error> frame: a `return Ok(())` is
+	// checked against it, not the enclosing function's return type. A `return`
+	// of a non-Result value fires E0203 against the frame. Regression for the
+	// spawn-frame return-typing (previously masked while Ok(()) typed Unknown).
+	clean := `import fmt
+func work(): int { return 1 }
+func compute(): int {
+  let ch = makeChannel<int>(2)
+  let _ = scope<unit, error> {
+    spawn { ch.send(work()); return Ok(()) }
+    ()
+  }
+  return ch.recv()
+}
+func main() { fmt.println(compute()) }
+`
+	if codes := runCheck(t, clean); len(codes) != 0 {
+		t.Errorf("expected clean spawn frame in an int-returning fn, got %v", codes)
+	}
+	bad := `import fmt
+func compute(): int {
+  let _ = scope<unit, error> {
+    spawn { return 5 }
+    ()
+  }
+  return 0
+}
+func main() { fmt.println(compute()) }
+`
+	if codes := runCheck(t, bad); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a non-Result spawn return, got %v", codes)
+	}
+}
+
+func TestConstructorPayloadConformsToInterfaceAndError(t *testing.T) {
+	// A constructor-inferred payload that *conforms* to (but is not structurally
+	// equal to) the annotated Option/Result payload fits — covariance the flat
+	// structural `equal` skips. Regression: typing the constructor concretely
+	// must not reject `Err(userErrorClass)` / `Some(interfaceImpl)` at an
+	// annotated position (both build+run on the pre-epoch compiler).
+	errCase := `import fmt
+class MyErr implements error {
+  let msg: string
+  error(): string { return "e: " + this.msg }
+}
+func plain(bad: bool): Result<int, error> {
+  if bad { return Err(MyErr{ msg: "boom" }) }
+  return Ok(7)
+}
+func main() { fmt.println(plain(true).isErr()) }
+`
+	if codes := runCheck(t, errCase); len(codes) != 0 {
+		t.Errorf("expected clean (Err of a class implementing error), got %v", codes)
+	}
+	ifaceCase := `import fmt
+interface Shape { area(): int }
+class Sq implements Shape {
+  let s: int
+  area(): int { return this.s * this.s }
+}
+func pick(b: bool): Option<Shape> {
+  if b { return Some(Sq{ s: 3 }) }
+  return None
+}
+func main() { fmt.println(pick(true).isSome()) }
+`
+	if codes := runCheck(t, ifaceCase); len(codes) != 0 {
+		t.Errorf("expected clean (Some of an interface impl), got %v", codes)
+	}
+	// A genuinely non-conforming payload still fires E0203 (a clean Aril
+	// diagnostic rather than a raw go/types leak).
+	badCase := `func f(): Result<int, error> { return Err(42) }
+func main() { let r = f() }
+`
+	if codes := runCheck(t, badCase); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a non-conforming Err payload, got %v", codes)
+	}
+	// Sized-int-literal narrowing reaches into the payload: `Some(5)` fits
+	// `Option<int64>` (the constructor arg expr is threaded through `fits`).
+	sizedCase := `import fmt
+func f(): Option<int64> { return Some(5) }
+func g(): Result<int64, error> { return Ok(7) }
+func main() {
+  let o: Option<int64> = Some(3)
+  fmt.println(f().isSome(), g().isOk(), o.unwrapOr(0))
+}
+`
+	if codes := runCheck(t, sizedCase); len(codes) != 0 {
+		t.Errorf("expected clean (sized-int payload literal narrowing), got %v", codes)
+	}
+	// An out-of-range payload literal still fires E0204 through the payload.
+	rangeCase := `func f(): Option<int8> { return Some(99999) }
+func main() { let r = f() }
+`
+	if codes := runCheck(t, rangeCase); !contains(codes, "E0204") {
+		t.Errorf("expected E0204 for an out-of-range payload literal, got %v", codes)
+	}
+	// Covariance is admitted only for a *directly-visible* constructor (codegen
+	// stamps the target payload into its Go type args). A stored/returned
+	// covariant sum can't lower (Go generics are invariant), so it must report a
+	// clean E0203 — not leak raw go/types (D10). Regression guard.
+	storedCase := `class MyErr implements error {
+  let msg: string
+  error(): string { return this.msg }
+}
+func helper(): Result<int64, MyErr> { return Err(MyErr{ msg: "x" }) }
+func caller(): Result<int64, error> { return helper() }
+func main() { let r = caller() }
+`
+	if codes := runCheck(t, storedCase); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a stored covariant sum (no D10 leak), got %v", codes)
+	}
+}
+
+func TestSpawnReturnDoesNotPolluteEnclosingClosureAcc(t *testing.T) {
+	// A spawn body's `return Ok(())` must not land in an enclosing un-annotated
+	// closure's return accumulator (inferSpawn resets returnAcc for the frame).
+	// Regression: without the reset, the spawn's Result return conflicted with
+	// the closure's real `int` return → a false "inconsistent closure return".
+	src := `import fmt
+func main() {
+  let ch = makeChannel<int>(2)
+  let f = () => {
+    let _ = scope<unit, error> {
+      spawn { ch.send(1); return Ok(()) }
+      ()
+    }
+    return 42
+  }
+  fmt.println(f())
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (spawn inside an un-annotated closure), got %v", codes)
+	}
+}
+
 func TestSpawnOutsideScopeFiresE0405(t *testing.T) {
 	src := `func main() {
   spawn { return Ok(()) }
