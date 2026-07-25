@@ -1919,6 +1919,21 @@ func main() { let r = f() }
 	if codes := runCheck(t, rangeCase); !contains(codes, "E0204") {
 		t.Errorf("expected E0204 for an out-of-range payload literal, got %v", codes)
 	}
+	// Covariance is admitted only for a *directly-visible* constructor (codegen
+	// stamps the target payload into its Go type args). A stored/returned
+	// covariant sum can't lower (Go generics are invariant), so it must report a
+	// clean E0203 — not leak raw go/types (D10). Regression guard.
+	storedCase := `class MyErr implements error {
+  let msg: string
+  error(): string { return this.msg }
+}
+func helper(): Result<int64, MyErr> { return Err(MyErr{ msg: "x" }) }
+func caller(): Result<int64, error> { return helper() }
+func main() { let r = caller() }
+`
+	if codes := runCheck(t, storedCase); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a stored covariant sum (no D10 leak), got %v", codes)
+	}
 }
 
 func TestSpawnReturnDoesNotPolluteEnclosingClosureAcc(t *testing.T) {

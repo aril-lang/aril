@@ -718,39 +718,51 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 	return false
 }
 
-// constructorPayloadFits admits a variant constructor at an annotated
-// Option/Result position: `Some(a)` / `Ok(a)` / `Err(a)` fits when the payload
-// arg conforms to the target payload type. When the constructor is directly
-// visible, recursing `fits` on the arg *expr* covers sized-int-literal
-// narrowing (`Some(5)` @ `Option<int64>`) and interface conformance that a
-// type-only check can't; a non-constructor value (a stored/returned
-// Option/Result) falls back to the type-only sumPayloadConforms.
+// constructorPayloadFits admits a *directly-visible* variant constructor at an
+// annotated Option/Result position: `Some(a)` / `Ok(a)` / `Err(a)` fits when
+// the payload arg conforms to the target payload type. Recursing `fits` on the
+// arg *expr* covers sized-int-literal narrowing (`Some(5)` @ `Option<int64>`)
+// and interface conformance a type-only check can't.
+//
+// Only a directly-visible constructor is admitted: codegen stamps the target
+// payload type into the constructor's Go type args (`ResultErr[int64, error]`),
+// so covariance lowers. A stored/returned covariant sum (`return helper()` where
+// `helper(): Result<_, MyErr>` reaches a `Result<_, error>` position) is *not*
+// admitted — Go generics are invariant, so it could never lower, and accepting
+// it would only turn a clean E0203 into a raw go/types leak (D10). Falling
+// through here reports E0203 (matching a non-covariant mismatch). Unknown /
+// generic payloads are handled earlier by `fits`'s non-concrete guard and
+// `equal`'s Unknown/Generic short-circuit, so they never reach here.
 func (c *checker) constructorPayloadFits(want Type, e ast.Expr, got Type) bool {
-	if call, ok := unparen(e).(*ast.Call); ok {
-		if id, ok := call.Callee.(*ast.Ident); ok && len(call.Args) == 1 {
-			switch id.Name {
-			case "Some":
-				if w, ok := want.(*Option); ok {
-					if _, ok := got.(*Option); ok {
-						return c.payloadArgFits(w.T, call.Args[0])
-					}
-				}
-			case "Ok":
-				if w, ok := want.(*Result); ok {
-					if _, ok := got.(*Result); ok {
-						return c.payloadArgFits(w.T, call.Args[0])
-					}
-				}
-			case "Err":
-				if w, ok := want.(*Result); ok {
-					if _, ok := got.(*Result); ok {
-						return c.payloadArgFits(w.E, call.Args[0])
-					}
-				}
+	call, ok := unparen(e).(*ast.Call)
+	if !ok {
+		return false
+	}
+	id, ok := call.Callee.(*ast.Ident)
+	if !ok || len(call.Args) != 1 {
+		return false
+	}
+	switch id.Name {
+	case "Some":
+		if w, ok := want.(*Option); ok {
+			if _, ok := got.(*Option); ok {
+				return c.payloadArgFits(w.T, call.Args[0])
+			}
+		}
+	case "Ok":
+		if w, ok := want.(*Result); ok {
+			if _, ok := got.(*Result); ok {
+				return c.payloadArgFits(w.T, call.Args[0])
+			}
+		}
+	case "Err":
+		if w, ok := want.(*Result); ok {
+			if _, ok := got.(*Result); ok {
+				return c.payloadArgFits(w.E, call.Args[0])
 			}
 		}
 	}
-	return c.sumPayloadConforms(want, got)
+	return false
 }
 
 // payloadArgFits reports whether a constructor payload arg fits `want`: `fits`
@@ -762,43 +774,6 @@ func (c *checker) payloadArgFits(want Type, arg ast.Expr) bool {
 		return true
 	}
 	return isErrorBuiltin(want) && classConformsToError(got)
-}
-
-// sumPayloadConforms reports whether `got` fits `want` when both are the same
-// sum kind (Option/Result) by covariant payload conformance — the component
-// check the flat structural `equal` (types.go) skips. Result checks both T and
-// E. The type-only fallback for a non-constructor value (constructorPayloadFits
-// handles the directly-visible constructor).
-func (c *checker) sumPayloadConforms(want, got Type) bool {
-	switch w := want.(type) {
-	case *Option:
-		g, ok := got.(*Option)
-		return ok && c.payloadConforms(w.T, g.T)
-	case *Result:
-		g, ok := got.(*Result)
-		return ok && c.payloadConforms(w.T, g.T) && c.payloadConforms(w.E, g.E)
-	}
-	return false
-}
-
-// payloadConforms reports whether a sum-type payload `got` is admissible where
-// `want` is expected: identical, an Unknown/Generic on either side, a class /
-// interface satisfying a `want` interface (D14), a class implementing the
-// builtin `error` (D43), or a nested conforming sum.
-func (c *checker) payloadConforms(want, got Type) bool {
-	if isUnknown(want) || isUnknown(got) || isGeneric(want) || isGeneric(got) {
-		return true
-	}
-	if equal(want, got) {
-		return true
-	}
-	if c.satisfiesInterface(want, got) {
-		return true
-	}
-	if isErrorBuiltin(want) && classConformsToError(got) {
-		return true
-	}
-	return c.sumPayloadConforms(want, got)
 }
 
 // classConformsToError reports whether `got` is a class whose `implements`
