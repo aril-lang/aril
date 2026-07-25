@@ -684,6 +684,17 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 	if c.satisfiesInterface(want, got) {
 		return true
 	}
+	// Covariant Option/Result payloads: an `Option<Sq>` / `Result<_, MyErr>`
+	// from a `Some(...)` / `Err(...)` constructor fits an annotated
+	// `Option<Shape>` / `Result<_, error>` when the payload class conforms to
+	// the expected interface / `error`. A constructor-inferred value carries a
+	// concrete payload, so raw structural `equal` (types.go) would reject a
+	// conforming-but-not-identical payload — Go's own assignability accepts the
+	// lowered `ResultErr(MyErr{…})` at a `Result[_, error]` position, so sema
+	// must too (T-Variant-Payload covariance).
+	if c.sumPayloadConforms(want, got) {
+		return true
+	}
 	if intLiteralAdaptsTo(want, e) {
 		c.info.Type[e] = want
 		c.checkIntLitRange(want, e)
@@ -701,6 +712,63 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 				c.info.Type[e] = want
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// sumPayloadConforms reports whether `got` fits `want` when both are the same
+// sum kind (Option/Result) by covariant payload conformance — the component
+// check the flat structural `equal` (types.go) skips. Result checks both T and
+// E. Used only in the `fits` fall-through (a constructor-inferred receiver now
+// carries a concrete payload; before this epoch the whole constructor call was
+// Unknown and `fits` abstained).
+func (c *checker) sumPayloadConforms(want, got Type) bool {
+	switch w := want.(type) {
+	case *Option:
+		g, ok := got.(*Option)
+		return ok && c.payloadConforms(w.T, g.T)
+	case *Result:
+		g, ok := got.(*Result)
+		return ok && c.payloadConforms(w.T, g.T) && c.payloadConforms(w.E, g.E)
+	}
+	return false
+}
+
+// payloadConforms reports whether a sum-type payload `got` is admissible where
+// `want` is expected: identical, an Unknown/Generic on either side, a class /
+// interface satisfying a `want` interface (D14), a class implementing the
+// builtin `error` (D43), or a nested conforming sum.
+func (c *checker) payloadConforms(want, got Type) bool {
+	if isUnknown(want) || isUnknown(got) || isGeneric(want) || isGeneric(got) {
+		return true
+	}
+	if equal(want, got) {
+		return true
+	}
+	if c.satisfiesInterface(want, got) {
+		return true
+	}
+	if isErrorBuiltin(want) && classConformsToError(got) {
+		return true
+	}
+	return c.sumPayloadConforms(want, got)
+}
+
+// classConformsToError reports whether `got` is a class whose `implements`
+// list names the builtin `error` (the D43 class-error boundary).
+func classConformsToError(got Type) bool {
+	n, ok := got.(*Named)
+	if !ok {
+		return false
+	}
+	cd, ok := n.Decl.(*ast.ClassDecl)
+	if !ok {
+		return false
+	}
+	for _, impl := range cd.Implements {
+		if nt, ok := impl.(*ast.NamedType); ok && len(nt.QName) == 1 && nt.QName[0] == "error" {
+			return true
 		}
 	}
 	return false

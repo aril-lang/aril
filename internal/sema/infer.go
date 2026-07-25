@@ -261,17 +261,22 @@ func (c *checker) inferSpawn(s *ast.SpawnExpr) Type {
 	// frame is a Result, so a `try` on an Option there is ill-formed
 	// (E0408, flagged via curSpawnFrame in tryResultType).
 	savedForbidden, savedSpawnFrame := c.curTryForbidden, c.curSpawnFrame
-	savedReturn := c.curReturn
+	savedReturn, savedAcc := c.curReturn, c.returnAcc
 	c.curTryForbidden = false
 	c.curSpawnFrame = true
 	// The frame's declared return is `Result<unit, error>`, so a `return
 	// Ok(())` / `return Err(e)` in the body checks against it (E0203), not
 	// the enclosing function's return type. (Previously masked because a
 	// constructor-inferred `Ok(())` typed as Unknown; now that Some/Ok/Err
-	// carry their sum type, the frame return must be set here.)
+	// carry their sum type, the frame return must be set here.) `returnAcc`
+	// is cleared too: the frame's returns belong to it, not an enclosing
+	// un-annotated closure whose return accumulator would otherwise collect
+	// this `Ok(())` and mis-fire an inconsistent-return E0203.
 	c.curReturn = &Result{T: &Unit{}, E: &Builtin{N: "error"}}
+	c.returnAcc = nil
 	c.checkBlock(s.Body)
-	c.curTryForbidden, c.curSpawnFrame, c.curReturn = savedForbidden, savedSpawnFrame, savedReturn
+	c.curTryForbidden, c.curSpawnFrame = savedForbidden, savedSpawnFrame
+	c.curReturn, c.returnAcc = savedReturn, savedAcc
 	return &Unit{}
 }
 

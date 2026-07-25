@@ -1856,6 +1856,74 @@ func main() { fmt.println(compute()) }
 	}
 }
 
+func TestConstructorPayloadConformsToInterfaceAndError(t *testing.T) {
+	// A constructor-inferred payload that *conforms* to (but is not structurally
+	// equal to) the annotated Option/Result payload fits — covariance the flat
+	// structural `equal` skips. Regression: typing the constructor concretely
+	// must not reject `Err(userErrorClass)` / `Some(interfaceImpl)` at an
+	// annotated position (both build+run on the pre-epoch compiler).
+	errCase := `import fmt
+class MyErr implements error {
+  let msg: string
+  error(): string { return "e: " + this.msg }
+}
+func plain(bad: bool): Result<int, error> {
+  if bad { return Err(MyErr{ msg: "boom" }) }
+  return Ok(7)
+}
+func main() { fmt.println(plain(true).isErr()) }
+`
+	if codes := runCheck(t, errCase); len(codes) != 0 {
+		t.Errorf("expected clean (Err of a class implementing error), got %v", codes)
+	}
+	ifaceCase := `import fmt
+interface Shape { area(): int }
+class Sq implements Shape {
+  let s: int
+  area(): int { return this.s * this.s }
+}
+func pick(b: bool): Option<Shape> {
+  if b { return Some(Sq{ s: 3 }) }
+  return None
+}
+func main() { fmt.println(pick(true).isSome()) }
+`
+	if codes := runCheck(t, ifaceCase); len(codes) != 0 {
+		t.Errorf("expected clean (Some of an interface impl), got %v", codes)
+	}
+	// A genuinely non-conforming payload still fires E0203 (a clean Aril
+	// diagnostic rather than a raw go/types leak).
+	badCase := `func f(): Result<int, error> { return Err(42) }
+func main() { let r = f() }
+`
+	if codes := runCheck(t, badCase); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a non-conforming Err payload, got %v", codes)
+	}
+}
+
+func TestSpawnReturnDoesNotPolluteEnclosingClosureAcc(t *testing.T) {
+	// A spawn body's `return Ok(())` must not land in an enclosing un-annotated
+	// closure's return accumulator (inferSpawn resets returnAcc for the frame).
+	// Regression: without the reset, the spawn's Result return conflicted with
+	// the closure's real `int` return → a false "inconsistent closure return".
+	src := `import fmt
+func main() {
+  let ch = makeChannel<int>(2)
+  let f = () => {
+    let _ = scope<unit, error> {
+      spawn { ch.send(1); return Ok(()) }
+      ()
+    }
+    return 42
+  }
+  fmt.println(f())
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (spawn inside an un-annotated closure), got %v", codes)
+	}
+}
+
 func TestSpawnOutsideScopeFiresE0405(t *testing.T) {
 	src := `func main() {
   spawn { return Ok(()) }
