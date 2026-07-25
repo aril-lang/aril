@@ -238,6 +238,31 @@ func (c *checker) inferBuiltinTypeCall(name string, call *ast.Call, args []Type)
 	return &Unknown{}
 }
 
+// inferBuiltinVariantCall types a built-in variant constructor call
+// (`Some`/`Ok`/`Err`) as its Option/Result sum, with the payload type
+// taken from the argument. The tag whose payload the constructor does
+// not carry stays Unknown (`Ok(v)` cannot pin E, `Err(e)` cannot pin
+// the ok-payload) — a subsequent annotation or unification refines it.
+// `None` is nullary and never reaches here as a call.
+func (c *checker) inferBuiltinVariantCall(name string, args []Type) Type {
+	payload := Type(&Unknown{})
+	if len(args) == 1 {
+		payload = args[0]
+	}
+	switch name {
+	case "Some":
+		return &Option{T: payload}
+	case "Ok":
+		return &Result{T: payload, E: &Unknown{}}
+	case "Err":
+		return &Result{T: &Unknown{}, E: payload}
+	case "None":
+		// A `None()` call form (rare); its element type is uninferrable.
+		return &Option{T: &Unknown{}}
+	}
+	return &Unknown{}
+}
+
 // inferBuiltinFuncCall types calls to the predeclared free
 // functions sema models: refEq (E0206) and makeSlice.
 func (c *checker) inferBuiltinFuncCall(name string, call *ast.Call, args []Type) Type {

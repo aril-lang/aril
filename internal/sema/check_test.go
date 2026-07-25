@@ -1766,6 +1766,96 @@ func TestScopeSpawnClean(t *testing.T) {
 	}
 }
 
+func TestBuiltinVariantCtorTypesAsSum(t *testing.T) {
+	// A `Some(...)`/`Ok(...)`/`Err(...)` constructor call is typed as its
+	// Option/Result sum (payload from the argument), so a constructor-
+	// inferred receiver reaches the same builtin method-lowering path as a
+	// signature-typed one (builtins.md §Option/§Result methods). Regression
+	// for the D10 leak where `let o = Some(5); o.unwrapOr(-1)` emitted the
+	// raw lowercase method name.
+	src := `func main() {
+  let o = Some(5)
+  let r = Ok(3)
+  let e = Err("boom")
+}
+`
+	toks, lerr := lexer.LexFile(src, "test.aril")
+	if lerr != nil {
+		t.Fatalf("lex: %v", lerr)
+	}
+	f, perr := parser.ParseFile(toks, "test.aril")
+	if perr != nil {
+		t.Fatalf("parse: %v", perr)
+	}
+	info, _ := Check(f, "test.aril")
+	fn := f.Decls[0].(*ast.FuncDecl)
+	checkLetIsType := func(idx int, want string, pred func(Type) bool) {
+		ls, ok := fn.Body.Stmts[idx].(*ast.LetStmt)
+		if !ok {
+			t.Fatalf("stmt %d is not a let", idx)
+		}
+		if got := info.Type[ls.Value]; !pred(got) {
+			t.Errorf("let %d value type = %v; want %s", idx, got, want)
+		}
+	}
+	checkLetIsType(0, "Option", func(ty Type) bool { _, ok := ty.(*Option); return ok })
+	checkLetIsType(1, "Result", func(ty Type) bool { _, ok := ty.(*Result); return ok })
+	checkLetIsType(2, "Result", func(ty Type) bool { _, ok := ty.(*Result); return ok })
+}
+
+func TestConstructorInferredReceiverMethodClean(t *testing.T) {
+	// The whole chain compiles clean: a constructor-inferred Option receiver
+	// resolves isSome/isNone/unwrapOr/map without a diagnostic (the fix reaches
+	// the same path as a `.get()`-typed receiver).
+	src := `import fmt
+func main() {
+  let o = Some(5)
+  fmt.println(o.isSome(), o.isNone(), o.unwrapOr(-1))
+  fmt.println(Some(7).unwrapOr(-1))
+  let doubled = Some(10).map((x) => x * 2)
+  fmt.println(doubled.unwrapOr(0))
+}
+`
+	if codes := runCheck(t, src); len(codes) != 0 {
+		t.Errorf("expected clean (constructor-inferred Option methods), got %v", codes)
+	}
+}
+
+func TestSpawnFrameReturnTypedResult(t *testing.T) {
+	// A spawn body is a Result<unit, error> frame: a `return Ok(())` is
+	// checked against it, not the enclosing function's return type. A `return`
+	// of a non-Result value fires E0203 against the frame. Regression for the
+	// spawn-frame return-typing (previously masked while Ok(()) typed Unknown).
+	clean := `import fmt
+func work(): int { return 1 }
+func compute(): int {
+  let ch = makeChannel<int>(2)
+  let _ = scope<unit, error> {
+    spawn { ch.send(work()); return Ok(()) }
+    ()
+  }
+  return ch.recv()
+}
+func main() { fmt.println(compute()) }
+`
+	if codes := runCheck(t, clean); len(codes) != 0 {
+		t.Errorf("expected clean spawn frame in an int-returning fn, got %v", codes)
+	}
+	bad := `import fmt
+func compute(): int {
+  let _ = scope<unit, error> {
+    spawn { return 5 }
+    ()
+  }
+  return 0
+}
+func main() { fmt.println(compute()) }
+`
+	if codes := runCheck(t, bad); !contains(codes, "E0203") {
+		t.Errorf("expected E0203 for a non-Result spawn return, got %v", codes)
+	}
+}
+
 func TestSpawnOutsideScopeFiresE0405(t *testing.T) {
 	src := `func main() {
   spawn { return Ok(()) }
