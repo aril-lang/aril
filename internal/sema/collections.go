@@ -684,15 +684,16 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 	if c.satisfiesInterface(want, got) {
 		return true
 	}
-	// Covariant Option/Result payloads: an `Option<Sq>` / `Result<_, MyErr>`
-	// from a `Some(...)` / `Err(...)` constructor fits an annotated
-	// `Option<Shape>` / `Result<_, error>` when the payload class conforms to
-	// the expected interface / `error`. A constructor-inferred value carries a
-	// concrete payload, so raw structural `equal` (types.go) would reject a
-	// conforming-but-not-identical payload — Go's own assignability accepts the
-	// lowered `ResultErr(MyErr{…})` at a `Result[_, error]` position, so sema
-	// must too (T-Variant-Payload covariance).
-	if c.sumPayloadConforms(want, got) {
+	// Covariant Option/Result payloads: a `Some(...)` / `Ok(...)` / `Err(...)`
+	// constructor fits an annotated `Option<Shape>` / `Result<_, error>` /
+	// `Option<int64>` when the payload conforms to the expected type. A
+	// constructor-inferred value carries a concrete payload, so raw structural
+	// `equal` (types.go) would reject a conforming-but-not-identical payload —
+	// Go's own assignability accepts the lowered `ResultErr(MyErr{…})` at a
+	// `Result[_, error]` position, so sema must too (T-Variant-Payload
+	// covariance). Recursing on the constructor's arg expr also picks up
+	// sized-int-literal narrowing (`Some(5)` @ `Option<int64>`).
+	if c.constructorPayloadFits(want, e, got) {
 		return true
 	}
 	if intLiteralAdaptsTo(want, e) {
@@ -717,12 +718,57 @@ func (c *checker) fits(want Type, e ast.Expr, got Type) bool {
 	return false
 }
 
+// constructorPayloadFits admits a variant constructor at an annotated
+// Option/Result position: `Some(a)` / `Ok(a)` / `Err(a)` fits when the payload
+// arg conforms to the target payload type. When the constructor is directly
+// visible, recursing `fits` on the arg *expr* covers sized-int-literal
+// narrowing (`Some(5)` @ `Option<int64>`) and interface conformance that a
+// type-only check can't; a non-constructor value (a stored/returned
+// Option/Result) falls back to the type-only sumPayloadConforms.
+func (c *checker) constructorPayloadFits(want Type, e ast.Expr, got Type) bool {
+	if call, ok := unparen(e).(*ast.Call); ok {
+		if id, ok := call.Callee.(*ast.Ident); ok && len(call.Args) == 1 {
+			switch id.Name {
+			case "Some":
+				if w, ok := want.(*Option); ok {
+					if _, ok := got.(*Option); ok {
+						return c.payloadArgFits(w.T, call.Args[0])
+					}
+				}
+			case "Ok":
+				if w, ok := want.(*Result); ok {
+					if _, ok := got.(*Result); ok {
+						return c.payloadArgFits(w.T, call.Args[0])
+					}
+				}
+			case "Err":
+				if w, ok := want.(*Result); ok {
+					if _, ok := got.(*Result); ok {
+						return c.payloadArgFits(w.E, call.Args[0])
+					}
+				}
+			}
+		}
+	}
+	return c.sumPayloadConforms(want, got)
+}
+
+// payloadArgFits reports whether a constructor payload arg fits `want`: `fits`
+// on the arg expr (int-literal narrowing, interface satisfaction, nested sums),
+// plus the class→`error` boundary (D43) that `fits` itself does not cover.
+func (c *checker) payloadArgFits(want Type, arg ast.Expr) bool {
+	got := c.info.Type[arg]
+	if c.fits(want, arg, got) {
+		return true
+	}
+	return isErrorBuiltin(want) && classConformsToError(got)
+}
+
 // sumPayloadConforms reports whether `got` fits `want` when both are the same
 // sum kind (Option/Result) by covariant payload conformance — the component
 // check the flat structural `equal` (types.go) skips. Result checks both T and
-// E. Used only in the `fits` fall-through (a constructor-inferred receiver now
-// carries a concrete payload; before this epoch the whole constructor call was
-// Unknown and `fits` abstained).
+// E. The type-only fallback for a non-constructor value (constructorPayloadFits
+// handles the directly-visible constructor).
 func (c *checker) sumPayloadConforms(want, got Type) bool {
 	switch w := want.(type) {
 	case *Option:

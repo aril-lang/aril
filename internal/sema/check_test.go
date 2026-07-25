@@ -1899,6 +1899,26 @@ func main() { let r = f() }
 	if codes := runCheck(t, badCase); !contains(codes, "E0203") {
 		t.Errorf("expected E0203 for a non-conforming Err payload, got %v", codes)
 	}
+	// Sized-int-literal narrowing reaches into the payload: `Some(5)` fits
+	// `Option<int64>` (the constructor arg expr is threaded through `fits`).
+	sizedCase := `import fmt
+func f(): Option<int64> { return Some(5) }
+func g(): Result<int64, error> { return Ok(7) }
+func main() {
+  let o: Option<int64> = Some(3)
+  fmt.println(f().isSome(), g().isOk(), o.unwrapOr(0))
+}
+`
+	if codes := runCheck(t, sizedCase); len(codes) != 0 {
+		t.Errorf("expected clean (sized-int payload literal narrowing), got %v", codes)
+	}
+	// An out-of-range payload literal still fires E0204 through the payload.
+	rangeCase := `func f(): Option<int8> { return Some(99999) }
+func main() { let r = f() }
+`
+	if codes := runCheck(t, rangeCase); !contains(codes, "E0204") {
+		t.Errorf("expected E0204 for an out-of-range payload literal, got %v", codes)
+	}
 }
 
 func TestSpawnReturnDoesNotPolluteEnclosingClosureAcc(t *testing.T) {
