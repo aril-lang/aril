@@ -64,6 +64,7 @@ Go, which has no sum types.
 | `error_chain` | error chaining with `Result` + `.mapErr` boundary conversion |
 | `errors_as_types` | errors modelled as sum-typed values |
 | `option_result_map` | `Option.map` / `Result.map` — transform the `Some`/`Ok` payload, `None`/`Err` flows through (the Ok-side mirror of `.mapErr`) |
+| `option_constructor_defaults` | constructor-inferred `Option` receivers — `isSome`/`isNone`/`unwrapOr`/`map` resolve on a value typed straight from a `Some(...)`/`None` constructor (no annotation/signature); a load-bearing clamp-and-default contract |
 
 ## `stdlib-binding/` — typed bindings over the Go standard library
 

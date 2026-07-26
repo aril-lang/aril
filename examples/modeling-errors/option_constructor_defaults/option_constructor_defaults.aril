@@ -1,0 +1,75 @@
+// Constructor-inferred Option receivers — the total Option methods
+// (`isSome`/`isNone`/`unwrapOr`/`map`) resolve on a value whose type comes
+// STRAIGHT from a `Some(...)` / `None` constructor (no annotation, no
+// signature), exactly as they do on a `.get()` / `atoi` / typed-return
+// receiver. This is the regression guard for the D57 leak where such a
+// receiver emitted a raw lowercase `.unwrapOr` (undefined Go method) instead
+// of the arilrt `UnwrapOr` — `Some(5).unwrapOr(0)`, the first thing a
+// newcomer writes, used to fail `go build` (builtins.md §Option methods).
+import fmt
+
+// clamp keeps a reading inside [lo, hi]; an out-of-range reading is absent
+// (`None`), so a caller substitutes a floor with `.unwrapOr`. The Option is
+// BUILT from a `Some`/`None` constructor here and queried at the call site.
+func clamp(x: int, lo: int, hi: int): Option<int> {
+  if x < lo || x > hi {
+    return None
+  }
+  return Some(x)
+}
+
+// clampAll normalizes a run of raw readings: each out-of-range reading defaults
+// to `floor`. The clamped Option is defaulted with `.unwrapOr(floor)`.
+func clampAll(raws: []int, lo: int, hi: int, floor: int): List<int> {
+  let out = List<int>{}
+  for r in raws {
+    out.push(clamp(r, lo, hi).unwrapOr(floor))
+  }
+  return out
+}
+
+// allInRange reports whether every element sits in [lo, hi] — the contract's
+// soundness half (an unclamped reading would violate it).
+func allInRange(xs: List<int>, lo: int, hi: int): bool {
+  for x in xs {
+    if x < lo || x > hi {
+      return false
+    }
+  }
+  return true
+}
+
+// Load-bearing contract: every normalized reading lands in [min(lo, floor),
+// max(hi, floor)] (soundness — a forgotten clamp lets a raw 200 or -5 through
+// and fails it) and the count is preserved (completeness — rules out an
+// under-generating fold).
+contract clampAll {
+  ensures result.len() == raws.len()
+  ensures allInRange(result, min(lo, floor), max(hi, floor))
+}
+
+func main() {
+  // A value whose type is inferred straight from `Some(...)` — no annotation,
+  // no signature — still resolves the total Option methods.
+  let reading = Some(42)
+  fmt.println(reading.isSome(), reading.isNone(), reading.unwrapOr(0))
+
+  // A bare constructor literal as the receiver, including a `.map` step.
+  fmt.println(Some(7).map((n) => n * 2).unwrapOr(-1))
+
+  // `None` from a constructor-returning function, defaulted.
+  fmt.println(clamp(150, 0, 100).unwrapOr(-1))
+
+  let raws = [50, 200, 30, -5, 99]
+  let normalized = clampAll(raws, 0, 100, 0)
+  fmt.println("normalized", normalized, "sum", sum(normalized))
+}
+
+// sum totals a List<int> — used to print a stable, checkable scalar.
+func sum(xs: List<int>): int {
+  var total = 0
+  for x in xs {
+    total = total + x
+  }
+  return total
+}
