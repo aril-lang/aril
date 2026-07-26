@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 101 / 101 examples build end-to-end** (floor 101).
+- **build_ok — 102 / 102 examples build end-to-end** (floor 102).
 - **diag_ok — 124 / 124 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 101 / 101 run-pass examples build and run as specified** (floor 101; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 102 / 102 run-pass examples build and run as specified** (floor 102; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 101 |
+| ✅ build (full pipeline) | 102 |
 | emit / codegen fail | 0 |
 | sema fail | 0 |
 | parse fail | 0 |
@@ -93,6 +93,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/modeling-errors/option_constructor_defaults/option_constructor_defaults.aril` | build | — |
 | `examples/modeling-errors/option_result_map/option_result_map.aril` | build | — |
 | `examples/modeling-errors/parse_int/parse_int.aril` | build | — |
+| `examples/modeling-errors/result_closure_checks/result_closure_checks.aril` | build | — |
 | `examples/modeling-errors/rpn_calculator/rpn_calculator.aril` | build | — |
 | `examples/modeling-errors/safe_divide/safe_divide.aril` | build | — |
 | `examples/modeling-errors/vending_machine/vending_machine.aril` | build | — |
@@ -134,7 +135,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**0 of 101 run-pass examples fall short of run_ok.**
+**0 of 102 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

@@ -1,0 +1,77 @@
+--- TITLE ---
+Closure result type inferred from the call parameter — a `Result<unit, string>`
+body with `try`; the closure is its own try frame (CLOSURE-INFERENCE)
+
+--- INPUT ---
+import fmt
+
+func want(cond: bool, msg: string): Result<unit, string> {
+  if !cond { return Err(msg) }
+  return Ok(())
+}
+
+func run(check: (int) => Result<unit, string>, n: int): bool {
+  match check(n) {
+    Ok(_) => { return true },
+    Err(_) => { return false },
+  }
+}
+
+func main() {
+  let ok = run((n) => {
+    try want(n > 0, "positive")
+    return Ok(())
+  }, 5)
+  fmt.println(ok)
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+type Result[T any, E any] struct {
+	Tag uint8
+	V   T
+	E   E
+}
+
+func ResultOk[T any, E any](value T) Result[T, E] {
+	return Result[T, E]{Tag: 0, V: value}
+}
+func ResultErr[T any, E any](err E) Result[T, E] {
+	return Result[T, E]{Tag: 1, E: err}
+}
+func (r Result[T, E]) String() string {
+	if r.Tag == 0 {
+		return fmt.Sprintf("Ok(%v)", r.V)
+	}
+	return fmt.Sprintf("Err(%v)", r.E)
+}
+func want(cond bool, msg string) Result[struct{}, string] {
+	if !cond {
+		return ResultErr[struct{}, string](msg)
+	}
+	return ResultOk[struct{}, string](struct{}{})
+}
+func run(check func(int) Result[struct{}, string], n int) bool {
+	__aril_match_1 := check(n)
+	switch __aril_match_1.Tag {
+	case 0:
+		return true
+	case 1:
+		return false
+	}
+	panic("unreachable: non-exhaustive match")
+}
+func main() {
+	var ok = run(func(n int) Result[struct{}, string] {
+		__aril_try_1 := want(n > 0, "positive")
+		if __aril_try_1.Tag == 1 {
+			return Result[struct{}, string]{Tag: 1, E: __aril_try_1.E}
+		}
+		return ResultOk[struct{}, string](struct{}{})
+	}, 5)
+	fmt.Println(ok)
+}

@@ -179,6 +179,15 @@ func (c *checker) inferClosure(cl *ast.ClosureLit) Type {
 		c.curReturn = ret
 		c.curTryForbidden = c.definitelyNotTryable(cl.ReturnType)
 		c.returnAcc = nil // annotated: the type is fixed, don't accumulate
+	} else if expect != nil && expect.Return != nil && concrete(expect.Return) {
+		// Bidirectional (T-Closure): adopt the expected result type so the
+		// body's `return Ok(())` constrains its E; a mismatch still fires E0203.
+		ret = expect.Return
+		c.curReturn = ret
+		_, isRes := expect.Return.(*Result)
+		_, isOpt := expect.Return.(*Option)
+		c.curTryForbidden = !(isRes || isOpt)
+		c.returnAcc = nil
 	} else {
 		c.curReturn = &Unknown{}
 		c.curTryForbidden = false
@@ -198,6 +207,41 @@ func (c *checker) inferClosure(cl *ast.ClosureLit) Type {
 		}
 	}
 	return &Func{Params: params, Return: ret}
+}
+
+// seedClosureArgExpect gives each closure argument the expected Func signature
+// of its parameter so its params/return infer from context (T-Closure
+// bidirectional) without annotations. Concrete Ident callee only — a generic
+// param's real type needs the args first (instantiation).
+func (c *checker) seedClosureArgExpect(call *ast.Call) {
+	id, ok := call.Callee.(*ast.Ident)
+	if !ok {
+		return
+	}
+	sym := c.info.Symbol[id]
+	if sym == nil {
+		return
+	}
+	fn, ok := sym.Type.(*Func)
+	if !ok || len(fn.TypeParams) > 0 {
+		return
+	}
+	for i, a := range call.Args {
+		if i >= len(fn.Params) {
+			break
+		}
+		cl, ok := a.(*ast.ClosureLit)
+		if !ok {
+			continue
+		}
+		pf, ok := fn.Params[i].(*Func)
+		if !ok {
+			continue
+		}
+		if _, exists := c.closureExpect[cl]; !exists {
+			c.closureExpect[cl] = pf
+		}
+	}
 }
 
 // inferScope types a `scope<T, E>(parent?) { body }` expression as
@@ -608,6 +652,12 @@ func (c *checker) inferCall(call *ast.Call) Type {
 	if c.isMapArityMiss(call) {
 		c.report("E0202", "Wrong arity in call to map: expects 1 argument (a mapper `(x) => ...`), got "+strconv.Itoa(len(call.Args)), call.Span)
 	}
+	// Pre-seed the expected Func signature for any closure argument whose
+	// parameter type is a concrete function type, so its params + return type
+	// infer from context (T-Closure bidirectional) rather than requiring
+	// annotations. Non-generic Ident callee only — a generic param's real type
+	// is not known until instantiation (a later enhancement).
+	c.seedClosureArgExpect(call)
 	args := make([]Type, len(call.Args))
 	for i, a := range call.Args {
 		args[i] = c.inferExpr(a)

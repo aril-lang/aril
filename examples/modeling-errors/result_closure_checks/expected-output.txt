@@ -1,0 +1,3 @@
+reject -3 - not positive
+reject 150 - too large
+rejected: 2

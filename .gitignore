@@ -35,3 +35,8 @@ __pycache__/
 /spec-gaps.md
 /audit-report.md
 /epoch-history.md
+
+# Sibling library repos checked out (or symlinked) under here for one-workspace
+# ergonomics. Each is its own independent repo — the compiler repo never tracks
+# them (that would invert the dependency direction).
+/sub-projects/

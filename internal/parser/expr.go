@@ -628,10 +628,56 @@ func (p *parser) couldBeShortClosure() bool {
 					if n.Kind == lexer.KindNewline {
 						continue
 					}
-					return n.Kind == lexer.KindOp && n.Lexeme == "=>"
+					if n.Kind == lexer.KindOp && n.Lexeme == "=>" {
+						return true // `) =>`
+					}
+					// `) : Ret =>` — an explicit return annotation. Confirm the
+					// `=>` follows the type; bare `):` is also a slice bound
+					// (`xs[(i):]`), which never reaches `=>`.
+					if n.Kind == lexer.KindPunct && n.Lexeme == ":" {
+						return p.arrowFollowsType(j + 1)
+					}
+					return false
 				}
 				return false
 			}
+		}
+	}
+	return false
+}
+
+// arrowFollowsType reports whether a closure `=>` follows the return-type that
+// starts at toks[start] — scanning past a `TypeExpr` (tracking `()[]<>` nesting)
+// to a depth-0 `=>`. A depth-0 closer / separator (`] ) , ; { }`) first means
+// this `):` was a slice bound or other context, not a closure header.
+func (p *parser) arrowFollowsType(start int) bool {
+	depth := 0
+	for k := start; k < len(p.toks); k++ {
+		t := p.toks[k]
+		switch {
+		case t.Kind == lexer.KindOp && t.Lexeme == "=>":
+			if depth == 0 {
+				return true
+			}
+		case t.Kind == lexer.KindPunct && (t.Lexeme == "(" || t.Lexeme == "["):
+			depth++
+		case t.Kind == lexer.KindOp && t.Lexeme == "<":
+			depth++
+		case t.Kind == lexer.KindPunct && (t.Lexeme == ")" || t.Lexeme == "]"):
+			if depth == 0 {
+				return false
+			}
+			depth--
+		case t.Kind == lexer.KindOp && t.Lexeme == ">":
+			if depth > 0 {
+				depth--
+			}
+		case t.Kind == lexer.KindPunct && (t.Lexeme == "," || t.Lexeme == ";" || t.Lexeme == "{" || t.Lexeme == "}"):
+			if depth == 0 {
+				return false
+			}
+		case t.Kind == lexer.KindEOF:
+			return false
 		}
 	}
 	return false
@@ -675,6 +721,16 @@ func (p *parser) parseShortClosure() (*ast.ClosureLit, *Diag) {
 	if _, err := p.expect(lexer.KindPunct, ")"); err != nil {
 		return nil, err
 	}
+	var retType ast.TypeExpr
+	if p.at(lexer.KindPunct, ":") {
+		p.advance()
+		p.skipNewlines()
+		rt, rerr := p.parseTypeExpr()
+		if rerr != nil {
+			return nil, rerr
+		}
+		retType = rt
+	}
 	if _, err := p.expect(lexer.KindOp, "=>"); err != nil {
 		return nil, err
 	}
@@ -688,9 +744,10 @@ func (p *parser) parseShortClosure() (*ast.ClosureLit, *Diag) {
 			StartLine: open.Line, StartCol: open.Col,
 			EndLine: body.NodeSpan().EndLine, EndCol: body.NodeSpan().EndCol,
 		},
-		Params: params,
-		Body:   bodyBlock,
-		Short:  true,
+		Params:     params,
+		ReturnType: retType,
+		Body:       bodyBlock,
+		Short:      true,
 	}, nil
 }
 

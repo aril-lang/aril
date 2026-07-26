@@ -1,0 +1,31 @@
+--- TITLE ---
+Parenthesized slice bounds `xs[(i):]`, `xs[(i):(j)]` — a `):` that is NOT a
+closure return annotation; the short-closure peek must not misfire on it
+(CLOSURE-INFERENCE regression guard)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let xs = [10, 20, 30, 40]
+  let i = 1
+  let j = 3
+  fmt.println(xs[(i):])
+  fmt.println(xs[(i):(j)])
+  fmt.println(xs[(i + 0):])
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func main() {
+	var xs = []int{10, 20, 30, 40}
+	var i = 1
+	var j = 3
+	fmt.Println(xs[(i):])
+	fmt.Println(xs[(i):(j)])
+	fmt.Println(xs[(i + 0):])
+}
