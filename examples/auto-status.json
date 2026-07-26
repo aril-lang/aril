@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 101,
+    "total": 102,
     "parse_fail": 0,
     "sema_fail": 0,
     "emit_fail": 0,
-    "build_ok": 101,
+    "build_ok": 102,
     "diag_ok": 124,
     "diag_total": 124,
-    "run_ok": 101,
-    "run_total": 101
+    "run_ok": 102,
+    "run_total": 102
   },
   "files": [
     {
@@ -379,6 +379,11 @@
     },
     {
       "path": "examples/modeling-errors/parse_int/parse_int.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/modeling-errors/result_closure_checks/result_closure_checks.aril",
       "stage": "build",
       "blocker": ""
     },

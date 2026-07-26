@@ -213,22 +213,33 @@ func (g *gen) emitTryPreamble(t *ast.TryExpr) (string, error) {
 	if g.curFuncReturn == nil {
 		return "", fmt.Errorf("codegen: `try` outside a function that returns Result/Option")
 	}
-	ret, ok := g.curFuncReturn.(*ast.NamedType)
-	if !ok || len(ret.QName) != 1 {
+	nt, ok := g.curFuncReturn.(*ast.NamedType)
+	if !ok || len(nt.QName) != 1 {
 		return "", fmt.Errorf("codegen: `try` requires the enclosing function's return type to be Result/Option, got %T", g.curFuncReturn)
 	}
-	var bailTag int
-	switch ret.QName[0] {
-	case "Result":
-		bailTag = 1 // Err
-	case "Option":
-		bailTag = 0 // None
-	default:
-		return "", fmt.Errorf("codegen: `try` requires the enclosing function's return type to be Result/Option, got %s", ret.QName[0])
+	bailTag, isResult, ok := bailKind(nt.QName[0])
+	if !ok {
+		return "", fmt.Errorf("codegen: `try` requires the enclosing function's return type to be Result/Option, got %s", nt.QName[0])
 	}
-	// A `try` nested in this try's inner expr (`try f(try g())`) is
-	// hoisted first, so its early-return preamble precedes the
-	// `tmp := <inner>` line below — when reordering is safe.
+	return g.emitTryBail(t, bailTag, isResult, func() error { return g.emitTypeExpr(nt) })
+}
+
+// bailKind maps a Result/Option type-name to its bail tag (Err=1 / None=0).
+func bailKind(name string) (tag int, isResult, ok bool) {
+	switch name {
+	case "Result":
+		return 1, true, true
+	case "Option":
+		return 0, false, true
+	}
+	return 0, false, false
+}
+
+// emitTryBail writes the shared `tmp := inner; if tmp.Tag == bail { return … }`
+// preamble; emitRet writes the frame's Go return type (AST or sema source).
+func (g *gen) emitTryBail(t *ast.TryExpr, bailTag int, isResult bool, emitRet func() error) (string, error) {
+	// A nested `try` in the inner expr is hoisted first (when safe) so its
+	// early-return precedes the `tmp :=` line below.
 	if err := g.hoistTriesIfSafe(t.Inner); err != nil {
 		return "", err
 	}
@@ -251,13 +262,13 @@ func (g *gen) emitTryPreamble(t *ast.TryExpr) (string, error) {
 	g.indent++
 	g.writeIndent()
 	g.b.WriteString("return ")
-	if err := g.emitTypeExpr(ret); err != nil {
+	if err := emitRet(); err != nil {
 		return "", err
 	}
 	g.b.WriteByte('{')
 	g.b.WriteString("Tag: ")
 	g.b.WriteString(strconv.Itoa(bailTag))
-	if ret.QName[0] == "Result" {
+	if isResult {
 		g.b.WriteString(", E: ")
 		g.b.WriteString(tmp)
 		g.b.WriteString(".E")

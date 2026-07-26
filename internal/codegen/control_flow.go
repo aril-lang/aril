@@ -588,6 +588,22 @@ func (g *gen) emitClosure(cl *ast.ClosureLit) error {
 	if cl.Short && !hasReturn && !isUnit {
 		return fmt.Errorf("codegen: cannot infer closure result type — annotate the return (`(…): R => …`)")
 	}
+	// The closure is its own frame: rebuild its return type as an AST TypeExpr
+	// (annotation, else synthesized from sema) so return-position lowering —
+	// `try` bail shape, Ok/Err type-args — uses it, not the enclosing function's.
+	var closureRet ast.TypeExpr
+	if cl.ReturnType != nil {
+		closureRet = cl.ReturnType
+	} else if g.info != nil {
+		if fn, ok := g.info.Type[cl].(*sema.Func); ok && fn.Return != nil {
+			if at, ok := semaTypeToAST(fn.Return); ok {
+				closureRet = at
+			}
+		}
+	}
+	savedRet := g.curFuncReturn
+	g.curFuncReturn = closureRet
+	defer func() { g.curFuncReturn = savedRet }()
 	g.b.WriteString(" {\n")
 	g.indent++
 	if cl.Short {

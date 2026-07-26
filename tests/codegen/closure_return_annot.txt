@@ -1,0 +1,24 @@
+--- TITLE ---
+Short-closure return annotation `(params): R => body` — the explicit escape
+hatch the inference hint promises now parses (CLOSURE-INFERENCE)
+
+--- INPUT ---
+import fmt
+
+func main() {
+  let eq = (a: int, b: int): bool => a == b
+  fmt.println(eq(3, 3))
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func main() {
+	var eq = func(a int, b int) bool {
+		return a == b
+	}
+	fmt.Println(eq(3, 3))
+}

@@ -628,7 +628,9 @@ func (p *parser) couldBeShortClosure() bool {
 					if n.Kind == lexer.KindNewline {
 						continue
 					}
-					return n.Kind == lexer.KindOp && n.Lexeme == "=>"
+					// `) =>` or the return-annotated `) : Ret =>`.
+					return (n.Kind == lexer.KindOp && n.Lexeme == "=>") ||
+						(n.Kind == lexer.KindPunct && n.Lexeme == ":")
 				}
 				return false
 			}
@@ -675,6 +677,16 @@ func (p *parser) parseShortClosure() (*ast.ClosureLit, *Diag) {
 	if _, err := p.expect(lexer.KindPunct, ")"); err != nil {
 		return nil, err
 	}
+	var retType ast.TypeExpr
+	if p.at(lexer.KindPunct, ":") {
+		p.advance()
+		p.skipNewlines()
+		rt, rerr := p.parseTypeExpr()
+		if rerr != nil {
+			return nil, rerr
+		}
+		retType = rt
+	}
 	if _, err := p.expect(lexer.KindOp, "=>"); err != nil {
 		return nil, err
 	}
@@ -688,9 +700,10 @@ func (p *parser) parseShortClosure() (*ast.ClosureLit, *Diag) {
 			StartLine: open.Line, StartCol: open.Col,
 			EndLine: body.NodeSpan().EndLine, EndCol: body.NodeSpan().EndCol,
 		},
-		Params: params,
-		Body:   bodyBlock,
-		Short:  true,
+		Params:     params,
+		ReturnType: retType,
+		Body:       bodyBlock,
+		Short:      true,
 	}, nil
 }
 
