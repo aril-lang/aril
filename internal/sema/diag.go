@@ -5,11 +5,8 @@ import (
 	"sort"
 )
 
-// Severity classifies a Diag as a blocking error or a non-blocking hint.
-// The zero value is SeverityError, so every diagnostic built without an
-// explicit severity (all E-code diagnostics) stays a blocking error — the
-// hint tier is strictly additive (D58). A hint never fails the build or
-// changes the exit code; it teaches just-in-time.
+// Severity splits blocking errors from non-blocking hints; the zero value is
+// SeverityError, so every E-code stays blocking (diagnostics.md §Severity, D58).
 type Severity uint8
 
 const (

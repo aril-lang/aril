@@ -90,6 +90,9 @@ type checker struct {
 	curSpawnFrame   bool // body is a spawn body — a Result<unit, error> frame (E0408)
 	loopDepth       int  // enclosing for/while nesting — 0 ⇒ break/continue illegal (E0404)
 	scopeDepth      int  // enclosing `scope` nesting — 0 ⇒ spawn illegal (E0405)
+	// inAssignTarget: inferring an assignment LValue (a store, not a could-miss
+	// read) — silences the H0002 bare-`m[k]` hint (diagnostics.md H0002).
+	inAssignTarget bool
 	// invariantResolve: resolving a loop-invariant predicate — its refs
 	// must not count toward Used (lowering-go.md §MatchIR exemptions).
 	invariantResolve bool
@@ -148,9 +151,8 @@ func (c *checker) report(code, message string, span ast.Span) {
 	})
 }
 
-// hint records a non-blocking teaching note (D58). Unlike report, the
-// diagnostic carries SeverityHint, so the CLI prints it (unless hints are
-// suppressed) but never fails the build on it. Hint codes are H-prefixed.
+// hint records a non-blocking teaching note (SeverityHint, H-prefixed) — never
+// fails the build (diagnostics.md §Severity, D58).
 func (c *checker) hint(code, message string, span ast.Span) {
 	c.diags = append(c.diags, &Diag{
 		File:     c.file,

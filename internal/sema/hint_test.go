@@ -146,6 +146,105 @@ func main() { let _ = wrap() }`},
 	}
 }
 
+const mapClassPrelude = `class Node {
+	var v: int
+	new(v: int) { this.v = v }
+}
+`
+
+// TestBareMapClassReadHintFires: a bare `m[k]` read on a class-valued map hints
+// (H0002, D58 / AUDIT-3 T13); the hint is non-blocking.
+func TestBareMapClassReadHintFires(t *testing.T) {
+	src := mapClassPrelude + `func main() {
+	let m = Map<string, Node>{}
+	m["a"] = Node(1)
+	let n = m["a"]
+	let _ = n
+}`
+	diags := runCheckHintDiags(t, src)
+	if got := countHint(diags, "H0002"); got != 1 {
+		t.Fatalf("expected exactly one H0002 hint, got %d (%v)", got, diags)
+	}
+	if anyBlocking(diags) {
+		t.Fatalf("H0002 must not be accompanied by a blocking error: %v", diags)
+	}
+}
+
+// TestBareMapRecordWithClassFieldHintFires: a record transitively containing a
+// class field has no safe default either, so its bare read hints (H0002).
+func TestBareMapRecordWithClassFieldHintFires(t *testing.T) {
+	src := mapClassPrelude + `type Wrap = { n: Node }
+func main() {
+	let m = Map<string, Wrap>{}
+	let w = m["a"]
+	let _ = w
+}`
+	diags := runCheckHintDiags(t, src)
+	if got := countHint(diags, "H0002"); got != 1 {
+		t.Fatalf("expected one H0002 hint on a record-with-class-field read, got %d (%v)", got, diags)
+	}
+}
+
+// TestBareMapClassReadOnAssignRHSHints guards the inAssignTarget save/restore:
+// a class-map read on an assignment's right-hand side is a real read miss and
+// must still hint (the LValue's inAssignTarget must not leak into the RHS).
+func TestBareMapClassReadOnAssignRHSHints(t *testing.T) {
+	src := mapClassPrelude + `func main() {
+	let m = Map<string, Node>{}
+	var out = Node(0)
+	out = m["a"]
+	let _ = out
+}`
+	diags := runCheckHintDiags(t, src)
+	if got := countHint(diags, "H0002"); got != 1 {
+		t.Fatalf("expected one H0002 hint on the RHS class-map read, got %d (%v)", got, diags)
+	}
+}
+
+// TestBareMapClassReadHintSilent: a store target, a `.get(k)`, a scalar-valued
+// map read, and a container-valued map read (defaulted to empty by R1) do not
+// hint.
+func TestBareMapClassReadHintSilent(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"store target", mapClassPrelude + `func main() {
+	let m = Map<string, Node>{}
+	m["a"] = Node(1)
+}`},
+		{"safe .get form", mapClassPrelude + `func main() {
+	let m = Map<string, Node>{}
+	let n = m.get("a")
+	let _ = n
+}`},
+		{"scalar value", `func main() {
+	let m = Map<string, int>{}
+	m["a"] = 1
+	let n = m["a"]
+	let _ = n
+}`},
+		{"container value (R1 empty default)", `func main() {
+	let m = Map<string, List<int>>{}
+	let xs = m["a"]
+	let _ = xs
+}`},
+		{"key-type mismatch suppresses the hint", mapClassPrelude + `func main() {
+	let m = Map<string, Node>{}
+	let n = m[42]
+	let _ = n
+}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := runCheckHintDiags(t, tc.src)
+			if got := countHint(diags, "H0002"); got != 0 {
+				t.Fatalf("expected no H0002 hint, got %d (%v)", got, diags)
+			}
+		})
+	}
+}
+
 // TestHintSeverityRenders: the hint renders with a `hint[...]` prefix, not
 // `error[...]`, so the CLI can tell it apart (D58).
 func TestHintSeverityRenders(t *testing.T) {
