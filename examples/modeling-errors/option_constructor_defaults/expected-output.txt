@@ -1,0 +1,4 @@
+true false 42
+14
+-1
+normalized [50, 0, 30, 0, 99] sum 179

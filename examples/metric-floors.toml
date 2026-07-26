@@ -20,7 +20,11 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 100  # current build_ok; strict ratchet (raised 99→100 in the
+build_ok_min = 101  # current build_ok; strict ratchet (raised 100→101 in the
+                    # OPTION-METHOD-RECEIVER follow-on — option_constructor_defaults,
+                    # the live regression guard for the D57 fix: an Option method on
+                    # a value typed straight from a Some(...)/None constructor now
+                    # builds instead of leaking raw Go); prior 99→100 in the
                     # NIL-SAFETY+DIAG-CLEANUP follow-on — graph_bfs, the live
                     # regression guard for the R1/R2 container fixes: T2 omitted
                     # Map field, bug#3 uninit List var, T13 bare Map<int,List>
@@ -37,7 +41,11 @@ diag_ok_min  = 116  # headroom below current diag_ok (124/124) so an individual
                     # the CORPUS-POLISH close — the E0112 humanizer closed the whole
                     # token-spelling backlog, diag_ok 98→121; ~5 slack for future
                     # negative fixtures that don't immediately hit their ideal)
-run_ok_min   = 100  # current run_ok; strict ratchet (raised 99→100 in the
+run_ok_min   = 101  # current run_ok; strict ratchet (raised 100→101 in the
+                    # OPTION-METHOD-RECEIVER follow-on — option_constructor_defaults
+                    # runs and its clamp-and-default contract holds under
+                    # --contracts=panic, exercising constructor-inferred Option
+                    # method resolution end-to-end); prior 99→100 in the
                     # NIL-SAFETY+DIAG-CLEANUP follow-on — graph_bfs runs, exercising
                     # the R1/R2 container fixes end-to-end); prior 98→99 in
                     # CONTAINER-MODEL — list_demo runs, exercising List<T> mutate-in-

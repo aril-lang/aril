@@ -1,0 +1,10 @@
+description = "Constructor-inferred Option receivers: the total Option methods (isSome/isNone/unwrapOr/map) resolve on a value typed straight from a Some(...)/None constructor — regression guard for the D57 leak"
+source   = "R5 OPTION-METHOD-RECEIVER follow-on (constructor-inferred receiver corpus guard)"
+category = "modeling-errors"
+showcase = false
+forces   = []
+since    = "0.25"
+status   = "running"
+expects  = "run-pass"
+entry    = "option_constructor_defaults.aril"
+expected_output = "expected-output.txt"

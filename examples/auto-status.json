@@ -1,15 +1,15 @@
 {
   "schema_version": 3,
   "totals": {
-    "total": 100,
+    "total": 101,
     "parse_fail": 0,
     "sema_fail": 0,
     "emit_fail": 0,
-    "build_ok": 100,
+    "build_ok": 101,
     "diag_ok": 124,
     "diag_total": 124,
-    "run_ok": 100,
-    "run_total": 100
+    "run_ok": 101,
+    "run_total": 101
   },
   "files": [
     {
@@ -364,6 +364,11 @@
     },
     {
       "path": "examples/modeling-errors/errors_as_types/errors_as_types.aril",
+      "stage": "build",
+      "blocker": ""
+    },
+    {
+      "path": "examples/modeling-errors/option_constructor_defaults/option_constructor_defaults.aril",
       "stage": "build",
       "blocker": ""
     },
