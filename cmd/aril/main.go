@@ -102,8 +102,9 @@ func cmdEmit(args []string) int {
 	noLine := fs.Bool("no-line", false, "strip //line directives from the lowered Go (for human reading)")
 	vendor := fs.Bool("vendor-runtime", false, "emit `import .../arilrt` + arilrt.X instead of inlining the runtime (not self-contained)")
 	contracts := addContractsFlag(fs)
+	hints := addHintsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] [-vendor-runtime] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril emit [-no-line] [-vendor-runtime] [-contracts=<mode>] [-hints=<on|off>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -113,11 +114,15 @@ func cmdEmit(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	if err := checkHintsMode(*hints); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "aril emit: expected exactly one <file.aril>")
 		return 2
 	}
-	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine, *vendor, *contracts)
+	goSrc, err := emitGoSourceOpts(fs.Arg(0), *noLine, *vendor, *contracts, resolveHintPolicy(*hints))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -179,14 +184,19 @@ func cmdBuild(args []string) int {
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	race := fs.Bool("race", false, "build with Go's race detector so a data race across `spawn` is reported at runtime (needs a C toolchain)")
 	contracts := addContractsFlag(fs)
+	hints := addHintsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril build [-o <path>] [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] [-hints=<on|off>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if err := checkContractsMode(*contracts); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if err := checkHintsMode(*hints); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
@@ -212,7 +222,7 @@ func cmdBuild(args []string) int {
 		return 1
 	}
 	defer release()
-	src, err := compileToProjectGo(srcPath, !*inlineRT, *contracts, outDir)
+	src, err := compileToProjectGo(srcPath, !*inlineRT, *contracts, outDir, resolveHintPolicy(*hints))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -291,7 +301,7 @@ func gatherSources(path string) ([]string, error) {
 // generated Go source string. Used by cmdEmit and (indirectly via
 // compileToTempGo) by build / run.
 func emitGoSource(path string) (string, error) {
-	return emitGoSourceOpts(path, false, false, "off")
+	return emitGoSourceOpts(path, false, false, "off", resolveHintPolicy(""))
 }
 
 // emitGoSourceOpts is the variant that takes the `no-line` flag —
@@ -300,12 +310,12 @@ func emitGoSource(path string) (string, error) {
 // Build / run keep them on so panic traces and `go vet` errors
 // still point at Aril source coordinates. `emit` does not require a
 // `func main` (it lowers any package for inspection); build / run do.
-func emitGoSourceOpts(path string, stripLine, vendored bool, contractMode string) (string, error) {
+func emitGoSourceOpts(path string, stripLine, vendored bool, contractMode string, hints hintPolicy) (string, error) {
 	files, userImports, _, _, err := buildUnit(path)
 	if err != nil {
 		return "", err
 	}
-	return compilePackage(files, userImports, stripLine, false, vendored, contractMode)
+	return compilePackage(files, userImports, stripLine, false, vendored, contractMode, hints)
 }
 
 // buildUnit resolves a build target into its full source-file set. It
@@ -379,7 +389,7 @@ func buildUnit(path string) ([]string, map[string]bool, []thirdPartyDep, string,
 // each file's real path; //line labels are suppressed when stripLine is
 // set. requireMain enforces exactly one `func main` across the package
 // (RFC-0002) — on for build / run, off for emit.
-func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain, vendored bool, contractMode string) (string, error) {
+func compilePackage(paths []string, userImports map[string]bool, stripLine, requireMain, vendored bool, contractMode string, hints hintPolicy) (string, error) {
 	trees := make([]*ast.File, len(paths))
 	labels := make([]string, len(paths))
 	for i, p := range paths {
@@ -423,10 +433,7 @@ func compilePackage(paths []string, userImports map[string]bool, stripLine, requ
 		trees[i] = tree
 	}
 	info, diags := sema.CheckFiles(trees, labels)
-	if len(diags) > 0 {
-		for _, d := range diags {
-			fmt.Fprintln(os.Stderr, d.Error())
-		}
+	if printDiags(diags, hints) {
 		return "", fmt.Errorf("aril: sema failed")
 	}
 	if requireMain {
@@ -471,7 +478,7 @@ func checkPackageMain(trees []*ast.File, paths []string) error {
 // emitGoFromText runs the lexer / parser / codegen pipeline over
 // an in-memory string. Used by REPL execution where the source
 // is synthesised between turns rather than read from disk.
-func emitGoFromText(src, file string) (string, error) {
+func emitGoFromText(src, file string, hints hintPolicy) (string, error) {
 	// Pass the path verbatim into diagnostics and //line
 	// directives. test-contract.md §File paths requires
 	// repo-relative paths so two files with the same basename
@@ -486,12 +493,8 @@ func emitGoFromText(src, file string) (string, error) {
 		return "", perr
 	}
 	info, diags := sema.Check(tree, file)
-	if len(diags) > 0 {
-		// Report all diags; return the first as the error so
-		// callers stop, after printing the full batch.
-		for _, d := range diags {
-			fmt.Fprintln(os.Stderr, d.Error())
-		}
+	if printDiags(diags, hints) {
+		// A blocking diagnostic was printed; stop after the full batch.
 		return "", fmt.Errorf("aril: sema failed")
 	}
 	goSrc, err := codegen.EmitWithInfo(tree, file, info)
@@ -508,14 +511,19 @@ func cmdRun(args []string) int {
 	inlineRT := fs.Bool("inline-runtime", false, "inline the runtime into the single main.go instead of vendoring the arilrt package")
 	race := fs.Bool("race", false, "build with Go's race detector so a data race across `spawn` is reported at runtime (needs a C toolchain)")
 	contracts := addContractsFlag(fs)
+	hints := addHintsFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: aril run [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] <file.aril | dir>")
+		fmt.Fprintln(os.Stderr, "usage: aril run [-out-dir <dir>] [-inline-runtime] [-race] [-contracts=<mode>] [-hints=<on|off>] <file.aril | dir>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if err := checkContractsMode(*contracts); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if err := checkHintsMode(*hints); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
@@ -543,7 +551,7 @@ func cmdRun(args []string) int {
 		return 1
 	}
 	defer release()
-	src, err := compileToProjectGo(fs.Arg(0), !*inlineRT, *contracts, outDir)
+	src, err := compileToProjectGo(fs.Arg(0), !*inlineRT, *contracts, outDir, resolveHintPolicy(*hints))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -592,12 +600,12 @@ type compiledSource struct {
 // <outDir>/gen module (RFC-0009). The returned dir is NOT removed by the caller
 // — persistence unlocks Go's incremental build cache. Unlike emit, a runnable
 // build requires exactly one `func main` (RFC-0002).
-func compileToProjectGo(path string, vendored bool, contractMode, outDir string) (*compiledSource, error) {
+func compileToProjectGo(path string, vendored bool, contractMode, outDir string, hints hintPolicy) (*compiledSource, error) {
 	files, userImports, goDeps, goVersion, err := buildUnit(path)
 	if err != nil {
 		return nil, err
 	}
-	goSrc, err := compilePackage(files, userImports, false, true, vendored, contractMode)
+	goSrc, err := compilePackage(files, userImports, false, true, vendored, contractMode, hints)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +616,8 @@ func compileToProjectGo(path string, vendored bool, contractMode, outDir string)
 // REPL: takes Aril source text + a synthetic file label for
 // diagnostics, returns a runnable temp module.
 func compileSourceToTempGo(src, label string) (*compiledSource, error) {
-	goSrc, err := emitGoFromText(src, label)
+	// The REPL has no --hints flag; honour the ARIL_HINTS env only.
+	goSrc, err := emitGoFromText(src, label, resolveHintPolicy(""))
 	if err != nil {
 		return nil, err
 	}

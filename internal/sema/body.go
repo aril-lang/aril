@@ -37,6 +37,7 @@ func (c *checker) checkBodies(f *ast.File) {
 				c.curTryForbidden = c.definitelyNotTryable(v.ReturnType)
 				c.curContract = c.contractByTarget[v.Name]
 				c.checkBlock(v.Body)
+				c.hintDiscardedTrailingResult(v.Body)
 				c.checkFuncContract(v)
 				c.curContract = nil
 			}
@@ -58,6 +59,7 @@ func (c *checker) checkBodies(f *ast.File) {
 					c.curThis = &Named{N: v.Name, Decl: v}
 				}
 				c.checkBlock(m.Body)
+				c.hintDiscardedTrailingResult(m.Body)
 			}
 			// Type-invariant predicates type against the receiver, like a
 			// method body (RFC-0006). curThis is the class while inferring.
@@ -112,10 +114,46 @@ func (c *checker) checkLetReassign(a *ast.AssignStmt) {
 	}
 }
 
+// hintDiscardedResult emits the must-use hint (H0001, D58) when a
+// statement-position expression yields a Result that nothing consumes —
+// the error path is being dropped silently. `try` / `catch` / `match`
+// unwrap the Result (their statement-position type is not *Result), so
+// they are naturally exempt; the deliberate-discard escape hatch is
+// `let _ = e`. A non-blocking teaching note (AUDIT-3 T16, diagnostics.md
+// §Hxxx). Sound-over-complete (D38): fires only when the whole discarded
+// value is statically a Result.
+func (c *checker) hintDiscardedResult(e ast.Expr, t Type) {
+	if _, ok := t.(*Result); !ok {
+		return
+	}
+	c.hint("H0001",
+		"Discarded `Result` — its error path is dropped silently; consume it with `try`, `catch`, or `match e { … }`, or write `let _ = e` to discard it deliberately",
+		e.NodeSpan())
+}
+
+// hintDiscardedTrailingResult extends the must-use hint (H0001) to a
+// function/method body whose *trailing* expression yields a Result that is
+// discarded because the body returns unit — the trailing value has nowhere
+// to flow. checkStmt catches a mid-block discard (an ExprStmt); this catches
+// the common single-line `func f() { risky() }` form, where the parser makes
+// the call the block's trailing expression rather than a statement. Guarded on
+// a unit/absent return type so a real `func f(): Result<…> { risky() }`
+// (whose trailing Result *is* the return value) stays silent.
+func (c *checker) hintDiscardedTrailingResult(b *ast.Block) {
+	if b == nil || b.Trailing == nil {
+		return
+	}
+	if c.curReturn != nil && !isUnitOrNever(c.curReturn) {
+		return
+	}
+	c.hintDiscardedResult(b.Trailing, c.info.Type[b.Trailing])
+}
+
 func (c *checker) checkStmt(s ast.Stmt) {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
-		c.inferExpr(v.Expr)
+		t := c.inferExpr(v.Expr)
+		c.hintDiscardedResult(v.Expr, t)
 	case *ast.LetStmt:
 		c.checkBinding(v, v.Pattern, v.DeclType, v.Value)
 	case *ast.VarStmt:
