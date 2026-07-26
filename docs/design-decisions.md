@@ -300,6 +300,18 @@ protocols).
 flowing into Go interfaces are satisfied structurally on the Go side at
 codegen — Aril adds no checking there.
 
+**v1 status (amended — records are nominal for v1).** The nominal half of
+this decision — explicit, declared conformance for behavioral types — holds
+as specified. The **structural**-records half does not yet: in v1 two
+same-shape named records are **nominal**, not interchangeable (a `B` where an
+`A` is expected is a type error), and an anonymous record literal is written
+in its named form (`A{ … }`). Structural record typing and anonymous literals
+are deferred post-v1. The readiness audit surfaced this gap between the claim
+and the compiler; the surface docs (language spec, cheatsheet) describe the
+nominal v1 reality, and this note keeps the decision record honest rather than
+promising more than the compiler delivers. Revisit if/when structural record
+typing is implemented.
+
 ### D15 — Aril targets a defined, stable subset of Go as its IR contract
 
 **Claim.** Aril does not assume "the current Go, forever." It commits to a

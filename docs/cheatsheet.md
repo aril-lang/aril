@@ -246,7 +246,7 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `throw` / exceptions | none — `Result<T, E>` |
 | `arr.push(x)` mutates | slice `[]T` has **no `push`** (value view); grow with `List<T>` — `let l = List<int>{}; l.push(x)` |
 | `sort.Slice(xs, …)` in place (Go) | slice is a value view — `sort.sorted(xs, less)` returns a **new** slice (`sort.sortedBy(xs, key)` by a key); `sort.Slice` is E0217 |
-| `map[k]` → undefined on miss | zero value; use `m.has(k): bool` / `m.get(k): Option<V>` |
+| `map[k]` → undefined on miss | zero value; use `m.has(k): bool` / `m.get(k): Option<V>` (a class-valued bare `m[k]` is a nil landmine → `hint[H0002]`) |
 | `a == b` on objects | class instances: `refEq(a,b)` (E0401); records/tuples compare field-wise |
 | same-shape records interchangeable | nominal named types — `A` ≠ `B` (E0201) |
 | `Number(s)` / `int(s)` | `strconv.atoi(s): Result<int,error>` (E0205 on a cast) |
@@ -257,9 +257,14 @@ Go (`-no-line` for a clean read) — Go is the IR, and you can always read it.
 | `5 / 2` → `2.5` | integer division **truncates** → `2`; fixed-width ints **wrap** at runtime (an `int8` at 127 `+ 1` → `-128`; a constant overflow is caught at compile time) |
 | `10 / 0` → `Infinity` | integer divide-by-zero **panics** at runtime (float `1.0/0.0` → `+Inf`) |
 | `s[i] = v` on a slice is "pure" | ⚠ it **mutates** the shared backing array (even via `let`); `[]T` forbids *growth*, not element writes — and `List` forbids `l[i]=v` (use `l.set`) |
-| discarding a `Result` is caught | silently **dropped** (no must-use) — bind it and `match`/`try`/`catch` |
+| discarding a `Result` is caught | silently **dropped** at runtime — but the compiler emits a soft `hint[H0001]`; consume it with `match`/`try`/`catch` or `let _ = e` |
 | `var` shared into `spawn` is safe | ⚠ **data race** — mutate via `atomic`/channel, not a captured `var`; detect with `aril run -race` |
 | `x ?? fallback` short-circuits | `x.unwrapOr(fallback)` evaluates `fallback` **eagerly** (matches Rust) |
+
+A few of these traps the compiler now teaches just-in-time with a **hint**
+(`hint[H0001]`, `hint[H0002]`, …): a soft, non-blocking note — it never fails
+the build or changes the exit code. Hints are default-on; silence them with
+`--hints=off` or `ARIL_HINTS=off` (one code: `ARIL_HINTS=off:H0001`).
 
 The full set — floats, strings/runes, shallow record copy, `defer` in a loop,
 `os.exit` vs `defer`, and the *reassuring* priors that do transfer — is in

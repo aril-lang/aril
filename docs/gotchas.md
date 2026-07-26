@@ -172,6 +172,11 @@ honest forms are `m.has(k): bool` (presence) and `m.get(k): Option<V>`
 (`Some(v)` / `None`). Reach for those whenever "absent" and "present-with-zero"
 must be told apart.
 
+For a scalar the zero value is merely ambiguous, but for a **class**-valued map
+it is a nil landmine — a bare `m[k]` miss returns a nil pointer that crashes on
+first use. The compiler emits a **hint** there (`hint[H0002]`) pointing you at
+`m.get(k)`; a container-valued map is safe (a miss yields the empty container).
+
 ---
 
 ## Option, Result, and channels
@@ -188,8 +193,11 @@ fmt.println("continued")         // runs
 
 Aril's positioning is *"no exceptions — `Result<T, E>`"*, and Rust makes
 `Result` `#[must_use]`, so this undercuts the promise more than it does in Go.
-Until a discarded-`Result` diagnostic lands, treat a bare `Result` statement as a
-smell — bind it and `match`, or propagate with `try` / handle with `catch`.
+The compiler now emits a **hint** on a dropped `Result` (`hint[H0001]`) — a
+non-blocking teaching note, not an error. Consume it: bind it and `match`,
+propagate with `try`, handle with `catch`, or write `let _ = e` to discard it
+deliberately (which silences the hint). Hints are default-on; silence them with
+`--hints=off` / `ARIL_HINTS=off`.
 
 ### `unwrapOr(fallback)` evaluates its argument eagerly **≈Rust, ≠ TS `??`**
 
