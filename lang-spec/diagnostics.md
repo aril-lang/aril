@@ -28,10 +28,14 @@ E07xx — desugaring (internal)
 E08xx — codegen / lowering (internal)
 E09xx — REPL input
 E10xx — foreign bindings (Go FFI)
+E11xx — contracts (RFC-0006 value/state)
+E12xx — channel contracts (RFC-0007 trace contracts)
+Hxxxx — hints (soft, non-blocking teaching notes; D58)
 ```
 
 Warnings use the same number space but are flagged in the
-severity column.
+severity column. Hints use a separate `H`-prefixed space (they are
+not errors and must be visually distinct at the call site).
 
 ## Severity legend
 
@@ -42,6 +46,15 @@ severity column.
   under correct input; if it does, it's a compiler bug. Halts
   compilation; the message includes "internal:" prefix; fixture
   `EXIT` is non-zero.
+- **H** — Hint (D58). A soft, non-blocking teaching note for
+  *spec-valid* code with a surprising or easy-to-misuse behaviour
+  (the just-in-time gotcha). Reported on stderr with a `hint[Hxxxx]:`
+  prefix; **never** halts compilation or changes the exit code
+  (fixture `EXIT` is zero). Default-on; suppressed globally with
+  `--hints=off` / `ARIL_HINTS=off`, or per-code with
+  `ARIL_HINTS=off:H0001,…`. The compiler *teaches*, it does not
+  *complain* — forcing a spec-valid surprise to a hard error is a
+  language-design (D11) call, not a hint.
 
 ## Catalog
 
@@ -225,6 +238,19 @@ running (see T-Delivery).
 | E1211 | E | reserved — liveness `eventually` not observed | RFC-0007 §Design (liveness) | reserved — bounded liveness is non-definitive (follow-up). |
 | E1212 | E | reserved — fairness starvation under stress | RFC-0007 §Design (fairness) | reserved — testable fairness is non-definitive (follow-up). |
 
+### Hxxxx — Hints (soft, non-blocking; D58)
+
+Hints are the audit's soft **make-it-loud** tier for a *silent lie* — code
+the type system accepts, that compiles and runs, but whose behaviour is
+surprising or easy to misuse. A hint never fails the build (`EXIT` is zero)
+and is default-on but suppressible (`--hints=off` / `ARIL_HINTS`). It carries
+the gotcha to the exact call site, so it is stricter to earn than a docs row
+and gentler than an error.
+
+| Code | Sev | Message | Authoritative rule | Fix |
+|---|---|---|---|---|
+| H0001 | H | Discarded `Result` — its error path is dropped silently | `builtins.md` §Result; AUDIT-3 T16 | A statement-position expression (a mid-block statement, an if/for/while body's trailing expression, or a unit-returning function body's trailing expression) yields a `Result` that nothing consumes, so the error arm is silently ignored. Consume it with `try` / `catch` / `match e { … }`, or write `let _ = e` to discard it deliberately. Fires only when the discarded value is statically a `Result` (sound-over-complete); `try`/`catch`/`match` unwrap it, so they are exempt. A value-position block (an if-*expression* branch) flows its trailing value onward and is not diagnosed. |
+
 ## Diagnostic formatting
 
 Every diagnostic is emitted in this canonical format:
@@ -243,7 +269,7 @@ src/parser.aril:42:14: error[E0201]: Type mismatch
 ```
 
 Severity labels: `error` for E, `warning` for W, `internal` for
-I. The bracketed code is mandatory and stable; fixture
+I, `hint` for H. The bracketed code is mandatory and stable; fixture
 comparison (`test-contract.md`) uses the code, not the message
 alone.
 

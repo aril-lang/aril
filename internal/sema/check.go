@@ -147,3 +147,17 @@ func (c *checker) report(code, message string, span ast.Span) {
 		Col:     span.StartCol,
 	})
 }
+
+// hint records a non-blocking teaching note (D58). Unlike report, the
+// diagnostic carries SeverityHint, so the CLI prints it (unless hints are
+// suppressed) but never fails the build on it. Hint codes are H-prefixed.
+func (c *checker) hint(code, message string, span ast.Span) {
+	c.diags = append(c.diags, &Diag{
+		File:     c.file,
+		Code:     code,
+		Message:  message,
+		Line:     span.StartLine,
+		Col:      span.StartCol,
+		Severity: SeverityHint,
+	})
+}
