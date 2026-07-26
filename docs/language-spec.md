@@ -80,8 +80,8 @@ implicitly widen to `Any` at call sites that expect it. Going back to a
 concrete type requires a typed `match` (form TBD). User-authored Aril code
 should not introduce `Any`-typed parameters in its own functions.
 
-Struct shapes use `type` and are **records** (value types, structural —
-see Records below):
+Struct shapes use `type` and are **records** (value types, nominal in v1 with
+structural field-wise equality — see Records below):
 
 ```aril
 type User = {
@@ -579,12 +579,13 @@ block-scoped (matches Go).
 Records (`type X = {...}`) are value types, copied on assignment like Go
 structs, and compared **field-wise** by `==`.
 
-> **v1 status vs. D14.** D14 (see `design-decisions.md`) targets *structural*
-> record typing — two records with the same fields interchangeable. The current
-> compiler does **not** yet realize that: records are **nominal named types**, so
-> a value of one record type is rejected where a same-shape *different* record
-> type is expected (E0201). Realizing D14's structural target (or amending D14 to
-> nominal-for-v1) is an open item.
+> **v1 status vs. D14.** Records are **nominal named types** in v1: a value of one
+> record type is rejected where a same-shape *different* record type is expected
+> (E0201), and an anonymous record literal is written in named form (`A{ … }`).
+> D14 (see `design-decisions.md`) originally targeted *structural* record typing;
+> it has been **amended to nominal-for-v1** (structural records + anonymous
+> literals deferred post-v1), so this note and the decision now agree. Field-wise
+> `==` structural *equality* is unaffected.
 
 **Construction.** Named fields, all required unless the field type is
 `Option<T>`:
