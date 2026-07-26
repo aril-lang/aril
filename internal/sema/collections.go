@@ -172,23 +172,27 @@ func (c *checker) inferIndex(ix *ast.Index) Type {
 	case *Map:
 		if !c.fits(r.Key, ix.Idx, idx) {
 			c.report("E0201", "Type mismatch — map key is "+idx.String()+", expected "+r.Key.String(), ix.Idx.NodeSpan())
+		} else {
+			// A hint alongside a blocking key-type error is noise; teach only
+			// on an otherwise-valid read.
+			c.hintBareMapClassRead(ix, r.Val)
 		}
-		c.hintBareMapClassRead(ix, r.Val)
 		return r.Val
 	default:
 		return &Unknown{}
 	}
 }
 
-// hintBareMapClassRead emits H0002 for a bare `m[k]` read whose value is a
-// non-defaultable class (nil-on-miss → SIGSEGV, the residual T13 hole); silent
-// in a store position. diagnostics.md H0002.
+// hintBareMapClassRead emits H0002 for a bare `m[k]` read whose value has no
+// safe default — a class, or a record/tuple transitively holding one
+// (nil-on-miss → SIGSEGV, the residual T13 hole); silent in a store position.
+// diagnostics.md H0002.
 func (c *checker) hintBareMapClassRead(ix *ast.Index, val Type) {
 	if c.inAssignTarget || c.hasSafeDefault(val, map[string]bool{}) {
 		return
 	}
 	c.hint("H0002",
-		"Bare `m[k]` on a map of `"+val.String()+"` returns Go's zero value on a missing key — for a class that is a nil landmine (a later use SIGSEGVs). Use `m.get(k): Option<"+val.String()+">` and handle the `None`, or `m.has(k)` first",
+		"Bare `m[k]` on a map of `"+val.String()+"` returns Go's zero value on a missing key — a nil landmine that SIGSEGVs on first use. Read it as `m.get(k): Option<"+val.String()+">` and handle the `None` (guarding with `m.has(k)` still leaves the bare `m[k]` unsafe)",
 		ix.NodeSpan())
 }
 

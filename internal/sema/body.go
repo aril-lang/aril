@@ -162,9 +162,10 @@ func (c *checker) checkStmt(s ast.Stmt) {
 	case *ast.AssignStmt:
 		c.checkExternalFieldWrite(v)
 		c.checkLetReassign(v)
+		savedAssignTarget := c.inAssignTarget
 		c.inAssignTarget = true
 		lt := c.inferExpr(v.LValue)
-		c.inAssignTarget = false
+		c.inAssignTarget = savedAssignTarget
 		vt := c.inferExpr(v.Value)
 		if !c.fits(lt, v.Value, vt) {
 			c.report("E0201", "Type mismatch — cannot assign "+vt.String()+" to "+lt.String(), v.Span)
