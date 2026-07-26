@@ -628,12 +628,56 @@ func (p *parser) couldBeShortClosure() bool {
 					if n.Kind == lexer.KindNewline {
 						continue
 					}
-					// `) =>` or the return-annotated `) : Ret =>`.
-					return (n.Kind == lexer.KindOp && n.Lexeme == "=>") ||
-						(n.Kind == lexer.KindPunct && n.Lexeme == ":")
+					if n.Kind == lexer.KindOp && n.Lexeme == "=>" {
+						return true // `) =>`
+					}
+					// `) : Ret =>` — an explicit return annotation. Confirm the
+					// `=>` follows the type; bare `):` is also a slice bound
+					// (`xs[(i):]`), which never reaches `=>`.
+					if n.Kind == lexer.KindPunct && n.Lexeme == ":" {
+						return p.arrowFollowsType(j + 1)
+					}
+					return false
 				}
 				return false
 			}
+		}
+	}
+	return false
+}
+
+// arrowFollowsType reports whether a closure `=>` follows the return-type that
+// starts at toks[start] — scanning past a `TypeExpr` (tracking `()[]<>` nesting)
+// to a depth-0 `=>`. A depth-0 closer / separator (`] ) , ; { }`) first means
+// this `):` was a slice bound or other context, not a closure header.
+func (p *parser) arrowFollowsType(start int) bool {
+	depth := 0
+	for k := start; k < len(p.toks); k++ {
+		t := p.toks[k]
+		switch {
+		case t.Kind == lexer.KindOp && t.Lexeme == "=>":
+			if depth == 0 {
+				return true
+			}
+		case t.Kind == lexer.KindPunct && (t.Lexeme == "(" || t.Lexeme == "["):
+			depth++
+		case t.Kind == lexer.KindOp && t.Lexeme == "<":
+			depth++
+		case t.Kind == lexer.KindPunct && (t.Lexeme == ")" || t.Lexeme == "]"):
+			if depth == 0 {
+				return false
+			}
+			depth--
+		case t.Kind == lexer.KindOp && t.Lexeme == ">":
+			if depth > 0 {
+				depth--
+			}
+		case t.Kind == lexer.KindPunct && (t.Lexeme == "," || t.Lexeme == ";" || t.Lexeme == "{" || t.Lexeme == "}"):
+			if depth == 0 {
+				return false
+			}
+		case t.Kind == lexer.KindEOF:
+			return false
 		}
 	}
 	return false

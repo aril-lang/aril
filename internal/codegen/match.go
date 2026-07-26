@@ -682,11 +682,25 @@ func (g *gen) goTypeFromSema(t sema.Type) (string, bool) {
 		// A bare-unit closure result is caught upstream as isUnit.
 		return "struct{}", true
 	case *sema.Builtin:
-		// unit is *sema.Unit (above); this guard is vestigial.
-		if v.N == "unit" {
-			return "", false
-		}
 		return v.N, true
+	case *sema.List:
+		if e, ok := g.goTypeFromSema(v.Elem); ok {
+			return "*" + g.rt("List") + "[" + e + "]", true
+		}
+	case *sema.Set:
+		if e, ok := g.goTypeFromSema(v.Elem); ok {
+			return "*" + g.rt("Set") + "[" + e + "]", true
+		}
+	case *sema.Stack:
+		if e, ok := g.goTypeFromSema(v.Elem); ok {
+			return "*" + g.rt("Stack") + "[" + e + "]", true
+		}
+	case *sema.Map:
+		kt, okK := g.goTypeFromSema(v.Key)
+		vt, okV := g.goTypeFromSema(v.Val)
+		if okK && okV {
+			return "*" + g.rt("Map") + "[" + kt + ", " + vt + "]", true
+		}
 	case *sema.Named:
 		if _, isClass := g.class[v.N]; isClass {
 			return "*" + goIdent(v.N), true
@@ -764,6 +778,16 @@ func (g *gen) goTypeFromSema(t sema.Type) (string, bool) {
 // needs one but has no source node — a closure's inferred return, consumed by
 // `try` bail shape + Ok/Err type-args. Covers the shapes that appear there;
 // false for the rest (the frame then stays unset, as before).
+// namedFromSema builds a single-type-argument named AST type (`Name<Elem>`)
+// from a sema element type, for the container shapes in semaTypeToAST.
+func namedFromSema(name string, elem sema.Type) (ast.TypeExpr, bool) {
+	e, ok := semaTypeToAST(elem)
+	if !ok {
+		return nil, false
+	}
+	return &ast.NamedType{QName: []string{name}, Args: []ast.TypeExpr{e}}, true
+}
+
 func semaTypeToAST(t sema.Type) (ast.TypeExpr, bool) {
 	switch v := t.(type) {
 	case *sema.Unit:
@@ -776,6 +800,28 @@ func semaTypeToAST(t sema.Type) (ast.TypeExpr, bool) {
 		if e, ok := semaTypeToAST(v.Elem); ok {
 			return &ast.SliceType{Elem: e}, true
 		}
+	case *sema.List:
+		return namedFromSema("List", v.Elem)
+	case *sema.Set:
+		return namedFromSema("Set", v.Elem)
+	case *sema.Stack:
+		return namedFromSema("Stack", v.Elem)
+	case *sema.Map:
+		kt, ok1 := semaTypeToAST(v.Key)
+		vt, ok2 := semaTypeToAST(v.Val)
+		if ok1 && ok2 {
+			return &ast.NamedType{QName: []string{"Map"}, Args: []ast.TypeExpr{kt, vt}}, true
+		}
+	case *sema.Tuple:
+		comps := make([]ast.TypeExpr, len(v.Comps))
+		for i, c := range v.Comps {
+			ct, ok := semaTypeToAST(c)
+			if !ok {
+				return nil, false
+			}
+			comps[i] = ct
+		}
+		return &ast.TupleType{Components: comps}, true
 	case *sema.Option:
 		if tt, ok := semaTypeToAST(v.T); ok {
 			return &ast.NamedType{QName: []string{"Option"}, Args: []ast.TypeExpr{tt}}, true
