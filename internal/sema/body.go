@@ -114,14 +114,8 @@ func (c *checker) checkLetReassign(a *ast.AssignStmt) {
 	}
 }
 
-// hintDiscardedResult emits the must-use hint (H0001, D58) when a
-// statement-position expression yields a Result that nothing consumes —
-// the error path is being dropped silently. `try` / `catch` / `match`
-// unwrap the Result (their statement-position type is not *Result), so
-// they are naturally exempt; the deliberate-discard escape hatch is
-// `let _ = e`. A non-blocking teaching note (AUDIT-3 T16, diagnostics.md
-// §Hxxx). Sound-over-complete (D38): fires only when the whole discarded
-// value is statically a Result.
+// hintDiscardedResult emits H0001 for a statement-position expression that
+// drops a Result; sound-over-complete on a static *Result (diagnostics.md H0001).
 func (c *checker) hintDiscardedResult(e ast.Expr, t Type) {
 	if _, ok := t.(*Result); !ok {
 		return
@@ -131,14 +125,8 @@ func (c *checker) hintDiscardedResult(e ast.Expr, t Type) {
 		e.NodeSpan())
 }
 
-// hintDiscardedTrailingResult extends the must-use hint (H0001) to a
-// function/method body whose *trailing* expression yields a Result that is
-// discarded because the body returns unit — the trailing value has nowhere
-// to flow. checkStmt catches a mid-block discard (an ExprStmt); this catches
-// the common single-line `func f() { risky() }` form, where the parser makes
-// the call the block's trailing expression rather than a statement. Guarded on
-// a unit/absent return type so a real `func f(): Result<…> { risky() }`
-// (whose trailing Result *is* the return value) stays silent.
+// hintDiscardedTrailingResult extends H0001 to a unit-returning body's trailing
+// expression (the value has nowhere to flow); diagnostics.md H0001.
 func (c *checker) hintDiscardedTrailingResult(b *ast.Block) {
 	if b == nil || b.Trailing == nil {
 		return
@@ -149,13 +137,9 @@ func (c *checker) hintDiscardedTrailingResult(b *ast.Block) {
 	c.hintDiscardedResult(b.Trailing, c.info.Type[b.Trailing])
 }
 
-// checkStmtBlock checks a block that sits in *statement* position — an
-// if/for/while body — where its value is discarded. Its trailing expression
-// is therefore a dropped value, so a trailing Result earns the must-use hint
-// (H0001), consistently with a mid-block ExprStmt (`if c { risky() }` hints
-// like `while c { risky() }`, not silently unlike it). A value-position block
-// (an if-*expression* branch, a block-as-value) flows its trailing value
-// elsewhere and is checked via inferBlock, which does not hint.
+// checkStmtBlock checks a statement-position block (an if/for/while body),
+// whose discarded trailing Result earns H0001 (diagnostics.md H0001). A
+// value-position block flows its trailing value on (inferBlock, no hint).
 func (c *checker) checkStmtBlock(b *ast.Block) {
 	if b == nil {
 		return
@@ -178,7 +162,9 @@ func (c *checker) checkStmt(s ast.Stmt) {
 	case *ast.AssignStmt:
 		c.checkExternalFieldWrite(v)
 		c.checkLetReassign(v)
+		c.inAssignTarget = true
 		lt := c.inferExpr(v.LValue)
+		c.inAssignTarget = false
 		vt := c.inferExpr(v.Value)
 		if !c.fits(lt, v.Value, vt) {
 			c.report("E0201", "Type mismatch — cannot assign "+vt.String()+" to "+lt.String(), v.Span)
