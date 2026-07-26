@@ -249,7 +249,7 @@ and gentler than an error.
 
 | Code | Sev | Message | Authoritative rule | Fix |
 |---|---|---|---|---|
-| H0001 | H | Discarded `Result` — its error path is dropped silently | `type-system.md` §Result (must-use); AUDIT-3 T16 | A statement-position expression (or a unit-returning body's trailing expression) yields a `Result` that nothing consumes, so the error arm is silently ignored. Consume it with `try` / `catch` / `match e { … }`, or write `let _ = e` to discard it deliberately. Fires only when the discarded value is statically a `Result` (sound-over-complete); `try`/`catch`/`match` unwrap it, so they are exempt. |
+| H0001 | H | Discarded `Result` — its error path is dropped silently | `builtins.md` §Result; AUDIT-3 T16 | A statement-position expression (a mid-block statement, an if/for/while body's trailing expression, or a unit-returning function body's trailing expression) yields a `Result` that nothing consumes, so the error arm is silently ignored. Consume it with `try` / `catch` / `match e { … }`, or write `let _ = e` to discard it deliberately. Fires only when the discarded value is statically a `Result` (sound-over-complete); `try`/`catch`/`match` unwrap it, so they are exempt. A value-position block (an if-*expression* branch) flows its trailing value onward and is not diagnosed. |
 
 ## Diagnostic formatting
 

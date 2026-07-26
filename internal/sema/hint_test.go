@@ -67,6 +67,21 @@ func TestDiscardedResultHintFires(t *testing.T) {
 	risky()
 }
 func main() { helper() }`},
+		{"if-statement branch trailing discard", hintPrelude + `func main() {
+	if true {
+		risky()
+	}
+}`},
+		{"while-body trailing discard", hintPrelude + `func main() {
+	while false {
+		risky()
+	}
+}`},
+		{"for-body trailing discard", hintPrelude + `func main() {
+	for i in 0..1 {
+		risky()
+	}
+}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,6 +122,18 @@ func main() { let _ = wrap() }`},
 		{"assigned to a binding", hintPrelude + `func main() {
 	let r = risky()
 	let _ = r
+}`},
+		// A mixed if-*expression* used as a statement (one branch yields a
+		// Result, the other unit) has an Unknown unified type, so the
+		// "statically a Result" guard keeps it silent — an accepted
+		// sound-over-complete miss (no false positive). A uniform-Result
+		// if-expression-statement DOES hint via the ExprStmt arm.
+		{"mixed if-expression-statement (known gap)", hintPrelude + `func main() {
+	if false {
+		let _ = 1
+	} else {
+		risky()
+	}
 }`},
 	}
 	for _, tc := range cases {

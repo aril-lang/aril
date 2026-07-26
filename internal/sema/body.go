@@ -149,6 +149,23 @@ func (c *checker) hintDiscardedTrailingResult(b *ast.Block) {
 	c.hintDiscardedResult(b.Trailing, c.info.Type[b.Trailing])
 }
 
+// checkStmtBlock checks a block that sits in *statement* position — an
+// if/for/while body — where its value is discarded. Its trailing expression
+// is therefore a dropped value, so a trailing Result earns the must-use hint
+// (H0001), consistently with a mid-block ExprStmt (`if c { risky() }` hints
+// like `while c { risky() }`, not silently unlike it). A value-position block
+// (an if-*expression* branch, a block-as-value) flows its trailing value
+// elsewhere and is checked via inferBlock, which does not hint.
+func (c *checker) checkStmtBlock(b *ast.Block) {
+	if b == nil {
+		return
+	}
+	c.checkBlock(b)
+	if b.Trailing != nil {
+		c.hintDiscardedResult(b.Trailing, c.info.Type[b.Trailing])
+	}
+}
+
 func (c *checker) checkStmt(s ast.Stmt) {
 	switch v := s.(type) {
 	case *ast.ExprStmt:
@@ -169,13 +186,13 @@ func (c *checker) checkStmt(s ast.Stmt) {
 	case *ast.IfStmt:
 		c.inferExpr(v.Cond)
 		if v.ThenBlock != nil {
-			c.checkBlock(v.ThenBlock)
+			c.checkStmtBlock(v.ThenBlock)
 		}
 		switch e := v.Else.(type) {
 		case *ast.IfStmt:
 			c.checkStmt(e)
 		case *ast.Block:
-			c.checkBlock(e)
+			c.checkStmtBlock(e)
 		}
 	case *ast.ForStmt:
 		// Infer the iterable first so checkForBinding can read its
@@ -191,7 +208,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 		c.checkForBinding(v, iterT)
 		if v.Body != nil {
 			c.loopDepth++
-			c.checkBlock(v.Body)
+			c.checkStmtBlock(v.Body)
 			c.loopDepth--
 		}
 		c.checkLoopInvariants(v, v.Label)
@@ -199,7 +216,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 		c.inferExpr(v.Cond)
 		if v.Body != nil {
 			c.loopDepth++
-			c.checkBlock(v.Body)
+			c.checkStmtBlock(v.Body)
 			c.loopDepth--
 		}
 		c.checkLoopInvariants(v, v.Label)
