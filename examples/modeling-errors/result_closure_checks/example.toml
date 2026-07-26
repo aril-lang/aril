@@ -1,0 +1,10 @@
+description = "Closure returning Result<unit, E> with `try` — result type + param inferred from the call context (CLOSURE-INFERENCE guard)"
+source   = "CLOSURE-INFERENCE"
+category = "modeling-errors"
+showcase = false
+forces   = []
+since    = "0.27"
+status   = "running"
+expects  = "run-pass"
+entry    = "result_closure_checks.aril"
+expected_output = "expected-output.txt"

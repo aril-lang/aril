@@ -1,0 +1,42 @@
+import fmt
+
+// want is a check primitive: Ok(()) when cond holds, else Err(msg).
+func want(cond: bool, msg: string): Result<unit, string> {
+  if !cond { return Err(msg) }
+  return Ok(())
+}
+
+// eachCheck runs a check over every item, counting rejections. The check is a
+// closure returning Result<unit, string>: its parameter `n` and its result
+// type are both inferred from this signature (no annotations), and a `try` in
+// its body short-circuits against the inferred Result frame.
+func eachCheck(items: List<int>, check: (int) => Result<unit, string>): int {
+  var fails = 0
+  for n in items {
+    match check(n) {
+      Ok(_) => {},
+      Err(msg) => {
+        fails = fails + 1
+        fmt.println("reject", n, "-", msg)
+      },
+    }
+  }
+  return fails
+}
+
+func main() {
+  let nums = List<int>{}
+  nums.push(7)
+  nums.push(-3)
+  nums.push(150)
+  nums.push(42)
+
+  // Inline closure: param `n` inferred, result Result<unit, string> inferred,
+  // `try` bails out of the closure on the first failing sub-check.
+  let fails = eachCheck(nums, (n) => {
+    try want(n > 0, "not positive")
+    try want(n < 100, "too large")
+    return Ok(())
+  })
+  fmt.println("rejected:", fails)
+}
