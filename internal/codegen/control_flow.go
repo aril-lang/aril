@@ -569,11 +569,18 @@ func (g *gen) emitClosure(cl *ast.ClosureLit) error {
 	// form, which always yields a value).
 	hasReturn, isUnit := false, false
 	if cl.ReturnType != nil {
-		g.b.WriteByte(' ')
-		if err := g.emitTypeExpr(cl.ReturnType); err != nil {
-			return err
+		if isUnitReturn(cl.ReturnType) {
+			// Explicit `(): unit => …`: no Go result (`func()`), a
+			// statement body — same as an inferred unit closure, so the
+			// `() => unit` slot accepts it. (T-Closure-Block)
+			isUnit = true
+		} else {
+			g.b.WriteByte(' ')
+			if err := g.emitTypeExpr(cl.ReturnType); err != nil {
+				return err
+			}
+			hasReturn = true
 		}
-		hasReturn = true
 	} else if g.info != nil {
 		if fn, ok := g.info.Type[cl].(*sema.Func); ok && fn.Return != nil {
 			if _, u := fn.Return.(*sema.Unit); u {
@@ -620,6 +627,16 @@ func (g *gen) emitClosure(cl *ast.ClosureLit) error {
 				if err := g.emitStmt(s); err != nil {
 					return err
 				}
+			}
+		} else if blk, ok := cl.Body.Trailing.(*ast.Block); ok && isUnit {
+			// `() => { … }` unit-typed braced body: a statement body whose
+			// trailing value is discarded — a `() => unit` cleanup/cancel
+			// callback or a Jest-style `describe(name, () => { … })` body.
+			// A block-as-expression IIFE (emitExpr below) can't yield a
+			// unit trailing, so emit the block in statement position
+			// (T-Closure-Block).
+			if err := g.emitBlockBody(blk); err != nil {
+				return err
 			}
 		} else if cl.Body.Trailing != nil {
 			g.writeIndent()

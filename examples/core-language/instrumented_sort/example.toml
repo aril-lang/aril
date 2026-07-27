@@ -1,0 +1,10 @@
+description = "bubble sort instrumented with a () => unit onSwap hook (swaps == inversions)"
+source   = "aril"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.28"
+status   = "running"
+expects  = "run-pass"
+entry    = "instrumented_sort.aril"
+expected_output = "expected-output.txt"
