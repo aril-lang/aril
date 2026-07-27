@@ -4,13 +4,13 @@ Generated from `examples/auto-status.json` by the `corpus-status` tool (`tools/c
 
 Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 
-- **build_ok — 103 / 103 examples build end-to-end** (floor 103).
+- **build_ok — 104 / 104 examples build end-to-end** (floor 104).
 - **diag_ok — 124 / 124 negative cases produce their expected diagnostic** (floor 116).
-- **run_ok — 103 / 103 run-pass examples build and run as specified** (floor 103; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
+- **run_ok — 104 / 104 run-pass examples build and run as specified** (floor 104; behavioural: exit code, stdout vs an `expected_output` sidecar (exact) or `expected_patterns` (ordered subsequence) when present, no `forbidden_patterns` line present, and — built under `--contracts=panic` — every stated contract held; `no-run` examples excluded).
 
 | Stage reached | Count |
 |---|---|
-| ✅ build (full pipeline) | 103 |
+| ✅ build (full pipeline) | 104 |
 | emit / codegen fail | 0 |
 | sema fail | 0 |
 | parse fail | 0 |
@@ -35,6 +35,7 @@ Three tracked metrics, each with a CI-enforced floor in `metric-floors.toml`:
 | `examples/concurrency/select_showcase/select_showcase.aril` | build | — |
 | `examples/concurrency/worker_pool/worker_pool.aril` | build | — |
 | `examples/core-language/balanced_brackets/balanced_brackets.aril` | build | — |
+| `examples/core-language/bst_visitor/bst_visitor.aril` | build | — |
 | `examples/core-language/caesar_cipher/caesar_cipher.aril` | build | — |
 | `examples/core-language/d01/d01.aril` | build | — |
 | `examples/core-language/d02/d02.aril` | build | — |
@@ -136,7 +137,7 @@ Negative cases whose `.expected` records the **ideal** user-facing diagnostic th
 
 Run-pass examples that do not yet reach run_ok — they fail to build (an existing build_ok gap), exit non-zero (often awaiting argv/stdin), or time out. Closing a row means making the example run, not relaxing the check.
 
-**0 of 103 run-pass examples fall short of run_ok.**
+**0 of 104 run-pass examples fall short of run_ok.**
 
 | Example | Status | Exit |
 |---|---|---|

@@ -211,19 +211,13 @@ func (c *checker) inferClosure(cl *ast.ClosureLit) Type {
 
 // seedClosureArgExpect gives each closure argument the expected Func signature
 // of its parameter so its params/return infer from context (T-Closure
-// bidirectional) without annotations. Concrete Ident callee only — a generic
-// param's real type needs the args first (instantiation).
+// bidirectional) without annotations. Handles a free-function/constructor
+// (Ident) callee and a resolved method (`recv.m(…)`) callee alike. A generic
+// callee is skipped — a generic param's real type needs the args first
+// (instantiation).
 func (c *checker) seedClosureArgExpect(call *ast.Call) {
-	id, ok := call.Callee.(*ast.Ident)
-	if !ok {
-		return
-	}
-	sym := c.info.Symbol[id]
-	if sym == nil {
-		return
-	}
-	fn, ok := sym.Type.(*Func)
-	if !ok || len(fn.TypeParams) > 0 {
+	fn := c.calleeFuncSig(call.Callee)
+	if fn == nil || len(fn.TypeParams) > 0 {
 		return
 	}
 	for i, a := range call.Args {
@@ -242,6 +236,30 @@ func (c *checker) seedClosureArgExpect(call *ast.Call) {
 			c.closureExpect[cl] = pf
 		}
 	}
+}
+
+// calleeFuncSig returns the concrete Func signature of a call's callee — a
+// free function / constructor (Ident, from its symbol) or a method
+// (`recv.m`, a Field whose callee inferField already typed as the method's
+// Func at c.info.Type[callee]). Returns nil when the callee is not a plain
+// function type (a generic-param callee, a builtin, an unresolved name).
+func (c *checker) calleeFuncSig(callee ast.Expr) *Func {
+	switch e := callee.(type) {
+	case *ast.Ident:
+		if sym := c.info.Symbol[e]; sym != nil {
+			if fn, ok := sym.Type.(*Func); ok {
+				return fn
+			}
+		}
+	case *ast.Field:
+		// Method call `recv.m(…)`: inferCall infers the Field callee before
+		// this runs (infer.go, non-Ident callee), so its method Func is
+		// already stamped. (T-Closure method-arg)
+		if fn, ok := c.info.Type[e].(*Func); ok {
+			return fn
+		}
+	}
+	return nil
 }
 
 // inferScope types a `scope<T, E>(parent?) { body }` expression as
