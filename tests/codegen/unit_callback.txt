@@ -1,0 +1,69 @@
+--- TITLE ---
+`() => unit` cleanup/cancel callback — the function type lowers to Go `func()` (void), so a void named func / block-body closure / annotated closure all assign to a `() => unit` slot (T-Closure-Block)
+
+--- INPUT ---
+import fmt
+
+func applyTo(n: int, body: (int) => unit) {
+  body(n)
+}
+
+func register(setup: () => unit) {
+  setup()
+}
+
+func doCleanup() {
+  fmt.println("cleanup")
+}
+
+func main() {
+  // named void func into a `() => unit` slot
+  let cancel: () => unit = doCleanup
+  register(cancel)
+  // block-body closure arg (the Jest-style `describe(name, () => { … })` form)
+  register(() => { fmt.println("inline setup") })
+  // explicitly annotated unit closure
+  let logHi: () => unit = (): unit => fmt.println("hi")
+  logHi()
+  // block-body callback taking a parameter
+  applyTo(42, (n: int) => { fmt.println(n) })
+}
+
+--- GO ---
+
+package main
+
+import "fmt"
+
+func applyTo(n int, body func(int)) {
+	body(n)
+}
+func register(setup func()) {
+	setup()
+}
+func doCleanup() {
+	fmt.Println("cleanup")
+}
+func main() {
+	var cancel func() = doCleanup
+	register(cancel)
+	register(func() {
+		fmt.Println("inline setup")
+	})
+	var logHi func() = func() {
+		fmt.Println("hi")
+	}
+	logHi()
+	applyTo(42, func(n int) {
+		fmt.Println(n)
+	})
+}
+
+--- STDOUT ---
+cleanup
+inline setup
+hi
+42
+
+--- EXIT ---
+0

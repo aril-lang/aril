@@ -681,7 +681,11 @@ func (g *gen) emitTypeExpr(t ast.TypeExpr) error {
 			}
 		}
 		g.b.WriteByte(')')
-		if v.ReturnType != nil {
+		// A unit/omitted result carries no Go value → `func()`, not
+		// `func() struct{}`, so the type matches how void funcs/closures
+		// lower (spec: `func()` == `func(): unit`). Without this a
+		// `() => unit` slot rejects every void thunk (D10 Go leak).
+		if !isUnitReturn(v.ReturnType) {
 			g.b.WriteByte(' ')
 			if err := g.emitTypeExpr(v.ReturnType); err != nil {
 				return err

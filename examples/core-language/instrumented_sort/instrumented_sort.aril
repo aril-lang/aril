@@ -1,0 +1,68 @@
+// Bubble sort instrumented with a `() => unit` `onSwap` hook — the
+// canonical "void callback" use: an algorithm that reports progress to a
+// caller-supplied thunk. The hook is load-bearing, and its call count is
+// a real invariant: bubble sort performs exactly one adjacent swap per
+// inversion, so a correct run fires `onSwap` `inversions(input)` times.
+//
+// Exercises the spec-sanctioned `() => unit` callback slot (a function
+// type that lowers to Go `func()`), with the hook passed as a block-body
+// closure `() => { … }`.
+
+import fmt
+import std/pred   // isSorted
+
+// inversions counts unordered pairs (i<j with xs[i] > xs[j]) — the exact
+// number of adjacent swaps bubble sort must perform.
+func inversions(xs: []int): int {
+  var c = 0
+  var i = 0
+  while i < xs.len() {
+    var j = i + 1
+    while j < xs.len() {
+      if xs[i] > xs[j] { c = c + 1 }
+      j = j + 1
+    }
+    i = i + 1
+  }
+  return c
+}
+
+// bubbleSort sorts `xs` in place, invoking `onSwap` on every adjacent
+// exchange. Returns the sorted sequence.
+func bubbleSort(xs: List<int>, onSwap: () => unit): []int {
+  let n = xs.len()
+  var i = 0
+  while i < n {
+    var j = 0
+    while j < n - i - 1 {
+      if xs[j] > xs[j + 1] {
+        let tmp = xs[j]
+        xs.set(j, xs[j + 1])
+        xs.set(j + 1, tmp)
+        onSwap()
+      }
+      j = j + 1
+    }
+    i = i + 1
+  }
+  return xs.toSlice()
+}
+
+func main() {
+  let data = List<int>{5, 3, 8, 1, 4, 7, 9, 2, 6}
+  let want = inversions(data.toSlice())
+
+  var swaps = 0
+  let sorted = bubbleSort(data, () => { swaps = swaps + 1 })
+
+  fmt.println("sorted:", sorted)
+  fmt.println("swaps:", swaps)
+  fmt.println("inversions:", want)
+  fmt.println("match:", swaps == want)
+}
+
+// Load-bearing correctness property: the returned sequence is
+// non-decreasing. Rules out any swap-logic corruption.
+contract bubbleSort {
+  ensures isSorted(result)
+}

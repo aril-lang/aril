@@ -20,7 +20,7 @@
 #     accelerated (unchanged examples hit; only changed ones re-run), so the
 #     gate is fast and deterministic.
 
-build_ok_min = 102  # current build_ok — strict ratchet (§Adjusting the floors)
+build_ok_min = 103  # current build_ok — strict ratchet (§Adjusting the floors)
 diag_ok_min  = 116  # deliberate headroom below current diag_ok (124): an imprecise
                     # message is a penalty, not red, until the count crosses this
-run_ok_min   = 102  # current run_ok — strict ratchet (§Adjusting the floors)
+run_ok_min   = 103  # current run_ok — strict ratchet (§Adjusting the floors)
