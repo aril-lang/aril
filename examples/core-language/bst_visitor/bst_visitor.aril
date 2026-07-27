@@ -1,0 +1,91 @@
+// A binary search tree whose in-order traversal is exposed as a `walk`
+// method taking a `(int) => unit` visitor closure — the fluent
+// higher-order-method form (`tree.inorder((k) => …)`). The visitor's
+// unannotated parameter types from the method signature (closure
+// inference through a method-call argument).
+//
+// The visitor-collected sequence is cross-checked against an independent
+// pure in-order traversal, whose contract pins the load-bearing property:
+// a BST's in-order key sequence is sorted.
+
+import fmt
+import std/pred   // isSorted, seqEq
+
+class Node {
+  let key: int
+  var left: Option<Node>
+  var right: Option<Node>
+}
+
+class BST {
+  var root: Option<Node>
+
+  insert(k: int) {
+    root = insertNode(root, k)
+  }
+
+  // inorder invokes `visit` on every key in ascending order.
+  inorder(visit: (int) => unit) {
+    walk(root, visit)
+  }
+}
+
+func insertNode(n: Option<Node>, k: int): Option<Node> {
+  match n {
+    None => Some(Node{ key: k, left: None, right: None }),
+    Some(node) => {
+      if k < node.key {
+        node.left = insertNode(node.left, k)
+      } else if k > node.key {
+        node.right = insertNode(node.right, k)
+      }
+      Some(node)
+    },
+  }
+}
+
+func walk(n: Option<Node>, visit: (int) => unit) {
+  match n {
+    None => {},
+    Some(node) => {
+      walk(node.left, visit)
+      visit(node.key)
+      walk(node.right, visit)
+    },
+  }
+}
+
+// inorderList is the pure counterpart: it returns the in-order key
+// sequence, and its contract is the BST invariant.
+func inorderList(n: Option<Node>): []int {
+  match n {
+    None => []int{},
+    Some(node) => {
+      let out = List<int>{}
+      for x in inorderList(node.left) { out.push(x) }
+      out.push(node.key)
+      for x in inorderList(node.right) { out.push(x) }
+      out.toSlice()
+    },
+  }
+}
+
+func main() {
+  let tree = BST{ root: None }
+  for k in [5, 3, 8, 1, 4, 7, 9, 2, 6] {
+    tree.insert(k)
+  }
+
+  let seen = List<int>{}
+  tree.inorder((k) => { seen.push(k) })
+
+  fmt.println("inorder:", seen)
+  fmt.println("sorted:", isSorted(seen.toSlice()))
+  fmt.println("visitor matches pure:", seqEq(seen.toSlice(), inorderList(tree.root)))
+}
+
+// The load-bearing correctness property of a BST: its in-order key
+// sequence is non-decreasing. Rules out a broken insert or traversal.
+contract inorderList {
+  ensures isSorted(result)
+}

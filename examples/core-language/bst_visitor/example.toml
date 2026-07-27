@@ -1,0 +1,10 @@
+description = "BST with a walk method taking a (int) => unit visitor closure (method-arg closure inference)"
+source   = "aril"
+category = "core-language"
+showcase = false
+forces   = []
+since    = "0.28"
+status   = "running"
+expects  = "run-pass"
+entry    = "bst_visitor.aril"
+expected_output = "expected-output.txt"
