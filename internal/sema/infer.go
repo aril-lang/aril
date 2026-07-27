@@ -673,8 +673,8 @@ func (c *checker) inferCall(call *ast.Call) Type {
 	// Pre-seed the expected Func signature for any closure argument whose
 	// parameter type is a concrete function type, so its params + return type
 	// infer from context (T-Closure bidirectional) rather than requiring
-	// annotations. Non-generic Ident callee only — a generic param's real type
-	// is not known until instantiation (a later enhancement).
+	// annotations. Non-generic function-or-method callee — a generic param's
+	// real type is not known until instantiation (a later enhancement).
 	c.seedClosureArgExpect(call)
 	args := make([]Type, len(call.Args))
 	for i, a := range call.Args {
